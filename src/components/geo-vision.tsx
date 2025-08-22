@@ -1,22 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-// Mock data for drillholes
-const drillholeData = [
-    { x: 50, z: 20, depth: 300, value: 0.85, type: 'assay' },
-    { x: -30, z: -40, depth: 350, value: 0.3, type: 'lithology' },
-    { x: 100, z: -80, depth: 280, value: 0.6, type: 'assay' },
-    { x: -90, z: 70, depth: 400, value: 0.9, type: 'lithology' },
-    { x: 0, z: 0, depth: 500, value: 0.5, type: 'assay' },
-    { x: 150, z: 120, depth: 250, value: 0.2, type: 'assay' },
-    { x: -120, z: -150, depth: 420, value: 0.7, type: 'lithology' },
-];
-
 const GeoVision = () => {
     const mountRef = useRef<HTMLDivElement>(null);
+    const [colorMode, setColorMode] = useState<'lithology' | 'assay'>('lithology'); // State for color mode
 
     useEffect(() => {
         if (!mountRef.current) return;
@@ -78,29 +68,112 @@ const GeoVision = () => {
         terrain.receiveShadow = true;
         scene.add(terrain);
 
-        // Drillholes
-        drillholeData.forEach(hole => {
-            const holeGeometry = new THREE.CylinderGeometry(5, 5, hole.depth, 16);
-            
-            let holeColor = 0x77A1AB;
-            if (hole.type === 'assay') {
-                const color = new THREE.Color();
-                color.setHSL(0.7 * (1 - hole.value), 0.8, 0.5); // Blue (low) to Red (high)
-                holeColor = color.getHex();
-            } else if (hole.type === 'lithology') {
-                const color = new THREE.Color();
-                color.setHSL(hole.value * 0.5, 0.6, 0.6); // Varies color based on value
-                holeColor = color.getHex();
-            }
+        // Function to render drillholes
+        const renderDrillholes = async () => {
+            // Clear existing drillholes
+            scene.children.forEach(object => {
+                if (object.userData.isDrillhole) {
+                    scene.remove(object);
+                    if (object instanceof THREE.Mesh) {
+                        object.geometry.dispose();
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach(mat => mat.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
+                    }
+                }
+            });
 
-            const holeMaterial = new THREE.MeshStandardMaterial({ color: holeColor, roughness: 0.5 });
-            const cylinder = new THREE.Mesh(holeGeometry, holeMaterial);
-            
-            // Note: This is a simplified positioning. For accuracy, it should sample terrain height.
-            cylinder.position.set(hole.x, hole.depth / 2 - 100, hole.z); 
-            cylinder.castShadow = true;
-            scene.add(cylinder);
-        });
+            try {
+                const lithologyResponse = await fetch('/lithology_data.json');
+                const lithologyData = await lithologyResponse.json();
+
+                const assayResponse = await fetch('/assay_data.json');
+                const assayData = await assayResponse.json();
+
+                // Group data by hole_id
+                const lithologyByHole = lithologyData.reduce((acc: any, segment: any) => {
+                    (acc[segment.hole_id] = acc[segment.hole_id] || []).push(segment);
+                    return acc;
+                }, {});
+
+                const assayByHole = assayData.reduce((acc: any, segment: any) => {
+                    (acc[segment.hole_id] = acc[segment.hole_id] || []).push(segment);
+                    return acc;
+                }, {});
+
+                const holeIds = Object.keys(lithologyByHole); // Assuming lithology data has all holes
+
+                holeIds.forEach(holeId => {
+                    const lithologySegments = lithologyByHole[holeId] || [];
+                    const assaySegments = assayByHole[holeId] || [];
+
+                    // Use lithology segments as the base, assuming they define the overall structure
+                    lithologySegments.forEach((segment: any) => {
+                        const depth = segment.depth_to - segment.depth_from;
+                        if (depth <= 0) return; // Skip segments with no thickness
+
+                        const holeGeometry = new THREE.CylinderGeometry(1, 1, depth, 16);
+
+                        let segmentColor = 0xcccccc; // Default color
+
+                        if (colorMode === 'lithology') {
+                            // Dummy color mapping for lithology
+                            const lithologyColorMap: { [key: string]: number } = {
+                                "AMPHIB": 0x8B4513, // SaddleBrown
+                                "BASALT": 0x483D8B, // DarkSlateBlue
+                                "RHYOLITE": 0xA0522D, // Sienna
+                                "ANDESITE": 0xCD5C5C, // IndianRed
+                                "DACITE": 0xF08080, // LightCoral
+                                "SHALE": 0x696969, // DimGrey
+                                "SANDSTONE": 0xC0C0C0, // Silver
+                                "LIMESTONE": 0xD3D3D3, // LightGrey
+                                "DOLOMITE": 0xF5F5DC, // Beige
+                                "QUARTZITE": 0xFFF8DC, // Cornsilk
+                                // Add more lithology types and colors here
+                            };
+                            segmentColor = lithologyColorMap[segment.lithology] || 0xcccccc; // Default grey if not found
+
+                        } else if (colorMode === 'assay') {
+                            // Find the corresponding assay segment
+                            const correspondingAssay = assaySegments.find((assaySeg: any) =>
+                                assaySeg.depth_from >= segment.depth_from && assaySeg.depth_to <= segment.depth_to
+                            );
+
+                            if (correspondingAssay) {
+                                // Simple color scale based on cu_value (0 to 1)
+                                const cuValue = correspondingAssay.cu_value || 0;
+                                const normalizedValue = Math.min(Math.max(cuValue, 0), 1); // Clamp between 0 and 1
+                                const color = new THREE.Color();
+                                color.setHSL((1 - normalizedValue) * 0.6, 1, 0.5); // Green (low) to Red (high)
+                                segmentColor = color.getHex();
+                            } else {
+                                // If no assay data for the segment, use a default color
+                                segmentColor = 0x808080; // Grey
+                            }
+                        }
+
+                        const holeMaterial = new THREE.MeshStandardMaterial({ color: segmentColor, roughness: 0.5 });
+                        const cylinder = new THREE.Mesh(holeGeometry, holeMaterial);
+
+                        // Position the segment based on its start depth and the hole's origin
+                        cylinder.position.set(
+                            segment.x,
+                            segment.z - segment.depth_from - (depth / 2), // Adjust z to be vertical
+                            segment.y // Use y for the other horizontal axis
+                        );
+                        cylinder.rotation.x = Math.PI / 2; // Orient cylinder vertically
+                        cylinder.castShadow = true;
+                        cylinder.userData.isDrillhole = true; // Mark as drillhole for easy removal
+                        scene.add(cylinder);
+                    });
+                });
+
+            } catch (error) {
+                console.error('Error loading or rendering drillhole data:', error);
+            }
+        };
 
         // Handle resize
         const handleResize = () => {
@@ -109,6 +182,12 @@ const GeoVision = () => {
             camera.updateProjectionMatrix();
             renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         };
+
+        // Initial render of drillholes
+        renderDrillholes();
+
+        // Re-render drillholes when colorMode changes
+        useEffect(() => { renderDrillholes() }, [colorMode]);
         window.addEventListener('resize', handleResize);
 
         // Animation loop
@@ -143,7 +222,17 @@ const GeoVision = () => {
         };
     }, []);
 
-    return <div ref={mountRef} className="h-full w-full" data-ai-hint="satellite map grayscale topography" />;
+    return (
+        <>
+            <div className="absolute top-4 right-4 z-10">
+                <select onChange={(e) => setColorMode(e.target.value as 'lithology' | 'assay')} value={colorMode} className="p-2 rounded">
+                    <option value="lithology">Lithology</option>
+                    <option value="assay">Assay (Cu)</option>
+                </select>
+            </div>
+            <div ref={mountRef} className="h-full w-full" data-ai-hint="satellite map grayscale topography" />
+        </>
+    );
 };
 
 export default GeoVision;
