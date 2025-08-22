@@ -174,14 +174,13 @@ const GeoVision = () => {
                 console.error('Error loading or rendering drillhole data:', error);
             }
         };
+    
+    // Re-render drillholes when colorMode changes
+    useEffect(() => { renderDrillholes() }, [colorMode]);
 
         // Handle resize
-        const handleResize = () => {
-            if (!currentMount) return;
-            camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
-        };
+
+
 
         // Initial render of drillholes
         renderDrillholes();
@@ -189,6 +188,14 @@ const GeoVision = () => {
         // Re-render drillholes when colorMode changes
         useEffect(() => { renderDrillholes() }, [colorMode]);
         window.addEventListener('resize', handleResize);
+
+    // Handle resize
+    const handleResize = () => {
+        if (!currentMount) return;
+        camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+    };
 
         // Animation loop
         let animationFrameId: number;
