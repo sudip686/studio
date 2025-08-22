@@ -8,6 +8,14 @@ const GeoVision = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const [colorMode, setColorMode] = useState<'lithology' | 'assay'>('lithology'); // State for color mode
 
+    // Handle resize
+    const handleResize = (camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer) => {
+        if (!mountRef.current) return;
+        camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+    };
+
     useEffect(() => {
         if (!mountRef.current) return;
 
@@ -20,7 +28,8 @@ const GeoVision = () => {
 
         // Camera setup
         const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 2000);
-        camera.position.set(0, 400, 500);
+        // camera.position.set(0, 400, 500); // Original camera position
+        camera.position.set(6640, 7500, 7158); // Adjusted camera position
 
         // Renderer setup
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -91,6 +100,8 @@ const GeoVision = () => {
 
                 const assayResponse = await fetch('/assay_data.json');
                 const assayData = await assayResponse.json();
+            console.log('Lithology Data:', lithologyData);
+            console.log('Assay Data:', assayData);
 
                 // Group data by hole_id
                 const lithologyByHole = lithologyData.reduce((acc: any, segment: any) => {
@@ -106,6 +117,7 @@ const GeoVision = () => {
                 const holeIds = Object.keys(lithologyByHole); // Assuming lithology data has all holes
 
                 holeIds.forEach(holeId => {
+                console.log('Processing Hole ID:', holeId);
                     const lithologySegments = lithologyByHole[holeId] || [];
                     const assaySegments = assayByHole[holeId] || [];
 
@@ -114,6 +126,7 @@ const GeoVision = () => {
                         const depth = segment.depth_to - segment.depth_from;
                         if (depth <= 0) return; // Skip segments with no thickness
 
+                    console.log('Processing Segment:', segment);
                         const holeGeometry = new THREE.CylinderGeometry(1, 1, depth, 16);
 
                         let segmentColor = 0xcccccc; // Default color
@@ -159,13 +172,14 @@ const GeoVision = () => {
 
                         // Position the segment based on its start depth and the hole's origin
                         cylinder.position.set(
-                            segment.x,
-                            segment.z - segment.depth_from - (depth / 2), // Adjust z to be vertical
-                            segment.y // Use y for the other horizontal axis
+ - segment.x - 6500,
+ segment.z - segment.depth_from - (depth / 2) - 600, // Adjust z to be vertical and apply offset
+ segment.y - 7000 // Use y for the other horizontal axis and apply offset
                         );
                         cylinder.rotation.x = Math.PI / 2; // Orient cylinder vertically
                         cylinder.castShadow = true;
                         cylinder.userData.isDrillhole = true; // Mark as drillhole for easy removal
+                    console.log('Adding cylinder for segment:', segment);
                         scene.add(cylinder);
                     });
                 });
@@ -174,20 +188,6 @@ const GeoVision = () => {
                 console.error('Error loading or rendering drillhole data:', error);
             }
         };
-    
-    // Re-render drillholes when colorMode changes
-    useEffect(() => { renderDrillholes() }, [colorMode]);
-
-        // Handle resize
-
-
-
-        // Initial render of drillholes
-        renderDrillholes();
-
-        // Re-render drillholes when colorMode changes
-        useEffect(() => { renderDrillholes() }, [colorMode]);
-        window.addEventListener('resize', handleResize);
 
     // Handle resize
     const handleResize = () => {
@@ -196,6 +196,12 @@ const GeoVision = () => {
         camera.updateProjectionMatrix();
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     };
+
+
+ window.addEventListener('resize', handleResize);
+
+        // Initial render of drillholes
+        renderDrillholes();
 
         // Animation loop
         let animationFrameId: number;
