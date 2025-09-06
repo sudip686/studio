@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cesium KML Viewer</title>
+
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.19.10/dist/proj4.min.js"></script>
+
+    <style>
+        html, body, #cesiumContainer {
+            width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+        }
+        .nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 50px;
+            font-weight: bold;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 1000;
+            user-select: none;
+        }
+        .nav-arrow:hover {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .left {
+            left: 30px;
+        }
+        .right {
+            right: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+    <div id="prevButton" class="nav-arrow left">&lt;</div>
+    <div id="nextButton" class="nav-arrow right">&gt;</div>
+
+    <div id="toolbar" style="position: absolute; top: 10px; left: 10px; background: rgba(42, 42, 42, 0.8); padding: 4px; border-radius: 4px; color: white; z-index: 1000; display: none;">
+        <table>
+            <tbody>
+            <tr>
+                <td>Exaggeration</td>
+                <td><input type="range" min="1" max="10" step="0.1" data-bind="value: exaggeration, valueUpdate: 'input'"></td>
+                <td><input type="text" size="5" data-bind="value: exaggeration"></td>
+            </tr>
+        </tbody></table>
+    </div>
+
+    <script>
+        async function main() {
+            // --- SETUP ---
+            const mapTilerKey = 'MQ8jhB5F57QiT1CrsiUJ'; // Your active MapTiler key
+            Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkMDFlYzZkOC00ZmQ0LTRhZDYtYjkxOC1mYzNiNzg3YWEyYWIiLCJpZCI6MzMxMTEyLCJpYXQiOjE3NTYzODcxMTh9.Wr0NYWSQJXkzlvwNerpP7k6xUQqklGQdPbUELgnw9VU';
+
+            const imageryProvider = new Cesium.UrlTemplateImageryProvider({
+                url: `https://api.maptiler.com/maps/bright-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`,
+                tilingScheme: new Cesium.WebMercatorTilingScheme(),
+                maximumLevel: 19,
+                credit: new Cesium.Credit('<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>')
+            });
+
+            const viewer = new Cesium.Viewer('cesiumContainer', {
+                animation: false,
+                timeline: false,
+                imageryProvider: imageryProvider
+            });
+
+            // --- LOAD INITIAL KML DATA ---
+            try {
+                const kmzDataSource = await Cesium.KmlDataSource.load('./tanga_boundary.kmz');
+                await viewer.dataSources.add(kmzDataSource);
+
+                const entities = kmzDataSource.entities.values;
+                for (const entity of entities) {
+                    if (entity.polygon) {
+                        entity.polygon.fill = false;
+                        entity.polygon.outline = true;
+                        entity.polygon.outlineColor = Cesium.Color.RED;
+                        entity.polygon.outlineWidth = 5;
+
+                        const polyPositions = entity.polygon.hierarchy.getValue(viewer.clock.currentTime).positions;
+                        if (polyPositions && polyPositions.length > 0) {
+                            const polyCenter = Cesium.BoundingSphere.fromPoints(polyPositions).center;
+                            viewer.entities.add({
+                                id: 'tanga_label',
+                                position: polyCenter,
+                                label: {
+                                    text: 'Tanga Graphite',
+                                    font: 'bold 20px sans-serif',
+                                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                                    fillColor: Cesium.Color.YELLOW,
+                                    outlineColor: Cesium.Color.BLACK,
+                                    outlineWidth: 3,
+                                    showBackground: true,
+                                    backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+                                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                                    pixelOffset: new Cesium.Cartesian2(0, -20),
+                                    disableDepthTestDistance: Number.POSITIVE_INFINITY
+                                }
+                            });
+                        }
+                    }
+                }
+                await viewer.flyTo(kmzDataSource);
+            } catch (error) {
+                console.error('Error loading KMZ file: ', error);
+                alert('Could not load local KMZ file. Ensure "tanga_boundary.kmz" is in the same directory and you are running a local server.');
+            }
+
+            // --- VERTICAL EXAGGERATION UI SETUP ---
+            const toolbar = document.getElementById("toolbar");
+            const viewModel = {
+                exaggeration: viewer.scene.verticalExaggeration,
+            };
+            Cesium.knockout.track(viewModel);
+            Cesium.knockout.applyBindings(viewModel, toolbar);
+            
+            function updateExaggeration() {
+                viewer.scene.verticalExaggeration = Number(viewModel.exaggeration);
+            }
+            Cesium.knockout.getObservable(viewModel, 'exaggeration').subscribe(updateExaggeration);
+            
+            // --- NAVIGATION LOGIC ---
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+            let currentView = 'original';
+            let styledKmlHandler;
+            let ionImageryLayer;
+
+            const viewStates = ['original', 'exaggerated_kml', 'styled_kml', 'ion_imagery'];
+            
+            function updateNavButtons() {
+                const currentIndex = viewStates.indexOf(currentView);
+                prevButton.style.display = (currentIndex > 0) ? 'block' : 'none';
+                nextButton.style.display = (currentIndex < viewStates.length - 1) ? 'block' : 'none';
+            }
+
+            async function switchToView(viewName) {
+                console.log(`Switching from ${currentView} to ${viewName} view...`);
+                
+                // Unload the current view
+                if (currentView === 'exaggerated_kml') await unloadExaggeratedView();
+                if (currentView === 'styled_kml') await unloadStyledKmlView();
+                if (currentView === 'ion_imagery') await unloadIonImageryView();
+                
+                // Load the new view
+                if (viewName === 'original') await loadOriginalView();
+                if (viewName === 'exaggerated_kml') await loadExaggeratedView();
+                if (viewName === 'styled_kml') await loadStyledKmlView();
+                if (viewName === 'ion_imagery') await loadIonImageryView();
+
+                currentView = viewName;
+                updateNavButtons();
+            }
+
+            nextButton.addEventListener('click', () => {
+                const currentIndex = viewStates.indexOf(currentView);
+                if (currentIndex < viewStates.length - 1) {
+                    switchToView(viewStates[currentIndex + 1]);
+                }
+            });
+
+            prevButton.addEventListener('click', () => {
+                const currentIndex = viewStates.indexOf(currentView);
+                if (currentIndex > 0) {
+                    switchToView(viewStates[currentIndex - 1]);
+                }
+            });
+
+            // --- View Implementations ---
+
+            async function loadOriginalView() {
+                console.log("Loading Original View...");
+                viewer.imageryLayers.removeAll();
+                viewer.imageryLayers.addImageryProvider(imageryProvider);
+                viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
+                    `https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=${mapTilerKey}`
+                );
+                const kmlDataSource = viewer.dataSources.get(0);
+                if (kmlDataSource) {
+                    kmlDataSource.show = true;
+                    const kmlEntity = kmlDataSource.entities.values.find(e => e.polygon);
+                    if (kmlEntity) {
+                        kmlEntity.polygon.fill = false;
+                        kmlEntity.polygon.material = Cesium.Color.TRANSPARENT;
+                    }
+                    const tangaLabel = viewer.entities.getById('tanga_label');
+                    if (tangaLabel) tangaLabel.show = true;
+                    await viewer.flyTo(kmlDataSource);
+                }
+            }
+
+            async function loadExaggeratedView() {
+                console.log("Loading Exaggerated KML View...");
+                const kmlDataSource = viewer.dataSources.get(0);
+                const kmlEntity = kmlDataSource.entities.values.find(e => e.polygon);
+                if (!kmlEntity) return;
+
+                const tangaLabel = viewer.entities.getById('tanga_label');
+                if (tangaLabel) tangaLabel.show = false;
+                
+                await viewer.flyTo(kmlEntity, {
+                    duration: 3.0,
+                    offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(30.0), Cesium.Math.toRadians(-45.0), 80000)
+                });
+
+                viewer.scene.verticalExaggeration = 3.0;
+                toolbar.style.display = 'block';
+            }
+
+            async function unloadExaggeratedView() {
+                console.log("Unloading Exaggerated KML View...");
+                toolbar.style.display = 'none';
+                viewer.scene.verticalExaggeration = 1.0;
+            }
+
+            async function loadStyledKmlView() {
+                console.log("Loading Styled KML View...");
+                
+                const kmlDataSource = viewer.dataSources.get(0);
+                if (!kmlDataSource) return;
+                const kmlEntity = kmlDataSource.entities.values.find(e => e.polygon);
+                if (!kmlEntity) return;
+
+                const tangaLabel = viewer.entities.getById('tanga_label');
+                if (tangaLabel) tangaLabel.show = false;
+
+                const originalMaterial = Cesium.Color.WHITE.withAlpha(0.5);
+                kmlEntity.polygon.fill = true;
+                kmlEntity.polygon.material = originalMaterial;
+
+                await viewer.flyTo(kmlEntity, {
+                    duration: 3.0,
+                    offset: new Cesium.HeadingPitchRange(
+                        Cesium.Math.toRadians(0.0),
+                        Cesium.Math.toRadians(-50.0),
+                        15000
+                    )
+                });
+
+                styledKmlHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+                let highlightedEntity = undefined;
+                styledKmlHandler.setInputAction(function onMouseMove(movement) {
+                    const pickedObject = viewer.scene.pick(movement.endPosition);
+                    if (Cesium.defined(highlightedEntity)) {
+                        highlightedEntity.polygon.material = originalMaterial;
+                        highlightedEntity = undefined;
+                    }
+                    if (Cesium.defined(pickedObject) && pickedObject.id === kmlEntity) {
+                        highlightedEntity = pickedObject.id;
+                        pickedObject.id.polygon.material = Cesium.Color.YELLOW.withAlpha(0.5);
+                    }
+                }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            }
+
+            async function unloadStyledKmlView() {
+                console.log("Unloading Styled KML View...");
+                if (styledKmlHandler && !styledKmlHandler.isDestroyed()) {
+                    styledKmlHandler.destroy();
+                }
+            }
+
+            async function loadIonImageryView() {
+                console.log("Loading ION Imagery View...");
+                try {
+                    ionImageryLayer = await viewer.imageryLayers.addImageryProvider(
+                        await Cesium.IonImageryProvider.fromAssetId(3678736)
+                    );
+                    console.log("Added ION imagery layer.");
+                } catch (error) {
+                    console.error("Error loading ION imagery:", error);
+                    alert("Failed to load the ION imagery layer. Please check the asset ID and your token.");
+                }
+            }
+
+            async function unloadIonImageryView() {
+                console.log("Unloading ION Imagery View...");
+                if (ionImageryLayer) {
+                    viewer.imageryLayers.remove(ionImageryLayer, true);
+                    ionImageryLayer = undefined;
+                }
+            }
+
+            // Initial setup
+            updateNavButtons();
+        }
+        main();
+    </script>
+</body>
+</html>

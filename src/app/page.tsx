@@ -1,13 +1,84 @@
-import GeoVision from '@/components/geo-vision';
+"use client";
+
+import { useState, useEffect } from 'react';
+import CesiumViewer from "@/components/cesium-viewer";
+import GeospatialViewer from "@/components/geospatial-viewer";
+import GeoVision from "@/components/geo-vision";
+
+// Define the sequence of views
+const viewSequence = ['original', 'exaggerated_kml', 'styled_kml', 'ion_imagery', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'geospatial_viewer', 'geo_vision'] as const;
+type ViewType = typeof viewSequence[number];
+
+const viewTitles: { [key in ViewType]: string } = {
+    original: "Tanga Graphite Project - Tanzania",
+    exaggerated_kml: "Exaggerated 3D Terrain View",
+    styled_kml: "Exploration License Area",
+    ion_imagery: "High-Resolution Satellite Imagery",
+    geojson_drillholes_lithology: "Drillhole Visualization - Lithology",
+    geojson_drillholes_assay: "Drillhole Visualization - Assay Data",
+    geospatial_viewer: "Interactive 2D Geospatial Viewer",
+    geo_vision: "Interactive 3D Geospatial Viewer"
+};
 
 export default function Home() {
+  const [currentViewIndex, setCurrentViewIndex] = useState(0);
+  const [title, setTitle] = useState(viewTitles[viewSequence[0]]);
+  const [titleVisible, setTitleVisible] = useState(true);
+
+  const handleNext = () => {
+    setCurrentViewIndex((prevIndex) => Math.min(prevIndex + 1, viewSequence.length - 1));
+  };
+
+  const handlePrev = () => {
+    setCurrentViewIndex((prevIndex) => Math.max(prevIndex - 1, 0));
+  };
+
+  useEffect(() => {
+    setTitleVisible(false);
+    setTimeout(() => {
+        setTitle(viewTitles[viewSequence[currentViewIndex]]);
+        setTitleVisible(true);
+    }, 300); // Corresponds to the fade-out duration
+  }, [currentViewIndex]);
+
+  const currentView: ViewType = viewSequence[currentViewIndex];
+
+  const isCesiumView = ['original', 'exaggerated_kml', 'styled_kml', 'ion_imagery', 'geojson_drillholes_lithology', 'geojson_drillholes_assay'].includes(currentView);
+
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-background">
-      <header className="absolute top-0 left-0 z-10 p-4 md:p-8">
-        <h1 className="text-2xl md:text-4xl font-bold text-foreground/80 font-headline">GeoVision3D</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Interactive Geological Data Visualization</p>
-      </header>
-      <GeoVision />
+    <main className="h-screen w-screen relative bg-black">
+        <div 
+            className={`absolute top-8 left-1/2 -translate-x-1/2 text-3xl font-bold text-white bg-black bg-opacity-50 p-4 rounded-lg z-20 transition-opacity duration-300 ${titleVisible ? 'opacity-100' : 'opacity-0'}`}
+        >
+            {title}
+        </div>
+      <div className="h-full w-full">
+        {isCesiumView ? (
+          <CesiumViewer view={currentView as 'original' | 'exaggerated_kml' | 'styled_kml' | 'ion_imagery' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay'} />
+        ) : currentView === 'geospatial_viewer' ? (
+          <GeospatialViewer />
+        ) : currentView === 'geo_vision' ? (
+          <GeoVision />
+        ) : null}
+      </div>
+
+      {/* Navigation Arrows */}
+      {currentViewIndex > 0 && (
+        <div 
+          onClick={handlePrev} 
+          className="fixed top-1/2 left-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-20 select-none hover:bg-opacity-50"
+        >
+          &lt;
+        </div>
+      )}
+      {currentViewIndex < viewSequence.length - 1 && (
+        <div 
+          onClick={handleNext} 
+          className="fixed top-1/2 right-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-20 select-none hover:bg-opacity-50"
+        >
+          &gt;
+        </div>
+      )}
     </main>
   );
 }

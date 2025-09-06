@@ -3,33 +3,59 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// ## Data Structures & Constants ##
 
 // Define the data structure for type safety
 interface DrillholeSegment {
-    x: number;
-    y: number;
-    z: number;
+    lon: number; // Longitude
+    lat: number; // Latitude
+    x?: number; // Local coordinate
+    z?: number; // Local coordinate
+    elevation: number; // Elevation from sea level
     depth_from: number;
     depth_to: number;
     hole_id: string;
     lithology?: string;
-    cu_value?: number;
+    graphitic_carbon?: number;
 }
 
-// Define the color map as a constant
+// Color map for different rock types
 const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
-    "AMPHIB": "#8B4513", "BASALT": "#483D8B", "RHYOLITE": "#A0522D",
-    "ANDESITE": "#CD5C5C", "DACITE": "#F08080", "SHALE": "#696969",
-    "SANDSTONE": "#C0C0C0", "LIMESTONE": "#D3D3D3", "DOLOMITE": "#F5F5DC",
-    "QUARTZITE": "#FFF8DC", "UNKNOWN": "#cccccc",
+    "Quartz-Feldspathic": "#FAD7A0",
+    "GRSC": "#839192",
+    "Felsic Dyke": "#F1948A",
+    "Mafic Dyke": "#5B2C6F",
+    "Pegmatite": "#76D7C4",
+    "Breccia": "#AF601A",
+    "Granulite": "#B3B6B7",
+    "Khondalite": "#E6B0AA",
+    "Marble": "#D4E6F1",
+    "Not Recovearble": "#515A5A",
+    "SOIL": "#A9DFBF",
+    "Schist": "#AED6F1",
+    "nan": "#FFFFFF",
+    "UNKNOWN": "#cccccc",
 };
 
+// ## Geo Projection Utilities ##
+const EARTH_RADIUS = 6371e3; // meters
+
+
+
+// ## UI Components ##
+
 // ## Legend Component ##
-const Legend = ({ colorMode }: { colorMode: 'lithology' | 'assay' }) => {
+const Legend = ({ colorMode, assayRange }: { colorMode: 'lithology' | 'assay', assayRange: { min: number, max: number } }) => {
     return (
-        <div className="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm">
-            <h3 className="font-bold text-lg mb-2">{colorMode === 'lithology' ? 'Lithology' : 'Assay (Cu Value)'}</h3>
+        <div className="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto">
+            <h3 className="font-bold text-lg mb-2">{colorMode === 'lithology' ? 'Lithology' : 'Assay (Graphitic Carbon)'}</h3>
             {colorMode === 'lithology' ? (
                 <ul className="space-y-1">
                     {Object.entries(LITHOLOGY_COLOR_MAP).map(([name, color]) => (
@@ -43,11 +69,54 @@ const Legend = ({ colorMode }: { colorMode: 'lithology' | 'assay' }) => {
                 <div className="flex flex-col items-center">
                     <div className="w-full h-6 rounded" style={{ background: 'linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))' }}></div>
                     <div className="flex justify-between w-full text-xs mt-1">
-                        <span>Low</span>
-                        <span>High</span>
+                        <span>{assayRange.min.toFixed(2)}</span>
+                        <span>{assayRange.max.toFixed(2)}</span>
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+// ## Tooltip Component ##
+const DrillholeTooltip = ({ data, position }: { data: DrillholeSegment | null, position: { x: number, y: number } }) => {
+    if (!data) return null;
+
+    return (
+        <div
+            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none"
+            style={{ left: `${position.x + 15}px`, top: `${position.y + 15}px`, transform: 'translateZ(0)' }} // Added transform for performance
+        >
+            <p className="font-bold text-base mb-1">Hole ID: {data.hole_id}</p>
+            <ul className="list-none space-y-1">
+                <li><strong>Lat:</strong> {data.lat.toFixed(5)}</li>
+                <li><strong>Lon:</strong> {data.lon.toFixed(5)}</li>
+                <li><strong>Depth From:</strong> {data.depth_from.toFixed(2)} m</li>
+                <li><strong>Depth To:</strong> {data.depth_to.toFixed(2)} m</li>
+                {data.lithology && <li><strong>Lithology:</strong> {data.lithology}</li>}
+                {data.graphitic_carbon !== undefined && (
+                    <li><strong>Graphitic Carbon:</strong> {data.graphitic_carbon.toFixed(3)} %</li>
+                )}
+            </ul>
+        </div>
+    );
+};
+
+// ## Compass Component ##
+const Compass = ({ rotation }: { rotation: number }) => {
+    return (
+        <div className="absolute top-4 left-4 bg-white bg-opacity-80 p-2 rounded-full shadow-md w-16 h-16 flex items-center justify-center pointer-events-none">
+            <div
+                className="relative w-full h-full"
+                style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s ease-out' }}
+            >
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 text-red-600 font-bold">N</div>
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-gray-500">S</div>
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500">W</div>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-500">E</div>
+                <div className="absolute w-0.5 h-1/2 bg-red-600 top-0 left-1/2 -translate-x-1/2 origin-bottom"></div>
+                <div className="absolute w-0.5 h-1/2 bg-gray-500 bottom-0 left-1/2 -translate-x-1/2 origin-top"></div>
+            </div>
         </div>
     );
 };
@@ -57,59 +126,111 @@ const Legend = ({ colorMode }: { colorMode: 'lithology' | 'assay' }) => {
 const GeoVision = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
+    const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
     const controlsRef = useRef<OrbitControls | null>(null);
-    const [colorMode, setColorMode] = useState<'lithology' | 'assay'>('lithology');
+    const raycasterRef = useRef(new THREE.Raycaster());
+    const mouseRef = useRef(new THREE.Vector2());
+
     const [drillholeData, setDrillholeData] = useState<{ lithology: DrillholeSegment[]; assay: DrillholeSegment[] } | null>(null);
-    const [sceneCenter, setSceneCenter] = useState<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
     const [step, setStep] = useState(0);
     const [presentationSteps, setPresentationSteps] = useState<string[]>([]);
-    
-    // Refs for different scene layers
-    const terrainRef = useRef<THREE.Mesh | null>(null);
-    const geologyMapRef = useRef<THREE.Mesh | null>(null);
-    const magneticMapRef = useRef<THREE.Mesh | null>(null);
-    const oreBodyRef = useRef<THREE.Object3D | null>(null);
+    const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
 
-    // Function to check if a file exists
-    const checkFileExists = async (url: string) => {
-        try {
-            const response = await fetch(url, { method: 'HEAD' });
-            return response.ok;
-        } catch (e) {
-            return false;
-        }
-    };
+    const [tooltipData, setTooltipData] = useState<DrillholeSegment | null>(null);
+    const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+    const [compassRotation, setCompassRotation] = useState(0);
+    const [loadingStatus, setLoadingStatus] = useState('Idle'); // New state for debugging
 
-    // Effect for one-time scene setup
     useEffect(() => {
         if (!mountRef.current) return;
         const currentMount = mountRef.current;
+
         const scene = new THREE.Scene();
         sceneRef.current = scene;
         scene.fog = new THREE.Fog(0xf0f4f5, 1000, 10000);
         scene.background = new THREE.Color(0xf0f4f5);
 
-        const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 10000);
-        camera.position.set(500, 500, 500);
-
+        const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 20000);
+        cameraRef.current = camera;
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         currentMount.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.target.set(0, 0, 0);
         controlsRef.current = controls;
+        controls.enableDamping = true;
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-        scene.add(ambientLight);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
         directionalLight.position.set(-500, 800, 500);
         scene.add(directionalLight);
 
-        const gridHelper = new THREE.GridHelper(2000, 20);
+        const gridHelper = new THREE.GridHelper(4000, 40);
         scene.add(gridHelper);
+
+        const loadAndSetupData = async () => {
+            try {
+                setLoadingStatus('Fetching lithology data...');
+                const lithologyResponse = await fetch('/lithology_data.geojson');
+                if (!lithologyResponse.ok) throw new Error(`Failed to fetch lithology: ${lithologyResponse.statusText}`);
+                const lithologyGeoJson = await lithologyResponse.json();
+                const lithologyData: DrillholeSegment[] = lithologyGeoJson.features.map((f: any) => ({
+                    lon: f.geometry.coordinates[0],
+                    lat: f.geometry.coordinates[1],
+                    elevation: f.geometry.coordinates[2],
+                    ...f.properties
+                }));
+                setLoadingStatus('Lithology data loaded.');
+
+                setLoadingStatus('Fetching assay data...');
+                const assayResponse = await fetch('/assay_data.geojson');
+                if (!assayResponse.ok) throw new Error(`Failed to fetch assay: ${assayResponse.statusText}`);
+                const assayGeoJson = await assayResponse.json();
+                const assayData: DrillholeSegment[] = assayGeoJson.features.map((f: any) => ({
+                    lon: f.geometry.coordinates[0],
+                    lat: f.geometry.coordinates[1],
+                    elevation: f.geometry.coordinates[2],
+                    ...f.properties
+                }));
+                setLoadingStatus('Assay data loaded.');
+
+                setLoadingStatus('Fetching boundary data...');
+                const boundaryResponse = await fetch('/mining_license_boundary.kml');
+                if (!boundaryResponse.ok) throw new Error(`Failed to fetch boundary KML: ${boundaryResponse.statusText}`);
+                const kmlText = await boundaryResponse.text();
+                setLoadingStatus('Boundary data loaded.');
+
+                setLoadingStatus('Processing data...');
+                if (lithologyData.length > 0) {
+                    const avgX = lithologyData.reduce((acc, p) => acc + p.x, 0) / lithologyData.length;
+                    const avgY = lithologyData.reduce((acc, p) => acc + p.y, 0) / lithologyData.length;
+                    const avgZ = lithologyData.reduce((acc, p) => acc + p.z, 0) / lithologyData.length;
+
+                    const center = new THREE.Vector3(avgX, avgZ, avgY);
+                    controls.target.copy(center);
+                    camera.position.set(avgX, avgZ + 2000, avgY + 2000);
+                    controls.update();
+                }
+                setDrillholeData({ lithology: lithologyData, assay: assayData });
+
+                if (assayData.length > 0) {
+                    const assayValues = assayData.map(p => p.graphitic_carbon).filter(v => v != null) as number[];
+                    if (assayValues.length > 0) {
+                        setAssayRange({ min: Math.min(...assayValues), max: Math.max(...assayValues) });
+                    }
+                }
+
+                setPresentationSteps(['lithology_data', 'assay_data']);
+                setLoadingStatus('Scene ready.');
+
+            } catch (error: any) {
+                console.error("Failed to load scene data:", error);
+                setLoadingStatus(`Error: ${error.message}`);
+            }
+        };
+
+        loadAndSetupData();
 
         const animate = () => {
             requestAnimationFrame(animate);
@@ -123,211 +244,135 @@ const GeoVision = () => {
             camera.updateProjectionMatrix();
             renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         };
+        
+        const handleMouseMove = (event: MouseEvent) => {
+            const rect = currentMount.getBoundingClientRect();
+            mouseRef.current.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
+            mouseRef.current.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
+
+            raycasterRef.current.setFromCamera(mouseRef.current, camera);
+            const intersects = raycasterRef.current.intersectObjects(scene.children);
+            
+            const drillholeIntersect = intersects.find(i => i.object.userData.isDrillhole);
+
+            if (drillholeIntersect) {
+                setTooltipData(drillholeIntersect.object.userData as DrillholeSegment);
+                setTooltipPosition({ x: event.clientX, y: event.clientY });
+            } else {
+                setTooltipData(null);
+            }
+        };
+
+        const updateCompass = () => {
+            if (!cameraRef.current) return;
+            const cameraDirection = new THREE.Vector3();
+            cameraRef.current.getWorldDirection(cameraDirection);
+            const angle = Math.atan2(cameraDirection.x, cameraDirection.z);
+            setCompassRotation(-angle * (180 / Math.PI));
+        };
+        
         window.addEventListener('resize', handleResize);
+        currentMount.addEventListener('mousemove', handleMouseMove);
+        controls.addEventListener('change', updateCompass);
+        updateCompass();
 
         return () => {
             window.removeEventListener('resize', handleResize);
-            currentMount.removeChild(renderer.domElement);
+            currentMount?.removeEventListener('mousemove', handleMouseMove);
+            controls.removeEventListener('change', updateCompass);
+            if (currentMount && renderer.domElement.parentElement === currentMount) {
+                currentMount.removeChild(renderer.domElement);
+            }
         };
     }, []);
 
-    // Effect to check for files and build the presentation flow
     useEffect(() => {
-        const buildFlow = async () => {
-            const flow: string[] = ['satellite_map'];
-            const hasTopography = await checkFileExists('/topography.jpg');
-            const hasGeology = await checkFileExists('/geology_map.jpg');
-            const hasMagnetic = await checkFileExists('/magnetic_map.jpg');
-            const hasDrillholes = await checkFileExists('/lithology_data.json');
-            const hasOreBody = await checkFileExists('/ore_body.glb');
-
-            if (hasTopography) flow.push('topography');
-            if (hasGeology) flow.push('geology_map');
-            if (hasMagnetic) flow.push('magnetic_map');
-            if (hasDrillholes) {
-                flow.push('lithology_data');
-                flow.push('assay_data');
-            }
-            if (hasOreBody) flow.push('ore_body');
-
-            setPresentationSteps(flow);
-        };
-        buildFlow();
-    }, []);
-
-    // Effect to load all data files and 3D models once
-    useEffect(() => {
-        const loadAllData = async () => {
-            // Load drillhole data
-            const [lithologyResponse, assayResponse] = await Promise.all([
-                fetch('/lithology_data.json'),
-                fetch('/assay_data.json')
-            ]);
-            const lithologyData: DrillholeSegment[] = await lithologyResponse.json();
-            const assayData: DrillholeSegment[] = await assayResponse.json();
-
-            const center = new THREE.Vector3();
-            if (lithologyData.length > 0) {
-                lithologyData.forEach(p => center.add(new THREE.Vector3(p.x, p.y, p.z)));
-                center.divideScalar(lithologyData.length);
-            }
-            setSceneCenter(center);
-            setDrillholeData({ lithology: lithologyData, assay: assayData });
-
-            const textureLoader = new THREE.TextureLoader();
-
-            // Load topography
-            if (await checkFileExists('/topography.jpg')) {
-                const topoTexture = textureLoader.load('/topography.jpg');
-                const terrainGeom = new THREE.PlaneGeometry(2000, 2000, 256, 256);
-                const terrainMat = new THREE.MeshStandardMaterial({ displacementMap: topoTexture, displacementScale: 200 });
-                const terrainMesh = new THREE.Mesh(terrainGeom, terrainMat);
-                terrainMesh.rotation.x = -Math.PI / 2;
-                terrainRef.current = terrainMesh;
-            }
-
-            // Load 2D maps
-            if (await checkFileExists('/geology_map.jpg')) {
-                const geologyTexture = textureLoader.load('/geology_map.jpg');
-                const geologyMat = new THREE.MeshBasicMaterial({ map: geologyTexture, transparent: true });
-                const geologyMesh = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), geologyMat);
-                geologyMesh.rotation.x = -Math.PI / 2;
-                geologyMesh.position.y = 1;
-                geologyMapRef.current = geologyMesh;
-            }
-            if (await checkFileExists('/magnetic_map.jpg')) {
-                const magneticTexture = textureLoader.load('/magnetic_map.jpg');
-                const magneticMat = new THREE.MeshBasicMaterial({ map: magneticTexture, transparent: true });
-                const magneticMesh = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), magneticMat);
-                magneticMesh.rotation.x = -Math.PI / 2;
-                magneticMesh.position.y = 2;
-                magneticMapRef.current = magneticMesh;
-            }
-            
-            // Load 3D model
-            const loader = new GLTFLoader();
-            if (await checkFileExists('/ore_body.glb')) {
-                loader.load('/ore_body.glb', (gltf) => {
-                    oreBodyRef.current = gltf.scene;
-                });
-            }
-        };
-        loadAllData();
-    }, []);
-
-    // Effect for handling presentation steps
-    useEffect(() => {
-        if (!sceneRef.current) return;
         const scene = sceneRef.current;
+        if (!scene || !drillholeData || presentationSteps.length === 0) return;
 
-        // Hide all layers first
-        scene.children.forEach(child => {
-            if (child.userData.isDrillhole || child.userData.isOreBody) {
-                child.visible = false;
+        const objectsToRemove = scene.children.filter(obj => obj.userData.isDrillhole);
+        objectsToRemove.forEach(obj => scene.remove(obj));
+
+        const currentStep = presentationSteps[step];
+        const dataToRender = currentStep === 'lithology_data' ? drillholeData.lithology : drillholeData.assay;
+
+        if (!dataToRender) return;
+
+        const collarData = new Map<string, DrillholeSegment>();
+        dataToRender.forEach(segment => {
+            if (segment.depth_from === 0) {
+                collarData.set(segment.hole_id, segment);
             }
         });
-        if (terrainRef.current) scene.remove(terrainRef.current);
-        if (geologyMapRef.current) scene.remove(geologyMapRef.current);
-        if (magneticMapRef.current) scene.remove(magneticMapRef.current);
-        if (oreBodyRef.current) scene.remove(oreBodyRef.current);
-        
-        // Render layers based on current step
-        const currentStep = presentationSteps[step];
-        const drillholesVisible = currentStep === 'lithology_data' || currentStep === 'assay_data';
 
-        if (currentStep === 'satellite_map') {
-            const satelliteTexture = new THREE.TextureLoader().load('/satellite_map.jpg');
-            const satMat = new THREE.MeshStandardMaterial({ map: satelliteTexture });
-            const satPlane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), satMat);
-            satPlane.rotation.x = -Math.PI / 2;
-            scene.add(satPlane);
-            satPlane.position.y = 0;
-        }
-        
-        if (currentStep === 'topography' && terrainRef.current) {
-            scene.add(terrainRef.current);
-        }
-        
-        if (currentStep === 'geology_map' && geologyMapRef.current) {
-            scene.add(geologyMapRef.current);
-        }
+        dataToRender.forEach(segment => {
+            const depth = segment.depth_to - segment.depth_from;
+            if (depth <= 0) return;
 
-        if (currentStep === 'magnetic_map' && magneticMapRef.current) {
-            scene.add(magneticMapRef.current);
-        }
+            const collar = collarData.get(segment.hole_id);
+            if (!collar) return;
 
-        if (drillholesVisible && drillholeData) {
-            const dataToRender = currentStep === 'lithology_data' ? drillholeData.lithology : drillholeData.assay;
-            const objectsToRemove = scene.children.filter(obj => obj.userData.isDrillhole);
-            objectsToRemove.forEach(obj => scene.remove(obj));
+            const holeGeometry = new THREE.CylinderGeometry(15, 15, depth, 12);
+            let segmentColor = new THREE.Color(LITHOLOGY_COLOR_MAP["UNKNOWN"]);
 
-            const dataByHole = dataToRender.reduce((acc, segment) => {
-                (acc[segment.hole_id] = acc[segment.hole_id] || []).push(segment);
-                return acc;
-            }, {} as Record<string, DrillholeSegment[]>);
+            if (currentStep === 'lithology_data' && segment.lithology) {
+                segmentColor = new THREE.Color(LITHOLOGY_COLOR_MAP[String(segment.lithology)] || LITHOLOGY_COLOR_MAP["UNKNOWN"]);
+            } else if (currentStep === 'assay_data' && segment.graphitic_carbon !== undefined) {
+                const range = assayRange.max - assayRange.min;
+                const normalizedValue = range > 0 ? (segment.graphitic_carbon - assayRange.min) / range : 0.5;
+                segmentColor.setHSL((1 - normalizedValue) * 0.33, 1, 0.5);
+            }
 
-            Object.values(dataByHole).forEach(segments => {
-                segments.forEach(segment => {
-                    const depth = segment.depth_to - segment.depth_from;
-                    if (depth <= 0) return;
-                    const holeGeometry = new THREE.CylinderGeometry(25, 25, depth, 12);
-                    let segmentColor = new THREE.Color(LITHOLOGY_COLOR_MAP["UNKNOWN"]);
+            const holeMaterial = new THREE.MeshStandardMaterial({ color: segmentColor });
+            const cylinder = new THREE.Mesh(holeGeometry, holeMaterial);
+            
+            const y_center = collar.z - (segment.depth_from + depth / 2);
+            
+            cylinder.position.set(collar.x, y_center, collar.y);
+            
+            cylinder.userData = { isDrillhole: true, ...segment };
+            scene.add(cylinder);
+        });
 
-                    if (currentStep === 'lithology_data' && segment.lithology) {
-                        segmentColor = new THREE.Color(LITHOLOGY_COLOR_MAP[segment.lithology] || LITHOLOGY_COLOR_MAP["UNKNOWN"]);
-                    } else if (currentStep === 'assay_data' && segment.cu_value !== undefined) {
-                        const normalizedValue = Math.min(Math.max(segment.cu_value, 0), 1);
-                        segmentColor.setHSL((1 - normalizedValue) * 0.33, 1, 0.5);
-                    }
-                    const holeMaterial = new THREE.MeshStandardMaterial({ color: segmentColor });
-                    const cylinder = new THREE.Mesh(holeGeometry, holeMaterial);
-                    
-                    cylinder.position.set(
-                        segment.x - sceneCenter.x,
-                        segment.z - sceneCenter.z - segment.depth_from - (depth / 2),
-                        segment.y - sceneCenter.y
-                    );
-                    cylinder.userData.isDrillhole = true;
-                    scene.add(cylinder);
-                });
-            });
-        }
-        
-        if (currentStep === 'ore_body' && oreBodyRef.current) {
-            oreBodyRef.current.position.set(-sceneCenter.x, -sceneCenter.z, -sceneCenter.y);
-            scene.add(oreBodyRef.current);
-        }
+    }, [step, presentationSteps, drillholeData, assayRange]);
 
-    }, [step, presentationSteps, drillholeData, sceneCenter]);
-
-    // Navigation handlers
     const nextStep = () => setStep(s => Math.min(s + 1, presentationSteps.length - 1));
     const prevStep = () => setStep(s => Math.max(s - 1, 0));
 
-    // UI to show when drilling data is visible
     const isDrillingDataVisible = presentationSteps[step] === 'lithology_data' || presentationSteps[step] === 'assay_data';
+    const colorMode = presentationSteps[step] === 'assay_data' ? 'assay' : 'lithology';
 
     return (
-        <div className="relative h-full w-full">
-            <div className="absolute top-4 right-4 z-10 flex flex-col items-end space-y-2">
-                <div className="flex space-x-2">
-                    <button onClick={prevStep} disabled={step === 0} className="p-2 rounded bg-white shadow-lg disabled:opacity-50">Previous</button>
-                    <button onClick={nextStep} disabled={step === presentationSteps.length - 1} className="p-2 rounded bg-white shadow-lg disabled:opacity-50">Next</button>
-                </div>
-                {isDrillingDataVisible && (
-                    <select 
-                        onChange={(e) => setColorMode(e.target.value as 'lithology' | 'assay')} 
-                        value={colorMode} 
-                        className="p-2 rounded bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="lithology">Lithology</option>
-                        <option value="assay">Assay (Cu)</option>
-                    </select>
-                )}
-            </div>
-            {isDrillingDataVisible && <Legend colorMode={colorMode} />}
-            <div ref={mountRef} className="h-full w-full" />
-        </div>
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <div className="relative h-full w-full">
+                        {/* UI Overlay */}
+                        <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                            <Compass rotation={compassRotation} />
+                            {isDrillingDataVisible && <Legend colorMode={colorMode} assayRange={assayRange} />}
+                            <div className="absolute top-4 right-4 z-10 flex flex-col items-end space-y-2 pointer-events-auto">
+                                <div className="flex space-x-2">
+                                    <button onClick={prevStep} disabled={step === 0} className="p-2 rounded bg-white shadow-lg disabled:opacity-50">Previous</button>
+                                    <button onClick={nextStep} disabled={step === presentationSteps.length - 1} className="p-2 rounded bg-white shadow-lg disabled:opacity-50">Next</button>
+                                </div>
+                            </div>
+                             {/* Debugging Status */}
+                            <div className="absolute top-20 left-4 bg-gray-800 text-white p-2 rounded shadow-lg text-xs">
+                                <p>Status: {loadingStatus}</p>
+                            </div>
+                        </div>
+
+                        <div ref={mountRef} className="h-full w-full" />
+                        
+                        <DrillholeTooltip data={tooltipData} position={tooltipPosition} />
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>3D Geo-Visualization</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     );
 };
 
