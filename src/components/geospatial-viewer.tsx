@@ -19,18 +19,14 @@ interface GeospatialViewerProps {}
 
 
 const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
-    "Quartz-Feldspathic": "#FAD7A0",
-    "GRSC": "#839192",
-    "Felsic Dyke": "#F1948A",
-    "Mafic Dyke": "#5B2C6F",
-    "Pegmatite": "#76D7C4",
-    "Breccia": "#AF601A",
-    "Granulite": "#B3B6B7",
-    "Khondalite": "#E6B0AA",
+    "Quartz-Feldspathic": "#e1f6f3ff",
+    "GRSC": "#4c54549c",
+    "Granulite": "#b90b79ff",
+    "Khondalite": "#433e43ff",
     "Marble": "#D4E6F1",
-    "Not Recovearble": "#515A5A",
-    "SOIL": "#A9DFBF",
-    "Schist": "#AED6F1",
+    "Not Recovearble": "#0b1414ff",
+    "SOIL": "#70f35fff",
+    "Schist": "#445751ff",
     "nan": "#FFFFFF",
     "UNKNOWN": "#cccccc",
 };
@@ -219,34 +215,45 @@ const GeospatialViewer = ({}: GeospatialViewerProps) => {
                 const customDataSource = new Cesium.CustomDataSource('custom-geojson');
 
                 geoJson.features.forEach((feature: any) => {
-                    const { properties } = feature;
-                    const lon = feature.geometry.coordinates[0];
-                    const lat = feature.geometry.coordinates[1];
-                    const elevation = feature.geometry.coordinates[2];
+                    if (feature.geometry.type === 'LineString') {
+                        const { properties } = feature;
+                        const [startCoords, endCoords] = feature.geometry.coordinates;
 
-                    let color;
-                    if (view === 'lithology') {
-                        color = lithologyColorMapCesiumRef.current[properties.lithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
-                    } else if (view === 'assay') {
-                        const carbon = properties.graphitic_carbon;
-                        const range = maxAssay - minAssay;
-                        const alpha = range > 0 ? (carbon - minAssay) / range : 0.5;
-                        color = Cesium.Color.fromHsl((1 - alpha) * 0.33, 1, 0.5);
+                        const startCartesian = Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]);
+                        const endCartesian = Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]);
+
+                        const length = Cesium.Cartesian3.distance(startCartesian, endCartesian);
+                        if (length === 0) {
+                            return; // Skip zero-length cylinders
+                        }
+
+                        let color;
+                        if (view === 'lithology') {
+                            color = lithologyColorMapCesiumRef.current[properties.lithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
+                        } else if (view === 'assay') {
+                            const carbon = properties.graphitic_carbon;
+                            const range = maxAssay - minAssay;
+                            const alpha = range > 0 ? (carbon - minAssay) / range : 0.5;
+                            color = Cesium.Color.fromHsl((1 - alpha) * 0.33, 1, 0.5);
+                        }
+
+                        const midpoint = Cesium.Cartesian3.midpoint(startCartesian, endCartesian, new Cesium.Cartesian3());
+
+                        const orientation = new Cesium.VelocityOrientationProperty(new Cesium.SampledPositionProperty());
+                        orientation.velocity = new Cesium.ConstantProperty(Cesium.Cartesian3.subtract(endCartesian, startCartesian, new Cesium.Cartesian3()));
+
+                        customDataSource.entities.add({
+                            position: midpoint,
+                            orientation: orientation,
+                            cylinder: {
+                                length: length,
+                                topRadius: 15,
+                                bottomRadius: 15,
+                                material: color,
+                            },
+                            properties: { ...properties, latitude: startCoords[1], longitude: startCoords[0] }
+                        });
                     }
-
-                    const length = properties.depth_to - properties.depth_from;
-                    const position = Cesium.Cartesian3.fromDegrees(lon, lat, elevation);
-
-                    customDataSource.entities.add({
-                        position: position,
-                        cylinder: {
-                            length: length,
-                            topRadius: 15,
-                            bottomRadius: 15,
-                            material: color,
-                        },
-                        properties: { ...properties, latitude: lat, longitude: lon }
-                    });
                 });
 
                 if (viewer && !viewer.isDestroyed()) {

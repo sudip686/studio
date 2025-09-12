@@ -57,7 +57,8 @@ const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
     "UNKNOWN": "#cccccc",
 };
 
-const Legend = ({ view, assayRange }: { view: CesiumView, assayRange: { min: number, max: number } }) => {
+const Legend = ({ view, assayRange, show }: { view: CesiumView, assayRange: { min: number, max: number }, show: boolean }) => {
+    if (!show) return null;
     return (
         <div className="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto">
             <h3 className="font-bold text-lg mb-2">{view === 'geojson_drillholes_lithology' ? 'Lithology' : 'Assay (Graphitic Carbon)'}</h3>
@@ -187,37 +188,21 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
             if(isMounted && viewerRef.current && !viewerRef.current.isDestroyed()){
                 console.log("CesiumViewer: Adding Tanga boundary to data sources and flying to it.");
                 viewer.dataSources.add(kmzDataSource);
-                const entities = kmzDataSource.entities.values;
-                for (const entity of entities) {
-                    if (entity.polygon) {
-                        entity.polygon.fill = false;
-                        entity.polygon.outline = true;
-                        entity.polygon.outlineColor = Cesium.Color.RED;
-                        entity.polygon.outlineWidth = 5;
-
-                        // Extract and store KML boundary data
-                        const polygonPositions = entity.polygon.hierarchy.getValue(Cesium.JulianDate.now()).positions;
-                        kmlBoundaryRef.current = polygonPositions;
-
-                        // Create and add a label for the KML boundary
-                        const boundingSphere = Cesium.BoundingSphere.fromPoints(polygonPositions);
-                        const center = boundingSphere.center;
-
-                        kmlLabelRef.current = viewer.entities.add({
-                            position: center,
-                            label: {
-                                text: 'Tanaga Graphite',
-                                font: '16pt sans-serif',
-                                fillColor: Cesium.Color.YELLOW,
-                                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                                outlineWidth: 2,
-                                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                                pixelOffset: new Cesium.Cartesian2(0, -9)
-                            }
-                        });
-                    }
-                }
                 viewer.flyTo(kmzDataSource);
+
+                // Create a single label for the entire KMZ
+                kmlLabelRef.current = viewer.entities.add({
+                    position: Cesium.Cartesian3.fromDegrees(38.78, -4.8), // Approximate center
+                    label: {
+                        text: 'Tanga Graphite',
+                        font: '16pt sans-serif',
+                        fillColor: Cesium.Color.YELLOW,
+                        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                        outlineWidth: 2,
+                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                        pixelOffset: new Cesium.Cartesian2(0, -9)
+                    }
+                });
             }
         }).catch((error: any) => {
             console.error('CesiumViewer: Error loading KMZ file: ', error);
@@ -293,6 +278,8 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
 
         const loadView = async (viewName: CesiumView) => {
             console.log(`CesiumViewer: Loading view: ${viewName}`);
+            if (!viewerRef.current || viewerRef.current.isDestroyed()) return;
+            const viewer = viewerRef.current;
             const kmlDataSource = viewer.dataSources.get(0);
             if (!kmlDataSource) return;
             const kmlEntity = kmlDataSource.entities.values.find((e: any) => e.polygon);
@@ -344,6 +331,12 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                     console.error("Error loading ION imagery:", error);
                 }
             } else if (viewName.startsWith('geojson_drillholes')) {
+                if (!geoJsonDataSourceRef.current) {
+                    geoJsonDataSourceRef.current = new Cesium.CustomDataSource('drillholes');
+                    viewer.dataSources.add(geoJsonDataSourceRef.current);
+                }
+                geoJsonDataSourceRef.current.entities.removeAll();
+
                 try {
                     const isLithology = viewName === 'geojson_drillholes_lithology';
                     console.log(`CesiumViewer: Fetching data for ${viewName}`);
@@ -351,9 +344,6 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                     const data = await response.json();
                     console.log("CesiumViewer: Data fetched and parsed.");
                     
-                    const customDataSource = new Cesium.CustomDataSource('drillholes');
-                    console.log("CesiumViewer: Creating custom data source for drillholes.");
-
                     let minAssay = Infinity, maxAssay = -Infinity;
                     if (!isLithology) {
                         data.features.forEach((feature: { properties: AssaySegment }) => {
@@ -364,41 +354,49 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                     }
                     setAssayRange({ min: minAssay, max: maxAssay });
 
-                    data.features.forEach((feature: { properties: DrillholeSegmentData, geometry: any }) => {
-                        const segment = feature.properties;
-                        const lon = feature.geometry.coordinates[0];
-                        const lat = feature.geometry.coordinates[1];
-                        const elevation = feature.geometry.coordinates[2];
+                    data.features.forEach((feature: any) => {
+                        if (feature.geometry.type === 'LineString') {
+                            const { properties } = feature;
+                            const [startCoords, endCoords] = feature.geometry.coordinates;
 
-                        let color;
-                        if (isLithology) {
-                            const lithology = (segment as LithologySegment).lithology;
-                            color = lithologyColorMapCesiumRef.current[lithology] || lithologyColorMapCesiumRef.current['default'];
-                        } else {
-                            const carbon = (segment as AssaySegment).graphitic_carbon;
-                            const alpha = (maxAssay - minAssay) > 0 ? (carbon - minAssay) / (maxAssay - minAssay) : 0;
-                            color = Cesium.Color.fromHsl((1 - alpha) * 0.33, 1, 0.5);
+                            const startCartesian = Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]);
+                            const endCartesian = Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]);
+
+                            const length = Cesium.Cartesian3.distance(startCartesian, endCartesian);
+                            if (length === 0) {
+                                return; // Skip zero-length cylinders
+                            }
+
+                            let color;
+                            if (isLithology) {
+                                const lithology = properties.lithology;
+                                color = lithologyColorMapCesiumRef.current[lithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
+                            } else {
+                                const carbon = properties.graphitic_carbon;
+                                const range = maxAssay - minAssay;
+                                const alpha = range > 0 ? (carbon - minAssay) / range : 0.5;
+                                color = Cesium.Color.fromHsl((1 - alpha) * 0.33, 1, 0.5);
+                            }
+
+                            const midpoint = Cesium.Cartesian3.midpoint(startCartesian, endCartesian, new Cesium.Cartesian3());
+                            const orientation = new Cesium.VelocityOrientationProperty(new Cesium.SampledPositionProperty());
+                            orientation.velocity = new Cesium.ConstantProperty(Cesium.Cartesian3.subtract(endCartesian, startCartesian, new Cesium.Cartesian3()));
+
+                            geoJsonDataSourceRef.current.entities.add({
+                                position: midpoint,
+                                orientation: orientation,
+                                cylinder: {
+                                    length: length,
+                                    topRadius: 15,
+                                    bottomRadius: 15,
+                                    material: color,
+                                },
+                                properties: { ...properties, latitude: startCoords[1], longitude: startCoords[0] }
+                            });
                         }
-
-                        const length = segment.depth_to - segment.depth_from;
-                        const position = Cesium.Cartesian3.fromDegrees(lon, lat, elevation);
-
-                        customDataSource.entities.add({
-                            position: position,
-                            cylinder: {
-                                length: length,
-                                topRadius: 15,
-                                bottomRadius: 15,
-                                material: color,
-                            },
-                            properties: { ...segment, latitude: lat, longitude: lon }
-                        });
                     });
 
-                    console.log("CesiumViewer: Adding custom data source to viewer.");
-                    viewer.dataSources.add(customDataSource);
-                    geoJsonDataSourceRef.current = customDataSource;
-                    viewer.flyTo(customDataSource, {
+                    viewer.flyTo(geoJsonDataSourceRef.current, {
                         offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 5000)
                     });
 
@@ -434,7 +432,7 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                     </tr>
                 </tbody></table>
             </div>
-            <Legend view={view} assayRange={assayRange} />
+            <Legend view={view} assayRange={assayRange} show={view === 'geojson_drillholes_lithology' || view === 'geojson_drillholes_assay'} />
             {tooltip.display && <TooltipContent data={tooltip} />}
         </div>
     );
