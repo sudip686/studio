@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -11,7 +11,7 @@ declare global {
 }
 
 // Define the type for the view prop
-type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'ion_imagery' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay';
+type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'ion_imagery' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location';
 
 interface CesiumViewerProps {
     view: CesiumView;
@@ -41,18 +41,14 @@ interface AssaySegment extends DrillholeSegmentData {
 }
 
 const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
-    "Quartz-Feldspathic": "#FAD7A0",
-    "GRSC": "#839192",
-    "Felsic Dyke": "#F1948A",
-    "Mafic Dyke": "#5B2C6F",
-    "Pegmatite": "#76D7C4",
-    "Breccia": "#AF601A",
-    "Granulite": "#B3B6B7",
-    "Khondalite": "#E6B0AA",
+    "Quartz-Feldspathic": "#dead5fff",
+    "GRSC": "#19292aff",
+    "Granulite": "#a1089aff",
+    "Khondalite": "#c58fc1ff",
     "Marble": "#D4E6F1",
     "Not Recovearble": "#515A5A",
-    "SOIL": "#A9DFBF",
-    "Schist": "#AED6F1",
+    "SOIL": "#2df27cff",
+    "Schist": "#153224ff",
     "nan": "#FFFFFF",
     "UNKNOWN": "#cccccc",
 };
@@ -110,11 +106,12 @@ const TooltipContent = ({ data }: { data: any }) => {
 };
 
 const CesiumViewer = ({ view }: CesiumViewerProps) => {
-    console.log("CesiumViewer component rendered");
     const cesiumContainerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<any>(null); // Using any for Cesium Viewer instance
     const styledKmlHandlerRef = useRef<any>(null);
     const ionImageryLayerRef = useRef<any>(null);
+    const tiffOverlayLayerRef = useRef<any>(null);
+    const projectLocationLayerRef = useRef<any>(null);
     const geoJsonDataSourceRef = useRef<any>(null); // To hold the GeoJSON data source
     const lastViewRef = useRef<CesiumView | null>(null);
     const kmlLabelRef = useRef<any>(null);
@@ -150,7 +147,7 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
         Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkMDFlYzZkOC00ZmQ0LTRhZDYtYjkxOC1mYzNiNzg3YWEyYWIiLCJpZCI6MzMxMTEyLCJpYXQiOjE3NTYzODcxMTh9.Wr0NYWSQJXkzlvwNerpP7k6xUQqklGQdPbUELgnw9VU';
 
         const imageryProvider = new Cesium.UrlTemplateImageryProvider({
-            url: `https://api.maptiler.com/maps/bright-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`,
+            url: `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`,
             tilingScheme: new Cesium.WebMercatorTilingScheme(),
             maximumLevel: 19,
             credit: new Cesium.Credit('') // Credits managed globally or removed for presentation
@@ -158,7 +155,7 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
 
         console.log("CesiumViewer: Initializing Cesium Viewer...");
         const viewer = new Cesium.Viewer(cesiumContainerRef.current!, {
-            animation: false,
+            animation: true,
             timeline: false,
             imageryProvider: imageryProvider,
         });
@@ -268,6 +265,18 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                     ionImageryLayerRef.current = null;
                 }
             }
+            if (viewName === 'tiff_overlay') {
+                if (tiffOverlayLayerRef.current) {
+                    viewer.imageryLayers.remove(tiffOverlayLayerRef.current, true);
+                    tiffOverlayLayerRef.current = null;
+                }
+            }
+            if (viewName === 'project_location') {
+                if (projectLocationLayerRef.current) {
+                    viewer.imageryLayers.remove(projectLocationLayerRef.current, true);
+                    projectLocationLayerRef.current = null;
+                }
+            }
             if (viewName.startsWith('geojson_drillholes')) {
                 if (geoJsonDataSourceRef.current) {
                     viewer.dataSources.remove(geoJsonDataSourceRef.current, true);
@@ -289,7 +298,8 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                     kmlLabelRef.current.show = true;
                 }
                 viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-                    `https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=MQ8jhB5F57QiT1CrsiUJ`
+                    //`https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=MQ8jhB5F57QiT1CrsiUJ`
+                    `https://api.maptiler.com/tiles/countries/?key=GvHUzx7jEMeTwOrsIxwV#1.0/0.00000/0.00000`
                 );
                 if (kmlEntity) {
                     kmlEntity.polygon.fill = false;
@@ -329,6 +339,47 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                     ionImageryLayerRef.current = await viewer.imageryLayers.addImageryProvider(layer);
                 } catch (error: any) {
                     console.error("Error loading ION imagery:", error);
+                }
+            } else if (viewName === 'tiff_overlay') {
+                try {
+                    const provider = await Cesium.IonImageryProvider.fromAssetId(3710994);
+                    await provider.readyPromise;
+                    const layer = viewer.imageryLayers.addImageryProvider(provider);
+                    tiffOverlayLayerRef.current = layer;
+                    const rect = provider.rectangle ?? Cesium.Rectangle.fromDegrees(-180, -90, 180, 90);
+                    viewer.camera.flyTo({ destination: rect, duration: 1.5 });
+                } catch (err) {
+                    console.error("Failed to load Ion imagery:", err);
+                }
+            } else if (viewName === 'project_location') {
+                try {
+                    const imageryProvider = new Cesium.UrlTemplateImageryProvider({
+                        url: 'https://api.maptiler.com/tiles/01993d63-21f6-7dd7-b9de-1d295f7e4cbd/tiles.json?key=GvHUzx7jEMeTwOrsIxwV'
+                    });
+                    await imageryProvider.readyPromise;
+                    const layer = viewer.imageryLayers.addImageryProvider(imageryProvider);
+                    layer.alpha = 0.5; // Set transparency
+                    projectLocationLayerRef.current = layer;
+
+                    viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
+                        `https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=MQ8jhB5F57QiT1CrsiUJ`
+                    );
+
+                    // Fly to the location from the URL fragment
+                    viewer.camera.flyTo({
+                        destination: Cesium.Cartesian3.fromDegrees(38.95765, -4.93155, 80000), // lon, lat, height
+                        orientation: {
+                            heading: Cesium.Math.toRadians(0.0),
+                            pitch: Cesium.Math.toRadians(-45.0),
+                        },
+                        duration: 3.0
+                    });
+
+                    viewer.scene.verticalExaggeration = 3.0;
+                    if(toolbar) toolbar.style.display = 'block';
+
+                } catch (err) {
+                    console.error("Failed to load Project Location view:", err);
                 }
             } else if (viewName.startsWith('geojson_drillholes')) {
                 if (!geoJsonDataSourceRef.current) {

@@ -312,18 +312,22 @@ const GeoVision = () => {
                 
                 setLoadingStatus('Processing data...');
 
-                const parsedDrillholes: DrillholeSegment[] = [...lithologyGeoJson.features, ...assayGeoJson.features].map((f: any) => {
+                const parsedDrillholes: DrillholeSegment[] = [...lithologyGeoJson.features, ...assayGeoJson.features].flatMap((f: any) => {
                     const p = f.properties;
-                    if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) return null;
+                    if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) {
+                        return [];
+                    }
                     const [startCoords, endCoords] = f.geometry.coordinates;
-                    if (!startCoords || startCoords.length < 3 || !endCoords || endCoords.length < 3) return null;
-                    return {
+                    if (!startCoords || startCoords.length < 3 || !endCoords || endCoords.length < 3) {
+                        return [];
+                    }
+                    return [{
                         lon: startCoords[0], lat: startCoords[1], elevation: startCoords[2],
                         depth_from: p.depth_from, depth_to: p.depth_to, hole_id: p.hole_id,
                         lithology: p.lithology, graphitic_carbon: p.graphitic_carbon,
                         feature: f
-                    };
-                }).filter((d): d is DrillholeSegment => d !== null);
+                    }];
+                });
                 
                 const parsedBlockModel: BlockSegment[] = blockModelGeoJson.features.map((f:any) => {
                     const p = f.properties ?? {};

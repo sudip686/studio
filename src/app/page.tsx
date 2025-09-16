@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 import CesiumViewer from "@/components/cesium-viewer";
@@ -23,13 +23,15 @@ import {
 import { PanelLeft } from "lucide-react";
 
 // Define the sequence of views
-const viewSequence = ['original', 'exaggerated_kml', 'styled_kml', 'ion_imagery', 'drillhole_map', 'statistical_analysis', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'geospatial_viewer', 'geo_vision', 'resource_model_viewer', 'downhole_plot'] as const;
+const viewSequence = ['original', 'exaggerated_kml', 'styled_kml', 'tiff_overlay', 'project_location', 'ion_imagery', 'drillhole_map', 'statistical_analysis', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'geospatial_viewer', 'geo_vision', 'resource_model_viewer', 'downhole_plot'] as const;
 type ViewType = typeof viewSequence[number];
 
 const viewTitles: { [key in ViewType]: string } = {
     original: "Tanga Graphite Project - Tanzania",
     exaggerated_kml: "Exaggerated 3D Terrain View",
     styled_kml: "Exploration License Area",
+    tiff_overlay: "Exploration License Area View",
+    project_location: "Project Location",
     ion_imagery: "High-Resolution Satellite Imagery",
     geojson_drillholes_lithology: "Drillhole Visualization - Lithology",
     geojson_drillholes_assay: "Drillhole Visualization - Assay Data",
@@ -56,7 +58,7 @@ export default function Home() {
 
   const currentView: ViewType = viewSequence[currentViewIndex];
 
-  const isCesiumView = ['original', 'exaggerated_kml', 'styled_kml', 'ion_imagery', 'geojson_drillholes_lithology', 'geojson_drillholes_assay'].includes(currentView);
+  const isCesiumView = ['original', 'exaggerated_kml', 'styled_kml', 'tiff_overlay', 'project_location', 'ion_imagery', 'geojson_drillholes_lithology', 'geojson_drillholes_assay'].includes(currentView);
 
   const handleNext = () => {
     setCurrentViewIndex((prevIndex) => Math.min(prevIndex + 1, viewSequence.length - 1));
@@ -101,7 +103,7 @@ export default function Home() {
             </div>
           <div className="h-full w-full">
             {isCesiumView ? (
-              <CesiumViewer view={currentView as 'original' | 'exaggerated_kml' | 'styled_kml' | 'ion_imagery' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay'} />
+              <CesiumViewer view={currentView as 'original' | 'exaggerated_kml' | 'styled_kml' | 'tiff_overlay' | 'project_location' | 'ion_imagery' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay'} />
             ) : currentView === 'geospatial_viewer' ? (
               <GeospatialViewer />
             ) : currentView === 'geo_vision' ? (
