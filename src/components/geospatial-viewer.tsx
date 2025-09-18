@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useCesium } from '@/contexts/cesium-context';
 
 declare global {
     interface Window {
@@ -8,15 +9,7 @@ declare global {
     }
 }
 
-// Define the type for the view prop
 type GeoView = 'lithology' | 'assay';
-
-interface GeospatialViewerProps {}
-
-// ==============================================================================
-// DATA-DRIVEN COORDINATE CONVERSION
-// ==============================================================================
-
 
 const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
     "Quartz-Feldspathic": "#e1f6f3ff",
@@ -60,7 +53,7 @@ const Legend = ({ view, assayRange }: { view: GeoView, assayRange: { min: number
 };
 
 const TooltipContent = ({ data }: { data: any }) => {
-    if (!data) return null;
+    if (!data || !data.content) return null;
 
     return (
         <div
@@ -82,76 +75,23 @@ const TooltipContent = ({ data }: { data: any }) => {
     );
 };
 
-const GeospatialViewer = ({}: GeospatialViewerProps) => {
-    console.log("GeospatialViewer component rendered");
-    const cesiumContainerRef = useRef<HTMLDivElement>(null);
-    const viewerRef = useRef<any>(null);
+const GeospatialViewer = () => {
+    const { viewer, isLoaded } = useCesium();
     const [view, setView] = useState<GeoView>('lithology');
-    const geoJsonDataSourceRef = useRef<any>(null);
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
     const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
+    
+    const dataSourceRef = useRef<any>(null);
+    const eventHandlerRef = useRef<any>(null);
     const lithologyColorMapCesiumRef = useRef<any>({});
 
     useEffect(() => {
-        console.log("GeospatialViewer main useEffect triggered");
-        let isMounted = true;
-        if (typeof window === 'undefined' || !cesiumContainerRef.current) {
-            return;
-        }
-
-        if (!window.Cesium) {
-            console.error("Cesium is not loaded.");
-            return;
-        }
-        console.log("Cesium is loaded.");
+        if (!isLoaded || !viewer) return;
 
         const Cesium = window.Cesium;
 
         Object.keys(LITHOLOGY_COLOR_MAP_CSS).forEach(key => {
             lithologyColorMapCesiumRef.current[key] = Cesium.Color.fromCssColorString(LITHOLOGY_COLOR_MAP_CSS[key]);
-        });
-        console.log("Lithology color map created.");
-
-        const mapTilerKey = 'MQ8jhB5F57QiT1CrsiUJ';
-        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkMDFlYzZkOC00ZmQ0LTRhZDYtYjkxOC1mYzNiNzg3YWEyYWIiLCJpZCI6MzMxMTEyLCJpYXQiOjE3NTYzODcxMTh9.Wr0NYWSQJXkzlvwNerpP7k6xUQqklGQdPbUELgnw9VU';
-
-        const imageryProvider = new Cesium.UrlTemplateImageryProvider({
-            url: `https://api.maptiler.com/maps/bright-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`,
-            tilingScheme: new Cesium.WebMercatorTilingScheme(),
-            maximumLevel: 19,
-            credit: new Cesium.Credit('')
-        });
-
-        console.log("Initializing Cesium Viewer...");
-        const viewer = new Cesium.Viewer(cesiumContainerRef.current!, {
-            animation: false,
-            timeline: false,
-            imageryProvider: imageryProvider,
-        });
-        viewerRef.current = viewer;
-        console.log("Cesium Viewer initialized.");
-
-        // Load KML boundaries
-        console.log("Loading KML boundaries...");
-        Cesium.KmlDataSource.load('/mining_license_boundary.kml').then((dataSource: any) => {
-            if (isMounted && viewerRef.current && !viewerRef.current.isDestroyed()) {
-                console.log("Adding mining license boundary to data sources.");
-                viewerRef.current.dataSources.add(dataSource);
-            }
-        }).catch((error: any) => {
-            console.error('Error loading KML file: ', error);
-        });
-
-        Cesium.KmlDataSource.load('/tanga_boundary.kmz').then((dataSource: any) => {
-            if (isMounted && viewerRef.current && !viewerRef.current.isDestroyed()) {
-                console.log("Adding Tanga boundary to data sources and flying to it.");
-                viewerRef.current.dataSources.add(dataSource);
-                viewerRef.current.flyTo(dataSource, {
-                    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-30), 5000)
-                });
-            }
-        }).catch((error: any) => {
-            console.error('Error loading KMZ file: ', error);
         });
 
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -165,72 +105,43 @@ const GeospatialViewer = ({}: GeospatialViewerProps) => {
                 setTooltip({ display: false, top: 0, left: 0, content: null });
             }
         }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-        return () => {
-            isMounted = false;
-            console.log("GeospatialViewer component unmounting, destroying viewer.");
-            if (viewerRef.current && !viewerRef.current.isDestroyed()) {
-                viewerRef.current.destroy();
-                viewerRef.current = null;
-            }
-            handler.destroy();
-        };
-    }, []);
-
-    useEffect(() => {
-        console.log(`View changed to: ${view}`);
-        if (!viewerRef.current) return;
-        const viewer = viewerRef.current;
-        const Cesium = window.Cesium;
-
-        if (geoJsonDataSourceRef.current) {
-            console.log("Removing previous drillhole data source.");
-            viewer.dataSources.remove(geoJsonDataSourceRef.current, true);
-            geoJsonDataSourceRef.current = null;
-        }
+        eventHandlerRef.current = handler;
 
         const loadData = async () => {
+            if (dataSourceRef.current) {
+                viewer.dataSources.remove(dataSourceRef.current, true);
+                dataSourceRef.current = null;
+            }
+
             try {
                 const geoJsonPath = view === 'lithology' ? '/lithology_data.geojson' : '/assay_data.geojson';
-                console.log(`Fetching data from: ${geoJsonPath}`);
                 const response = await fetch(geoJsonPath);
                 const geoJson = await response.json();
-                console.log("Data fetched and parsed.");
 
-                let minAssay = Infinity;
-                let maxAssay = -Infinity;
-
+                let minAssay = Infinity, maxAssay = -Infinity;
                 if (view === 'assay') {
-                    console.log("Calculating assay range...");
                     geoJson.features.forEach((feature: any) => {
                         const carbon = feature.properties.graphitic_carbon;
                         if (carbon < minAssay) minAssay = carbon;
                         if (carbon > maxAssay) maxAssay = carbon;
                     });
                     setAssayRange({min: minAssay, max: maxAssay});
-                    console.log(`Assay range calculated: ${minAssay} - ${maxAssay}`);
                 }
 
-                console.log("Creating custom data source for drillholes.");
                 const customDataSource = new Cesium.CustomDataSource('custom-geojson');
-
                 geoJson.features.forEach((feature: any) => {
                     if (feature.geometry.type === 'LineString') {
                         const { properties } = feature;
                         const [startCoords, endCoords] = feature.geometry.coordinates;
-
                         const startCartesian = Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]);
                         const endCartesian = Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]);
-
                         const length = Cesium.Cartesian3.distance(startCartesian, endCartesian);
-                        if (length === 0) {
-                            return; // Skip zero-length cylinders
-                        }
+                        if (length === 0) return;
 
                         let color;
                         if (view === 'lithology') {
                             color = lithologyColorMapCesiumRef.current[properties.lithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
-                        } else if (view === 'assay') {
+                        } else {
                             const carbon = properties.graphitic_carbon;
                             const range = maxAssay - minAssay;
                             const alpha = range > 0 ? (carbon - minAssay) / range : 0.5;
@@ -238,32 +149,20 @@ const GeospatialViewer = ({}: GeospatialViewerProps) => {
                         }
 
                         const midpoint = Cesium.Cartesian3.midpoint(startCartesian, endCartesian, new Cesium.Cartesian3());
-
                         const orientation = new Cesium.VelocityOrientationProperty(new Cesium.SampledPositionProperty());
                         orientation.velocity = new Cesium.ConstantProperty(Cesium.Cartesian3.subtract(endCartesian, startCartesian, new Cesium.Cartesian3()));
 
                         customDataSource.entities.add({
-                            position: midpoint,
-                            orientation: orientation,
-                            cylinder: {
-                                length: length,
-                                topRadius: 15,
-                                bottomRadius: 15,
-                                material: color,
-                            },
+                            position: midpoint, orientation: orientation,
+                            cylinder: { length: length, topRadius: 15, bottomRadius: 15, material: color },
                             properties: { ...properties, latitude: startCoords[1], longitude: startCoords[0] }
                         });
                     }
                 });
 
-                if (viewer && !viewer.isDestroyed()) {
-                    console.log("Adding custom data source to viewer.");
-                    viewer.dataSources.add(customDataSource);
-                    geoJsonDataSourceRef.current = customDataSource;
-                    viewer.flyTo(customDataSource, {
-                        offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 5000)
-                    });
-                }
+                viewer.dataSources.add(customDataSource);
+                dataSourceRef.current = customDataSource;
+                viewer.flyTo(customDataSource, { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 5000) });
 
             } catch (error) {
                 console.error(`Error loading ${view} data:`, error);
@@ -272,18 +171,26 @@ const GeospatialViewer = ({}: GeospatialViewerProps) => {
 
         loadData();
 
-    }, [view]);
-
+        return () => {
+            if (viewer && !viewer.isDestroyed()) {
+                if (dataSourceRef.current) {
+                    viewer.dataSources.remove(dataSourceRef.current, true);
+                }
+                if (eventHandlerRef.current && !eventHandlerRef.current.isDestroyed()) {
+                    eventHandlerRef.current.destroy();
+                }
+            }
+        };
+    }, [isLoaded, viewer, view]);
 
     return (
-        <div className="h-full w-full relative">
-            <div ref={cesiumContainerRef} className="h-full w-full" />
-            {tooltip.display && <TooltipContent data={tooltip} />}
-            <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000 }}>
-                <button onClick={() => setView('lithology')} disabled={view === 'lithology'}>Lithology</button>
-                <button onClick={() => setView('assay')} disabled={view === 'assay'}>Assay</button>
+        <div className="h-full w-full relative pointer-events-none">
+            <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000 }} className="pointer-events-auto">
+                <button onClick={() => setView('lithology')} disabled={view === 'lithology'} className="bg-white p-2 mr-2 rounded">Lithology</button>
+                <button onClick={() => setView('assay')} disabled={view === 'assay'} className="bg-white p-2 rounded">Assay</button>
             </div>
             <Legend view={view} assayRange={assayRange} />
+            <TooltipContent data={tooltip} />
         </div>
     );
 };

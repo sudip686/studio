@@ -3,17 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { useDataCache, DrillholeSegment, BlockSegment } from '@/lib/data-cache';
 
 // ## Data Structures & Constants ##
-interface DrillholeSegment {
-    lon: number; lat: number; elevation: number; depth_from: number; depth_to: number; hole_id: string;
-    lithology?: string; graphitic_carbon?: number; feature: any;
-}
-interface BlockSegment {
-    lon: number; lat: number; elevation: number; Id: string; dX: number; dY: number; dZ: number;
-    "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"?: string | number; RescCalc?: string; feature: any;
-}
 interface Point { lon: number; lat: number; elevation: number; }
 
 // Type guard functions
@@ -24,16 +17,6 @@ const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
     "quartz-feldspathic": "#FAD7A0", "grsc": "#212323", "granulite": "#df26c4", "khondalite": "#1a3523", "marble": "#fafafa",
     "not recovearble": "#515A5A", "soil": "#6efe70", "schist": "#46f1b2", "nan": "#ffffff", "unknown": "#cccccc",
 };
-
-function pickProp<T>(obj: any, keys: string[]): T | undefined {
-    if (!obj) return undefined;
-    for (const key of keys) {
-        const value = obj[key];
-        if (value !== undefined) return value as T;
-        for (const objKey in obj) { if (objKey.toLowerCase() === key.toLowerCase()) return obj[objKey] as T; }
-    }
-    return undefined;
-}
 
 function colorForLithology(raw?: string): string {
     const key = String(raw ?? 'unknown').trim().toLowerCase();
@@ -231,7 +214,13 @@ const ClassificationLegend = () => {
 };
 
 // ## Main GeoVision Component ##
-const GeoVision = () => {
+export type GeoVisionDisplayMode = 'lithology' | 'assay' | 'block_carbon' | 'block_resc' | 'clipped_view';
+
+interface GeoVisionProps {
+    displayMode: GeoVisionDisplayMode;
+}
+
+const GeoVision = ({ displayMode }: GeoVisionProps) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -240,11 +229,9 @@ const GeoVision = () => {
     const raycasterRef = useRef(new THREE.Raycaster());
     const mouseRef = useRef(new THREE.Vector2());
 
-    const [drillholeData, setDrillholeData] = useState<{ lithology: DrillholeSegment[]; assay: DrillholeSegment[] } | null>(null);
-    const [blockModelData, setBlockModelData] = useState<BlockSegment[] | null>(null);
+    const { drillholeData, blockModelData, loadingStatus: cacheLoadingStatus, error: cacheError } = useDataCache();
+
     const [modelCenter, setModelCenter] = useState({ lon: 0, lat: 0 });
-    const [step, setStep] = useState(0);
-    const [presentationSteps, setPresentationSteps] = useState<string[]>([]);
     const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
     const [blockTransparency, setBlockTransparency] = useState(0.8);
 
@@ -291,103 +278,8 @@ const GeoVision = () => {
         const gridHelper = new THREE.GridHelper(4000, 40, 0x4a5568, 0x4a5568);
         scene.add(gridHelper);
 
-        const loadAndSetupData = async () => {
-            try {
-                setLoadingStatus('Fetching data...');
-                const [lithologyResponse, assayResponse, blockModelResponse] = await Promise.all([
-                    fetch('/lithology_data.geojson'),
-                    fetch('/assay_data.geojson'),
-                    fetch('/BlockModel.geojson')
-                ]);
-
-                if (!lithologyResponse.ok) throw new Error(`Failed to fetch lithology: ${lithologyResponse.statusText}`);
-                if (!assayResponse.ok) throw new Error(`Failed to fetch assay: ${assayResponse.statusText}`);
-                if (!blockModelResponse.ok) throw new Error(`Failed to fetch block model: ${blockModelResponse.statusText}`);
-
-                const [lithologyGeoJson, assayGeoJson, blockModelGeoJson] = await Promise.all([
-                    lithologyResponse.json(),
-                    assayResponse.json(),
-                    blockModelResponse.json()
-                ]);
-                
-                setLoadingStatus('Processing data...');
-
-                const parsedDrillholes: DrillholeSegment[] = [...lithologyGeoJson.features, ...assayGeoJson.features].flatMap((f: any) => {
-                    const p = f.properties;
-                    if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) {
-                        return [];
-                    }
-                    const [startCoords, endCoords] = f.geometry.coordinates;
-                    if (!startCoords || startCoords.length < 3 || !endCoords || endCoords.length < 3) {
-                        return [];
-                    }
-                    return [{
-                        lon: startCoords[0], lat: startCoords[1], elevation: startCoords[2],
-                        depth_from: p.depth_from, depth_to: p.depth_to, hole_id: p.hole_id,
-                        lithology: p.lithology, graphitic_carbon: p.graphitic_carbon,
-                        feature: f
-                    }];
-                });
-                
-                const parsedBlockModel: BlockSegment[] = blockModelGeoJson.features.map((f:any) => {
-                    const p = f.properties ?? {};
-                    const [lat, lon, elev] = f.geometry.coordinates;
-                    return {
-                        lon, lat, elevation: elev,
-                        Id: String(p.Id ?? ''),
-                        dX: Number(p.dX ?? 10), dY: Number(p.dY ?? 10), dZ: Number(p.dZ ?? 10),
-                        "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC": p["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"],
-                        RescCalc: p.RescCalc,
-                        feature: f
-                    };
-                });
-                
-                const allPoints: Point[] = [
-                    ...parsedDrillholes.map(d => ({ lon: d.lon, lat: d.lat, elevation: d.elevation })),
-                    ...parsedBlockModel.map(b => ({ lon: b.lon, lat: b.lat, elevation: b.elevation }))
-                ].filter(p => p.lon != null && p.lat != null);
-
-                let centerLon = 0, centerLat = 0, centerElev = 0;
-                if (allPoints.length > 0) {
-                    centerLon = allPoints.reduce((acc, p) => acc + p.lon, 0) / allPoints.length;
-                    centerLat = allPoints.reduce((acc, p) => acc + p.lat, 0) / allPoints.length;
-                    centerElev = allPoints.reduce((acc, p) => acc + p.elevation, 0) / allPoints.length;
-                } else {
-                    return;
-                }
-
-                setModelCenter({ lon: centerLon, lat: centerLat });
-
-                const center = new THREE.Vector3(0, centerElev, 0);
-                controls.target.copy(center);
-                camera.position.set(center.x, center.y + 1000, center.z + 2000);
-                controls.update();
-
-                setDrillholeData({ 
-                    lithology: parsedDrillholes.filter(d => d.lithology),
-                    assay: parsedDrillholes.filter(d => d.graphitic_carbon !== undefined)
-                });
-                setBlockModelData(parsedBlockModel);
-
-                if (assayGeoJson.features.length > 0) {
-                    const assayValues = assayGeoJson.features.map((p: any) => p.properties.graphitic_carbon).filter((v: any): v is number => typeof v === 'number' && !Number.isNaN(v));
-                    if (assayValues.length > 0) {
-                        setAssayRange({ min: Math.min(...assayValues), max: Math.max(...assayValues) });
-                    }
-                }
-
-                setPresentationSteps(['lithology_data', 'assay_data', 'block_model_carbon', 'block_model_resc']);
-                setLoadingStatus('Scene ready.');
-
-            } catch (error: any) {
-                console.error("Failed to load scene data:", error);
-                setLoadingStatus(`Error: ${error.message}`);
-            }
-        };
-
-        loadAndSetupData();
-
         const animate = () => {
+            if (!renderer) return;
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
@@ -398,6 +290,7 @@ const GeoVision = () => {
         animate();
 
         const handleResize = () => {
+            if (!camera || !renderer) return;
             camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
@@ -462,18 +355,56 @@ const GeoVision = () => {
             if (labelRendererRef.current && labelRendererRef.current.domElement.parentElement === currentMount) {
                 currentMount.removeChild(labelRendererRef.current.domElement);
             }
-            if (currentMount && renderer.domElement.parentElement === currentMount) {
+            if (renderer && renderer.domElement.parentElement === currentMount) {
                 currentMount.removeChild(renderer.domElement);
             }
             renderer.dispose();
         };
     }, []);
 
-    const currentStep = presentationSteps[step];
+    useEffect(() => {
+        if (!drillholeData || !blockModelData || !controlsRef.current || !cameraRef.current) {
+            return;
+        }
+        
+        setLoadingStatus('Processing data...');
+
+        const allPoints: Point[] = [
+            ...drillholeData.lithology.map(d => ({ lon: d.lon, lat: d.lat, elevation: d.elevation })),
+            ...drillholeData.assay.map(d => ({ lon: d.lon, lat: d.lat, elevation: d.elevation })),
+            ...blockModelData.map(b => ({ lon: b.lon, lat: b.lat, elevation: b.elevation }))
+        ].filter(p => p.lon != null && p.lat != null);
+
+        let centerLon = 0, centerLat = 0, centerElev = 0;
+        if (allPoints.length > 0) {
+            centerLon = allPoints.reduce((acc, p) => acc + p.lon, 0) / allPoints.length;
+            centerLat = allPoints.reduce((acc, p) => acc + p.lat, 0) / allPoints.length;
+            centerElev = allPoints.reduce((acc, p) => acc + p.elevation, 0) / allPoints.length;
+        } else {
+            return;
+        }
+
+        setModelCenter({ lon: centerLon, lat: centerLat });
+
+        const center = new THREE.Vector3(0, centerElev, 0);
+        controlsRef.current.target.copy(center);
+        cameraRef.current.position.set(center.x, center.y + 1000, center.z + 2000);
+        controlsRef.current.update();
+
+        if (drillholeData.assay.length > 0) {
+            const assayValues = drillholeData.assay.map((p: any) => p.graphitic_carbon).filter((v: any): v is number => typeof v === 'number' && !Number.isNaN(v));
+            if (assayValues.length > 0) {
+                setAssayRange({ min: Math.min(...assayValues), max: Math.max(...assayValues) });
+            }
+        }
+
+        setLoadingStatus('Scene ready.');
+
+    }, [drillholeData, blockModelData]);
 
     useEffect(() => {
         const scene = sceneRef.current;
-        if (!scene || !drillholeData || !blockModelData || presentationSteps.length === 0) {
+        if (!scene || !drillholeData || !blockModelData) {
             return;
         }
 
@@ -499,14 +430,14 @@ const GeoVision = () => {
             return { x, z };
         };
 
-        if (currentStep === 'lithology_data' || currentStep === 'assay_data') {
-            const dataToRender = currentStep === 'lithology_data' ? drillholeData.lithology : drillholeData.assay;
+        if (displayMode === 'lithology' || displayMode === 'assay') {
+            const dataToRender = displayMode === 'lithology' ? drillholeData.lithology : drillholeData.assay;
             if (!dataToRender) return;
 
             const groupedByColor: { [color: string]: DrillholeSegment[] } = {};
             dataToRender.forEach(feature => {
                 let colorKey: string;
-                if (currentStep === 'lithology_data') {
+                if (displayMode === 'lithology') {
                     colorKey = colorForLithology(feature.lithology);
                 } else {
                     colorKey = colorForAssay(feature.graphitic_carbon, assayRange.min, assayRange.max);
@@ -554,11 +485,11 @@ const GeoVision = () => {
                 scene.add(instancedCylinders);
             });
 
-        } else if (currentStep === 'block_model_carbon' || currentStep === 'block_model_resc') {
+        } else if (displayMode === 'block_carbon' || displayMode === 'block_resc') {
             if (blockModelData) {
                 const groupedByColor: { [colorHex: string]: BlockSegment[] } = {};
 
-                if (currentStep === "block_model_carbon") {
+                if (displayMode === "block_carbon") {
                     blockModelData.forEach(block => {
                         const colorKey = getBlockCarbonColor(block["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
                         if (!groupedByColor[colorKey]) groupedByColor[colorKey] = [];
@@ -642,20 +573,25 @@ const GeoVision = () => {
                 scene.add(instancedTraces);
             }
         }
-    }, [step, presentationSteps, drillholeData, blockModelData, assayRange, blockTransparency, modelCenter]);
+    }, [displayMode, drillholeData, blockModelData, assayRange, blockTransparency, modelCenter]);
 
-    const nextStep = () => setStep(s => Math.min(s + 1, presentationSteps.length - 1));
-    const prevStep = () => setStep(s => Math.max(s - 1, 0));
+    const isCarbonView = displayMode === 'block_carbon';
+    const isRescCalcView = displayMode === 'block_resc';
 
-    const isCarbonView = currentStep === 'block_model_carbon';
-    const isRescCalcView = currentStep === 'block_model_resc';
+    if (cacheLoadingStatus === 'loading') {
+        return <div className="h-full w-full flex items-center justify-center bg-gray-900 text-white">Loading 3D Data...</div>;
+    }
+
+    if (cacheLoadingStatus === 'error') {
+        return <div className="h-full w-full flex items-center justify-center bg-gray-900 text-red-500">Error: {cacheError}</div>;
+    }
 
     return (
         <div className="relative h-full w-full">
             <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
                 <Compass rotation={compassRotation} />
-                {currentStep === 'lithology_data' && <LithologyLegend />}
-                {currentStep === 'assay_data' && <AssayLegend assayRange={assayRange} />}
+                {displayMode === 'lithology' && <LithologyLegend />}
+                {displayMode === 'assay' && <AssayLegend assayRange={assayRange} />}
                 {isCarbonView && <CarbonGradeLegend />}
                 {isRescCalcView && <ClassificationLegend />}
                 
@@ -663,11 +599,7 @@ const GeoVision = () => {
                 {isRescCalcView && <RescCalcReport />}
 
                 <div className="absolute top-4 right-4 z-10 flex flex-col items-end space-y-2 pointer-events-auto">
-                    <div className="flex space-x-2 mt-2">
-                        <button onClick={prevStep} disabled={step === 0} className="p-2 rounded bg-white shadow-lg disabled:opacity-50">Previous</button>
-                        <button onClick={nextStep} disabled={step === presentationSteps.length - 1} className="p-2 rounded bg-white shadow-lg disabled:opacity-50">Next</button>
-                    </div>
-                    {currentStep && currentStep.startsWith('block_model_') && (
+                    {(displayMode === 'block_carbon' || displayMode === 'block_resc') && (
                         <div className="flex flex-col items-end space-y-2 bg-white p-2 rounded shadow-lg mt-2">
                             <label className="text-sm font-bold">Block Opacity:</label>
                             <input

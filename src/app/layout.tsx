@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import './globals.css';
+import { DataCacheProvider } from '@/lib/data-cache';
 
 export const metadata: Metadata = {
   title: 'GeoVision3D',
@@ -20,7 +21,7 @@ export default function RootLayout({
         <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
         <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
       </head>
-      <body className="font-body antialiased">{children}</body>
+      <body className="font-body antialiased"><DataCacheProvider>{children}</DataCacheProvider></body>
     </html>
   );
 }
