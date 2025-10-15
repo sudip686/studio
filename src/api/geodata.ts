@@ -1,4 +1,4 @@
-// File: pages/api/geodata.ts
+// File: api/geodata.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';

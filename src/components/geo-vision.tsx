@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { useDataCache, DrillholeSegment, BlockSegment } from '@/lib/data-cache';
+import Legend from '@/components/ui/legend';
+import { geoVisionLithologyLegendData, carbonGradeLegendData, classificationLegendData } from '@/lib/legend-definitions';
 
 // ## Data Structures & Constants ##
 interface Point { lon: number; lat: number; elevation: number; }
@@ -60,55 +62,11 @@ function getBlockRescColor(rescCalc: any): string {
 }
 
 // ## UI Components ##
-const LithologyLegend = () => (
-    <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto text-white">
-        <h3 className="font-bold text-lg mb-2">Lithology</h3>
-        <ul className="space-y-1">
-            {Object.entries(LITHOLOGY_COLOR_MAP).map(([name, color]) => (
-                <li key={name} className="flex items-center">
-                    <span className="inline-block w-4 h-4 rounded-full mr-2 border border-gray-400" style={{ backgroundColor: color }}></span>
-                    <span style={{textTransform: 'capitalize'}}>{name}</span>
-                </li>
-            ))}
-        </ul>
-    </div>
-);
 
-const AssayLegend = ({ assayRange }: { assayRange: { min: number, max: number } }) => (
-    <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto text-white">
-        <h3 className="font-bold text-lg mb-2">Assay (Graphitic Carbon)</h3>
-        <div className="flex flex-col items-center">
-            <div className="w-full h-6 rounded" style={{ background: 'linear-gradient(to right, rgb(0, 255, 0), rgb(255, 0, 0))' }}></div>
-            <div className="flex justify-between w-full text-xs mt-1">
-                <span>{assayRange.min.toFixed(2)}</span>
-                <span>{assayRange.max.toFixed(2)}</span>
-            </div>
-        </div>
-    </div>
-);
 
-const CarbonGradeLegend = () => {
-    const legendItems = [
-        { color: CARBON_COLOR_MAP.LOW, label: '0.3 to 0.5' },
-        { color: CARBON_COLOR_MAP.MEDIUM, label: '0.5 to 2.0' },
-        { color: CARBON_COLOR_MAP.HIGH, label: '2.0 to 5.0' },
-        { color: CARBON_COLOR_MAP.VERY_HIGH, label: '>5.0' },
-        { color: CARBON_COLOR_MAP.DEFAULT, label: '<0.3 or Unknown' },
-    ];
-    return (
-        <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto text-white">
-            <h3 className="font-bold text-lg mb-2">Graphitic Carbon (%)</h3>
-            <ul className="space-y-1">
-                {legendItems.map(({ color, label }) => (
-                    <li key={label} className="flex items-center">
-                        <span className="inline-block w-4 h-4 mr-2" style={{ backgroundColor: color }}></span>
-                        <span>{label}</span>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
+
+
+
 
 const Tooltip = ({ data, position }: { data: any | null, position: { x: number, y: number } }) => {
     if (!data) return null;
@@ -196,22 +154,7 @@ const RescCalcReport = () => (
     </div>
 );
 
-const ClassificationLegend = () => {
-    const legendItems = { "Measured": "#0000ff", "Indicated": "#ff0000", "Inferred": "#00ff00" };
-    return (
-        <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto text-white">
-            <h3 className="font-bold text-lg mb-2">Classification</h3>
-            <ul className="space-y-1">
-                {Object.entries(legendItems).map(([name, color]) => (
-                    <li key={name} className="flex items-center">
-                        <span className="inline-block w-4 h-4 mr-2" style={{ backgroundColor: color }}></span>
-                        <span>{name}</span>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
+
 
 // ## Main GeoVision Component ##
 export type GeoVisionDisplayMode = 'lithology' | 'assay' | 'block_carbon' | 'block_resc' | 'clipped_view';
@@ -234,11 +177,14 @@ const GeoVision = ({ displayMode }: GeoVisionProps) => {
     const [modelCenter, setModelCenter] = useState({ lon: 0, lat: 0 });
     const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
     const [blockTransparency, setBlockTransparency] = useState(0.8);
-
     const [tooltipData, setTooltipData] = useState<any | null>(null);
     const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
     const [compassRotation, setCompassRotation] = useState(0);
     const [loadingStatus, setLoadingStatus] = useState('Idle');
+
+    const [lithologyFilter, setLithologyFilter] = useState('All');
+    const [assayFilterValue, setAssayFilterValue] = useState(0);
+    const [uniqueLithologies, setUniqueLithologies] = useState<string[]>(['All']);
 
     useEffect(() => {
         if (!mountRef.current) return;
@@ -369,6 +315,14 @@ const GeoVision = ({ displayMode }: GeoVisionProps) => {
         
         setLoadingStatus('Processing data...');
 
+        if (drillholeData?.lithology) {
+            const allLithologies = new Set<string>();
+            drillholeData.lithology.forEach(d => {
+                if (d.lithology) allLithologies.add(d.lithology);
+            });
+            setUniqueLithologies(['All', ...Array.from(allLithologies).sort()]);
+        }
+
         const allPoints: Point[] = [
             ...drillholeData.lithology.map(d => ({ lon: d.lon, lat: d.lat, elevation: d.elevation })),
             ...drillholeData.assay.map(d => ({ lon: d.lon, lat: d.lat, elevation: d.elevation })),
@@ -430,8 +384,22 @@ const GeoVision = ({ displayMode }: GeoVisionProps) => {
             return { x, z };
         };
 
+        // Filter data based on UI controls
+        const filteredDrillholeLithology = (drillholeData?.lithology || []).filter(d => 
+            lithologyFilter === 'All' || d.lithology === lithologyFilter
+        );
+
+        const filteredDrillholeAssay = (drillholeData?.assay || []).filter(d => 
+            assayFilterValue === 0 || (d.graphitic_carbon != null && d.graphitic_carbon >= assayFilterValue)
+        );
+
+        const filteredBlockModel = (blockModelData || []).filter(b => 
+            assayFilterValue === 0 || (b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"] != null && b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"] >= assayFilterValue)
+        );
+
+
         if (displayMode === 'lithology' || displayMode === 'assay') {
-            const dataToRender = displayMode === 'lithology' ? drillholeData.lithology : drillholeData.assay;
+            const dataToRender = displayMode === 'lithology' ? filteredDrillholeLithology : filteredDrillholeAssay;
             if (!dataToRender) return;
 
             const groupedByColor: { [color: string]: DrillholeSegment[] } = {};
@@ -486,17 +454,18 @@ const GeoVision = ({ displayMode }: GeoVisionProps) => {
             });
 
         } else if (displayMode === 'block_carbon' || displayMode === 'block_resc') {
-            if (blockModelData) {
+            const dataToRender = displayMode === 'block_carbon' ? filteredBlockModel : blockModelData;
+            if (dataToRender) {
                 const groupedByColor: { [colorHex: string]: BlockSegment[] } = {};
 
                 if (displayMode === "block_carbon") {
-                    blockModelData.forEach(block => {
+                    dataToRender.forEach(block => {
                         const colorKey = getBlockCarbonColor(block["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
                         if (!groupedByColor[colorKey]) groupedByColor[colorKey] = [];
                         groupedByColor[colorKey].push(block);
                     });
-                } else {
-                    blockModelData.forEach(block => {
+                } else { // block_resc
+                    dataToRender.forEach(block => {
                         const colorKey = getBlockRescColor(block.RescCalc);
                         if (!groupedByColor[colorKey]) groupedByColor[colorKey] = [];
                         groupedByColor[colorKey].push(block);
@@ -573,7 +542,7 @@ const GeoVision = ({ displayMode }: GeoVisionProps) => {
                 scene.add(instancedTraces);
             }
         }
-    }, [displayMode, drillholeData, blockModelData, assayRange, blockTransparency, modelCenter]);
+    }, [displayMode, drillholeData, blockModelData, assayRange, blockTransparency, modelCenter, lithologyFilter, assayFilterValue]);
 
     const isCarbonView = displayMode === 'block_carbon';
     const isRescCalcView = displayMode === 'block_resc';
@@ -587,13 +556,13 @@ const GeoVision = ({ displayMode }: GeoVisionProps) => {
     }
 
     return (
-        <div className="relative h-full w-full">
+        <div className="relative h-full w-full pointer-events-auto">
             <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
                 <Compass rotation={compassRotation} />
-                {displayMode === 'lithology' && <LithologyLegend />}
-                {displayMode === 'assay' && <AssayLegend assayRange={assayRange} />}
-                {isCarbonView && <CarbonGradeLegend />}
-                {isRescCalcView && <ClassificationLegend />}
+                {displayMode === 'lithology' && <Legend title={geoVisionLithologyLegendData.title} type="categorical" items={geoVisionLithologyLegendData.items} />}
+                {displayMode === 'assay' && <Legend title="Assay (Graphitic Carbon)" type="gradient" gradient="linear-gradient(to right, rgb(0, 255, 0), rgb(255, 0, 0))" minLabel={assayRange.min.toFixed(2)} maxLabel={assayRange.max.toFixed(2)} />}
+                {isCarbonView && <Legend title={carbonGradeLegendData.title} type="categorical" items={carbonGradeLegendData.items} />}
+                {isRescCalcView && <Legend title={classificationLegendData.title} type="categorical" items={classificationLegendData.items} />}
                 
                 {isCarbonView && <CarbonReport />}
                 {isRescCalcView && <RescCalcReport />}
@@ -608,7 +577,29 @@ const GeoVision = ({ displayMode }: GeoVisionProps) => {
                                 min="0" max="1" step="0.05"
                                 value={blockTransparency}
                                 onChange={(e) => setBlockTransparency(parseFloat(e.target.value))}
-                                className="w-24"
+                                className="w-32"
+                            />
+                        </div>
+                    )}
+                    {displayMode === 'lithology' && (
+                        <div className="flex flex-col items-start space-y-1 bg-white p-2 rounded shadow-lg mt-2">
+                            <label htmlFor="lithology-filter" className="text-sm font-bold">Filter Lithology:</label>
+                            <select id="lithology-filter" value={lithologyFilter} onChange={e => setLithologyFilter(e.target.value)} className="w-full p-1 border rounded">
+                                {uniqueLithologies.map(lith => <option key={lith} value={lith}>{lith}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    {(displayMode === 'assay' || displayMode === 'block_carbon') && (
+                        <div className="flex flex-col items-start space-y-1 bg-white p-2 rounded shadow-lg mt-2">
+                            <label htmlFor="assay-filter" className="text-sm font-bold">Min Carbon (%):</label>
+                            <input
+                                id="assay-filter"
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                value={assayFilterValue}
+                                onChange={e => setAssayFilterValue(parseFloat(e.target.value) || 0)}
+                                className="w-full p-1 border rounded"
                             />
                         </div>
                     )}

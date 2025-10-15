@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
+import Legend from '@/components/ui/legend';
+import { graphiticCarbonLegendData } from '@/lib/legend-definitions';
 
 declare global {
     interface Window {
@@ -9,320 +11,268 @@ declare global {
     }
 }
 
-const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
-    "Quartz-Feldspathic": "#e1f6f3ff",
-    "GRSC": "#4c54549c",
-    "Granulite": "#b90b79ff",
-    "Khondalite": "#433e43ff",
-    "Marble": "#D4E6F1",
-    "Not Recovearble": "#0b1414ff",
-    "SOIL": "#70f35fff",
-    "Schist": "#445751ff",
-    "nan": "#FFFFFF",
-    "UNKNOWN": "#cccccc",
+// --- Helper Functions ---
+const getAssayColor = (value: number, Cesium: any, alpha = 1.0) => {
+    const v = Number(value);
+    let color;
+    if (!Number.isFinite(v)) {
+        color = Cesium.Color.fromCssColorString('#CCCCCC');
+    } else if (v > 5.0) {
+        color = Cesium.Color.RED;
+    } else if (v > 2.0) {
+        color = Cesium.Color.ORANGE;
+    } else if (v > 0.5) {
+        color = Cesium.Color.YELLOW;
+    } else if (v > 0.3) {
+        color = Cesium.Color.GREEN;
+    } else if (v > 0.1) {
+        color = Cesium.Color.CYAN;
+    } else {
+        color = Cesium.Color.BLUE;
+    }
+    return color.withAlpha(alpha);
 };
 
-const Legend = ({ show }: { show: boolean }) => {
+// --- UI Components ---
+const DrillholeControls = ({ onAnimate, onToggle, show }: { onAnimate: () => void, onToggle: (filter: string) => void, show: boolean }) => {
     if (!show) return null;
     return (
-        <div className={`absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto transition-opacity duration-500 ${show ? 'opacity-100' : 'opacity-0'}`}>
-            <h3 className="font-bold text-lg mb-2">Lithology</h3>
-            <ul className="space-y-1">
-                {Object.entries(LITHOLOGY_COLOR_MAP_CSS).map(([name, color]) => (
-                    (name !== 'nan' && name !== 'UNKNOWN') && (
-                    <li key={name} className="flex items-center">
-                        <span className="inline-block w-4 h-4 rounded-full mr-2 border border-gray-400" style={{ backgroundColor: color }}></span>
-                        <span>{name}</span>
-                    </li>
-                    )
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const TooltipContent = ({ data }: { data: any }) => {
-    if (!data || !data.content) return null;
-    return (
-        <div
-            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none"
-            style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-        >
-            <p className="font-bold text-base mb-1">Hole ID: {data.content.hole_id}</p>
-            <ul className="list-none space-y-1">
-                <li><strong>Lat:</strong> {data.content.latitude?.toFixed(5)}</li>
-                <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
-                <li><strong>Depth From:</strong> {data.content.depth_from?.toFixed(2)} m</li>
-                <li><strong>Depth To:</strong> {data.content.depth_to?.toFixed(2)} m</li>
-                {data.content.lithology && <li><strong>Lithology:</strong> {data.content.lithology}</li>}
-            </ul>
-        </div>
-    );
-};
-
-const ClippingControls = ({ clipBox, setClipBox, sliderRange, enabled }: { clipBox: any, setClipBox: any, sliderRange: any, enabled: boolean }) => {
-    return (
-        <div className={`absolute top-4 right-4 bg-white bg-opacity-80 p-4 rounded-lg shadow-md w-72 text-sm pointer-events-auto transition-opacity duration-500 ${enabled ? 'opacity-100' : 'opacity-0'}`}>
-            <h3 className="font-bold text-lg mb-3">Clipping Box Controls</h3>
+        <div className={`absolute top-4 right-4 bg-white bg-opacity-80 p-4 rounded-lg shadow-md w-72 text-sm pointer-events-auto transition-opacity duration-500 ${show ? 'opacity-100' : 'opacity-0'}`}>
+            <h3 className="font-bold text-lg mb-3">Drillhole Controls</h3>
             <div className="space-y-3">
                 <div>
-                    <label className="block font-medium mb-1">X Axis (East/West)</label>
-                    <div className="flex items-center space-x-2">
-                        <span>Min</span>
-                        <input type="range" className="w-full" min={sliderRange.x.min} max={sliderRange.x.max} value={clipBox.x_min} onChange={e => setClipBox((prev: any) => ({ ...prev, x_min: Math.min(parseFloat(e.target.value), prev.x_max) }))} />
-                        <span>Max</span>
-                        <input type="range" className="w-full" min={sliderRange.x.min} max={sliderRange.x.max} value={clipBox.x_max} onChange={e => setClipBox((prev: any) => ({ ...prev, x_max: Math.max(parseFloat(e.target.value), prev.x_min) }))} />
-                    </div>
+                    <label className="block font-medium mb-1">Visibility</label>
+                    <select onChange={(e) => onToggle(e.target.value)} className="w-full p-1 border rounded">
+                        <option value="all">All Drillholes</option>
+                        <option value="TGDD">TGDD Program</option>
+                        <option value="TGRC">TGRC Program</option>
+                    </select>
                 </div>
                 <div>
-                    <label className="block font-medium mb-1">Y Axis (North/South)</label>
-                    <div className="flex items-center space-x-2">
-                        <span>Min</span>
-                        <input type="range" className="w-full" min={sliderRange.y.min} max={sliderRange.y.max} value={clipBox.y_min} onChange={e => setClipBox((prev: any) => ({ ...prev, y_min: Math.min(parseFloat(e.target.value), prev.y_max) }))} />
-                        <span>Max</span>
-                        <input type="range" className="w-full" min={sliderRange.y.min} max={sliderRange.y.max} value={clipBox.y_max} onChange={e => setClipBox((prev: any) => ({ ...prev, y_max: Math.max(parseFloat(e.target.value), prev.y_min) }))} />
-                    </div>
-                </div>
-                <div>
-                    <label className="block font-medium mb-1">Z Axis (Elevation)</label>
-                    <div className="flex items-center space-x-2">
-                        <span>Min</span>
-                        <input type="range" className="w-full" min={sliderRange.z.min} max={sliderRange.z.max} value={clipBox.z_min} onChange={e => setClipBox((prev: any) => ({ ...prev, z_min: Math.min(parseFloat(e.target.value), prev.z_max) }))} />
-                        <span>Max</span>
-                        <input type="range" className="w-full" min={sliderRange.z.min} max={sliderRange.z.max} value={clipBox.z_max} onChange={e => setClipBox((prev: any) => ({ ...prev, z_max: Math.max(parseFloat(e.target.value), prev.z_min) }))} />
-                    </div>
+                    <button onClick={onAnimate} className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Animate Discovery
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
 
+// --- Main Component ---
+type AnimationPhase = 'initial' | 'loading' | 'ready' | 'surface' | 'slice' | 'final';
+
 const AnimatedRevealViewer = () => {
     const { viewer, isLoaded } = useCesium();
-    const [animationState, setAnimationState] = useState('initial');
-    const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
-    const [clipBox, setClipBox] = useState({ x_min: 0, x_max: 0, y_min: 0, y_max: 0, z_min: 0, z_max: 0 });
-    const [sliderRange, setSliderRange] = useState({ x: {min:0, max:0}, y: {min:0, max:0}, z: {min:0, max:0} });
-    const [localTransform, setLocalTransform] = useState<any>(null);
-    const [controlsEnabled, setControlsEnabled] = useState(false);
+    const [controlsVisible, setControlsVisible] = useState(false);
+    const [animationPhase, setAnimationPhase] = useState<AnimationPhase>('initial');
+    
+    const sceneData = useRef<any>({});
+    const dataSources = useRef<any[]>([]);
+    const cleanupFuncs = useRef<(()=>void)[]>([]);
 
-    const dataSourceRef = useRef<any>(null);
-    const eventHandlerRef = useRef<any>(null);
-    const onTickCallbackRef = useRef<any>(null);
-    const lithologyColorMapCesiumRef = useRef<any>({});
-
+    // Phase 1: Data Loading
     useEffect(() => {
-        if (!isLoaded || !viewer) return;
-
-        let isMounted = true;
-        const Cesium = window.Cesium;
-
-        Object.keys(LITHOLOGY_COLOR_MAP_CSS).forEach(key => {
-            lithologyColorMapCesiumRef.current[key] = Cesium.Color.fromCssColorString(LITHOLOGY_COLOR_MAP_CSS[key]);
-        });
-
-        viewer.scene.screenSpaceCameraController.enableTilt = false;
-        viewer.scene.screenSpaceCameraController.enableLook = false;
-
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        handler.setInputAction((movement: any) => {
-            if (!controlsEnabled) return;
-            const pickedObject = viewer.scene.pick(movement.endPosition);
-            if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.properties) {
-                const entity = pickedObject.id;
-                const properties = entity.properties.getValue(viewer.clock.currentTime);
-                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: properties });
-            } else {
-                setTooltip({ display: false, top: 0, left: 0, content: null });
-            }
-        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-        eventHandlerRef.current = handler;
+        if (!isLoaded || !viewer || animationPhase !== 'initial') return;
 
         const loadData = async () => {
             try {
-                const response = await fetch('/lithology_data.geojson');
-                const geoJson = await response.json();
-                
-                const customDataSource = new Cesium.CustomDataSource('drillholes');
+                setAnimationPhase('loading');
+                const Cesium = window.Cesium;
+                const response = await fetch('/assay_data.geojson');
+                const assayData = await response.json();
+
+                const collarDataSource = new Cesium.CustomDataSource('collars');
+                const traceDataSource = new Cesium.CustomDataSource('traces');
                 const points: any[] = [];
 
-                geoJson.features.forEach((feature: any) => {
+                assayData.features.forEach((feature: any) => {
                     if (feature.geometry.type === 'LineString') {
-                        const { properties } = feature;
-                        const [startCoords, endCoords] = feature.geometry.coordinates;
-                        points.push(Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]));
-                        points.push(Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]));
+                        const [start, end] = feature.geometry.coordinates;
+                        const positions = Cesium.Cartesian3.fromDegreesArrayHeights([...start, ...end]);
+                        points.push(positions[0], positions[1]);
 
-                        const startCartesian = Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]);
-                        const endCartesian = Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]);
-                        const length = Cesium.Cartesian3.distance(startCartesian, endCartesian);
-                        if (length === 0) return;
-
-                        const color = lithologyColorMapCesiumRef.current[properties.lithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
-                        const midpoint = Cesium.Cartesian3.midpoint(startCartesian, endCartesian, new Cesium.Cartesian3());
-                        const orientation = new Cesium.VelocityOrientationProperty(new Cesium.SampledPositionProperty());
-                        orientation.velocity = new Cesium.ConstantProperty(Cesium.Cartesian3.subtract(endCartesian, startCartesian, new Cesium.Cartesian3()));
-
-                        customDataSource.entities.add({
-                            position: midpoint, orientation: orientation,
-                            cylinder: { length: length, topRadius: 15, bottomRadius: 15, material: color },
-                            properties: { ...properties, latitude: startCoords[1], longitude: startCoords[0] }
+                        collarDataSource.entities.add({ position: positions[0], point: { pixelSize: 8, color: Cesium.Color.DODGERBLUE } });
+                        
+                        const color = getAssayColor(feature.properties.graphitic_carbon, Cesium, 0.0); // Start transparent
+                        traceDataSource.entities.add({ 
+                            name: feature.properties.hole_id,
+                            polyline: { positions, width: 5, material: new Cesium.ColorMaterialProperty(color) }
                         });
                     }
                 });
 
-                if (isMounted && !viewer.isDestroyed()) {
-                    viewer.dataSources.add(customDataSource);
-                    dataSourceRef.current = customDataSource;
+                await viewer.dataSources.add(collarDataSource);
+                await viewer.dataSources.add(traceDataSource);
+                dataSources.current = [collarDataSource, traceDataSource];
+                
+                const boundingSphere = Cesium.BoundingSphere.fromPoints(points);
+                sceneData.current = { boundingSphere, siteCenter: boundingSphere.center };
 
-                    if (points.length > 0) {
-                        const boundingSphere = Cesium.BoundingSphere.fromPoints(points);
-                        const center = boundingSphere.center;
-                        const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-                        setLocalTransform(transform);
-
-                        const inverseTransform = Cesium.Matrix4.inverse(transform, new Cesium.Matrix4());
-                        const localPoints = points.map(p => Cesium.Matrix4.multiplyByPoint(inverseTransform, p, new Cesium.Cartesian3()));
-                        const localBoundingBox = Cesium.AxisAlignedBoundingBox.fromPoints(localPoints);
-
-                        setClipBox({
-                            x_min: localBoundingBox.minimum.x, x_max: localBoundingBox.maximum.x,
-                            y_min: localBoundingBox.minimum.y, y_max: localBoundingBox.maximum.y,
-                            z_min: localBoundingBox.minimum.z, z_max: localBoundingBox.maximum.z,
-                        });
-
-                        const rangePadding = 1000;
-                        setSliderRange({
-                            x: { min: localBoundingBox.minimum.x - rangePadding, max: localBoundingBox.maximum.x + rangePadding },
-                            y: { min: localBoundingBox.minimum.y - rangePadding, max: localBoundingBox.maximum.y + rangePadding },
-                            z: { min: localBoundingBox.minimum.z - rangePadding, max: localBoundingBox.maximum.z + rangePadding },
-                        });
-                    }
-                    viewer.flyTo(customDataSource, { duration: 2.0 });
-                }
+                setAnimationPhase('ready');
             } catch (error) {
-                console.error(`Error loading data:`, error);
+                console.error("Error loading scene data:", error);
+                setAnimationPhase('initial'); // Reset on error
             }
         };
 
         loadData();
+    }, [isLoaded, viewer, animationPhase]);
 
-        return () => {
-            isMounted = false;
-            if (viewer && !viewer.isDestroyed()) {
-                if (dataSourceRef.current) viewer.dataSources.remove(dataSourceRef.current, true);
-                if (eventHandlerRef.current) eventHandlerRef.current.destroy();
-                if (onTickCallbackRef.current) viewer.clock.onTick.removeEventListener(onTickCallbackRef.current);
-                viewer.scene.globe.clippingPlanes = undefined;
-                viewer.scene.screenSpaceCameraController.enableTilt = true;
-                viewer.scene.screenSpaceCameraController.enableLook = true;
+    // Phase 2-4: Animation Controller
+    useEffect(() => {
+        if (animationPhase === 'ready') {
+            // Automatically start the animation sequence once data is ready
+            setAnimationPhase('surface');
+            return;
+        }
+
+        if (!isLoaded || !viewer || !sceneData.current.boundingSphere) return;
+
+        const Cesium = window.Cesium;
+        const { boundingSphere, siteCenter } = sceneData.current;
+        let tickListener: (() => void) | undefined;
+
+        const runAnimation = async () => {
+            if (animationPhase === 'surface') {
+                viewer.scene.screenSpaceCameraController.enableInputs = false;
+                await viewer.camera.flyToBoundingSphere(boundingSphere, {
+                    duration: 2.0,
+                    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), 2000)
+                });
+                setAnimationPhase('slice');
+            }
+            else if (animationPhase === 'slice') {
+                const enu = Cesium.Transforms.eastNorthUpToFixedFrame(siteCenter);
+                const east = Cesium.Matrix4.getColumn(enu, 0, new Cesium.Cartesian3());
+                const planeNormal = Cesium.Cartesian3.normalize(east, new Cesium.Cartesian3());
+                const distance = -Cesium.Cartesian3.dot(planeNormal, siteCenter);
+
+                const halfMapPlane = new Cesium.ClippingPlane(planeNormal, distance - boundingSphere.radius);
+                sceneData.current.halfMapPlane = halfMapPlane; // Store for tick listener
+
+                const planeCollection = new Cesium.ClippingPlaneCollection({
+                    planes: [halfMapPlane],
+                    edgeWidth: 1.5,
+                    edgeColor: Cesium.Color.WHITE,
+                    enabled: true,
+                    shadows: Cesium.ShadowMode.DISABLED
+                });
+                viewer.scene.globe.clippingPlanes = planeCollection;
+                cleanupFuncs.current.push(() => { if(viewer.scene.globe.clippingPlanes) viewer.scene.globe.clippingPlanes.enabled = false; });
+
+                viewer.scene.globe.undergroundColor = Cesium.Color.BLACK;
+                viewer.scene.globe.depthTestAgainstTerrain = true;
+
+                const up = Cesium.Matrix4.getColumn(enu, 2, new Cesium.Cartesian3());
+                const gridPlaneDef = new Cesium.Plane(Cesium.Cartesian3.normalize(up, new Cesium.Cartesian3()), -Cesium.Cartesian3.dot(up, siteCenter));
+                const gridSize = boundingSphere.radius * 3.0;
+                
+                const gridEntity = viewer.entities.add({
+                    position: siteCenter,
+                    plane: { plane: gridPlaneDef, dimensions: new Cesium.Cartesian2(gridSize, gridSize), material: new Cesium.GridMaterialProperty({ color: Cesium.Color.fromCssColorString('#6b7280'), cellAlpha: 0.35, lineCount: new Cesium.Cartesian2(24, 24) }) }
+                });
+                cleanupFuncs.current.push(() => viewer.entities.remove(gridEntity));
+
+                const verticalGridEntity = viewer.entities.add({
+                    plane: {
+                        plane: new Cesium.CallbackProperty(() => new Cesium.Plane(planeNormal, sceneData.current.halfMapPlane.distance), false),
+                        dimensions: new Cesium.Cartesian2(gridSize, boundingSphere.radius * 2.5),
+                        material: new Cesium.GridMaterialProperty({ color: Cesium.Color.fromCssColorString('#6b7280'), cellAlpha: 0.3, lineCount: new Cesium.Cartesian2(24, 12) })
+                    }
+                });
+                cleanupFuncs.current.push(() => viewer.entities.remove(verticalGridEntity));
+
+                const duration = 5.0;
+                const startTime = Cesium.JulianDate.now();
+
+                tickListener = () => {
+                    const elapsed = Cesium.JulianDate.secondsDifference(Cesium.JulianDate.now(), startTime);
+                    const p = Math.min(1.0, elapsed / duration);
+                    const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+                    sceneData.current.halfMapPlane.distance = Cesium.Math.lerp(distance - boundingSphere.radius, distance, ease);
+
+                    if (p >= 1.0) {
+                        viewer.clock.onTick.removeEventListener(tickListener);
+                        tickListener = undefined;
+                        setAnimationPhase('final');
+                    }
+                };
+                viewer.clock.onTick.addEventListener(tickListener);
+            }
+            else if (animationPhase === 'final') {
+                const traceDataSource = dataSources.current.find(ds => ds.name === 'traces');
+                if (traceDataSource) {
+                    traceDataSource.entities.values.forEach((e:any) => {
+                        const material = e.polyline.material.color.getValue(viewer.clock.currentTime);
+                        e.polyline.material = new Cesium.ColorMaterialProperty(material.withAlpha(1.0));
+                    });
+                }
+                setControlsVisible(true);
+                viewer.scene.screenSpaceCameraController.enableInputs = true;
             }
         };
-    }, [isLoaded, viewer]);
 
+        runAnimation();
+
+        return () => {
+            if (tickListener) {
+                viewer.clock.onTick.removeEventListener(tickListener);
+            }
+        };
+    }, [animationPhase, isLoaded, viewer]);
+
+    // Cleanup effect
     useEffect(() => {
-        const Cesium = window.Cesium;
-        if (!isLoaded || !viewer) return;
+        return () => {
+            if (viewer && !viewer.isDestroyed()) {
+                dataSources.current.forEach(ds => viewer.dataSources.remove(ds, true));
+                cleanupFuncs.current.forEach(func => func());
+                if (viewer.scene.globe.clippingPlanes) {
+                    viewer.scene.globe.clippingPlanes.enabled = false;
+                }
+                viewer.scene.screenSpaceCameraController.enableInputs = true;
+                viewer.scene.globe.depthTestAgainstTerrain = false;
+            }
+        };
+    }, [viewer]);
 
-        if (animationState === 'animating' && dataSourceRef.current) {
-            viewer.scene.screenSpaceCameraController.enableTilt = true;
-            viewer.scene.screenSpaceCameraController.enableLook = true;
+    const handleAnimateDiscovery = () => {
+        const traceDataSource = dataSources.current.find(ds => ds.name === 'traces');
+        if (!traceDataSource) return;
+        const sortedEntities = [...traceDataSource.entities.values].sort((a, b) => a.name.localeCompare(b.name));
+        sortedEntities.forEach(entity => { if(entity.polyline) entity.polyline.show = false; });
+        let index = 0;
+        const interval = setInterval(() => {
+            if (index < sortedEntities.length) {
+                const entity = sortedEntities[index];
+                if (entity.polyline) entity.polyline.show = true;
+                index++;
+            } else {
+                clearInterval(interval);
+            }
+        }, 50);
+        cleanupFuncs.current.push(() => clearInterval(interval));
+    };
 
-            const boundingSphere = dataSourceRef.current.entities.computeBoundingSphere();
-            const center = boundingSphere.center;
-            const radius = boundingSphere.radius;
-            const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-            const rotation = Cesium.Matrix4.getMatrix3(transform, new Cesium.Matrix3());
-
-            const localNormal = new Cesium.Cartesian3(1, 0, 0);
-            const worldNormal = Cesium.Matrix3.multiplyByVector(rotation, localNormal, new Cesium.Cartesian3());
-
-            const startLocalPoint = new Cesium.Cartesian3(-radius * 1.5, 0, 0);
-            const startWorldPoint = Cesium.Matrix4.multiplyByPoint(transform, startLocalPoint, new Cesium.Cartesian3());
-            const startDistance = Cesium.Cartesian3.dot(startWorldPoint, worldNormal);
-
-            const endLocalPoint = new Cesium.Cartesian3(0, 0, 0);
-            const endWorldPoint = Cesium.Matrix4.multiplyByPoint(transform, endLocalPoint, new Cesium.Cartesian3());
-            const endDistance = Cesium.Cartesian3.dot(endWorldPoint, worldNormal);
-
-            const clippingPlane = new Cesium.ClippingPlane(worldNormal, startDistance);
-
-            viewer.scene.globe.clippingPlanes = new Cesium.ClippingPlaneCollection({
-                planes: [clippingPlane], edgeWidth: 1.0, edgeColor: Cesium.Color.YELLOW,
-            });
-
-            const startTime = viewer.clock.currentTime.clone();
-            onTickCallbackRef.current = () => {
-                const elapsedTime = Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, startTime);
-                const duration = 5.0;
-                const progress = Math.min(elapsedTime / duration, 1.0);
-                clippingPlane.distance = Cesium.Math.lerp(startDistance, endDistance, progress);
-            };
-            viewer.clock.onTick.addEventListener(onTickCallbackRef.current);
-
-            viewer.camera.flyToBoundingSphere(boundingSphere, {
-                duration: 5,
-                offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(20.0), Cesium.Math.toRadians(-45.0), boundingSphere.radius * 2.0),
-                complete: () => {
-                    setAnimationState('final');
-                    if (onTickCallbackRef.current) {
-                        viewer.clock.onTick.removeEventListener(onTickCallbackRef.current);
-                        onTickCallbackRef.current = null;
-                    }
-                },
-            });
-        } else if (animationState === 'final') {
-            setControlsEnabled(true);
-        }
-    }, [animationState, isLoaded, viewer]);
-
-    useEffect(() => {
-        if (!controlsEnabled || !viewer || !localTransform) return;
-
-        const Cesium = window.Cesium;
-        const transform = localTransform;
-        const rotation = Cesium.Matrix4.getMatrix3(transform, new Cesium.Matrix3());
-
-        const planeDefs = [
-            { normal: new Cesium.Cartesian3(-1, 0, 0), point: new Cesium.Cartesian3(clipBox.x_max, 0, 0) },
-            { normal: new Cesium.Cartesian3(1, 0, 0),  point: new Cesium.Cartesian3(clipBox.x_min, 0, 0) },
-            { normal: new Cesium.Cartesian3(0, -1, 0), point: new Cesium.Cartesian3(0, clipBox.y_max, 0) },
-            { normal: new Cesium.Cartesian3(0, 1, 0),  point: new Cesium.Cartesian3(0, clipBox.y_min, 0) },
-            { normal: new Cesium.Cartesian3(0, 0, -1), point: new Cesium.Cartesian3(0, 0, clipBox.z_max) },
-            { normal: new Cesium.Cartesian3(0, 0, 1),  point: new Cesium.Cartesian3(0, 0, clipBox.z_min) },
-        ];
-
-        const newPlanes: any[] = [];
-        for (const p_def of planeDefs) {
-            const worldPoint = Cesium.Matrix4.multiplyByPoint(transform, p_def.point, new Cesium.Cartesian3());
-            const worldNormal = Cesium.Matrix3.multiplyByVector(rotation, p_def.normal, new Cesium.Cartesian3());
-            const distance = Cesium.Cartesian3.dot(worldPoint, worldNormal);
-            newPlanes.push(new Cesium.ClippingPlane(worldNormal, distance));
-        }
-        
-        if (viewer.scene.globe.clippingPlanes) {
-            viewer.scene.globe.clippingPlanes.removeAll();
-            newPlanes.forEach(plane => viewer.scene.globe.clippingPlanes.add(plane));
-        }
-
-    }, [clipBox, localTransform, controlsEnabled, viewer]);
+    const handleToggleVisibility = (filter: string) => {
+        const traceDataSource = dataSources.current.find(ds => ds.name === 'traces');
+        if (!traceDataSource) return;
+        traceDataSource.entities.values.forEach((entity: any) => {
+            if (entity.polyline) {
+                if (filter === 'all') {
+                    entity.polyline.show = true;
+                } else {
+                    entity.polyline.show = entity.name.startsWith(filter);
+                }
+            }
+        });
+    };
 
     return (
-        <div className="h-full w-full relative pointer-events-none">
-            <TooltipContent data={tooltip} />
-            <Legend show={controlsEnabled} />
-            <ClippingControls clipBox={clipBox} setClipBox={setClipBox} sliderRange={sliderRange} enabled={controlsEnabled} />
-            {animationState === 'initial' && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                    <button 
-                        onClick={() => setAnimationState('animating')}
-                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-2xl shadow-lg animate-pulse"
-                    >
-                        Start Animation
-                    </button>
-                </div>
-            )}
-        </div>
+        <>
+            <Legend title={graphiticCarbonLegendData.title} type="categorical" items={graphiticCarbonLegendData.items} show={controlsVisible} />
+            <DrillholeControls show={controlsVisible} onAnimate={handleAnimateDiscovery} onToggle={handleToggleVisibility} />
+        </>
     );
 };
 

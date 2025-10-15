@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
+import Legend from '@/components/ui/legend';
+import { graphiticCarbonLegendData } from '@/lib/legend-definitions';
 
 declare global {
     interface Window {
@@ -9,263 +11,172 @@ declare global {
     }
 }
 
-const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
-    "Quartz-Feldspathic": "#e1f6f3ff",
-    "GRSC": "#4c54549c",
-    "Granulite": "#b90b79ff",
-    "Khondalite": "#433e43ff",
-    "Marble": "#D4E6F1",
-    "Not Recovearble": "#0b1414ff",
-    "SOIL": "#70f35fff",
-    "Schist": "#445751ff",
-    "nan": "#FFFFFF",
-    "UNKNOWN": "#cccccc",
+const getAssayColor = (value: number, Cesium: any) => {
+    const v = Number(value);
+    if (!Number.isFinite(v)) return Cesium.Color.fromCssColorString('#CCCCCC');
+    if (v > 5.0) return Cesium.Color.RED;
+    if (v > 2.0) return Cesium.Color.ORANGE;
+    if (v > 0.5) return Cesium.Color.YELLOW;
+    if (v > 0.3) return Cesium.Color.GREEN;
+    if (v > 0.1) return Cesium.Color.CYAN;
+    return Cesium.Color.BLUE;
 };
 
-const Legend = () => (
-    <div className="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto">
-        <h3 className="font-bold text-lg mb-2">Lithology</h3>
-        <ul className="space-y-1">
-            {Object.entries(LITHOLOGY_COLOR_MAP_CSS).map(([name, color]) => (
-                (name !== 'nan' && name !== 'UNKNOWN') && (
-                <li key={name} className="flex items-center">
-                    <span className="inline-block w-4 h-4 rounded-full mr-2 border border-gray-400" style={{ backgroundColor: color }}></span>
-                    <span>{name}</span>
-                </li>
-                )
-            ))}
-        </ul>
-    </div>
-);
 
-const TooltipContent = ({ data }: { data: any }) => {
-    if (!data || !data.content) return null;
-    return (
-        <div
-            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none"
-            style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-        >
-            <p className="font-bold text-base mb-1">Hole ID: {data.content.hole_id}</p>
-            <ul className="list-none space-y-1">
-                <li><strong>Lat:</strong> {data.content.latitude?.toFixed(5)}</li>
-                <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
-                <li><strong>Depth From:</strong> {data.content.depth_from?.toFixed(2)} m</li>
-                <li><strong>Depth To:</strong> {data.content.depth_to?.toFixed(2)} m</li>
-                {data.content.lithology && <li><strong>Lithology:</strong> {data.content.lithology}</li>}
-            </ul>
-        </div>
-    );
-};
-
-const ClippingControls = ({ clipBox, setClipBox, sliderRange, enabled }: { clipBox: any, setClipBox: any, sliderRange: any, enabled: boolean }) => {
-    if (!enabled) return null;
-
-    const handleMinChange = (axis: 'x' | 'y' | 'z', value: number) => {
-        setClipBox((prev: any) => ({ ...prev, [`${axis}_min`]: Math.min(value, prev[`${axis}_max`]) }));
-    };
-
-    const handleMaxChange = (axis: 'x' | 'y' | 'z', value: number) => {
-        setClipBox((prev: any) => ({ ...prev, [`${axis}_max`]: Math.max(value, prev[`${axis}_min`]) }));
-    };
-
-    return (
-        <div className="absolute top-4 right-4 bg-white bg-opacity-80 p-4 rounded-lg shadow-md w-72 text-sm pointer-events-auto">
-            <h3 className="font-bold text-lg mb-3">Clipping Box Controls</h3>
-            <div className="space-y-3">
-                <div>
-                    <label className="block font-medium mb-1">X Axis (East/West)</label>
-                    <div className="flex items-center space-x-2">
-                        <span>Min</span>
-                        <input type="range" className="w-full" min={sliderRange.x.min} max={sliderRange.x.max} value={clipBox.x_min} onChange={e => handleMinChange('x', parseFloat(e.target.value))} />
-                        <span>Max</span>
-                        <input type="range" className="w-full" min={sliderRange.x.min} max={sliderRange.x.max} value={clipBox.x_max} onChange={e => handleMaxChange('x', parseFloat(e.target.value))} />
-                    </div>
-                </div>
-                <div>
-                    <label className="block font-medium mb-1">Y Axis (North/South)</label>
-                    <div className="flex items-center space-x-2">
-                        <span>Min</span>
-                        <input type="range" className="w-full" min={sliderRange.y.min} max={sliderRange.y.max} value={clipBox.y_min} onChange={e => handleMinChange('y', parseFloat(e.target.value))} />
-                        <span>Max</span>
-                        <input type="range" className="w-full" min={sliderRange.y.min} max={sliderRange.y.max} value={clipBox.y_max} onChange={e => handleMaxChange('y', parseFloat(e.target.value))} />
-                    </div>
-                </div>
-                <div>
-                    <label className="block font-medium mb-1">Z Axis (Elevation)</label>
-                    <div className="flex items-center space-x-2">
-                        <span>Min</span>
-                        <input type="range" className="w-full" min={sliderRange.z.min} max={sliderRange.z.max} value={clipBox.z_min} onChange={e => handleMinChange('z', parseFloat(e.target.value))} />
-                        <span>Max</span>
-                        <input type="range" className="w-full" min={sliderRange.z.min} max={sliderRange.z.max} value={clipBox.z_max} onChange={e => handleMaxChange('z', parseFloat(e.target.value))} />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const SubsurfaceCutawayViewer = () => {
     const { viewer, isLoaded } = useCesium();
-    const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
-    const lithologyColorMapCesiumRef = useRef<any>({});
     
-    const [clipBox, setClipBox] = useState({ x_min: 0, x_max: 0, y_min: 0, y_max: 0, z_min: 0, z_max: 0 });
-    const [sliderRange, setSliderRange] = useState({ x: {min:0, max:0}, y: {min:0, max:0}, z: {min:0, max:0} });
-    const [localTransform, setLocalTransform] = useState<any>(null);
-    const [controlsEnabled, setControlsEnabled] = useState(false);
-
+    const [viewState, setViewState] = useState<'subsurface' | 'animating' | 'surface'>('subsurface');
+    const [clipDistance, setClipDistance] = useState(0);
+    
+    const clippingPlaneRef = useRef<any>(null);
     const dataSourceRef = useRef<any>(null);
-    const eventHandlerRef = useRef<any>(null);
+    const gridPlaneRef = useRef<any>(null);
+    const boundingSphereRef = useRef<any>(null);
 
+    // Effect to setup the initial cutaway view
     useEffect(() => {
         if (!isLoaded || !viewer) return;
-
-        let isMounted = true;
         const Cesium = window.Cesium;
+        let isMounted = true;
 
-        Object.keys(LITHOLOGY_COLOR_MAP_CSS).forEach(key => {
-            lithologyColorMapCesiumRef.current[key] = Cesium.Color.fromCssColorString(LITHOLOGY_COLOR_MAP_CSS[key]);
-        });
-
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        handler.setInputAction((movement: any) => {
-            const pickedObject = viewer.scene.pick(movement.endPosition);
-            if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.properties) {
-                const entity = pickedObject.id;
-                const properties = entity.properties.getValue(viewer.clock.currentTime);
-                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: properties });
-            } else {
-                setTooltip({ display: false, top: 0, left: 0, content: null });
-            }
-        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-        eventHandlerRef.current = handler;
-
-        const loadDrillholesAndClip = async () => {
+        const setupScene = async () => {
             try {
-                const response = await fetch('/lithology_data.geojson');
-                const geoJson = await response.json();
-                
-                const customDataSource = new Cesium.CustomDataSource('drillholes');
+                const response = await fetch('/assay_data.geojson');
+                const assayData = await response.json();
+                if (!isMounted) return;
+
+                const drillholeDataSource = new Cesium.CustomDataSource('drillholes_cutaway');
                 const points: any[] = [];
-
-                geoJson.features.forEach((feature: any) => {
+                assayData.features.forEach((feature: any) => {
                     if (feature.geometry.type === 'LineString') {
-                        const { properties } = feature;
-                        const [startCoords, endCoords] = feature.geometry.coordinates;
-                        points.push(Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]));
-                        points.push(Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]));
-
-                        const startCartesian = Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]);
-                        const endCartesian = Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]);
-                        const length = Cesium.Cartesian3.distance(startCartesian, endCartesian);
-                        if (length === 0) return;
-
-                        const color = lithologyColorMapCesiumRef.current[properties.lithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
-                        const midpoint = Cesium.Cartesian3.midpoint(startCartesian, endCartesian, new Cesium.Cartesian3());
-                        const orientation = new Cesium.VelocityOrientationProperty(new Cesium.SampledPositionProperty());
-                        orientation.velocity = new Cesium.ConstantProperty(Cesium.Cartesian3.subtract(endCartesian, startCartesian, new Cesium.Cartesian3()));
-
-                        customDataSource.entities.add({
-                            position: midpoint, orientation: orientation,
-                            cylinder: { length: length, topRadius: 15, bottomRadius: 15, material: color },
-                            properties: { ...properties, latitude: startCoords[1], longitude: startCoords[0] }
-                        });
+                        const [start, end] = feature.geometry.coordinates;
+                        const positions = Cesium.Cartesian3.fromDegreesArrayHeights([...start, ...end]);
+                        points.push(positions[0]);
+                        points.push(positions[1]);
+                        const color = getAssayColor(feature.properties.graphitic_carbon, Cesium);
+                        drillholeDataSource.entities.add({ polyline: { positions, width: 5, material: color } });
                     }
                 });
+                
+                await viewer.dataSources.add(drillholeDataSource);
+                dataSourceRef.current = drillholeDataSource;
 
-                if (isMounted && !viewer.isDestroyed()) {
-                    viewer.dataSources.add(customDataSource);
-                    dataSourceRef.current = customDataSource;
+                if (points.length > 0) {
+                    const boundingSphere = Cesium.BoundingSphere.fromPoints(points);
+                    boundingSphereRef.current = boundingSphere;
+                    viewer.camera.flyToBoundingSphere(boundingSphere, { 
+                        duration: 1.5,
+                        offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(45.0), Cesium.Math.toRadians(-30.0), boundingSphere.radius * 1.5)
+                    });
 
-                    if (points.length > 0) {
-                        const boundingSphere = Cesium.BoundingSphere.fromPoints(points);
-                        const center = boundingSphere.center;
-                        const transform = Cesium.Transforms.eastNorthUpToFixedFrame(center);
-                        setLocalTransform(transform);
+                    const normal = Cesium.Cartesian3.fromElements(0.707, 0.707, 0);
+                    const plane = new Cesium.ClippingPlane(normal, 0);
+                    clippingPlaneRef.current = plane;
 
-                        const inverseTransform = Cesium.Matrix4.inverse(transform, new Cesium.Matrix4());
-                        const localPoints = points.map(p => Cesium.Matrix4.multiplyByPoint(inverseTransform, p, new Cesium.Cartesian3()));
-                        const localBoundingBox = Cesium.AxisAlignedBoundingBox.fromPoints(localPoints);
+                    viewer.scene.globe.clippingPlanes = new Cesium.ClippingPlaneCollection({
+                        planes: [plane],
+                        edgeWidth: 1.0,
+                        edgeColor: Cesium.Color.WHITE,
+                    });
 
-                        setClipBox({
-                            x_min: localBoundingBox.minimum.x, x_max: localBoundingBox.maximum.x,
-                            y_min: localBoundingBox.minimum.y, y_max: localBoundingBox.maximum.y,
-                            z_min: localBoundingBox.minimum.z, z_max: localBoundingBox.maximum.z,
-                        });
+                    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#1a202c');
 
-                        const rangePadding = 1000;
-                        setSliderRange({
-                            x: { min: localBoundingBox.minimum.x - rangePadding, max: localBoundingBox.maximum.x + rangePadding },
-                            y: { min: localBoundingBox.minimum.y - rangePadding, max: localBoundingBox.maximum.y + rangePadding },
-                            z: { min: localBoundingBox.minimum.z - rangePadding, max: localBoundingBox.maximum.z + rangePadding },
-                        });
-
-                        viewer.scene.globe.clippingPlanes = new Cesium.ClippingPlaneCollection({
-                            planes: [], edgeWidth: 1.0, edgeColor: Cesium.Color.YELLOW,
-                        });
-                        setControlsEnabled(true);
-                    }
-
-                    viewer.flyTo(customDataSource, {
-                        duration: 3.0,
-                        offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(30.0), Cesium.Math.toRadians(-45.0), 8000)
+                    gridPlaneRef.current = viewer.entities.add({
+                        position: boundingSphere.center,
+                        plane: {
+                            plane: new Cesium.Plane(Cesium.Cartesian3.UNIT_Z, 0.0),
+                            dimensions: new Cesium.Cartesian2(20000, 20000),
+                            material: new Cesium.GridMaterialProperty({ color: Cesium.Color.GREY, cellAlpha: 0.2, lineCount: new Cesium.Cartesian2(80, 80) })
+                        },
                     });
                 }
             } catch (error) {
-                console.error(`Error loading drillhole data:`, error);
+                console.error("Error setting up cutaway view:", error);
             }
         };
 
-        loadDrillholesAndClip();
+        setupScene();
 
         return () => {
             isMounted = false;
             if (viewer && !viewer.isDestroyed()) {
-                if (dataSourceRef.current) {
-                    viewer.dataSources.remove(dataSourceRef.current, true);
+                if (dataSourceRef.current) viewer.dataSources.remove(dataSourceRef.current, true);
+                if (gridPlaneRef.current) viewer.entities.remove(gridPlaneRef.current);
+                if (viewer.scene.globe.clippingPlanes) {
+                    viewer.scene.globe.clippingPlanes.enabled = false;
+                    viewer.scene.globe.clippingPlanes.removeAll();
                 }
-                if (eventHandlerRef.current && !eventHandlerRef.current.isDestroyed()) {
-                    eventHandlerRef.current.destroy();
-                }
-                viewer.scene.globe.clippingPlanes = undefined;
+                viewer.scene.globe.baseColor = Cesium.Color.BLACK;
             }
         };
     }, [isLoaded, viewer]);
-
+    
+    // Effect to handle slider updates
     useEffect(() => {
-        if (!controlsEnabled || !viewer || !localTransform) return;
+        if (clippingPlaneRef.current) {
+            clippingPlaneRef.current.distance = clipDistance;
+        }
+    }, [clipDistance]);
+
+    // Effect to handle return to surface animation
+    useEffect(() => {
+        if (viewState !== 'animating' || !isLoaded || !viewer || !boundingSphereRef.current) return;
 
         const Cesium = window.Cesium;
-        const transform = localTransform;
-        const rotation = Cesium.Matrix4.getMatrix3(transform, new Cesium.Matrix3());
 
-        const planeDefs = [
-            { normal: new Cesium.Cartesian3(-1, 0, 0), point: new Cesium.Cartesian3(clipBox.x_max, 0, 0) },
-            { normal: new Cesium.Cartesian3(1, 0, 0),  point: new Cesium.Cartesian3(clipBox.x_min, 0, 0) },
-            { normal: new Cesium.Cartesian3(0, -1, 0), point: new Cesium.Cartesian3(0, clipBox.y_max, 0) },
-            { normal: new Cesium.Cartesian3(0, 1, 0),  point: new Cesium.Cartesian3(0, clipBox.y_min, 0) },
-            { normal: new Cesium.Cartesian3(0, 0, -1), point: new Cesium.Cartesian3(0, 0, clipBox.z_max) },
-            { normal: new Cesium.Cartesian3(0, 0, 1),  point: new Cesium.Cartesian3(0, 0, clipBox.z_min) },
-        ];
-
-        const newPlanes: any[] = [];
-        for (const p_def of planeDefs) {
-            const worldPoint = Cesium.Matrix4.multiplyByPoint(transform, p_def.point, new Cesium.Cartesian3());
-            const worldNormal = Cesium.Matrix3.multiplyByVector(rotation, p_def.normal, new Cesium.Cartesian3());
-            const distance = Cesium.Cartesian3.dot(worldPoint, worldNormal);
-            newPlanes.push(new Cesium.ClippingPlane(worldNormal, distance));
+        // 1. Remove subsurface elements
+        if (viewer.scene.globe.clippingPlanes) {
+            viewer.scene.globe.clippingPlanes.enabled = false;
         }
-        
-        viewer.scene.globe.clippingPlanes.removeAll();
-        newPlanes.forEach(plane => viewer.scene.globe.clippingPlanes.add(plane));
+        if (gridPlaneRef.current) {
+            viewer.entities.remove(gridPlaneRef.current);
+            gridPlaneRef.current = null;
+        }
 
-    }, [clipBox, localTransform, controlsEnabled, viewer]);
+        // 2. Animate camera to surface view
+        viewer.flyTo(dataSourceRef.current, {
+            duration: 2.5,
+            complete: () => {
+                // 3. Reset globe state
+                if (viewer && !viewer.isDestroyed()) {
+                    viewer.scene.globe.baseColor = Cesium.Color.BLACK;
+                    setViewState('surface');
+                }
+            }
+        });
+
+    }, [viewState, isLoaded, viewer]);
 
     return (
         <div className="h-full w-full relative pointer-events-none">
-            <TooltipContent data={tooltip} />
-            <Legend />
-            <ClippingControls clipBox={clipBox} setClipBox={setClipBox} sliderRange={sliderRange} enabled={controlsEnabled} />
+            <div className={`absolute top-4 right-4 bg-white bg-opacity-80 p-4 rounded-lg shadow-md w-72 text-sm pointer-events-auto transition-opacity duration-300 ${viewState === 'subsurface' ? 'opacity-100' : 'opacity-0'}`}>
+                <h3 className="font-bold text-lg mb-2">Cutaway Control</h3>
+                <label className="block font-medium mb-1">Slice Position</label>
+                <input 
+                    type="range" 
+                    className="w-full" 
+                    min="-5000" 
+                    max="5000" 
+                    step="50"
+                    value={clipDistance}
+                    onChange={e => setClipDistance(parseFloat(e.target.value))}
+                />
+            </div>
+
+            {viewState === 'subsurface' && (
+                 <div className="absolute top-32 right-4 z-10 pointer-events-auto">
+                    <button 
+                        onClick={() => setViewState('animating')} 
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg"
+                    >
+                        Return to Surface
+                    </button>
+                </div>
+            )}
+
+                        <Legend title={graphiticCarbonLegendData.title} type="categorical" items={graphiticCarbonLegendData.items} show={viewState === 'subsurface'} />
         </div>
     );
 };

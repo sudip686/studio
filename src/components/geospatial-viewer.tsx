@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
+import Legend from '@/components/ui/legend';
+import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData } from '@/lib/legend-definitions';
 
 declare global {
     interface Window {
@@ -9,48 +11,11 @@ declare global {
     }
 }
 
-type GeoView = 'lithology' | 'assay';
+interface GeospatialViewerProps {
+    displayMode: 'lithology' | 'assay';
+}
 
-const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
-    "Quartz-Feldspathic": "#e1f6f3ff",
-    "GRSC": "#4c54549c",
-    "Granulite": "#b90b79ff",
-    "Khondalite": "#433e43ff",
-    "Marble": "#D4E6F1",
-    "Not Recovearble": "#0b1414ff",
-    "SOIL": "#70f35fff",
-    "Schist": "#445751ff",
-    "nan": "#FFFFFF",
-    "UNKNOWN": "#cccccc",
-};
 
-const Legend = ({ view, assayRange }: { view: GeoView, assayRange: { min: number, max: number } }) => {
-    return (
-        <div className="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto">
-            <h3 className="font-bold text-lg mb-2">{view === 'lithology' ? 'Lithology' : 'Assay (Graphitic Carbon)'}</h3>
-            {view === 'lithology' ? (
-                <ul className="space-y-1">
-                    {Object.entries(LITHOLOGY_COLOR_MAP_CSS).map(([name, color]) => (
-                        (name !== 'nan' && name !== 'UNKNOWN') && (
-                        <li key={name} className="flex items-center">
-                            <span className="inline-block w-4 h-4 rounded-full mr-2 border border-gray-400" style={{ backgroundColor: color }}></span>
-                            <span>{name}</span>
-                        </li>
-                        )
-                    ))}
-                </ul>
-            ) : (
-                <div className="flex flex-col items-center">
-                    <div className="w-full h-6 rounded" style={{ background: 'linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))' }}></div>
-                    <div className="flex justify-between w-full text-xs mt-1">
-                        <span>{assayRange.min.toFixed(2)}</span>
-                        <span>{assayRange.max.toFixed(2)}</span>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
 
 const TooltipContent = ({ data }: { data: any }) => {
     if (!data || !data.content) return null;
@@ -75,9 +40,8 @@ const TooltipContent = ({ data }: { data: any }) => {
     );
 };
 
-const GeospatialViewer = () => {
+const GeospatialViewer = ({ displayMode }: GeospatialViewerProps) => {
     const { viewer, isLoaded } = useCesium();
-    const [view, setView] = useState<GeoView>('lithology');
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
     const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
     
@@ -114,12 +78,12 @@ const GeospatialViewer = () => {
             }
 
             try {
-                const geoJsonPath = view === 'lithology' ? '/lithology_data.geojson' : '/assay_data.geojson';
+                const geoJsonPath = displayMode === 'lithology' ? '/lithology_data.geojson' : '/assay_data.geojson';
                 const response = await fetch(geoJsonPath);
                 const geoJson = await response.json();
 
                 let minAssay = Infinity, maxAssay = -Infinity;
-                if (view === 'assay') {
+                if (displayMode === 'assay') {
                     geoJson.features.forEach((feature: any) => {
                         const carbon = feature.properties.graphitic_carbon;
                         if (carbon < minAssay) minAssay = carbon;
@@ -139,7 +103,7 @@ const GeospatialViewer = () => {
                         if (length === 0) return;
 
                         let color;
-                        if (view === 'lithology') {
+                        if (displayMode === 'lithology') {
                             color = lithologyColorMapCesiumRef.current[properties.lithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
                         } else {
                             const carbon = properties.graphitic_carbon;
@@ -165,7 +129,7 @@ const GeospatialViewer = () => {
                 viewer.flyTo(customDataSource, { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 5000) });
 
             } catch (error) {
-                console.error(`Error loading ${view} data:`, error);
+                console.error(`Error loading ${displayMode} data:`, error);
             }
         };
 
@@ -181,15 +145,27 @@ const GeospatialViewer = () => {
                 }
             }
         };
-    }, [isLoaded, viewer, view]);
+    }, [isLoaded, viewer, displayMode]);
 
     return (
         <div className="h-full w-full relative pointer-events-none">
-            <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000 }} className="pointer-events-auto">
-                <button onClick={() => setView('lithology')} disabled={view === 'lithology'} className="bg-white p-2 mr-2 rounded">Lithology</button>
-                <button onClick={() => setView('assay')} disabled={view === 'assay'} className="bg-white p-2 rounded">Assay</button>
-            </div>
-            <Legend view={view} assayRange={assayRange} />
+            {displayMode === 'lithology' ? (
+                <Legend
+                    title={geospatialViewerLithologyLegendData.title}
+                    type="categorical"
+                    items={geospatialViewerLithologyLegendData.items}
+                    show={true}
+                />
+            ) : (
+                <Legend
+                    title="Assay (Graphitic Carbon)"
+                    type="gradient"
+                    gradient="linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))"
+                    minLabel={assayRange.min.toFixed(2)}
+                    maxLabel={assayRange.max.toFixed(2)}
+                    show={true}
+                />
+            )}
             <TooltipContent data={tooltip} />
         </div>
     );

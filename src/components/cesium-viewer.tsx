@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
+import KmlBoundary from './KmlBoundary';
+import IonImageryLayer from './IonImageryLayer';
+import DrillholeLayer from './DrillholeLayer';
+import Legend from '@/components/ui/legend';
+import { cesiumViewerLithologyLegendData, mineralDomainsLegendData } from '@/lib/legend-definitions';
 
 declare global {
     interface Window {
@@ -10,7 +15,7 @@ declare global {
     }
 }
 
-type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'ion_imagery' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'drillhole_3d_combined' | 'subsurface_deposit_view';
+type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'ion_imagery' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'drillhole_3d_combined' | 'subsurface_deposit_view' | 'geospatial_viewer';
 
 interface CesiumViewerProps {
     view: CesiumView;
@@ -28,48 +33,6 @@ interface DrillholeSegmentData {
 interface AssaySegment extends DrillholeSegmentData {
     graphitic_carbon: number;
 }
-
-const LITHOLOGY_COLOR_MAP_CSS: { [key: string]: string } = {
-    "Quartz-Feldspathic": "#d39127ff",
-    "GRSC": "#19292aff",
-    "Granulite": "#a1089aff",
-    "Khondalite": "#4f1dc4ff",
-    "Marble": "#D4E6F1",
-    "Not Recovearble": "#515A5A",
-    "SOIL": "#2df27cff",
-    "Schist": "#153224ff",
-    "nan": "#ffffffbe",
-    "UNKNOWN": "#cccccc",
-};
-
-const Legend = ({ view, assayRange, show }: { view: CesiumView, assayRange: { min: number, max: number }, show: boolean }) => {
-    if (!show) return null;
-    return (
-        <div className="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto">
-            <h3 className="font-bold text-lg mb-2">{view === 'geojson_drillholes_lithology' ? 'Lithology' : 'Assay (Graphitic Carbon)'}</h3>
-            {view === 'geojson_drillholes_lithology' ? (
-                <ul className="space-y-1">
-                    {Object.entries(LITHOLOGY_COLOR_MAP_CSS).map(([name, color]) => (
-                        (name !== 'nan' && name !== 'UNKNOWN') && (
-                        <li key={name} className="flex items-center">
-                            <span className="inline-block w-4 h-4 rounded-full mr-2 border border-gray-400" style={{ backgroundColor: color }}></span>
-                            <span>{name}</span>
-                        </li>
-                        )
-                    ))}
-                </ul>
-            ) : (
-                <div className="flex flex-col items-center">
-                    <div className="w-full h-6 rounded" style={{ background: 'linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))' }}></div>
-                    <div className="flex justify-between w-full text-xs mt-1">
-                        <span>{assayRange.min.toFixed(2)}</span>
-                        <span>{assayRange.max.toFixed(2)}</span>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
 
 const TooltipContent = ({ data }: { data: any }) => {
     if (!data || !data.content) return null;
@@ -93,69 +56,21 @@ const TooltipContent = ({ data }: { data: any }) => {
     );
 };
 
-const SubsurfaceAssayLegend = ({ assayRange, show }: { assayRange: { min: number, max: number }, show: boolean }) => {
-    if (!show) return null;
-    return (
-        <div className="absolute bottom-20 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto">
-            <h3 className="font-bold text-lg mb-2">Drill Trace (g/t Au)</h3>
-            <div className="flex flex-col items-center">
-                <div className="w-full h-6 rounded" style={{ background: 'linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))' }}></div>
-                <div className="flex justify-between w-full text-xs mt-1">
-                    <span>{assayRange.min.toFixed(2)}</span>
-                    <span>{assayRange.max.toFixed(2)}</span>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const MineralDomainsLegend = ({ show }: { show: boolean }) => {
-    if (!show) return null;
-    const legendItems = [
-        { color: '#ff0000', label: 'High-Grade' },
-        { color: '#ffa500', label: 'Medium-Grade' },
-        { color: '#00ff00', label: 'Low-Grade' },
-        { color: '#0000ff', label: 'Underground' },
-        { color: '#ffff00', label: 'Laterite' },
-    ];
-    return (
-        <div className="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto">
-            <h3 className="font-bold text-lg mb-2">Gold Mineralised Domains</h3>
-            <ul className="space-y-1">
-                {legendItems.map(({ color, label }) => (
-                    <li key={label} className="flex items-center">
-                        <span className="inline-block w-4 h-4 mr-2" style={{ backgroundColor: color }}></span>
-                        <span>{label}</span>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
 const CesiumViewer = ({ view }: CesiumViewerProps) => {
     const { viewer, isLoaded } = useCesium();
-    const lastViewRef = useRef<CesiumView | null>(null);
-
-    const componentDataSources = useRef<any[]>([]);
-    const componentEntities = useRef<any[]>([]);
-    const componentImageryLayers = useRef<any[]>([]);
-    const componentPrimitives = useRef<any[]>([]);
+    
     const eventHandlerRef = useRef<any>(null);
 
     const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
     const [showSubsurfaceAssayLegend, setShowSubsurfaceAssayLegend] = useState(false);
     const [showMineralDomainsLegend, setShowMineralDomainsLegend] = useState(false);
+    const [showExaggerationToolbar, setShowExaggerationToolbar] = useState(false);
 
+    // Effect for one-time setup
     useEffect(() => {
         if (!isLoaded || !viewer) return;
-
         const Cesium = window.Cesium;
-        const lithologyColorMapCesium: { [key: string]: any } = {};
-        Object.keys(LITHOLOGY_COLOR_MAP_CSS).forEach(key => {
-            lithologyColorMapCesium[key] = Cesium.Color.fromCssColorString(LITHOLOGY_COLOR_MAP_CSS[key]);
-        });
 
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
         handler.setInputAction((movement: any) => {
@@ -170,152 +85,127 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
         }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
         eventHandlerRef.current = handler;
 
-        const cleanup = () => {
-            componentDataSources.current.forEach(ds => viewer.dataSources.remove(ds, true));
-            componentEntities.current.forEach(e => viewer.entities.remove(e));
-            componentImageryLayers.current.forEach(l => viewer.imageryLayers.remove(l, true));
-            componentPrimitives.current.forEach(p => viewer.scene.primitives.remove(p));
-            
-            componentDataSources.current = [];
-            componentEntities.current = [];
-            componentImageryLayers.current = [];
-            componentPrimitives.current = [];
+        // Configure ScreenSpaceCameraController immediately on load
+        viewer.scene.screenSpaceCameraController.enableRotate = true;
+        viewer.scene.screenSpaceCameraController.enableTranslate = true;
+        viewer.scene.screenSpaceCameraController.enableZoom = true;
+        viewer.scene.screenSpaceCameraController.enableTilt = true;
+        viewer.scene.screenSpaceCameraController.enableLook = true;
+        viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
 
-            if (eventHandlerRef.current && !eventHandlerRef.current.isDestroyed()) {
-                eventHandlerRef.current.destroy();
-                eventHandlerRef.current = null;
+        const toolbar = document.getElementById("cesium-toolbar");
+        let subscription: any = null;
+
+        if (toolbar) {
+            let viewModel = Cesium.knockout.dataFor(toolbar);
+            if (!viewModel) {
+                viewModel = { exaggeration: 1.0 };
+                Cesium.knockout.track(viewModel);
+                Cesium.knockout.applyBindings(viewModel, toolbar);
             }
             
-            viewer.scene.globe.depthTestAgainstTerrain = true;
-            viewer.scene.verticalExaggeration = 1.0;
-            viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider(); // Reset to default
-        };
-
-        const loadView = async (viewName: CesiumView) => {
-            cleanup();
-
-            const kmlDataSource = await Cesium.KmlDataSource.load('/tanga_boundary.kmz');
-            viewer.dataSources.add(kmlDataSource);
-            componentDataSources.current.push(kmlDataSource);
-            const kmlEntity = kmlDataSource.entities.values.find((e: any) => e.polygon);
-
-            if (viewName === 'original') {
-                viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-                    `https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=MQ8jhB5F57QiT1CrsiUJ`
+            const observable = Cesium.knockout.getObservable(viewModel, 'exaggeration');
+            if (observable) {
+                subscription = observable.subscribe(
+                    (value: any) => { if (viewer) viewer.scene.verticalExaggeration = Number(value) }
                 );
-                if (kmlEntity) kmlEntity.polygon.fill = false;
-                await viewer.flyTo(kmlDataSource);
-            } else if (viewName === 'exaggerated_kml') {
-                viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-                    `https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=MQ8jhB5F57QiT1CrsiUJ`
-                );
-                await viewer.flyTo(kmlEntity, { duration: 3.0, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(30.0), Cesium.Math.toRadians(-45.0), 80000) });
-                viewer.scene.verticalExaggeration = 3.0;
-            } else if (viewName === 'styled_kml') {
-                if (kmlEntity) {
-                    kmlEntity.polygon.fill = true;
-                    kmlEntity.polygon.material = Cesium.Color.WHITE.withAlpha(0.5);
-                }
-                await viewer.flyTo(kmlEntity, { duration: 3.0, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0.0), Cesium.Math.toRadians(-50.0), 15000) });
-            } else if (viewName === 'ion_imagery' || viewName === 'drillhole_3d_combined' || viewName === 'subsurface_deposit_view') {
-                const layer = await Cesium.IonImageryProvider.fromAssetId(3678736);
-                const imageryLayer = viewer.imageryLayers.addImageryProvider(layer);
-                componentImageryLayers.current.push(imageryLayer);
-            } else if (viewName === 'tiff_overlay') {
-                const provider = await Cesium.IonImageryProvider.fromAssetId(3733958);
-                const layer = viewer.imageryLayers.addImageryProvider(provider);
-                componentImageryLayers.current.push(layer);
-                const rect = provider.rectangle ?? Cesium.Rectangle.fromDegrees(-180, -90, 180, 90);
-                viewer.camera.flyTo({ destination: rect, duration: 1.5 });
             }
-
-            if (viewName.startsWith('geojson_drillholes') || viewName === 'drillhole_3d_combined' || viewName === 'subsurface_deposit_view') {
-                const isLithology = viewName === 'geojson_drillholes_lithology';
-                const response = await fetch(isLithology ? '/lithology_data.geojson' : '/assay_data.geojson');
-                const data = await response.json();
-
-                let minAssay = Infinity, maxAssay = -Infinity;
-                if (!isLithology || viewName === 'drillhole_3d_combined' || viewName === 'subsurface_deposit_view') {
-                    data.features.forEach((feature: { properties: AssaySegment }) => {
-                        const d = feature.properties;
-                        if (d.graphitic_carbon < minAssay) minAssay = d.graphitic_carbon;
-                        if (d.graphitic_carbon > maxAssay) maxAssay = d.graphitic_carbon;
-                    });
-                    setAssayRange({ min: minAssay, max: maxAssay });
-                }
-
-                const customDataSource = new Cesium.CustomDataSource('drillholes');
-                data.features.forEach((feature: any) => {
-                    if (feature.geometry.type === 'LineString') {
-                        const { properties } = feature;
-                        const [startCoords, endCoords] = feature.geometry.coordinates;
-                        const startCartesian = Cesium.Cartesian3.fromDegrees(startCoords[0], startCoords[1], startCoords[2]);
-                        const endCartesian = Cesium.Cartesian3.fromDegrees(endCoords[0], endCoords[1], endCoords[2]);
-                        const length = Cesium.Cartesian3.distance(startCartesian, endCartesian);
-                        if (length === 0) return;
-
-                        let color;
-                        if (isLithology) {
-                            color = lithologyColorMapCesium[properties.lithology] || lithologyColorMapCesium['UNKNOWN'];
-                        } else {
-                            const carbon = properties.graphitic_carbon;
-                            const range = maxAssay - minAssay;
-                            const alpha = range > 0 ? (carbon - minAssay) / range : 0.5;
-                            color = Cesium.Color.fromHsl((1 - alpha) * 0.33, 1, 0.5);
-                        }
-
-                        const midpoint = Cesium.Cartesian3.midpoint(startCartesian, endCartesian, new Cesium.Cartesian3());
-                        const orientation = new Cesium.VelocityOrientationProperty(new Cesium.SampledPositionProperty());
-                        orientation.velocity = new Cesium.ConstantProperty(Cesium.Cartesian3.subtract(endCartesian, startCartesian, new Cesium.Cartesian3()));
-
-                        customDataSource.entities.add({
-                            position: midpoint, orientation: orientation,
-                            cylinder: { length: length, topRadius: 15, bottomRadius: 15, material: color },
-                            properties: { ...properties, latitude: startCoords[1], longitude: startCoords[0] }
-                        });
-                    }
-                });
-                viewer.dataSources.add(customDataSource);
-                componentDataSources.current.push(customDataSource);
-                if (!viewName.includes('combined') && !viewName.includes('deposit')) {
-                    viewer.flyTo(customDataSource, { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 5000) });
-                }
-            }
-
-            if (viewName === 'drillhole_3d_combined' || viewName === 'subsurface_deposit_view') {
-                setShowSubsurfaceAssayLegend(true);
-                setShowMineralDomainsLegend(true);
-                viewer.scene.globe.depthTestAgainstTerrain = false;
-                if (viewName === 'drillhole_3d_combined') viewer.scene.globe.show = false;
-
-                const modelUrl = viewName === 'drillhole_3d_combined' ? '/geologicalModel.glb' : '/mineral_domains.glb';
-                const model = await Cesium.Model.fromGltf({ url: modelUrl });
-                const primitive = viewer.scene.primitives.add(model);
-                componentPrimitives.current.push(primitive);
-
-                viewer.camera.flyTo({
-                    destination: Cesium.Cartesian3.fromDegrees(38.8, -5.2, 15000),
-                    orientation: { heading: Cesium.Math.toRadians(15.0), pitch: Cesium.Math.toRadians(-35.0), roll: 0.0 },
-                    duration: 3
-                });
-            }
-
-            lastViewRef.current = viewName;
-        };
-
-        if (lastViewRef.current !== view) {
-            loadView(view);
         }
 
-        return () => { cleanup(); };
-    }, [isLoaded, viewer, view]);
+        return () => {
+            if (subscription) {
+                subscription.dispose();
+            }
+            if (viewer && !viewer.isDestroyed()) {
+                if (eventHandlerRef.current) eventHandlerRef.current.destroy();
+            }
+        };
+    }, [isLoaded, viewer]);
+
+    // This effect acts as a "reset" button for the 3D scene. It runs
+    // every time the view changes to ensure the viewer is in 3D mode.
+    useEffect(() => {
+        if (!isLoaded || !viewer) return;
+
+        const Cesium = window.Cesium;
+
+        // 1. Force the scene back into 3D mode. This is the most important fix.
+        viewer.scene.mode = Cesium.SceneMode.SCENE3D;
+        
+        // 2. Reset the terrain and exaggeration, as other views might change them.
+        viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+        viewer.scene.verticalExaggeration = 1.0;
+
+        // 3. Hide UI elements that might have been shown by other views.
+        setShowExaggerationToolbar(false); // Or manage this based on the view
+
+        // 4. Re-enable all camera controls for 3D interaction.
+        viewer.scene.screenSpaceCameraController.enableRotate = true;
+        viewer.scene.screenSpaceCameraController.enableTranslate = true;
+        viewer.scene.screenSpaceCameraController.enableZoom = true;
+        viewer.scene.screenSpaceCameraController.enableTilt = true;
+        viewer.scene.screenSpaceCameraController.enableLook = true;
+        viewer.scene.screenSpaceCameraController.enableCollisionDetection = true;
+        
+    }, [view, isLoaded, viewer]); // It re-runs whenever the view changes!
 
     return (
         <div className="pointer-events-none">
-            <Legend view={view} assayRange={assayRange} show={view === 'geojson_drillholes_lithology' || view === 'geojson_drillholes_assay'} />
-            <SubsurfaceAssayLegend assayRange={assayRange} show={showSubsurfaceAssayLegend} />
-            <MineralDomainsLegend show={showMineralDomainsLegend} />
+            {viewer && (view === 'original' || view === 'exaggerated_kml') && <KmlBoundary viewer={viewer} />}
+            {viewer && view === 'styled_kml' && <KmlBoundary viewer={viewer} styled={true} />}
+            {viewer && view === 'ion_imagery' && <IonImageryLayer viewer={viewer} assetId={3678736} />}
+            {viewer && view === 'tiff_overlay' && <IonImageryLayer viewer={viewer} assetId={3754092} />}
+            {viewer && view === 'geojson_drillholes_lithology' && <DrillholeLayer viewer={viewer} type='lithology' />}
+            {viewer && view === 'geojson_drillholes_assay' && <DrillholeLayer viewer={viewer} type='assay' />}
+
+            { (view === 'geojson_drillholes_lithology') &&
+                <Legend
+                    title={cesiumViewerLithologyLegendData.title}
+                    type="categorical"
+                    items={cesiumViewerLithologyLegendData.items}
+                    show={true}
+                />
+            }
+            { (view === 'geojson_drillholes_assay') &&
+                <Legend
+                    title="Assay (Graphitic Carbon)"
+                    type="gradient"
+                    gradient="linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))"
+                    minLabel={assayRange.min.toFixed(2)}
+                    maxLabel={assayRange.max.toFixed(2)}
+                    show={true}
+                />
+            }
+            { showSubsurfaceAssayLegend &&
+                <Legend
+                    title="Assay (Graphitic Carbon)"
+                    type="gradient"
+                    gradient="linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))"
+                    minLabel={assayRange.min.toFixed(2)}
+                    maxLabel={assayRange.max.toFixed(2)}
+                    show={true}
+                />
+            }
+            { showMineralDomainsLegend &&
+                <Legend
+                    title={mineralDomainsLegendData.title}
+                    type="categorical"
+                    items={mineralDomainsLegendData.items}
+                    show={true}
+                />
+            }
             {tooltip.display && <TooltipContent data={tooltip} />}
+            <div id="cesium-toolbar" style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(42, 42, 42, 0.8)', padding: '4px', borderRadius: '4px', color: 'white', zIndex: 1000, display: showExaggerationToolbar ? 'block' : 'none' }} className="pointer-events-auto">
+                <table>
+                    <tbody>
+                    <tr>
+                        <td>Exaggeration</td>
+                        <td><input type="range" min="1" max="10" step="0.1" data-bind="value: exaggeration, valueUpdate: 'input'" /></td>
+                        <td><input type="text" size={5} data-bind="value: exaggeration" /></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };
