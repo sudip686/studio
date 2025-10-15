@@ -4,8 +4,10 @@ import * as React from "react"
 import { Menu, X } from "lucide-react"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
+import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet"
 
 interface ChapterMenuProps {
   viewSequence: readonly string[];
@@ -30,37 +32,43 @@ export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCur
           <span className="sr-only">Toggle Chapter Menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[300px] sm:w-[400px]">
+      <SheetContent side="left" className="w-[300px] sm:w-[400px] bg-gray-900 text-white">
         <SheetHeader className="flex flex-row items-center justify-between">
           <SheetTitle>
             <VisuallyHidden>Chapter Menu</VisuallyHidden>
           </SheetTitle>
+          <SheetDescription>
+            <VisuallyHidden>A list of chapters to navigate through the presentation.</VisuallyHidden>
+          </SheetDescription>
           <h2 className="text-lg font-semibold">Chapters</h2>
-          <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
-            <X />
-            <span className="sr-only">Close</span>
-          </Button>
         </SheetHeader>
         <div className="mt-8">
-          <ul className="space-y-2">
-            {viewSequence.map((view, index) => (
-              <li key={view}>
-                <a
-                  href="#"
-                  onClick={() => handleChapterClick(index)}
+          <ScrollArea className="h-[calc(100vh-10rem)]">
+            <ul className="space-y-2">
+              {viewSequence.map((view, index) => (
+                <li key={view}>
+                  <a
+                    href="#"
+                    onClick={() => handleChapterClick(index)}
                   className={`flex items-center rounded-md px-4 py-2 text-lg font-medium transition-colors
                     ${
                       currentViewIndex === index
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
+                        ? "bg-gray-700 text-white"
+                        : "hover:bg-gray-800"
                     }`}
-                >
-                  <span className="mr-4 text-2xl font-bold">{index + 1}</span>
-                  <span>{viewTitles[view]}</span>
+                  >
+                    <span className="text-lg font-medium">{viewTitles[view]}</span>
+                    <span className="ml-auto text-sm text-gray-400">{index + 1}</span>
+                  </a>
+                </li>
+              ))}
+              <li>
+                <a href="/chapters" className={`flex items-center rounded-md px-4 py-2 text-lg font-medium transition-colors hover:bg-gray-800`}>
+                    <span className="text-lg font-medium">3D Viewers</span>
                 </a>
               </li>
-            ))}
-          </ul>
+            </ul>
+          </ScrollArea>
         </div>
       </SheetContent>
     </Sheet>

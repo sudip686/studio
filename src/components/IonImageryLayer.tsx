@@ -1,17 +1,19 @@
 import { useEffect, useRef } from 'react';
 
+import { useCesium } from '@/contexts/cesium-context';
+
 interface IonImageryLayerProps {
-    viewer: any;
     assetId: number;
 }
 
-const IonImageryLayer = ({ viewer, assetId }: IonImageryLayerProps) => {
+const IonImageryLayer = ({ assetId }: IonImageryLayerProps) => {
+    const { viewer } = useCesium();
     const imageryLayerRef = useRef<any>(null);
 
     useEffect(() => {
         if (!viewer || viewer.isDestroyed()) return;
 
-        const Cesium = window.Cesium;
+        const Cesium = (window as any).Cesium as typeof import('cesium');
         let isMounted = true;
 
         const loadImageryLayer = async () => {
@@ -20,7 +22,7 @@ const IonImageryLayer = ({ viewer, assetId }: IonImageryLayerProps) => {
                 if (isMounted && viewer && !viewer.isDestroyed()) {
                     const layer = viewer.imageryLayers.addImageryProvider(provider);
                     imageryLayerRef.current = layer;
-                    viewer.flyTo(layer);
+                    viewer.scene.requestRender();
                 }
             } catch (error) {
                 console.error(`Error loading ION imagery asset ${assetId}:`, error);

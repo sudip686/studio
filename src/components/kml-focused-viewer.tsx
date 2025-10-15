@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
-import Legend from '@/components/ui/legend';
+import { Legend } from '@/components/ui/legend';
 import { graphiticCarbonLegendData } from '@/lib/legend-definitions';
 
 declare global {
@@ -23,13 +23,13 @@ const getAssayColor = (value: number, Cesium: any) => {
 };
 
 const KmlFocusedViewer = () => {
-    const { viewer, isLoaded } = useCesium();
+    const { viewer, ready } = useCesium(); // Using new context
     const dataSources = useRef<any[]>([]).current;
     const gridPlaneRef = useRef<any>(null);
 
     useEffect(() => {
-        if (!isLoaded || !viewer) return;
-        const Cesium = window.Cesium;
+        if (!ready || !viewer) return;
+        const Cesium = (window as any).Cesium as typeof import('cesium');
         let isMounted = true;
 
         const setupScene = async () => {
@@ -44,7 +44,7 @@ const KmlFocusedViewer = () => {
                 dataSources.push(kmlDataSource);
 
                 // 2. Load drillhole data
-                const response = await fetch('/assay_data.geojson');
+                const response = await fetch('/assay_data.geojson'); // Replaced fetchCachedData
                 const assayData = await response.json();
                 if (!isMounted) return;
 
@@ -74,18 +74,20 @@ const KmlFocusedViewer = () => {
                             viewer.scene.globe.show = false;
                             viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#1a202c');
 
-                            const boundingSphere = kmlDataSource.entities.values[0]?.polygon?.hierarchy?.getValue(viewer.clock.currentTime)?.positions?.[0];
-                            if(boundingSphere) {
-                                const center = Cesium.BoundingSphere.fromPoints(boundingSphere)?.center;
-                                gridPlaneRef.current = viewer.entities.add({
-                                    name: 'KML Focus Grid',
-                                    position: center,
-                                    plane: {
-                                        plane: new Cesium.Plane(Cesium.Cartesian3.UNIT_Z, 0),
-                                        dimensions: new Cesium.Cartesian2(40000, 40000),
-                                        material: new Cesium.GridMaterialProperty({ color: Cesium.Color.GREY, cellAlpha: 0.2, lineCount: new Cesium.Cartesian2(100, 100) })
-                                    }
-                                });
+                            const kmlEntity = kmlDataSource.entities.values[0];
+                            if(kmlEntity) {
+                                const boundingSphere = viewer.dataSourceDisplay.getBoundingSphere(kmlEntity, true, new Cesium.BoundingSphere());
+                                if (boundingSphere) {
+                                    gridPlaneRef.current = viewer.entities.add({
+                                        name: 'KML Focus Grid',
+                                        position: boundingSphere.center,
+                                        plane: {
+                                            plane: new Cesium.Plane(Cesium.Cartesian3.UNIT_Z, -boundingSphere.center.z),
+                                            dimensions: new Cesium.Cartesian2(40000, 40000),
+                                            material: new Cesium.GridMaterialProperty({ color: Cesium.Color.GREY, cellAlpha: 0.2, lineCount: new Cesium.Cartesian2(100, 100) })
+                                        }
+                                    });
+                                }
                             }
                         }
                     }
@@ -107,7 +109,7 @@ const KmlFocusedViewer = () => {
                 viewer.scene.backgroundColor = Cesium.Color.BLACK;
             }
         };
-    }, [isLoaded, viewer]);
+    }, [ready, viewer]);
 
     return (
         <div className="h-full w-full relative pointer-events-none">

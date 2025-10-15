@@ -1,50 +1,54 @@
-'use client';
-
-interface LegendItem {
-    color: string;
-    label: string;
-}
+import React from 'react';
 
 interface LegendProps {
-    title: string;
-    show?: boolean;
-    type: 'categorical' | 'gradient';
-    items?: LegendItem[];
-    gradient?: string;
-    minLabel?: string | number;
-    maxLabel?: string | number;
+  title: string;
+  items?: { label: string; color: string }[]; // Make items optional for gradient type
+  type?: 'categorical' | 'gradient';
+  gradient?: string;
+  minLabel?: string;
+  maxLabel?: string;
+  show?: boolean;
 }
 
-const Legend = ({ title, show = true, type, items, gradient, minLabel, maxLabel }: LegendProps) => {
-    if (!show) return null;
+export const Legend: React.FC<LegendProps> = ({
+  title,
+  items,
+  type = 'categorical',
+  gradient,
+  minLabel,
+  maxLabel,
+  show = true,
+}) => {
+  if (!show) return null;
 
-    const renderCategorical = () => (
-        <ul className="space-y-1">
-            {items?.map((item) => (
-                <li key={item.label} className="flex items-center">
-                    <span className="w-4 h-4 mr-2 border border-gray-300" style={{ backgroundColor: item.color }}></span>
-                    <span>{item.label}</span>
-                </li>
-            ))}
-        </ul>
-    );
-
-    const renderGradient = () => (
-        <div className="flex flex-col items-center">
-            <div className="w-full h-6 rounded" style={{ background: gradient }}></div>
-            <div className="flex justify-between w-full text-xs mt-1">
-                <span>{minLabel}</span>
-                <span>{maxLabel}</span>
+  return (
+    <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-3 rounded-lg shadow-lg z-50">
+      <h4 className="font-bold text-lg mb-2">{title}</h4>
+      {type === 'categorical' && items && (
+        <div className="space-y-1">
+          {items.map((item, index) => (
+            <div key={index} className="flex items-center">
+              <span
+                className="w-4 h-4 rounded-full mr-2"
+                style={{ backgroundColor: item.color }}
+              ></span>
+              <span>{item.label}</span>
             </div>
+          ))}
         </div>
-    );
-
-    return (
-        <div className={`absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-md max-w-xs text-sm pointer-events-auto transition-opacity duration-500 ${show ? 'opacity-100' : 'opacity-0'}`}>
-            <h3 className="font-bold text-lg mb-2">{title}</h3>
-            {type === 'categorical' ? renderCategorical() : renderGradient()}
+      )}
+      {type === 'gradient' && gradient && (
+        <div className="flex flex-col items-stretch mt-2">
+          <div
+            className="h-4 w-full rounded-md"
+            style={{ background: gradient }}
+          ></div>
+          <div className="flex justify-between text-xs mt-1">
+            <span>{minLabel}</span>
+            <span>{maxLabel}</span>
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
-
-export default Legend;

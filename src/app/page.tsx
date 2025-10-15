@@ -1,147 +1,135 @@
 'use client';
 
-import { CesiumProvider } from '@/contexts/cesium-context';
 import { useState, useEffect } from 'react';
-import CesiumViewer from "@/components/cesium-viewer";
-import GeospatialViewer from "@/components/geospatial-viewer";
-import GeoVision, { GeoVisionDisplayMode } from "@/components/geo-vision";
-import DrillholeLocationMap from "@/components/drillhole-location-map";
-import DownholePlot from "@/components/downhole-plot";
-import ResourceModelViewer from "@/components/resource-model-viewer";
-import StatisticalAnalysis from "@/components/statistical-analysis";
-import SubsurfaceCutawayViewer from "@/components/subsurface-cutaway-viewer";
-import AnimatedRevealViewer from "@/components/animated-reveal-viewer";
-import KmlFocusedViewer from "@/components/kml-focused-viewer";
-
 import { ChapterMenu } from "@/components/ui/chapter-menu";
-import BasemapPicker from "@/components/basemap-picker";
+import { CesiumProvider } from '@/contexts/cesium-context';
+import CesiumViewSwitch from '@/components/CesiumViewSwitch';
+import ThreeJsViewSwitch from '@/components/ThreeJsViewSwitch';
+import { ThreeSceneProvider } from '@/contexts/three-scene-context';
 
-// Define the sequence of views
-const viewSequence = ['original', 'exaggerated_kml', 'styled_kml', 'tiff_overlay', 'ion_imagery', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'drillhole_3d_combined', 'subsurface_deposit_view', 'geospatial_lithology', 'geospatial_assay', 'drillhole_location_lithology', 'drillhole_location_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'geovision_assay', 'geovision_block_carbon', 'geovision_block_resc', 'resource_model_viewer', 'downhole_plot'] as const;
+// Simplified view sequence
+const viewSequence = [
+  'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'geospatial_lithology', 'geospatial_assay',
+  'drillhole_location_lithology', 'drillhole_location_assay', 'drillhole_lithology_reveal',
+  'subsurface_cutaway', 'kml_focused_view', 
+  'lithology_view', 'assay_view', 'block_model_carbon_view', 'block_model_resc_view',
+  'resource_model_viewer',
+  'downhole_plot', 'grand_canyon_assay', 'grand_canyon_lithology',
+  'block_model_box_cutter_grade', 'block_model_box_cutter_class',
+  'terrain_clipping', 'cesium_three_block_model'
+] as const;
+
 type ViewType = typeof viewSequence[number];
 
 const viewTitles: { [key in ViewType]: string } = {
-    original: "Tanga Graphite Project - Tanzania",
-    exaggerated_kml: "Exaggerated 3D Terrain View",
-    styled_kml: "Exploration License Area",
-    tiff_overlay: "Exploration License Area View",
-    ion_imagery: "High-Resolution Satellite Imagery",
-    geojson_drillholes_lithology: "Drillholes - Lithology",
-    geojson_drillholes_assay: "Drillholes - Assay",
-    drillhole_3d_combined: "3D Drillhole Animation",
-    subsurface_deposit_view: "Subsurface Deposit View",
-    drillhole_location_lithology: "Drillhole Location Map - Lithology",
-    drillhole_location_assay: "Drillhole Location Map - Assay",
-    drillhole_lithology_reveal: "Drillhole Map & 3D Reveal",
-    subsurface_cutaway: "Interactive Subsurface Cutaway",
-    kml_focused_view: "KML-Focused Subsurface View",
-    geovision_assay: "3D Drillholes - Assay",
-    geovision_block_carbon: "3D Block Model - Carbon",
-    geovision_block_resc: "3D Block Model - Classification",
-    resource_model_viewer: "Resource Estimation Block Model",
-    downhole_plot: "Downhole Plot",
-    geospatial_lithology: "Geospatial View - Lithology",
-    geospatial_assay: "Geospatial View - Assay",
+  'original': 'Original View',
+  'exaggerated_kml': 'Exaggerated KML',
+  'styled_kml': 'Styled KML',
+  'tanaga_accessibility': 'Tanaga Accessibility',
+  'tanga_geological_map': 'Tanga Geological Map',
+  'geojson_drillholes_lithology': 'GeoJSON Drillholes Lithology',
+  'geojson_drillholes_assay': 'GeoJSON Drillholes Assay',
+  'geospatial_lithology': 'Geospatial Lithology',
+  'geospatial_assay': 'Geospatial Assay',
+  'drillhole_location_lithology': 'Drillhole Location Lithology',
+  'drillhole_location_assay': 'Drillhole Location Assay',
+  'drillhole_lithology_reveal': 'Drillhole Lithology Reveal',
+  'subsurface_cutaway': 'Subsurface Cutaway',
+  'kml_focused_view': 'KML Focused View',
+  //'terrain_traces': 'Terrain Traces',
+  'lithology_view': '3D Lithology',
+  'assay_view': '3D Assay',
+  'block_model_carbon_view': '3D Block Model - Carbon',
+  'block_model_resc_view': '3D Block Model - Resource Classification',
+  'resource_model_viewer': 'Resource Model Viewer',
+  'downhole_plot': 'Downhole Plot',
+  'grand_canyon_assay': 'Grand Canyon Assay',
+  'grand_canyon_lithology': 'Grand Canyon Lithology',
+  'block_model_box_cutter_grade': 'Block Model Box Cutter Grade',
+  'block_model_box_cutter_class': 'Block Model Box Cutter Class',
+  'terrain_clipping': 'Terrain Clipping',
+  'cesium_three_block_model': 'Cesium Three Block Model'
 };
+
+const cesiumSwitcherViews = new Set<string>([
+    'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map', 
+    'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'tiff_overlay', 'project_location',
+    'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer', 'grand_canyon_assay', 'grand_canyon_lithology', 'cesium_three_block_model', 'drillhole_location_lithology', 'drillhole_location_assay', 'terrain_clipping', 'block_model_box_cutter_grade', 'block_model_box_cutter_class'
+]);
+
+const threeJsSwitcherViews = new Set<string>([
+    'lithology_view',
+    'assay_view',
+    'block_model_carbon_view',
+    'block_model_resc_view',
+]);
 
 export default function Home() {
   const [currentViewIndex, setCurrentViewIndex] = useState(0);
   const [title, setTitle] = useState(viewTitles[viewSequence[0]]);
   const [titleVisible, setTitleVisible] = useState(true);
+  const [assayCutoff, setAssayCutoff] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     setTitleVisible(false);
     setTimeout(() => {
-        setTitle(viewTitles[viewSequence[currentViewIndex]]);
-        setTitleVisible(true);
-    }, 300); // Corresponds to the fade-out duration
+      setTitle(viewTitles[viewSequence[currentViewIndex]]);
+      setTitleVisible(true);
+    }, 300);
   }, [currentViewIndex]);
 
   const currentView: ViewType = viewSequence[currentViewIndex];
+  const handleNext = () => setCurrentViewIndex(i => Math.min(i + 1, viewSequence.length - 1));
+  const handlePrev = () => setCurrentViewIndex(i => Math.max(i - 1, 0));
 
-  const isCesiumView = ['original', 'exaggerated_kml', 'styled_kml', 'tiff_overlay', 'ion_imagery', 'drillhole_3d_combined', 'subsurface_deposit_view', 'geojson_drillholes_lithology', 'geojson_drillholes_assay'].includes(currentView);
+  const isCesiumSwitcherView = cesiumSwitcherViews.has(currentView);
+  const isThreeJsSwitcherView = threeJsSwitcherViews.has(currentView);
+  const isStandalone2D = ['downhole_plot'].includes(currentView);
 
-  const handleNext = () => {
-    setCurrentViewIndex((prevIndex) => Math.min(prevIndex + 1, viewSequence.length - 1));
-  };
-
-  const handlePrev = () => {
-    setCurrentViewIndex((prevIndex) => Math.max(prevIndex - 1, 0));
-  };
+  console.log(`[page.tsx] Rendering view: ${currentView}`);
 
   return (
-    <CesiumProvider>
-      <main className="h-screen w-full relative bg-transparent pointer-events-none">
-        <div
-          className={`absolute top-8 left-1/2 -translate-x-1/2 text-3xl font-bold text-white bg-black bg-opacity-50 p-4 rounded-lg z-20 transition-opacity duration-300 ${
-            titleVisible ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          {title}
-        </div>
+      <div className="h-full w-full relative bg-black">
+        <main className="absolute top-0 left-0 h-full w-full pointer-events-none z-20">
+          <div className={`absolute top-8 left-1/2 -translate-x-1/2 text-3xl font-bold text-white bg-black bg-opacity-50 p-4 rounded-lg transition-opacity duration-300 ${titleVisible ? "opacity-100" : "opacity-0"}`}>
+            {title}
+          </div>
+        </main>
         <div className="fixed top-4 left-4 z-[9999] pointer-events-auto">
-          <ChapterMenu
-            viewSequence={viewSequence}
-            viewTitles={viewTitles}
-            currentViewIndex={currentViewIndex}
-            setCurrentViewIndex={setCurrentViewIndex}
-          />
+          <ChapterMenu viewSequence={viewSequence} viewTitles={viewTitles} currentViewIndex={currentViewIndex} setCurrentViewIndex={setCurrentViewIndex} />
         </div>
-        <div className="h-full w-full">
-          {isCesiumView ? (
-            <CesiumViewer
-              view={
-                currentView as
-                  | "original"
-                  | "exaggerated_kml"
-                  | "styled_kml"
-                  | "tiff_overlay"
-                  | "ion_imagery"
-                  | "drillhole_3d_combined"
-                  | "subsurface_deposit_view"
-                  | "geojson_drillholes_lithology"
-                  | "geojson_drillholes_assay"
-              }
-            />
-          ) : currentView === "geospatial_lithology" ? (
-            <GeospatialViewer displayMode="lithology" />
-          ) : currentView === "geospatial_assay" ? (
-            <GeospatialViewer displayMode="assay" />
-          ) : currentView.startsWith("geovision_") ? (
-            <GeoVision displayMode={currentView.replace('geovision_', '') as GeoVisionDisplayMode} />
-          ) : currentView === "drillhole_location_lithology" ? (
-            <DrillholeLocationMap displayMode="lithology" />
-          ) : currentView === "drillhole_location_assay" ? (
-            <DrillholeLocationMap displayMode="assay" />
-          ) : currentView === "drillhole_lithology_reveal" ? (
-            <AnimatedRevealViewer />
-          ) : currentView === "subsurface_cutaway" ? (
-            <SubsurfaceCutawayViewer />
-          ) : currentView === "kml_focused_view" ? (
-            <KmlFocusedViewer />
-          ) : currentView === "resource_model_viewer" ? (
-            <ResourceModelViewer />
-          ) : null}
-        </div>
+        {isThreeJsSwitcherView && (
+            <div className="fixed top-4 right-4 z-[9999] pointer-events-auto bg-black bg-opacity-70 p-2 rounded-lg text-white">
+                <label htmlFor="assayCutoff" className="mr-2">Assay Cutoff:</label>
+                <input
+                    id="assayCutoff"
+                    type="number"
+                    step="0.1"
+                    value={assayCutoff ?? ''}
+                    onChange={(e) => setAssayCutoff(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                    className="w-24 p-1 rounded bg-gray-800 text-white border border-gray-700"
+                />
+            </div>
+        )}
+        {currentViewIndex > 0 && <div onClick={handlePrev} className="fixed top-1/2 left-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-30 select-none hover:bg-opacity-50 pointer-events-auto">&lt;</div>}
+        {currentViewIndex < viewSequence.length - 1 && <div onClick={handleNext} className="fixed top-1/2 right-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-30 select-none hover:bg-opacity-50 pointer-events-auto">&gt;</div>}
 
-        {/* Navigation Arrows */}
-        {currentViewIndex > 0 && (
-          <div
-            onClick={handlePrev}
-            className="fixed top-1/2 left-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-20 select-none hover:bg-opacity-50 pointer-events-auto"
-          >
-            &lt;
+        <ThreeSceneProvider> {/* NEW: ThreeSceneProvider wraps the entire view area */}
+          <div className="h-full w-full absolute inset-0">
+              {isCesiumSwitcherView && (
+                  <CesiumProvider>
+                      <CesiumViewSwitch view={currentView as any} />
+                  </CesiumProvider>
+              )}
+
+              {isThreeJsSwitcherView && (
+                  <ThreeJsViewSwitch view={currentView as any} assayCutoff={assayCutoff} />
+              )}
+
+              {isStandalone2D && <div className="h-full w-full bg-white">{/* Standalone 2D content */}</div>}
           </div>
-        )}
-        {currentViewIndex < viewSequence.length - 1 && (
-          <div
-            onClick={handleNext}
-            className="fixed top-1/2 right-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-20 select-none hover:bg-opacity-50 pointer-events-auto"
-          >
-            &gt;
-          </div>
-        )}
-      </main>
-    </CesiumProvider>
+        </ThreeSceneProvider> {/* NEW: Closing tag for ThreeSceneProvider */}
+         <div id="cesium-toolbar" className="absolute top-12 left-4 z-10 hidden bg-zinc-800/80 text-white p-2 rounded"></div>
+      </div>
   );
 }

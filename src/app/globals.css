@@ -1,8 +1,12 @@
+@import "cesium/Build/Cesium/Widgets/widgets.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html, body {
+    @apply h-full w-full m-0 p-0 overflow-hidden;
+  }
   :root {
     --background: 195 23% 95%;
     --foreground: 0 0% 3.9%;

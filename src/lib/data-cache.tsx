@@ -52,7 +52,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                     blockModelResponse.json()
                 ]);
 
-                const parsedDrillholes: DrillholeSegment[] = [...lithologyGeoJson.features, ...assayGeoJson.features].flatMap((f: any) => {
+                const parsedDrillholes: DrillholeSegment[] = [...(lithologyGeoJson.features || []), ...(assayGeoJson.features || [])].flatMap((f: any) => {
                     const p = f.properties;
                     if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) return [];
                     const [startCoords, endCoords] = f.geometry.coordinates;

@@ -1,131 +1,224 @@
 'use client';
+import React, { createContext, useContext, useRef, useState, useEffect } from 'react';
+import { createRenderController, RenderController } from '@/lib/cesium-render-controller';
+import { clipTilesetToRectangle } from '@/lib/utils/aoi-clip';
+import { bufferRectangleMeters } from '@/lib/utils/rectangle-utils';
 
-import { createContext, useContext, useRef, useEffect, useState, ReactNode, useCallback } from 'react';
+type PerfProfile = 'performance' | 'balanced' | 'quality';
 
-declare global {
-    interface Window {
-        Cesium: any;
-    }
-}
-
-// 1. UPDATE THE CONTEXT SHAPE to include the setBasemap function
-interface CesiumContextValue {
-    viewer: any;
-    isLoaded: boolean;
-    setBasemap: (style: string) => void;
-}
-
-// 2. UPDATE THE DEFAULT CONTEXT VALUE
-const CesiumContext = createContext<CesiumContextValue | null>(null);
-
-export const CesiumProvider = ({ children }: { children: ReactNode }) => {
-    const cesiumContainerRef = useRef<HTMLDivElement>(null);
-    const [viewer, setViewer] = useState<any>(null);
-    const [isLoaded, setIsLoaded] = useState(false);
-
-    // 3. CREATE THE setBasemap FUNCTION
-    // This function can now be called from any component that uses the useCesium hook
-    const setBasemap = useCallback((style: string) => {
-        if (!viewer) return;
-
-        const key = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
-        const layers = viewer.imageryLayers;
-
-        // Remove all existing base layers
-        for (let i = layers.length - 1; i >= 0; i--) {
-            const layer = layers.get(i);
-            if (!layer._isOverlay) layers.remove(layer, true);
-        }
-
-        const provider = new window.Cesium.UrlTemplateImageryProvider({
-            url: `https://api.maptiler.com/maps/${style}/{z}/{x}/{y}.png?key=${key}`,
-            credit: "© MapTiler © OpenStreetMap"
-        });
-
-        layers.addImageryProvider(provider, 0); // Add as the new base layer
-    }, [viewer]); // This function depends on the viewer instance
-
-    // 4. UPDATE THE INITIALIZATION useEffect
-    useEffect(() => {
-        // Use an async function inside useEffect to handle await
-        const initializeViewer = async () => {
-           if (cesiumContainerRef.current && !viewer && window.Cesium) {
-        try {
-            window.Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzMmJlZTgxYi0wMjE5LTRhYzAtYTM1ZS02NzE0MDYxMGQzODMiLCJpZCI6MzMxMTEyLCJpYXQiOjE3NTgxNzk2Njh9.oqTC-DWfZOq776pNzMR9eYnS3VA17n6y3jOcuoXkJqs'; // Your token
-
-            const key = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
-            
-            // Await the terrain provider and catch potential errors
-            const terrainProvider = await window.Cesium.CesiumTerrainProvider.fromUrl(
-                `https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=${key}`,
-                { requestVertexNormals: true }
-            );
-
-            const v = new window.Cesium.Viewer(cesiumContainerRef.current, {
-                terrainProvider: terrainProvider,
-                timeline: false,
-                animation: false,
-                // Your other viewer options...
-            });
-
-            // --- Scene Quality and Configuration ---
-
-            // Prevents underground geometry from showing through the surface
-            v.scene.globe.depthTestAgainstTerrain = true;
-
-            // Enables lighting calculations based on the sun's position
-            v.scene.globe.enableLighting = true;
-
-            // Enhances the 3D effect of the terrain
-            v.scene.verticalExaggeration = 1.5;
-
-            // ADDED: Enable FXAA for anti-aliasing, which smooths jagged edges
-            v.scene.postProcessStages.fxaa.enabled = true;
-
-            setViewer(v);
-            setIsLoaded(true);
-
-        } catch (error) {
-            // ADDED: Catch errors during initialization (e.g., bad API key for terrain)
-            console.error("Failed to initialize the Cesium Viewer:", error);
-            // Optionally, you could set an error state here to show a message in the UI
-            }
-        }
-        };
-
-        initializeViewer();
-
-        return () => {
-            if (viewer && !viewer.isDestroyed()) {
-                viewer.destroy();
-                setViewer(null);
-            }
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Set a default basemap once the viewer is loaded
-    useEffect(() => {
-        if (isLoaded && viewer) {
-            setBasemap('satellite');
-        }
-    }, [isLoaded, viewer, setBasemap]);
-
-    return (
-        // 5. ADD setBasemap TO THE PROVIDER'S VALUE
-        <CesiumContext.Provider value={{ viewer, isLoaded, setBasemap }}>
-            <div className="h-full w-full absolute top-0 left-0" ref={cesiumContainerRef} />
-            <div className="absolute top-0 left-0 h-full w-full pointer-events-none">
-                {children}
-            </div>
-        </CesiumContext.Provider>
-    );
+type CesiumCtx = {
+  viewer: any | null;
+  ready: boolean;
+  renderController: RenderController | null;
+  tileset: any | null; // OSM Buildings
+  kmlDataSource: any | null;
+  kmlLabel: any | null;
+  applyTilesetProfile: ((tileset: any, p: PerfProfile) => void) | null;
 };
 
-export const useCesium = () => {
-    const context = useContext(CesiumContext);
-    if (context === null) {
-        throw new Error('useCesium must be used within a CesiumProvider');
+const Ctx = createContext<CesiumCtx>({ 
+  viewer: null, 
+  ready: false, 
+  renderController: null, 
+  tileset: null, 
+  kmlDataSource: null,
+  kmlLabel: null,
+  applyTilesetProfile: null 
+});
+
+export const useCesium = () => useContext(Ctx);
+
+export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const initializedRef = useRef(false);
+  const [viewer, setViewer] = useState<any | null>(null);
+  const [ready, setReady] = useState(false);
+  const [renderController, setRenderController] = useState<RenderController | null>(null);
+  const [tileset, setTileset] = useState<any | null>(null);
+  const [kmlDataSource, setKmlDataSource] = useState<any | null>(null);
+  const [kmlLabel, setKmlLabel] = useState<any | null>(null);
+
+  const applyTilesetProfileRef = useRef<((tileset: any, p: PerfProfile) => void) | null>(null);
+  const controllerRef = useRef<RenderController | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (initializedRef.current) return; // StrictMode double-mount guard
+    initializedRef.current = true;
+
+    let v: any;
+    let destroyed = false;
+
+    // Helper to fly so a rectangle fills the view
+    function flyToRectangleFill(viewer: any, rect: any, pitchDeg = -35, headingDeg = 25) {
+      const Cesium = (window as any).Cesium;
+      const corners = [
+        Cesium.Cartesian3.fromRadians(rect.west, rect.south),
+        Cesium.Cartesian3.fromRadians(rect.west, rect.north),
+        Cesium.Cartesian3.fromRadians(rect.east, rect.south),
+        Cesium.Cartesian3.fromRadians(rect.east, rect.north),
+      ];
+      const bs = Cesium.BoundingSphere.fromPoints(corners);
+      return viewer.camera.flyToBoundingSphere(
+        bs,
+        {
+          duration: 1.2,
+          offset: new Cesium.HeadingPitchRange(
+            Cesium.Math.toRadians(headingDeg),
+            Cesium.Math.toRadians(pitchDeg),
+            bs.radius * 1.2 // standoff so it fills nicely
+          )
+        }
+      );
     }
-    return context;
+
+    (async () => {
+      if (destroyed || !containerRef.current) return;
+      const Cesium = (window as any).Cesium;
+      if (!Cesium) return;
+
+      Cesium.Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN || '';
+
+      // 1. Viewer with terrain
+      const terrainProvider = await Cesium.createWorldTerrainAsync({
+        requestVertexNormals: true,
+        requestWaterMask: true,
+      });
+      if (destroyed) return;
+
+      v = new Cesium.Viewer(containerRef.current, {
+        terrainProvider,
+        animation: false, timeline: false, geocoder: false, homeButton: false,
+        sceneModePicker: false, baseLayerPicker: false, navigationHelpButton: false,
+        infoBox: false, selectionIndicator: false, requestRenderMode: true,
+        maximumRenderTimeChange: Number.POSITIVE_INFINITY,
+      });
+      if (destroyed) { v.destroy(); return; }
+      setViewer(v);
+
+      // 2. Load KMZ to determine AOI first
+      let aoi: any;
+      try {
+        const kmlDs = await Cesium.KmlDataSource.load('/tanga_boundary.kmz', {
+          camera: v.scene.camera,
+          canvas: v.scene.canvas
+        });
+        if (destroyed) { v.dataSources.remove(kmlDs); return; }
+        await v.dataSources.add(kmlDs);
+        setKmlDataSource(kmlDs);
+
+        const entity = kmlDs.entities.values.find((e: any) => e.polygon);
+        if (entity && entity.polygon) {
+          entity.polygon.outline = true;
+          entity.polygon.outlineColor = Cesium.Color.RED;
+          entity.polygon.outlineWidth = 5;
+          entity.polygon.fill = false;
+
+          const polyPositions = entity.polygon.hierarchy.getValue(v.clock.currentTime).positions;
+          aoi = Cesium.Rectangle.fromCartesianArray(polyPositions, Cesium.Ellipsoid.WGS84);
+
+          const polyCenter = Cesium.BoundingSphere.fromPoints(polyPositions).center;
+          const label = v.entities.add({
+            position: polyCenter,
+            label: {
+              text: 'Tanga Graphite',
+              font: 'bold 20px sans-serif',
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              fillColor: Cesium.Color.YELLOW,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 3,
+              showBackground: true,
+              backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              pixelOffset: new Cesium.Cartesian2(0, -20),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              eyeOffset: new Cesium.Cartesian3(0, 0, -100)
+            }
+          });
+          if (destroyed) { v.entities.remove(label); return; }
+          setKmlLabel(label);
+        }
+      } catch (err) {
+        console.error("KMZ loading failed:", err);
+        aoi = Cesium.Rectangle.fromDegrees(38.6, -5.2, 39.1, -4.5);
+      }
+      if (destroyed) return;
+
+      // 3. Create buffered AOI and add limited aerial imagery
+      let aoiBuffered: any;
+      if (aoi) {
+        aoiBuffered = bufferRectangleMeters(Cesium, aoi, 25000); // 25km buffer
+      }
+
+      const aerialProvider = Cesium.createWorldImagery
+        ? Cesium.createWorldImagery({ style: Cesium.IonWorldImageryStyle.AERIAL })
+        : await Cesium.IonImageryProvider.fromAssetId(2);
+      
+      const aerialLayer = new Cesium.ImageryLayer(aerialProvider, {
+        rectangle: aoiBuffered
+      });
+      if (destroyed) return;
+      v.imageryLayers.add(aerialLayer);
+
+      // 4. Add OSM Buildings and clip to AOI
+      try {
+        const buildings = await Cesium.createOsmBuildingsAsync();
+        if (destroyed) { v.scene.primitives.remove(buildings); return; }
+        v.scene.primitives.add(buildings);
+        setTileset(buildings);
+        if (aoiBuffered) {
+          clipTilesetToRectangle(v, buildings, aoiBuffered);
+        }
+        buildings.cullRequestsWhileMoving = true;
+        buildings.cullRequestsWhileMovingMultiplier = 10.0;
+        buildings.dynamicScreenSpaceError = true;
+        buildings.maximumScreenSpaceError = 8;
+      } catch (err) {
+        console.error("OSM Buildings failed:", err);
+      }
+      if (destroyed) return;
+
+      // 5. Apply 3D cues
+      v.scene.globe.show = true;
+      v.scene.globe.translucency.enabled = false;
+      v.scene.globe.depthTestAgainstTerrain = true;
+      v.scene.globe.enableLighting = true;
+      try { v.scene.terrainExaggeration = 1.3; } catch {}
+
+      // 6. Fly camera to AOI
+      if (aoiBuffered) {
+        await flyToRectangleFill(v, aoiBuffered);
+      }
+      if (destroyed) return;
+      v.scene.requestRender();
+
+      // 7. Final setup
+      const controller = createRenderController(v);
+      controller.bindUserInput();
+      controllerRef.current = controller;
+      setRenderController(controller);
+      setReady(true);
+
+    })();
+
+    return () => {
+      destroyed = true;
+      if (controllerRef.current) controllerRef.current.stop();
+      try { if (v && !v.isDestroyed()) v.destroy(); } catch {}
+      setViewer(null);
+      setRenderController(null);
+      setTileset(null);
+      setKmlDataSource(null);
+      setKmlLabel(null);
+      setReady(false);
+      initializedRef.current = false;
+    };
+  }, []);
+
+  return (
+    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current }}>
+      <div className="absolute inset-0 pointer-events-auto" ref={containerRef} />
+      {children}
+    </Ctx.Provider>
+  );
 };

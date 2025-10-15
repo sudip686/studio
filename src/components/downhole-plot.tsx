@@ -3,13 +3,10 @@
 
 import { useEffect, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts';
+import { useDataCache, DrillholeSegment as DataCacheDrillholeSegment } from '@/lib/data-cache';
 
-interface DrillholeSegment {
-    hole_id: string;
-    depth_from: number;
-    depth_to: number;
-    lithology?: string;
-    graphitic_carbon?: number;
+interface DrillholeSegment extends DataCacheDrillholeSegment {
+    // Additional properties if any, otherwise just extends
 }
 
 const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
@@ -30,50 +27,41 @@ const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
 };
 
 const DownholePlot = () => {
+    const { drillholeData } = useDataCache();
     const [holeIds, setHoleIds] = useState<string[]>([]);
     const [selectedHoleId, setSelectedHoleId] = useState<string>('');
     const [plotData, setPlotData] = useState<DrillholeSegment[]>([]);
 
     useEffect(() => {
-        const fetchData = async () => {
-            const lithologyResponse = await fetch('/lithology_data.geojson');
-            const lithologyGeoJson = await lithologyResponse.json();
-            const lithologyData = lithologyGeoJson.features.map((f: any) => f.properties);
+        if (!drillholeData) return;
 
-            const assayResponse = await fetch('/assay_data.geojson');
-            const assayGeoJson = await assayResponse.json();
-            const assayData = assayGeoJson.features.map((f: any) => f.properties);
+        const combinedData: { [key: string]: DrillholeSegment[] } = {};
 
-            const combinedData: { [key: string]: DrillholeSegment[] } = {};
-
-            lithologyData.forEach((segment: any) => {
-                if (!combinedData[segment.hole_id]) {
-                    combinedData[segment.hole_id] = [];
-                }
-                combinedData[segment.hole_id].push(segment);
-            });
-
-            assayData.forEach((segment: any) => {
-                if (combinedData[segment.hole_id]) {
-                    const existingSegment = combinedData[segment.hole_id].find(s => s.depth_from === segment.depth_from && s.depth_to === segment.depth_to);
-                    if (existingSegment) {
-                        existingSegment.graphitic_carbon = segment.graphitic_carbon;
-                    } else {
-                        combinedData[segment.hole_id].push(segment);
-                    }
-                }
-            });
-
-            const allHoleIds = Object.keys(combinedData);
-            setHoleIds(allHoleIds);
-            if (allHoleIds.length > 0) {
-                setSelectedHoleId(allHoleIds[0]);
-                setPlotData(combinedData[allHoleIds[0]].sort((a, b) => a.depth_from - b.depth_from));
+        drillholeData.lithology.forEach((segment: DrillholeSegment) => {
+            if (!combinedData[segment.hole_id]) {
+                combinedData[segment.hole_id] = [];
             }
-        };
+            combinedData[segment.hole_id].push(segment);
+        });
 
-        fetchData();
-    }, []);
+        drillholeData.assay.forEach((segment: DrillholeSegment) => {
+            if (combinedData[segment.hole_id]) {
+                const existingSegment = combinedData[segment.hole_id].find(s => s.depth_from === segment.depth_from && s.depth_to === segment.depth_to);
+                if (existingSegment) {
+                    existingSegment.graphitic_carbon = segment.graphitic_carbon;
+                } else {
+                    combinedData[segment.hole_id].push(segment);
+                }
+            }
+        });
+
+        const allHoleIds = Object.keys(combinedData);
+        setHoleIds(allHoleIds);
+        if (allHoleIds.length > 0) {
+            setSelectedHoleId(allHoleIds[0]);
+            setPlotData(combinedData[allHoleIds[0]].sort((a, b) => a.depth_from - b.depth_from));
+        }
+    }, [drillholeData]);
 
     useEffect(() => {
         if (selectedHoleId) {

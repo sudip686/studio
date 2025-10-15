@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
-import Legend from '@/components/ui/legend';
+import { Legend } from '@/components/ui/legend';
 import { graphiticCarbonLegendData } from '@/lib/legend-definitions';
 
 declare global {
@@ -17,15 +17,15 @@ const getAssayColor = (value: number, Cesium: any, alpha = 1.0) => {
     let color;
     if (!Number.isFinite(v)) {
         color = Cesium.Color.fromCssColorString('#CCCCCC');
-    } else if (v > 5.0) {
+    } else if (v > 10.0) {
         color = Cesium.Color.RED;
-    } else if (v > 2.0) {
+    } else if (v > 8.0) {
         color = Cesium.Color.ORANGE;
-    } else if (v > 0.5) {
+    } else if (v > 4) {
         color = Cesium.Color.YELLOW;
-    } else if (v > 0.3) {
+    } else if (v > 2) {
         color = Cesium.Color.GREEN;
-    } else if (v > 0.1) {
+    } else if (v > 1) {
         color = Cesium.Color.CYAN;
     } else {
         color = Cesium.Color.BLUE;
@@ -62,7 +62,7 @@ const DrillholeControls = ({ onAnimate, onToggle, show }: { onAnimate: () => voi
 type AnimationPhase = 'initial' | 'loading' | 'ready' | 'surface' | 'slice' | 'final';
 
 const AnimatedRevealViewer = () => {
-    const { viewer, isLoaded } = useCesium();
+    const { viewer } = useCesium();
     const [controlsVisible, setControlsVisible] = useState(false);
     const [animationPhase, setAnimationPhase] = useState<AnimationPhase>('initial');
     
@@ -72,12 +72,12 @@ const AnimatedRevealViewer = () => {
 
     // Phase 1: Data Loading
     useEffect(() => {
-        if (!isLoaded || !viewer || animationPhase !== 'initial') return;
+        if (!viewer || animationPhase !== 'initial') return;
 
         const loadData = async () => {
             try {
                 setAnimationPhase('loading');
-                const Cesium = window.Cesium;
+                const Cesium = (window as any).Cesium as typeof import('cesium');
                 const response = await fetch('/assay_data.geojson');
                 const assayData = await response.json();
 
@@ -102,7 +102,9 @@ const AnimatedRevealViewer = () => {
                 });
 
                 await viewer.dataSources.add(collarDataSource);
+                viewer.scene.requestRender();
                 await viewer.dataSources.add(traceDataSource);
+                viewer.scene.requestRender();
                 dataSources.current = [collarDataSource, traceDataSource];
                 
                 const boundingSphere = Cesium.BoundingSphere.fromPoints(points);
@@ -116,7 +118,7 @@ const AnimatedRevealViewer = () => {
         };
 
         loadData();
-    }, [isLoaded, viewer, animationPhase]);
+    }, [viewer, animationPhase]);
 
     // Phase 2-4: Animation Controller
     useEffect(() => {
@@ -126,9 +128,9 @@ const AnimatedRevealViewer = () => {
             return;
         }
 
-        if (!isLoaded || !viewer || !sceneData.current.boundingSphere) return;
+        if (!viewer || !sceneData.current.boundingSphere) return;
 
-        const Cesium = window.Cesium;
+        const Cesium = (window as any).Cesium as typeof import('cesium');
         const { boundingSphere, siteCenter } = sceneData.current;
         let tickListener: (() => void) | undefined;
 
@@ -139,11 +141,13 @@ const AnimatedRevealViewer = () => {
                     duration: 2.0,
                     offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), 2000)
                 });
+                viewer.scene.requestRender();
                 setAnimationPhase('slice');
             }
             else if (animationPhase === 'slice') {
                 const enu = Cesium.Transforms.eastNorthUpToFixedFrame(siteCenter);
-                const east = Cesium.Matrix4.getColumn(enu, 0, new Cesium.Cartesian3());
+                const east4 = Cesium.Matrix4.getColumn(enu, 0, new Cesium.Cartesian4());
+                const east = Cesium.Cartesian3.fromCartesian4(east4);
                 const planeNormal = Cesium.Cartesian3.normalize(east, new Cesium.Cartesian3());
                 const distance = -Cesium.Cartesian3.dot(planeNormal, siteCenter);
 
@@ -154,16 +158,17 @@ const AnimatedRevealViewer = () => {
                     planes: [halfMapPlane],
                     edgeWidth: 1.5,
                     edgeColor: Cesium.Color.WHITE,
-                    enabled: true,
-                    shadows: Cesium.ShadowMode.DISABLED
+                    enabled: true
                 });
                 viewer.scene.globe.clippingPlanes = planeCollection;
+                viewer.scene.requestRender();
                 cleanupFuncs.current.push(() => { if(viewer.scene.globe.clippingPlanes) viewer.scene.globe.clippingPlanes.enabled = false; });
 
                 viewer.scene.globe.undergroundColor = Cesium.Color.BLACK;
                 viewer.scene.globe.depthTestAgainstTerrain = true;
 
-                const up = Cesium.Matrix4.getColumn(enu, 2, new Cesium.Cartesian3());
+                const up4 = Cesium.Matrix4.getColumn(enu, 2, new Cesium.Cartesian4());
+                const up = Cesium.Cartesian3.fromCartesian4(up4);
                 const gridPlaneDef = new Cesium.Plane(Cesium.Cartesian3.normalize(up, new Cesium.Cartesian3()), -Cesium.Cartesian3.dot(up, siteCenter));
                 const gridSize = boundingSphere.radius * 3.0;
                 
@@ -171,6 +176,7 @@ const AnimatedRevealViewer = () => {
                     position: siteCenter,
                     plane: { plane: gridPlaneDef, dimensions: new Cesium.Cartesian2(gridSize, gridSize), material: new Cesium.GridMaterialProperty({ color: Cesium.Color.fromCssColorString('#6b7280'), cellAlpha: 0.35, lineCount: new Cesium.Cartesian2(24, 24) }) }
                 });
+                viewer.scene.requestRender();
                 cleanupFuncs.current.push(() => viewer.entities.remove(gridEntity));
 
                 const verticalGridEntity = viewer.entities.add({
@@ -180,6 +186,7 @@ const AnimatedRevealViewer = () => {
                         material: new Cesium.GridMaterialProperty({ color: Cesium.Color.fromCssColorString('#6b7280'), cellAlpha: 0.3, lineCount: new Cesium.Cartesian2(24, 12) })
                     }
                 });
+                viewer.scene.requestRender();
                 cleanupFuncs.current.push(() => viewer.entities.remove(verticalGridEntity));
 
                 const duration = 5.0;
@@ -190,6 +197,7 @@ const AnimatedRevealViewer = () => {
                     const p = Math.min(1.0, elapsed / duration);
                     const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
                     sceneData.current.halfMapPlane.distance = Cesium.Math.lerp(distance - boundingSphere.radius, distance, ease);
+                    viewer.scene.requestRender();
 
                     if (p >= 1.0) {
                         viewer.clock.onTick.removeEventListener(tickListener);
@@ -205,10 +213,12 @@ const AnimatedRevealViewer = () => {
                     traceDataSource.entities.values.forEach((e:any) => {
                         const material = e.polyline.material.color.getValue(viewer.clock.currentTime);
                         e.polyline.material = new Cesium.ColorMaterialProperty(material.withAlpha(1.0));
+                        viewer.scene.requestRender();
                     });
                 }
                 setControlsVisible(true);
                 viewer.scene.screenSpaceCameraController.enableInputs = true;
+                viewer.scene.requestRender();
             }
         };
 
@@ -219,7 +229,7 @@ const AnimatedRevealViewer = () => {
                 viewer.clock.onTick.removeEventListener(tickListener);
             }
         };
-    }, [animationPhase, isLoaded, viewer]);
+    }, [animationPhase, viewer]);
 
     // Cleanup effect
     useEffect(() => {

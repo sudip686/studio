@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
-import Legend from '@/components/ui/legend';
+import { Legend } from '@/components/ui/legend';
 import { graphiticCarbonLegendData } from '@/lib/legend-definitions';
 
 declare global {
@@ -22,10 +22,8 @@ const getAssayColor = (value: number, Cesium: any) => {
     return Cesium.Color.BLUE;
 };
 
-
-
 const SubsurfaceCutawayViewer = () => {
-    const { viewer, isLoaded } = useCesium();
+    const { viewer, ready } = useCesium(); // Using new context
     
     const [viewState, setViewState] = useState<'subsurface' | 'animating' | 'surface'>('subsurface');
     const [clipDistance, setClipDistance] = useState(0);
@@ -37,8 +35,8 @@ const SubsurfaceCutawayViewer = () => {
 
     // Effect to setup the initial cutaway view
     useEffect(() => {
-        if (!isLoaded || !viewer) return;
-        const Cesium = window.Cesium;
+        if (!ready || !viewer) return;
+        const Cesium = (window as any).Cesium as typeof import('cesium');
         let isMounted = true;
 
         const setupScene = async () => {
@@ -79,6 +77,7 @@ const SubsurfaceCutawayViewer = () => {
                         planes: [plane],
                         edgeWidth: 1.0,
                         edgeColor: Cesium.Color.WHITE,
+                        enabled: true
                     });
 
                     viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#1a202c');
@@ -111,20 +110,21 @@ const SubsurfaceCutawayViewer = () => {
                 viewer.scene.globe.baseColor = Cesium.Color.BLACK;
             }
         };
-    }, [isLoaded, viewer]);
+    }, [ready, viewer]);
     
     // Effect to handle slider updates
     useEffect(() => {
         if (clippingPlaneRef.current) {
             clippingPlaneRef.current.distance = clipDistance;
+            viewer.scene.requestRender();
         }
-    }, [clipDistance]);
+    }, [clipDistance, viewer]);
 
     // Effect to handle return to surface animation
     useEffect(() => {
-        if (viewState !== 'animating' || !isLoaded || !viewer || !boundingSphereRef.current) return;
+        if (viewState !== 'animating' || !ready || !viewer || !boundingSphereRef.current) return;
 
-        const Cesium = window.Cesium;
+        const Cesium = (window as any).Cesium as typeof import('cesium');
 
         // 1. Remove subsurface elements
         if (viewer.scene.globe.clippingPlanes) {
@@ -147,7 +147,7 @@ const SubsurfaceCutawayViewer = () => {
             }
         });
 
-    }, [viewState, isLoaded, viewer]);
+    }, [viewState, ready, viewer]);
 
     return (
         <div className="h-full w-full relative pointer-events-none">
@@ -176,7 +176,7 @@ const SubsurfaceCutawayViewer = () => {
                 </div>
             )}
 
-                        <Legend title={graphiticCarbonLegendData.title} type="categorical" items={graphiticCarbonLegendData.items} show={viewState === 'subsurface'} />
+            <Legend title={graphiticCarbonLegendData.title} type="categorical" items={graphiticCarbonLegendData.items} show={viewState === 'subsurface'} />
         </div>
     );
 };
