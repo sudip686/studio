@@ -61,6 +61,11 @@ export async function surfaceSnapAndSegment(
     const len = Math.max(0, r.depth_to - r.depth_from);
     if (len <= 1e-6) continue;
 
+    if (Math.abs(surfaceZ - (surfaceZ - len)) < 1e-6) {
+        console.warn('[Drill QA] Skipping degenerate segment due to Z values', { hole_id: r.hole_id, surfaceZ, bottomZ: surfaceZ - len });
+        continue;
+    }
+
     // Calculate absolute Z for the bottom of the segment
     const bottomZ = surfaceZ - len;
 

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Legend } from '@/components/ui/legend';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
-import { CompassOverlay, getCameraHeadingDeg } from '@/components/ui/CompassOverlay';
+import CompassOverlay from '@/components/ui/CompassOverlay';
 import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context'; // NEW: Import useThreeScene
@@ -34,6 +34,12 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
     const asNumber = (v: any, d = 0) => {
       const n = Number(v);
       return Number.isFinite(n) ? n : d;
+    };
+
+    function getThreeHeading(camera: THREE.PerspectiveCamera, THREE: any) {
+        const v = new THREE.Vector3();
+        camera.getWorldDirection(v);
+        return Math.atan2(v.x, v.z);
     };
 
     const modelCenter = useMemo(() => {
@@ -220,7 +226,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         </div>
         {camera && renderer && ( // Check camera and renderer for overlays
           <div style={{ position: 'absolute', top: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-            <CompassOverlay headingDeg={getCameraHeadingDeg(camera, THREE)} />
+            <CompassOverlay mode="three" getHeading={() => getThreeHeading(camera, THREE)} />
             <ScaleBarOverlay
               camera={camera}
               rendererDom={renderer.domElement} // Get canvas from renderer

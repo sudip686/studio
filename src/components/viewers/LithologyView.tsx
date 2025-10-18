@@ -21,12 +21,21 @@ const LITHOLOGY_COLOR_MAP: Record<string,string> = {
 const colorForLithology = (raw?: string) =>
   LITHOLOGY_COLOR_MAP[String(raw ?? 'unknown').trim().toLowerCase()] ?? '#cccccc';
 
-function getSegmentEnds(seg:{feature:any}) {
+function getSegmentEnds(seg: DrillholeSegment) {
+  // First, try the existing method
   const g = seg?.feature?.geometry;
   if (g?.type === 'LineString' && g.coordinates?.length >= 2) {
     const [a,b] = g.coordinates; // [lon,lat,z]
     if (a?.length>=3 && b?.length>=3) return {a, b};
   }
+
+  // Fallback: Assume vertical hole using segment properties
+  if (seg.lon != null && seg.lat != null && seg.elevation != null && seg.depth_from != null && seg.depth_to != null) {
+      const a = [seg.lon, seg.lat, seg.elevation - seg.depth_from];
+      const b = [seg.lon, seg.lat, seg.elevation - seg.depth_to];
+      return { a, b };
+  }
+
   return null; // skip bad segments
 }
 
@@ -36,6 +45,7 @@ export default function LithologyViewer() {
     const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
 
     useEffect(() => {
+        console.log('[LithologyView] Received drillholeData.lithology:', drillholeData?.lithology?.slice(0, 5));
         if (!scene || !camera || !controls || !dynamicGroup) return;
         console.log('[LithologyView] Initializing with:', { scene, camera, controls, dynamicGroup });
         if (!drillholeData || !Array.isArray(drillholeData.lithology) || drillholeData.lithology.length === 0) {

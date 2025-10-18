@@ -11,7 +11,7 @@ export async function clampCollarsToSurface(viewer: any, lonLatArr: Array<{lon:n
   if (!clamped || clamped.some((c:any) => !Cesium.defined(c))) {
     const cartos = lonLatArr.map(p => Cesium.Cartographic.fromDegrees(p.lon, p.lat));
     const sampled = await Cesium.sampleTerrainMostDetailed(terrainProvider, cartos);
-    clamped = sampled.map((c:any) => Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, c.height));
+    clamped = sampled.map((c:any) => Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, c.height ?? 0));
   }
   return clamped; // Cartesian3[] on the photoreal surface (or terrain)
 }
@@ -33,7 +33,7 @@ export function addDrillholeCylinder(dataSource: any, positions: any[], color?: 
   const entity = dataSource.entities.add({
     polylineVolume: {
       positions,
-      shape: circleShape(0.3), // meters (tune radius)
+      shape: circleShape(0.6), // meters (tune radius)
       material: color || Cesium.Color.fromBytes(255, 120, 0, 200),
       cornerType: Cesium.CornerType.MITERED
     }

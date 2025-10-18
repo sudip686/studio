@@ -1,11 +1,13 @@
-'use client';
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
-import { useCesiumBoreholes } from '@/lib/boreholes/useCesiumBoreholes';
-import { lithologyColor, assayColor } from '@/lib/boreholes/colors';
 import { Legend } from '@/components/ui/legend';
-
-import { drillholeLocationMapLithologyLegendData } from '@/lib/legend-definitions';
+import KmlBoundary from './KmlBoundary';
+import CompassOverlay from '@/components/ui/CompassOverlay';
+import MetricScaleOverlay from '@/components/ui/MetricScaleOverlay';
+import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/legend-definitions';
+import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
+import { BoreholeCylinderCache, Interval, Style } from '@/lib/boreholes/borehole-cylinders';
+import { colorFromLegend } from '@/lib/boreholes/legend-color';
 
 const TooltipContent = ({ data }: { data: any }) => {
     if (!data || !data.content) return null;
@@ -26,220 +28,212 @@ const TooltipContent = ({ data }: { data: any }) => {
         </div>
     );
 };
-import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
-import { BoreholeRowBase } from '@/lib/boreholes/borehole-core';
 
 interface DrillholeLayerProps {
     type: 'lithology' | 'assay';
 }
 
 const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
-    const { viewer, ready } = useCesium();
-    const { drillholeData } = useDataCache();
-    const [rows, setRows] = useState<BoreholeRowBase[] | null>(null);
-    const [min, setMin] = useState(0);
-    const [max, setMax] = useState(1);
-    const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
-    const eventHandlerRef = useRef<any>(null);
-    const [globeTransparency, setGlobeTransparency] = useState(1.0);
+  const { viewer, ready } = useCesium();
+  const { drillholeData } = useDataCache();
+  const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
+  const [uiTick, setUiTick] = useState(0);
+  
+  const cacheRef = useRef<BoreholeCylinderCache | null>(null);
+  const intervalsRef = useRef<any[]>([]);
 
-    // 1. Use data from cache based on the view type and sample terrain
-    useEffect(() => {
-        if (!type || !drillholeData || !viewer || !ready) return;
-        const Cesium = (window as any).Cesium;
+  // Main effect for creating and styling geometries
+  useEffect(() => {
+    if (!viewer || !ready || !drillholeData) return;
+    let isCancelled = false;
 
-        const processAndSampleData = async () => {
-            const dataToProcess = type === 'lithology' ? drillholeData.lithology : drillholeData.assay;
-            const outRows: BoreholeRowBase[] = [];
-            let mi = Infinity, ma = -Infinity;
+    cacheRef.current = new BoreholeCylinderCache(viewer);
+    const cache = cacheRef.current;
 
-            // 1) collect collars (lon, lat) per hole_id
-            const collars = new Map<string, { lon: number; lat: number; originalZ: number }>();
-            for (const segment of dataToProcess) {
-                const hid = segment.hole_id;
-                const lon = segment.lon;
-                const lat = segment.lat;
-                const originalZ = segment.elevation; // Store original elevation
-                if (!collars.has(hid)) collars.set(hid, { lon, lat, originalZ });
-            }
+    const allSegments = [...(drillholeData.lithology || []), ...(drillholeData.assay || [])];
+    const uniqueIntervals = new Map<string, any>();
+    for (const segment of allSegments) {
+        const id = `${segment.hole_id}-${segment.depth_from}-${segment.depth_to}`;
+        if (uniqueIntervals.has(id)) continue;
 
-            // 2) sample terrain for those collars
-            await viewer.terrainProvider.readyPromise;
-            const positions = Array.from(collars.values()).map(c =>
-                Cesium.Cartographic.fromDegrees(c.lon, c.lat)
-            );
-            const sampled = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, positions);
+        const coords = segment.feature.geometry.coordinates;
+        if (!coords || coords.length < 2) continue;
 
-            // 3) map hole_id -> surfaceHeight
-            const surfaceByHole = new Map<string, number>();
-            Array.from(collars.keys()).forEach((hid, i) => {
-                surfaceByHole.set(hid, sampled[i].height ?? 0);
-            });
+        const [lon0, lat0, z0] = coords[0];
+        const [lon1, lat1, z1] = coords[1];
 
-            // QA check — how close are collars to input z?
-            let maxDelta = 0, sumAbs = 0, n = 0;
-            Array.from(collars.entries()).forEach(([hid, collarData]) => {
-                const zIn = collarData.originalZ;
-                const zTer = surfaceByHole.get(hid);
-                if (zTer != null) {
-                    const d = Math.abs(zIn - zTer);
-                    sumAbs += d; n++; if (d > maxDelta) maxDelta = d;
-                }
-            });
-            if (n > 0) {
-                console.log(`[Drill QA] collars: n=${n}, mean|Δz|=${(sumAbs/n).toFixed(2)} m, max|Δz|=${maxDelta.toFixed(2)} m`);
-            }
-
-
-            for (const segment of dataToProcess) {
-                const v = Number(segment.graphitic_carbon ?? 0);
-
-                if (type === 'assay') {
-                    mi = Math.min(mi, v);
-                    ma = Math.max(ma, v);
-                }
-
-                // Use sampled surface height for the segment's top Z
-                const surfaceZ = surfaceByHole.get(segment.hole_id) ?? segment.elevation; // Fallback to original elevation
-
-                const lon = Number(segment.lon);
-                const lat = Number(segment.lat);
-                const df  = Number(segment.depth_from);
-                const dt  = Number(segment.depth_to);
-
-                if (
-                  !Number.isFinite(lon) || !Number.isFinite(lat) ||
-                  !Number.isFinite(surfaceZ) || !Number.isFinite(df) || !Number.isFinite(dt) ||
-                  dt <= df // zero/negative length => degenerate
-                ) {
-                  console.warn('[Drill QA] Skipping bad segment', {
-                    hole_id: segment.hole_id, lon, lat, surfaceZ, df, dt
-                  });
-                  continue;
-                }
-
-                outRows.push({
-                    hole_id: segment.hole_id,
-                    lon, lat,
-                    depth_from: df,
-                    depth_to: dt,
-                    lithology: segment.lithology,
-                    graphitic_carbon: v,
-                    z: surfaceZ
-                });
-            }
-
-            if (type === 'assay') {
-                const span = (ma - mi);
-                if (!Number.isFinite(mi) || !Number.isFinite(ma) || span <= 0) {
-                  setMin(0); setMax(1);
-                } else {
-                  setMin(mi); setMax(ma);
-                }
-            }
-            setRows(outRows);
+        const interval: Interval = {
+            id: id,
+            start: [lat0, lon0, z0],
+            end: [lat1, lon1, z1],
+            props: { ...segment, latitude: lat0, longitude: lon0 }
         };
-
-        processAndSampleData();
-
-    }, [type, drillholeData, viewer, ready]);
-
-    // 2. Memoize the color function
-    const colorFn = useMemo(() => {
-        if (!viewer || !ready) return () => {};
-        const Cesium = (window as any).Cesium;
-        return type === 'lithology'
-            ? lithologyColor(Cesium)
-            : assayColor(Cesium, min, max);
-    }, [viewer, ready, type, min, max]);
-
-    // 3. Use the centralized borehole hook
-    if (rows) {
-      for (const r of rows) {
-        const bad = [r.lon, r.lat, r.z, r.depth_from, r.depth_to].some(v => !Number.isFinite(Number(v)));
-        const deg = (Number(r.depth_to) - Number(r.depth_from)) <= 0;
-        if (bad || deg) {
-          console.error('[Boreholes] First bad row:', r);
-          break;
-        }
-      }
+        uniqueIntervals.set(id, interval);
     }
-    useCesiumBoreholes(viewer, rows, colorFn, { 
-        radius: 10, // Example radius
-        name: `boreholes-${type}`,
-        fit: true 
+    intervalsRef.current = Array.from(uniqueIntervals.values());
+
+    const run = async () => {
+        console.log(`Creating ${intervalsRef.current.length} drillhole entities...`);
+        
+        viewer.entities.suspendEvents();
+        for (const interval of intervalsRef.current) {
+            if (isCancelled) break;
+            // Creates with default transparent style
+            await cache.getOrCreate(interval);
+        }
+        viewer.entities.resumeEvents();
+
+        if (isCancelled) return;
+        
+        console.log("Finished creating entities.");
+        // Initial styling is now handled by the style effect
+        applyStyles();
+    };
+
+    run();
+
+    return () => {
+      isCancelled = true;
+      console.log("Cleaning up borehole cache...");
+      cacheRef.current?.destroy();
+      cacheRef.current = null;
+    }
+  }, [viewer, ready, drillholeData]);
+
+  // Effect for applying styles when type changes
+  useEffect(() => {
+    applyStyles();
+  }, [type]);
+
+  const applyStyles = () => {
+    if (!cacheRef.current || !intervalsRef.current.length || !viewer) return;
+    console.log(`Applying style for type: ${type}`);
+
+    const cache = cacheRef.current;
+    const legend = type === 'assay' ? ASSAY_GRAPHITIC_CARBON : LITHOLOGY_COLORS;
+
+    const defaultStyle: Style = {
+        material: Cesium.Color.GREY,
+        opacity: 0.15,
+        outline: true,
+        outlineColor: Cesium.Color.WHITE,
+        radiusMeters: 8,
+    };
+
+    for (const interval of intervalsRef.current) {
+        const entity = viewer.entities.getById(`bh-${interval.id}`);
+        if (!entity) continue;
+
+        let styleToApply: Style;
+
+        if (type === 'assay') {
+            const value = interval.props.graphitic_carbon;
+            // For assay, we always color, even if value is 0 or undefined
+            const color = colorFromLegend(legend, value ?? 0);
+            styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 8 };
+        } else { // lithology
+            const value = interval.props.lithology;
+            if (value) {
+                const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+                if (LITHOLOGY_COLORS.map[normalizedValue]) {
+                    const color = colorFromLegend(legend, normalizedValue);
+                    styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 8 };
+                } else {
+                    // Has a lithology value, but it's not in our legend
+                    styleToApply = defaultStyle;
+                }
+            } else {
+                // Has no lithology property at all
+                styleToApply = defaultStyle;
+            }
+        }
+        cache.applyStyle(entity, styleToApply);
+    }
+    
+    viewer.scene.requestRender();
+  };
+
+  // UI Effects (Overlays)
+  useEffect(() => {
+    if (!viewer || !ready) return;
+    const Cesium = (window as any).Cesium;
+
+    const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    handler.setInputAction((movement: any) => {
+      const picked = viewer.scene.pick(movement.endPosition);
+
+      if (picked?.id?.properties) {
+        setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: picked.id.properties.getValue(viewer.clock.currentTime) });
+      } else {
+        setTooltip({ display: false, top: 0, left: 0, content: null });
+      }
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+    const removePreRender = viewer.scene.preRender.addEventListener(() => {
+        requestAnimationFrame(() => setUiTick(t => (t + 1) % 1_000_000));
     });
 
-    // Effect to control globe transparency
-    useEffect(() => {
-        if (!viewer || !ready) return;
-        viewer.scene.globe.translucency.enabled = globeTransparency < 1.0;
-        viewer.scene.globe.translucency.alpha = globeTransparency;
-        viewer.scene.requestRender();
-    }, [viewer, ready, globeTransparency]);
+    return () => {
+      if (!handler.isDestroyed()) handler.destroy();
+      removePreRender();
+    };
+  }, [viewer, ready]);
 
-    // Setup tooltip handler
-    useEffect(() => {
-        if (!viewer || !ready) return;
-        const Cesium = (window as any).Cesium;
+  const getHeading = useCallback(() => {
+    if (!viewer) return 0;
+    const Cesium = (window as any).Cesium;
+    return Cesium.Math.toDegrees(viewer.camera.heading);
+  }, [viewer]);
 
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        handler.setInputAction((movement: any) => {
-            const pickedObject = viewer.scene.pick(movement.endPosition);
-            console.log('Picked object:', pickedObject); // Debug log
-            if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.properties) {
-                const entity = pickedObject.id;
-                const properties = entity.properties.getValue(viewer.clock.currentTime);
-                console.log('Picked entity properties:', properties); // Debug log
-                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: properties });
-            } else {
-                setTooltip({ display: false, top: 0, left: 0, content: null });
-            }
-        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-        eventHandlerRef.current = handler;
+  const getMetersIn100px = useCallback(() => {
+    if (!viewer) return 0;
+    const Cesium = (window as any).Cesium;
+    const { scene } = viewer;
+    const canvas = scene.canvas;
+    const p1 = new Cesium.Cartesian2(canvas.clientWidth / 2 - 50, canvas.clientHeight - 10);
+    const p2 = new Cesium.Cartesian2(canvas.clientWidth / 2 + 50, canvas.clientHeight - 10);
 
-        return () => {
-            if (eventHandlerRef.current && !eventHandlerRef.current.isDestroyed()) {
-                eventHandlerRef.current.destroy();
-            }
-        };
-    }, [viewer, ready]);
+    const r1 = scene.camera.getPickRay(p1);
+    const r2 = scene.camera.getPickRay(p2);
+    let c1 = r1 ? scene.globe.pick(r1, scene) : undefined;
+    let c2 = r2 ? scene.globe.pick(r2, scene) : undefined;
 
-    return (
-        <div className="h-full w-full relative">
-            {tooltip.display && <TooltipContent data={tooltip} />}
-            <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }} className="pointer-events-auto">
-                <div>
-                    <label>Globe Transparency: </label>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={globeTransparency}
-                        onChange={(e) => setGlobeTransparency(parseFloat(e.target.value))}
-                    />
-                </div>
-            </div>
-            {type === 'lithology' ? (
-                <Legend
-                    title={drillholeLocationMapLithologyLegendData.title}
-                    type="categorical"
-                    items={drillholeLocationMapLithologyLegendData.items}
-                    show={true}
-                />
-            ) : (
-                <Legend
-                    title="Assay (Graphitic Carbon)"
-                    type="gradient"
-                    gradient="linear-gradient(to right, rgb(0, 255, 0), rgb(255, 0, 0))"
-                    minLabel={min.toFixed(2)}
-                    maxLabel={max.toFixed(2)}
-                    show={true}
-                />
-            )}
-        </div>
-    );
+    if (c1 && c2) return Cesium.Cartesian3.distance(c1, c2);
+
+    const ellipsoid = scene.globe.ellipsoid;
+    const center = scene.camera.positionCartographic;
+    if (!center) return 0;
+    const metersPerPx = Math.tan(scene.camera.frustum.fovy / 2) * center.height / (canvas.clientHeight / 2);
+    const dLon = (100 * metersPerPx) / ellipsoid.maximumRadius;
+    const gc1 = new Cesium.Cartographic(center.longitude - dLon / 2, center.latitude, 0);
+    const gc2 = new Cesium.Cartographic(center.longitude + dLon / 2, center.latitude, 0);
+    const geod = new Cesium.EllipsoidGeodesic(gc1, gc2, ellipsoid);
+    return geod.surfaceDistance || 0;
+  }, [viewer]);
+
+  return (
+    <div className="h-full w-full relative z-20 pointer-events-none">
+        <KmlBoundary />
+        <CompassOverlay mode="cesium" getHeading={getHeading} />
+        <MetricScaleOverlay mode="cesium" getMetersIn100px={getMetersIn100px} />
+        <TooltipContent data={tooltip} />
+        {type === 'lithology' ? (
+            <Legend
+                title={drillholeLocationMapLithologyLegendData.title}
+                type="categorical"
+                items={drillholeLocationMapLithologyLegendData.items}
+                show={true}
+            />
+        ) : (
+            <Legend
+                title="Assay (Graphitic Carbon)"
+                type="categorical"
+                items={ASSAY_GRAPHITIC_CARBON.bins}
+                show={true}
+            />
+        )}
+    </div>
+  );
 };
 
 export default DrillholeLayer;

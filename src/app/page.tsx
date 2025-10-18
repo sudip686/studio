@@ -9,14 +9,10 @@ import { ThreeSceneProvider } from '@/contexts/three-scene-context';
 
 // Simplified view sequence
 const viewSequence = [
-  'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'geospatial_lithology', 'geospatial_assay',
-  'drillhole_location_lithology', 'drillhole_location_assay', 'drillhole_lithology_reveal',
-  'subsurface_cutaway', 'kml_focused_view', 
+  'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map',  'drillhole_location_assay', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal',
   'lithology_view', 'assay_view', 'block_model_carbon_view', 'block_model_resc_view',
-  'resource_model_viewer',
-  'downhole_plot', 'grand_canyon_assay', 'grand_canyon_lithology',
-  'block_model_box_cutter_grade', 'block_model_box_cutter_class',
-  'terrain_clipping', 'cesium_three_block_model'
+   'grand_canyon_assay', 'grand_canyon_lithology',
+  'terrain_clipping','block_model_clip_view'
 ] as const;
 
 type ViewType = typeof viewSequence[number];
@@ -31,30 +27,27 @@ const viewTitles: { [key in ViewType]: string } = {
   'geojson_drillholes_assay': 'GeoJSON Drillholes Assay',
   'geospatial_lithology': 'Geospatial Lithology',
   'geospatial_assay': 'Geospatial Assay',
-  'drillhole_location_lithology': 'Drillhole Location Lithology',
-  'drillhole_location_assay': 'Drillhole Location Assay',
+  // 'drillhole_location_lithology': 'Drillhole Location-Lithology',
+  'drillhole_location_assay': 'Drillhole Location-Assay',
   'drillhole_lithology_reveal': 'Drillhole Lithology Reveal',
-  'subsurface_cutaway': 'Subsurface Cutaway',
-  'kml_focused_view': 'KML Focused View',
+  // 'subsurface_cutaway': 'Subsurface Cutaway',
+  // 'kml_focused_view': 'KML Focused View',
   //'terrain_traces': 'Terrain Traces',
   'lithology_view': '3D Lithology',
   'assay_view': '3D Assay',
   'block_model_carbon_view': '3D Block Model - Carbon',
   'block_model_resc_view': '3D Block Model - Resource Classification',
-  'resource_model_viewer': 'Resource Model Viewer',
-  'downhole_plot': 'Downhole Plot',
+  // 'downhole_plot': 'Downhole Plot',
   'grand_canyon_assay': 'Grand Canyon Assay',
   'grand_canyon_lithology': 'Grand Canyon Lithology',
-  'block_model_box_cutter_grade': 'Block Model Box Cutter Grade',
-  'block_model_box_cutter_class': 'Block Model Box Cutter Class',
   'terrain_clipping': 'Terrain Clipping',
-  'cesium_three_block_model': 'Cesium Three Block Model'
+  'block_model_clip_view': 'Block Model Clip View'
 };
 
 const cesiumSwitcherViews = new Set<string>([
     'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map', 
     'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'tiff_overlay', 'project_location',
-    'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer', 'grand_canyon_assay', 'grand_canyon_lithology', 'cesium_three_block_model', 'drillhole_location_lithology', 'drillhole_location_assay', 'terrain_clipping', 'block_model_box_cutter_grade', 'block_model_box_cutter_class'
+    'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer', 'grand_canyon_assay', 'grand_canyon_lithology', 'cesium_three_block_model', 'drillhole_location_lithology', 'drillhole_location_assay', 'terrain_clipping',    'block_model_box_cutter_grade', 'block_model_box_cutter_class', 'block_model_clip_view'
 ]);
 
 const threeJsSwitcherViews = new Set<string>([

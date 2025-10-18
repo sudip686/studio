@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useThreeScene } from '@/contexts/three-scene-context';
 import { useDataCache, Block } from '@/lib/data-cache';
 import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
-import { CompassOverlay, getCameraHeadingDeg } from '@/components/ui/CompassOverlay';
+import CompassOverlay from '@/components/ui/CompassOverlay';
 import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
 import { Legend } from '@/components/ui/legend';
 
@@ -23,6 +23,12 @@ function colorForCarbon(vRaw: any): number {
     carbonColorCache[step] = hexString;
     return color.getHex();
 }
+
+function getThreeHeading(camera: THREE.PerspectiveCamera, THREE: any) {
+    const v = new THREE.Vector3();
+    camera.getWorldDirection(v);
+    return Math.atan2(v.x, v.z);
+};
 
 
 export default function BlockModelCarbonViewer({
@@ -207,7 +213,7 @@ export default function BlockModelCarbonViewer({
       </div>
       {camera && renderer && (
         <div style={{ position: 'absolute', top: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-          <CompassOverlay headingDeg={getCameraHeadingDeg(camera, THREE)} />
+          <CompassOverlay mode="three" getHeading={() => getThreeHeading(camera, THREE)} />
           <ScaleBarOverlay
             camera={camera}
             rendererDom={renderer.domElement}

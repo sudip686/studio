@@ -220,7 +220,7 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
           bs,
           new Cesium.HeadingPitchRange(0.5, -0.5, bs.radius * 2.5)
         );
-        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+
         viewer.scene.requestRender();
 
         // Cleanup

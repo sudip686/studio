@@ -1,34 +1,29 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
 import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLOR_MAP_CSS } from '@/lib/legend-definitions';
-
-const flyToEntities = (viewer: any, entities: any[]) => {
-  const Cesium = window.Cesium;
-  const positions: any[] = [];
-
-  for (const e of entities) {
-    const p = e.position && e.position.getValue
-      ? e.position.getValue(viewer.clock.currentTime)
-      : e.position;
-    if (Cesium.defined(p)) positions.push(p);
-  }
-  if (positions.length === 0) return;
-
-  const bs = Cesium.BoundingSphere.fromPoints(positions);
-  // (optional) give some padding
-  const offset = new Cesium.HeadingPitchRange(0, -0.6, bs.radius * 2.5);
-  viewer.camera.flyToBoundingSphere(bs, { duration: 1.2, offset });
-};
 
 declare global {
     interface Window {
         Cesium: any;
     }
 }
+
+// --- Type Definitions ---
+
+interface ProcessedDrillhole {
+    hole_id: string;
+    longitude: number;
+    latitude: number;
+    lithologies: Set<string>;
+    assayValues: number[];
+    avgAssay: number | null;
+}
+
+// --- Helper Functions ---
 
 const CONTINUOUS_PALETTES: { [key: string]: string[] } = {
     Viridis: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'],
@@ -37,15 +32,15 @@ const CONTINUOUS_PALETTES: { [key: string]: string[] } = {
 };
 
 const getContinuousColor = (value: number, min: number, max: number, paletteName: string, Cesium: any) => {
-    const palette = CONTINUOUS_PALETTES[paletteName];
-    if (!palette) return Cesium.Color.GRAY;
     const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
-    const index = Math.min(Math.floor(ratio * (palette.length - 1)), palette.length - 2);
-    const localRatio = (ratio - (index / (palette.length - 1))) * (palette.length - 1);
-    const startColor = Cesium.Color.fromCssColorString(palette[index]);
-    const endColor = Cesium.Color.fromCssColorString(palette[index + 1]);
-    return Cesium.Color.lerp(startColor, endColor, localRatio, new Cesium.Color());
+    const startColor = Cesium.Color.fromCssColorString('#440154');
+    const endColor = Cesium.Color.fromCssColorString('#fde725');
+    return Cesium.Color.lerp(startColor, endColor, ratio, new Cesium.Color());
 };
+
+const norm = (s: any) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// --- UI Components ---
 
 const TooltipContent = ({ data }: { data: any }) => {
     if (!data || !data.content) return null;
@@ -67,6 +62,213 @@ const TooltipContent = ({ data }: { data: any }) => {
     );
 };
 
+// --- View-Specific Components ---
+
+interface LithologyMapViewProps {
+    viewer: any;
+    ready: boolean;
+    processedData: Map<string, ProcessedDrillhole>;
+    uniqueLithologies: string[];
+}
+
+function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: LithologyMapViewProps) {
+    const [lithologyFilter, setLithologyFilter] = useState('All');
+    const entitiesRef = useRef<any[]>([]);
+    const lithologyColorMapCesiumRef = useRef<any>({});
+
+    useEffect(() => {
+        if (!viewer || !ready || processedData.size === 0) return;
+        const Cesium = window.Cesium;
+
+        Object.keys(LITHOLOGY_COLOR_MAP_CSS).forEach(key => {
+            const k = norm(key);
+            lithologyColorMapCesiumRef.current[k] = Cesium.Color.fromCssColorString(LITHOLOGY_COLOR_MAP_CSS[key]);
+        });
+        lithologyColorMapCesiumRef.current.unknown = Cesium.Color.WHITE;
+
+        (async () => {
+            const positions = Array.from(processedData.values()).map(c => Cesium.Cartographic.fromDegrees(c.longitude, c.latitude));
+            const clamped = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, positions);
+
+            entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
+            entitiesRef.current = [];
+
+            let plotted = 0;
+            Array.from(processedData.values()).forEach((data: ProcessedDrillhole, i) => {
+                const hTop = Number(clamped[i]?.height ?? 0);
+                if (typeof data.longitude !== 'number' || typeof data.latitude !== 'number' || !Number.isFinite(data.longitude) || !Number.isFinite(data.latitude)) return;
+
+                const wantAll = lithologyFilter === 'All';
+                const wantOne = !wantAll && data.lithologies.has(norm(lithologyFilter));
+
+                if (data.lithologies.size > 0 && (wantAll || wantOne)) {
+                    const firstLithology = data.lithologies.values().next().value as string;
+                    const key = norm(firstLithology);
+                    const color = lithologyColorMapCesiumRef.current[key] ?? lithologyColorMapCesiumRef.current.unknown;
+
+                    const entity = new Cesium.Entity({
+                        position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude, hTop),
+                        point: {
+                            pixelSize: 20,
+                            color,
+                            outlineColor: Cesium.Color.BLACK,
+                            outlineWidth: 1,
+                            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                        },
+                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay }
+                    });
+                    viewer.entities.add(entity);
+                    entitiesRef.current.push(entity);
+                    plotted++;
+                }
+            });
+            console.log(`[DrillholeLocationMap] plotted=${plotted} mode=lithology`);
+        })();
+
+        return () => {
+            if (viewer && !viewer.isDestroyed()) {
+                entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
+            }
+        };
+    }, [viewer, ready, processedData, lithologyFilter]);
+
+    return (
+        <>
+            <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000 }} className="pointer-events-auto">
+                <label>Filter by Lithology: </label>
+                <select value={lithologyFilter} onChange={(e) => setLithologyFilter(e.target.value)}>
+                    {uniqueLithologies.map((lith: string) => <option key={lith} value={lith}>{lith}</option>)}
+                </select>
+            </div>
+            <Legend
+                title={drillholeLocationMapLithologyLegendData.title}
+                type="categorical"
+                items={drillholeLocationMapLithologyLegendData.items}
+                show={true}
+            />
+        </>
+    );
+}
+
+interface AssayMapViewProps {
+    viewer: any;
+    ready: boolean;
+    processedData: Map<string, ProcessedDrillhole>;
+    assayRange: { min: number; max: number };
+}
+
+function AssayMapView({ viewer, ready, processedData, assayRange }: AssayMapViewProps) {
+    const [assayFilterValue, setAssayFilterValue] = useState(0);
+    const [scaleType, setScaleType] = useState<'continuous' | 'discrete'>('continuous');
+    const [continuousPalette, setContinuousPalette] = useState('Viridis');
+    const [manualBreaks, setManualBreaks] = useState('1, 1.5, 2');
+    const entitiesRef = useRef<any[]>([]);
+
+    useEffect(() => {
+        if (!viewer || !ready || processedData.size === 0) return;
+        const Cesium = window.Cesium;
+
+        (async () => {
+            const positions = Array.from(processedData.values()).map(c => Cesium.Cartographic.fromDegrees(c.longitude, c.latitude));
+            const clamped = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, positions);
+
+            entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
+            entitiesRef.current = [];
+
+            let plotted = 0;
+            Array.from(processedData.values()).forEach((data: ProcessedDrillhole, i) => {
+                const hTop = Number(clamped[i]?.height ?? 0);
+                if (typeof data.longitude !== 'number' || typeof data.latitude !== 'number' || !Number.isFinite(data.longitude) || !Number.isFinite(data.latitude)) return;
+
+                if (!(assayFilterValue > 0 && (data.avgAssay === null || data.avgAssay < assayFilterValue))) {
+                    let color;
+                    if (data.avgAssay !== null) {
+                        if (scaleType === 'continuous') {
+                            if (Number.isFinite(data.avgAssay)) {
+                                color = getContinuousColor(data.avgAssay, assayRange.min, assayRange.max, continuousPalette, Cesium);
+                            }
+                        } else {
+                            const breaks = manualBreaks.split(',').map(Number);
+                            const value = data.avgAssay;
+                            let breakIndex = breaks.findIndex(b => value <= b);
+                            if (breakIndex === -1) breakIndex = breaks.length;
+                            const palette = CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis'];
+                            color = Cesium.Color.fromCssColorString(palette[breakIndex % palette.length]);
+                        }
+                    } else {
+                        color = Cesium.Color.GRAY;
+                    }
+
+                    const entity = new Cesium.Entity({
+                        position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude, hTop),
+                        point: {
+                            pixelSize: 20,
+                            color,
+                            outlineColor: Cesium.Color.BLACK,
+                            outlineWidth: 1,
+                            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                        },
+                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay }
+                    });
+                    viewer.entities.add(entity);
+                    entitiesRef.current.push(entity);
+                    plotted++;
+                }
+            });
+            console.log(`[DrillholeLocationMap] plotted=${plotted} mode=assay`);
+        })();
+
+        return () => {
+            if (viewer && !viewer.isDestroyed()) {
+                entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
+            }
+        };
+    }, [viewer, ready, processedData, assayFilterValue, scaleType, continuousPalette, manualBreaks, assayRange]);
+
+    return (
+        <>
+            <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }} className="pointer-events-auto">
+                <div>
+                    <label>Min. Graphitic Carbon (%): </label>
+                    <input type="number" min="0" step="0.5" value={assayFilterValue} onChange={(e) => setAssayFilterValue(Number(e.target.value))} />
+                </div>
+                <div>
+                    <label>Scale Type: </label>
+                    <button onClick={() => setScaleType('continuous')} disabled={scaleType === 'continuous'}>Continuous</button>
+                    <button onClick={() => setScaleType('discrete')} disabled={scaleType === 'discrete'}>Discrete</button>
+                </div>
+                {scaleType === 'continuous' && (
+                    <div>
+                        <label>Continuous Color Scale: </label>
+                        <select value={continuousPalette} onChange={(e) => setContinuousPalette(e.target.value)}>
+                            <option value="Viridis">Viridis</option>
+                            <option value="Plasma">Plasma</option>
+                            <option value="Inferno">Inferno</option>
+                        </select>
+                    </div>
+                )}
+                {scaleType === 'discrete' && (
+                    <div>
+                        <label>Interval Breaks (comma-separated): </label>
+                        <input type="text" value={manualBreaks} onChange={(e) => setManualBreaks(e.target.value)} />
+                    </div>
+                )}
+            </div>
+            <Legend
+                title="Avg. Assay (Graphitic Carbon)"
+                type="gradient"
+                gradient={`linear-gradient(to right, ${(CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis']).join(', ')})`}
+                minLabel={assayRange.min.toFixed(2)}
+                maxLabel={assayRange.max.toFixed(2)}
+                show={true}
+            />
+        </>
+    );
+}
+
+
+// --- Main Component ---
+
 interface DrillholeLocationMapProps {
     displayMode: 'lithology' | 'assay';
 }
@@ -75,248 +277,123 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
     const { viewer, ready } = useCesium();
     const { drillholeData } = useDataCache();
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
-    const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
-    const [markerSize, setMarkerSize] = useState(10);
-    const [scaleType, setScaleType] = useState<'continuous' | 'discrete'>('continuous');
-    const [continuousPalette, setContinuousPalette] = useState('Viridis');
-    const [manualBreaks, setManualBreaks] = useState('1, 1.5, 2');
-    const [lithologyFilter, setLithologyFilter] = useState('All');
-    const [assayFilterValue, setAssayFilterValue] = useState(0);
+    const [processedData, setProcessedData] = useState<Map<string, ProcessedDrillhole>>(new Map());
     const [uniqueLithologies, setUniqueLithologies] = useState<string[]>(['All']);
-
-    const dataRef = useRef<{ kmz: any, collars: Map<string, any> } | null>(null);
-    const entitiesRef = useRef<any[]>([]);
-    const eventHandlerRef = useRef<any>(null);
-    const lithologyColorMapCesiumRef = useRef<any>({});
+    const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
     const hasFlownRef = useRef(false);
 
-    // Initialize component: enable camera controls, load data
+    // Data Processing Hook
     useEffect(() => {
-        if (!viewer || !ready || !drillholeData) return;
-        const Cesium = window.Cesium;
+        if (!drillholeData) return;
 
-        viewer.scene.screenSpaceCameraController.enableRotate = true;
-        viewer.scene.screenSpaceCameraController.enableTranslate = true;
-        viewer.scene.screenSpaceCameraController.enableZoom = true;
-        viewer.scene.screenSpaceCameraController.enableTilt = true;
-
-        Object.keys(LITHOLOGY_COLOR_MAP_CSS).forEach(key => {
-            lithologyColorMapCesiumRef.current[key] = Cesium.Color.fromCssColorString(LITHOLOGY_COLOR_MAP_CSS[key]);
-        });
-
-        const loadData = async () => {
-            try {
-                const kmzDataSource = await Cesium.KmlDataSource.load("/tanga_boundary.kmz");
-                
-                const allLithologies = new Set<string>();
-                drillholeData.lithology.forEach((f: DrillholeSegment) => f.lithology && allLithologies.add(f.lithology));
-                setUniqueLithologies(['All', ...Array.from(allLithologies).sort()]);
-
-                const collarData = new Map<string, any>();
-                drillholeData.lithology.forEach((segment: DrillholeSegment) => {
-                    const { hole_id, lon, lat, lithology } = segment;
-                    if (!collarData.has(hole_id)) {
-                        collarData.set(hole_id, { hole_id, longitude: lon, latitude: lat, lithologies: new Set(), assayValues: [] });
-                    }
-                    if (lithology) collarData.get(hole_id).lithologies.add(lithology);
+        const collarData = new Map<string, ProcessedDrillhole>();
+        const processSegment = (segment: DrillholeSegment) => {
+            const { hole_id, lon, lat } = segment;
+            if (!collarData.has(hole_id)) {
+                collarData.set(hole_id, {
+                    hole_id, longitude: lon, latitude: lat, lithologies: new Set(), assayValues: [] as number[], avgAssay: null
                 });
-
-                drillholeData.assay.forEach((segment: DrillholeSegment) => {
-                    if (collarData.has(segment.hole_id)) collarData.get(segment.hole_id).assayValues.push(segment.graphitic_carbon);
-                });
-                
-                let minAvgAssay = Infinity, maxAvgAssay = -Infinity;
-                collarData.forEach(data => {
-                    if (data.assayValues.length > 0) {
-                        const sum = data.assayValues.reduce((a: number, b: number) => a + b, 0);
-                        data.avgAssay = sum / data.assayValues.length;
-                        if (data.avgAssay < minAvgAssay) minAvgAssay = data.avgAssay;
-                        if (data.avgAssay > maxAvgAssay) maxAvgAssay = data.avgAssay;
-                    } else {
-                        data.avgAssay = null;
-                    }
-                });
-                
-                if (!Number.isFinite(minAvgAssay) || !Number.isFinite(maxAvgAssay) || maxAvgAssay <= minAvgAssay) {
-                  setAssayRange({ min: 0, max: 1 });
-                } else {
-                  setAssayRange({ min: minAvgAssay, max: maxAvgAssay });
-                }
-                dataRef.current = { kmz: kmzDataSource, collars: collarData };
-                viewer.dataSources.add(kmzDataSource);
-
-            } catch (error) {
-                console.error(`Error loading data:`, error);
             }
+            return collarData.get(hole_id)!;
         };
 
-        loadData();
-
-        return () => {
-            if (viewer && !viewer.isDestroyed()) {
-                entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
-                if (dataRef.current?.kmz) viewer.dataSources.remove(dataRef.current.kmz, true);
-            }
-            entitiesRef.current = [];
-            dataRef.current = null;
-            hasFlownRef.current = false; // Reset flyTo on cleanup
-        };
-    }, [viewer, ready, drillholeData]);
-
-    // Update entities based on filters and display options
-    useEffect(() => {
-        if (!viewer || !ready || !dataRef.current) return;
-        const Cesium = window.Cesium;
-
-        // Clear previous entities
-        entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
-        entitiesRef.current = [];
-
-        const { collars, kmz } = dataRef.current;
-        const { min, max } = assayRange;
-
-        collars.forEach(data => {
-            if (displayMode === 'lithology' && lithologyFilter !== 'All' && !data.lithologies.has(lithologyFilter)) return;
-            if (displayMode === 'assay' && assayFilterValue > 0 && (data.avgAssay === null || data.avgAssay < assayFilterValue)) return;
-            if (typeof data.longitude !== 'number' || typeof data.latitude !== 'number' || !Number.isFinite(data.longitude) || !Number.isFinite(data.latitude)) return;
-
-            let color;
-            if (displayMode === 'lithology') {
-                const firstLithology = data.lithologies.values().next().value;
-                color = lithologyColorMapCesiumRef.current[firstLithology] || lithologyColorMapCesiumRef.current['UNKNOWN'];
-            } else { // assay
-                if (data.avgAssay !== null) {
-                    if (scaleType === 'continuous') {
-                        color = getContinuousColor(data.avgAssay, min, max, continuousPalette, Cesium);
-                    } else {
-                        const breaks = manualBreaks.split(',').map(Number);
-                        const value = data.avgAssay;
-                        let breakIndex = breaks.findIndex(b => value <= b);
-                        if (breakIndex === -1) breakIndex = breaks.length;
-                        const palette = CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis'];
-                        color = Cesium.Color.fromCssColorString(palette[breakIndex % palette.length]);
-                    }
-                } else {
-                    color = Cesium.Color.GRAY;
-                }
-            }
-            const entity = new Cesium.Entity({
-                position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude),
-                point: {
-                   pixelSize: markerSize,
-                   color,
-                   outlineColor: Cesium.Color.BLACK,
-                   outlineWidth: 1,
-                   // always-on-top for picking & visibility
-                   disableDepthTestDistance: Number.POSITIVE_INFINITY,
-                },
-                properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay }
-            });
-            viewer.entities.add(entity);
-            entitiesRef.current.push(entity);
+        drillholeData.lithology.forEach((segment: DrillholeSegment) => {
+            const data = processSegment(segment);
+            if (segment.lithology) data.lithologies.add(norm(segment.lithology));
         });
 
-        if (!hasFlownRef.current && entitiesRef.current.length > 0) {
-            flyToEntities(viewer, entitiesRef.current);
-            hasFlownRef.current = true;
+        drillholeData.assay.forEach((segment: DrillholeSegment) => {
+            const data = processSegment(segment);
+            const value = segment.graphitic_carbon;
+            if (value !== undefined && value !== null && Number.isFinite(Number(value))) {
+                data.assayValues.push(Number(value));
+            }
+        });
+        
+        let minAvgAssay = Infinity, maxAvgAssay = -Infinity;
+        collarData.forEach((data: ProcessedDrillhole) => {
+            if (data.assayValues.length > 0) {
+                const sum = data.assayValues.reduce((a: number, b: number) => a + b, 0);
+                data.avgAssay = sum / data.assayValues.length;
+                if (data.avgAssay < minAvgAssay) minAvgAssay = data.avgAssay;
+                if (data.avgAssay > maxAvgAssay) maxAvgAssay = data.avgAssay;
+            } else {
+                data.avgAssay = null;
+            }
+        });
+        
+        if (minAvgAssay === Infinity || maxAvgAssay === -Infinity) {
+            setAssayRange({ min: 0, max: 1 });
+        } else if (minAvgAssay === maxAvgAssay) {
+            setAssayRange({ min: Math.max(0, minAvgAssay - 0.5), max: maxAvgAssay + 0.5 });
+        } else {
+            setAssayRange({ min: minAvgAssay, max: maxAvgAssay });
         }
 
-    }, [viewer, ready, dataRef.current, displayMode, markerSize, scaleType, continuousPalette, manualBreaks, lithologyFilter, assayFilterValue, assayRange]);
+        setProcessedData(collarData);
 
-    // Setup tooltip handler
+        const allLithologies = new Set<string>();
+        drillholeData.lithology.forEach((f: DrillholeSegment) => {
+            if (f.lithology) allLithologies.add(norm(f.lithology));
+        });
+        setUniqueLithologies(['All', ...Array.from(allLithologies).sort()]);
+    }, [drillholeData]);
+
+    // Tooltip Hook
     useEffect(() => {
         if (!viewer || !ready) return;
         const Cesium = window.Cesium;
-
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
         handler.setInputAction((movement: any) => {
-            const pickedObject = viewer.scene.pick(movement.endPosition);
-            if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.properties) {
-                const entity = pickedObject.id;
-                const properties = entity.properties.getValue(viewer.clock.currentTime);
-                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: properties });
+            const picked = viewer.scene.pick(movement.endPosition);
+            if (!picked) {
+                if (tooltip.display) setTooltip({ display: false, top: 0, left: 0, content: null });
+                return;
+            }
+            if (Cesium.defined(picked.id) && picked.id?.properties) {
+                const props = picked.id.properties.getValue(viewer.clock.currentTime);
+                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: props });
             } else {
-                setTooltip({ display: false, top: 0, left: 0, content: null });
+                if (tooltip.display) setTooltip({ display: false, top: 0, left: 0, content: null });
             }
             viewer.scene.requestRender();
         }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-        eventHandlerRef.current = handler;
 
-        return () => {
-            if (eventHandlerRef.current && !eventHandlerRef.current.isDestroyed()) {
-                eventHandlerRef.current.destroy();
-            }
-        };
-    }, [viewer, ready]);
+        return () => { if (!handler.isDestroyed()) handler.destroy(); };
+    }, [viewer, ready, tooltip.display]);
 
+    // Fly-to-entities Hook
     useEffect(() => {
-      hasFlownRef.current = false;
-    }, [displayMode]);
+        if (viewer && processedData.size > 0 && !hasFlownRef.current) {
+            const entities: any[] = [];
+            viewer.entities.values.forEach((entity: any) => {
+                if(entity.point) entities.push(entity);
+            });
+            if (entities.length > 0) {
+                viewer.flyTo(entities);
+                hasFlownRef.current = true;
+            }
+        }
+    }, [viewer, processedData, displayMode]); // Rerun fly-to when mode changes if needed
 
     return (
         <div className="h-full w-full relative">
             {tooltip.display && <TooltipContent data={tooltip} />}
-            <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }} className="pointer-events-auto">
-                {/* UI Controls */}
-                 <div>
-                    <label>Marker Size: </label>
-                    <input type="range" min="1" max="20" value={markerSize} onChange={(e) => setMarkerSize(Number(e.target.value))} />
-                </div>
-
-                {displayMode === 'lithology' && (
-                    <div>
-                        <label>Filter by Lithology: </label>
-                        <select value={lithologyFilter} onChange={(e) => setLithologyFilter(e.target.value)}>
-                            {uniqueLithologies.map(lith => <option key={lith} value={lith}>{lith}</option>)}
-                        </select>
-                    </div>
-                )}
-
-                {displayMode === 'assay' && (
-                    <>
-                        <div>
-                            <label>Min. Graphitic Carbon (%): </label>
-                            <input type="number" min="0" step="0.5" value={assayFilterValue} onChange={(e) => setAssayFilterValue(Number(e.target.value))} />
-                        </div>
-                        <div>
-                            <label>Scale Type: </label>
-                            <button onClick={() => setScaleType('continuous')} disabled={scaleType === 'continuous'}>Continuous</button>
-                            <button onClick={() => setScaleType('discrete')} disabled={scaleType === 'discrete'}>Discrete</button>
-                        </div>
-                        {scaleType === 'continuous' && (
-                            <div>
-                                <label>Continuous Color Scale: </label>
-                                <select value={continuousPalette} onChange={(e) => setContinuousPalette(e.target.value)}>
-                                    <option value="Viridis">Viridis</option>
-                                    <option value="Plasma">Plasma</option>
-                                    <option value="Inferno">Inferno</option>
-                                </select>
-                            </div>
-                        )}
-                        {scaleType === 'discrete' && (
-                            <div>
-                                <label>Interval Breaks (comma-separated): </label>
-                                <input type="text" value={manualBreaks} onChange={(e) => setManualBreaks(e.target.value)} />
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
+            
             {displayMode === 'lithology' ? (
-                <Legend
-                    title={drillholeLocationMapLithologyLegendData.title}
-                    type="categorical"
-                    items={drillholeLocationMapLithologyLegendData.items}
-                    show={true}
+                <LithologyMapView 
+                    viewer={viewer} 
+                    ready={ready} 
+                    processedData={processedData}
+                    uniqueLithologies={uniqueLithologies}
                 />
             ) : (
-                <Legend
-                    title="Avg. Assay (Graphitic Carbon)"
-                    type="gradient"
-                    gradient={`linear-gradient(to right, ${(CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis']).join(', ')})`}
-                    minLabel={assayRange.min.toFixed(2)}
-                    maxLabel={assayRange.max.toFixed(2)}
-                    show={true}
+                <AssayMapView 
+                    viewer={viewer}
+                    ready={ready}
+                    processedData={processedData}
+                    assayRange={assayRange}
                 />
             )}
         </div>
