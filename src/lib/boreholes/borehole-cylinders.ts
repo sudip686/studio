@@ -21,12 +21,12 @@ export type Style = {
 
 const DEFAULT_RADIUS = 8;
 
-function toFixed(latz: LatLonZ) {
+export function toFixed(latz: LatLonZ) {
   const [lat, lon, z] = latz;
   return Cesium.Cartesian3.fromDegrees(lon, lat, z || 0);
 }
 
-function orientationFrom(start: Cesium.Cartesian3, end: Cesium.Cartesian3) {
+export function orientationFrom(start: Cesium.Cartesian3, end: Cesium.Cartesian3) {
   const midpoint = Cesium.Cartesian3.midpoint(start, end, new Cesium.Cartesian3());
   const dirFixed = Cesium.Cartesian3.subtract(end, start, new Cesium.Cartesian3());
   const len = Cesium.Cartesian3.magnitude(dirFixed);
@@ -156,6 +156,10 @@ export class BoreholeCylinderCache {
   }
 
   destroy() {
+    if (!this.viewer || this.viewer.isDestroyed()) {
+        this.map.clear();
+        return;
+    }
     for (const entity of this.map.values()) {
       this.viewer.entities.remove(entity);
     }

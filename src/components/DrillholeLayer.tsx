@@ -109,6 +109,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     if (!cacheRef.current || !intervalsRef.current.length || !viewer) return;
     console.log(`Applying style for type: ${type}`);
 
+    const Cesium = (window as any).Cesium;
     const cache = cacheRef.current;
     const legend = type === 'assay' ? ASSAY_GRAPHITIC_CARBON : LITHOLOGY_COLORS;
 

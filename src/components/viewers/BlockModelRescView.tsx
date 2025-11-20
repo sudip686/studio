@@ -9,6 +9,7 @@ import CompassOverlay from '@/components/ui/CompassOverlay';
 import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context'; // NEW: Import useThreeScene
+import { ErrorDisplay } from '@/components/ui/error-display';
 
 
 const RESC_LEGEND = [
@@ -22,7 +23,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
     const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
     const mountedRef = useRef(false);
 
-    const { blockModelData, drillholeData, loadingStatus, error } = useDataCache();
+    const { blockModelData, drillholeData, loadingStatus, error, refetch } = useDataCache();
     const [blockOpacity, setBlockOpacity] = useState(0.8);
     const [showTraces, setShowTraces] = useState(true);
 
@@ -207,7 +208,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
     }, [camera, controls, dynamicGroup]);
 
     if (loadingStatus === 'loading') return <div>Loading...</div>;
-    if (error) return <div>Error: {error}</div>;
+    if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
     return (
       <>

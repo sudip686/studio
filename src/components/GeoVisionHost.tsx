@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import GeoVision, { GeoVisionDisplayMode } from './geo-vision';
+import GeoVision, { GeoVisionDisplayMode } from './GeoVision';
 import { GeoVisionContext } from '@/contexts/geovision-context';
 import { useDataCache } from '@/lib/data-cache';
+import { ErrorDisplay } from './ui/error-display';
+
 
 interface GeoVisionHostProps {
     displayMode: GeoVisionDisplayMode;
@@ -15,7 +17,7 @@ const GeoVisionHost = ({ displayMode, processedDrillholeData }: GeoVisionHostPro
     console.log(`[GeoVisionHost] displayMode: ${displayMode}`);
     console.log(`[GeoVisionHost] processedDrillholeData available: ${!!processedDrillholeData}`);
 
-    const { blockModelData, loadingStatus, error } = useDataCache();
+    const { blockModelData, loadingStatus, error, refetch } = useDataCache();
     console.log(`[GeoVisionHost] useDataCache: loadingStatus=${loadingStatus}, blockModelData available=${!!blockModelData}, error=${error}`);
 
     const [filters, setFilters] = useState({
@@ -30,7 +32,7 @@ const GeoVisionHost = ({ displayMode, processedDrillholeData }: GeoVisionHostPro
     }
 
     if (error) {
-        return <div className="h-full w-full flex items-center justify-center bg-gray-900 text-red-500">Error: {error}</div>;
+        return <ErrorDisplay message={error} onRetry={refetch} />;
     }
 
     const contextValue = {

@@ -8,6 +8,7 @@ import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-hel
 import CompassOverlay from '@/components/ui/CompassOverlay';
 import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
 import { Legend } from '@/components/ui/legend';
+import { ErrorDisplay } from '@/components/ui/error-display';
 
 const CARBON_COLOR_STEPS = 20;
 const carbonColorCache: { [step: number]: string } = {};
@@ -37,7 +38,7 @@ export default function BlockModelCarbonViewer({
 
   const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
   const mountedRef = useRef(false);
-  const { blockModelData, drillholeData, loadingStatus, error } = useDataCache();
+  const { blockModelData, drillholeData, loadingStatus, error, refetch } = useDataCache();
   const [showTraces, setShowTraces] = useState(true);
 
   const modelCenter = useMemo(() => {
@@ -195,7 +196,7 @@ export default function BlockModelCarbonViewer({
   }, [blockModelData, opacity, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff, drillholeData, showTraces, registerTooltipObject, unregisterTooltipObject]);
 
   if (loadingStatus === 'loading') return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
   const carbonLegendItems = Array.from({ length: 5 }).map((_, i) => {
     const value = 0 + (10 - 0) * (i / 4);

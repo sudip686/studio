@@ -1,6 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import * as THREE from 'three';
+import * as Cesium from 'cesium';
+import { toFixed, orientationFrom } from '@/lib/boreholes/borehole-cylinders';
 
 // ## Data Structures & Constants ##
 export interface DrillholeSegment {
@@ -12,29 +15,53 @@ export interface BlockSegment {
     "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"?: string | number; RescCalc?: string; feature: any;
 }
 
+interface BoreholeInfo {
+    segments: DrillholeSegment[];
+    orientation: { midpoint: THREE.Vector3; quaternion: THREE.Quaternion; length: number; } | null;
+}
+
+interface ProcessedLithologyData {
+    byHoleId: Record<string, BoreholeInfo>;
+    modelCenter: { lon: number; lat: number; };
+}
+
+interface ProcessedAssayData {
+    byHoleId: Record<string, BoreholeInfo>;
+    modelCenter: { lon: number; lat: number; };
+    assayRange: { min: number; max: number; };
+}
+
 interface DataCache {
     drillholeData: {
         lithology: DrillholeSegment[];
         assay: DrillholeSegment[];
     } | null;
     blockModelData: BlockSegment[] | null;
+    processedLithologyData: ProcessedLithologyData | null;
+    processedAssayData: ProcessedAssayData | null;
     loadingStatus: 'idle' | 'loading' | 'success' | 'error';
     error: string | null;
 }
 
-const DataCacheContext = createContext<DataCache | undefined>(undefined);
+const DataCacheContext = createContext<(DataCache & { refetch: () => void; }) | undefined>(undefined);
 
 export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
     const [cache, setCache] = useState<DataCache>({
         drillholeData: null,
         blockModelData: null,
-        loadingStatus: 'idle', 
+        processedLithologyData: null,
+        processedAssayData: null,
+        loadingStatus: 'idle',
         error: null,
     });
 
+    const refetch = () => {
+        setCache(c => ({ ...c, loadingStatus: 'idle' }));
+    };
+
     useEffect(() => {
         const loadData = async () => {
-            setCache(c => ({ ...c, loadingStatus: 'loading' }));
+            setCache(c => ({ ...c, loadingStatus: 'loading', error: null }));
             try {
                 const [lithologyResponse, assayResponse, blockModelResponse] = await Promise.all([
                     fetch('/lithology_data.geojson'),
@@ -78,19 +105,104 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                     };
                 });
 
+                console.log('Parsed drillholes:', parsedDrillholes);
+
+                const lithologyData = parsedDrillholes.filter(d => d.lithology);
+                console.log('Lithology data:', lithologyData);
+
+                const assayData = parsedDrillholes.filter(d => d.graphitic_carbon !== undefined);
+
+                // Process Lithology Data
+                const lithologyByHoleId: Record<string, BoreholeInfo> = {};
+                const allLithologyPoints: { lon: number; lat: number; elevation: number; }[] = [];
+
+                lithologyData.forEach(segment => {
+                    if (!lithologyByHoleId[segment.hole_id]) {
+                        lithologyByHoleId[segment.hole_id] = { segments: [], orientation: null };
+                    }
+                    lithologyByHoleId[segment.hole_id].segments.push(segment);
+                    allLithologyPoints.push({ lon: segment.lon, lat: segment.lat, elevation: segment.elevation });
+                });
+
+                const centerLonLithology = allLithologyPoints.reduce((acc, p) => acc + p.lon, 0) / allLithologyPoints.length;
+                const centerLatLithology = allLithologyPoints.reduce((acc, p) => acc + p.lat, 0) / allLithologyPoints.length;
+                const modelCenterLithology = { lon: centerLonLithology, lat: centerLatLithology };
+
+                // Calculate orientation for each lithology borehole
+                Object.values(lithologyByHoleId).forEach(borehole => {
+                    if (borehole.segments.length > 0) {
+                        const firstSegment = borehole.segments[0];
+                        const lastSegment = borehole.segments[borehole.segments.length - 1];
+
+                        const p0 = toFixed([firstSegment.lat, firstSegment.lon, firstSegment.elevation]);
+                        const p1 = toFixed([lastSegment.lat, lastSegment.lon, lastSegment.elevation]);
+                        const length = Cesium.Cartesian3.distance(p0, p1) || 0.01;
+                        const { midpoint, quaternion } = orientationFrom(p0, p1);
+                        borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
+                    }
+                });
+
+                // Process Assay Data
+                const assayByHoleId: Record<string, BoreholeInfo> = {};
+                const allAssayPoints: { lon: number; lat: number; elevation: number; }[] = [];
+
+                assayData.forEach(segment => {
+                    if (!assayByHoleId[segment.hole_id]) {
+                        assayByHoleId[segment.hole_id] = { segments: [], orientation: null };
+                    }
+                    assayByHoleId[segment.hole_id].segments.push(segment);
+                    allAssayPoints.push({ lon: segment.lon, lat: segment.lat, elevation: segment.elevation });
+                });
+
+                const centerLonAssay = allAssayPoints.reduce((acc, p) => acc + p.lon, 0) / allAssayPoints.length;
+                const centerLatAssay = allAssayPoints.reduce((acc, p) => acc + p.lat, 0) / allAssayPoints.length;
+                const modelCenterAssay = { lon: centerLonAssay, lat: centerLatAssay };
+
+                const assayValues = assayData.map(d => d.graphitic_carbon).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+                const assayRange = assayValues.length === 0 ? { min: 0, max: 1 } : { min: Math.min(...assayValues), max: Math.max(...assayValues) };
+
+                // Calculate orientation for each assay borehole
+                Object.values(assayByHoleId).forEach(borehole => {
+                    if (borehole.segments.length > 0) {
+                        const firstSegment = borehole.segments[0];
+                        const lastSegment = borehole.segments[borehole.segments.length - 1];
+
+                        const p0 = toFixed([firstSegment.lat, firstSegment.lon, firstSegment.elevation]);
+                        const p1 = toFixed([lastSegment.lat, lastSegment.lon, lastSegment.elevation]);
+                        const length = Cesium.Cartesian3.distance(p0, p1) || 0.01;
+                        const { midpoint, quaternion } = orientationFrom(p0, p1);
+                        borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
+                    }
+                });
+
                 setCache({
                     drillholeData: {
-                        lithology: parsedDrillholes.filter(d => d.lithology),
-                        assay: parsedDrillholes.filter(d => d.graphitic_carbon !== undefined)
+                        lithology: lithologyData,
+                        assay: assayData
                     },
                     blockModelData: parsedBlockModel,
+                    processedLithologyData: {
+                        byHoleId: lithologyByHoleId,
+                        modelCenter: modelCenterLithology,
+                    },
+                    processedAssayData: {
+                        byHoleId: assayByHoleId,
+                        modelCenter: modelCenterAssay,
+                        assayRange: assayRange,
+                    },
                     loadingStatus: 'success',
                     error: null,
                 });
+                console.log('Processed Lithology Data:', lithologyByHoleId);
+                console.log('Processed Assay Data:', assayByHoleId);
 
-            } catch (error: any) {
-                setCache(c => ({ ...c, loadingStatus: 'error', error: error.message }));
-                console.error("Failed to load data for cache:", error);
+            } catch (error) {
+                console.error("Failed to load data:", error);
+                setCache(c => ({
+                    ...c,
+                    loadingStatus: 'error',
+                    error: error instanceof Error ? error.message : String(error)
+                }));
             }
         };
 
@@ -100,7 +212,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
     }, [cache.loadingStatus]);
 
     return (
-        <DataCacheContext.Provider value={cache}>
+        <DataCacheContext.Provider value={{...cache, refetch}}>
             {children}
         </DataCacheContext.Provider>
     );

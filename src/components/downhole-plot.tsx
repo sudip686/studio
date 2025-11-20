@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts';
 import { useDataCache, DrillholeSegment as DataCacheDrillholeSegment } from '@/lib/data-cache';
 
@@ -32,72 +32,44 @@ const DownholePlot = () => {
     const [selectedHoleId, setSelectedHoleId] = useState<string>('');
     const [plotData, setPlotData] = useState<DrillholeSegment[]>([]);
 
-    useEffect(() => {
-        if (!drillholeData) return;
+    const combinedData = useMemo(() => {
+        if (!drillholeData) return {};
+        const data: { [key: string]: DrillholeSegment[] } = {};
 
-        const combinedData: { [key: string]: DrillholeSegment[] } = {};
-
-        drillholeData.lithology.forEach((segment: DrillholeSegment) => {
-            if (!combinedData[segment.hole_id]) {
-                combinedData[segment.hole_id] = [];
+        drillholeData.lithology.forEach(segment => {
+            if (!data[segment.hole_id]) {
+                data[segment.hole_id] = [];
             }
-            combinedData[segment.hole_id].push(segment);
+            data[segment.hole_id].push({...segment});
         });
 
-        drillholeData.assay.forEach((segment: DrillholeSegment) => {
-            if (combinedData[segment.hole_id]) {
-                const existingSegment = combinedData[segment.hole_id].find(s => s.depth_from === segment.depth_from && s.depth_to === segment.depth_to);
-                if (existingSegment) {
-                    existingSegment.graphitic_carbon = segment.graphitic_carbon;
-                } else {
-                    combinedData[segment.hole_id].push(segment);
-                }
+        drillholeData.assay.forEach(segment => {
+            if (!data[segment.hole_id]) {
+                data[segment.hole_id] = [];
+            }
+            const existingSegment = data[segment.hole_id].find(s => s.depth_from === segment.depth_from && s.depth_to === segment.depth_to);
+            if (existingSegment) {
+                existingSegment.graphitic_carbon = segment.graphitic_carbon;
+            } else {
+                data[segment.hole_id].push({...segment});
             }
         });
-
-        const allHoleIds = Object.keys(combinedData);
-        setHoleIds(allHoleIds);
-        if (allHoleIds.length > 0) {
-            setSelectedHoleId(allHoleIds[0]);
-            setPlotData(combinedData[allHoleIds[0]].sort((a, b) => a.depth_from - b.depth_from));
-        }
+        return data;
     }, [drillholeData]);
 
     useEffect(() => {
-        if (selectedHoleId) {
-            const fetchData = async () => {
-                const lithologyResponse = await fetch('/lithology_data.geojson');
-                const lithologyGeoJson = await lithologyResponse.json();
-                const lithologyData = lithologyGeoJson.features.map((f: any) => f.properties);
-    
-                const assayResponse = await fetch('/assay_data.geojson');
-                const assayGeoJson = await assayResponse.json();
-                const assayData = assayGeoJson.features.map((f: any) => f.properties);
-    
-                const combinedData: { [key: string]: DrillholeSegment[] } = {};
-
-                lithologyData.forEach((segment: any) => {
-                    if (!combinedData[segment.hole_id]) {
-                        combinedData[segment.hole_id] = [];
-                    }
-                    combinedData[segment.hole_id].push(segment);
-                });
-    
-                assayData.forEach((segment: any) => {
-                    if (combinedData[segment.hole_id]) {
-                        const existingSegment = combinedData[segment.hole_id].find(s => s.depth_from === segment.depth_from && s.depth_to === segment.depth_to);
-                        if (existingSegment) {
-                            existingSegment.graphitic_carbon = segment.graphitic_carbon;
-                        } else {
-                            combinedData[segment.hole_id].push(segment);
-                        }
-                    }
-                });
-                setPlotData(combinedData[selectedHoleId].sort((a, b) => a.depth_from - b.depth_from));
-            };
-            fetchData();
+        const allHoleIds = Object.keys(combinedData);
+        setHoleIds(allHoleIds);
+        if (allHoleIds.length > 0 && (!selectedHoleId || !allHoleIds.includes(selectedHoleId))) {
+            setSelectedHoleId(allHoleIds[0]);
         }
-    }, [selectedHoleId]);
+    }, [combinedData, selectedHoleId]);
+
+    useEffect(() => {
+        if (selectedHoleId && combinedData[selectedHoleId]) {
+            setPlotData(combinedData[selectedHoleId].sort((a, b) => a.depth_from - b.depth_from));
+        }
+    }, [selectedHoleId, combinedData]);
 
     return (
         <div className="h-screen w-screen bg-gray-100 p-4 flex flex-col">
@@ -118,14 +90,20 @@ const DownholePlot = () => {
                     layout="vertical"
                     data={plotData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    barCategoryGap={0}
                 >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis type="category" dataKey="depth_from" width={150} label={{ value: 'Depth (m)', angle: -90, position: 'insideLeft' }} />
+                    <XAxis type="number" domain={[0, 'dataMax + 2']} />
+                    <YAxis 
+                        type="category" 
+                        dataKey="depth_from" 
+                        width={150} 
+                        label={{ value: 'Depth (m)', angle: -90, position: 'insideLeft' }} 
+                        interval={0}
+                    />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="graphitic_carbon" name="Graphitic Carbon" fill="#8884d8" />
-                    <Bar dataKey="lithology" name="Lithology" >
+                    <Bar dataKey="graphitic_carbon" name="Graphitic Carbon">
                         {plotData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={LITHOLOGY_COLOR_MAP[entry.lithology || 'UNKNOWN']} />
                         ))}
