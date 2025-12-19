@@ -14,7 +14,7 @@ if (workbox) {
   navigationPreload.enable();
 
   // __WB_MANIFEST is replaced at build time (InjectManifest)
-  precaching.precacheAndRoute([{"revision":"c4f7b0a2780d1b6d328c7a90d09f839a","url":"topography.png"}] || []);
+  precaching.precacheAndRoute([{"revision":"c4f7b0a2780d1b6d328c7a90d09f839a","url":"topography.png"},{"revision":"a0dfd68399deef910f885a05df9e39f0","url":"assay_data.geojson"},{"revision":"3917290d47940c59bcdcdd9837ce276a","url":"assay_data.json"},{"revision":"e3924df8c4b5d51befa4b0189488ba2c","url":"boundary.kmz"},{"revision":"f7570b55f5370211de7c3eee2bebf2aa","url":"lithology_data.geojson"},{"revision":"6f5d89c3e77b96551b51e08c054c7153","url":"lithology_data.json"},{"revision":"5cf5bd8fef0972d887c9e24b90a4a8a7","url":"mining_license_boundary.kml"},{"revision":"a8834c491497a2a8852aaf7e95459fc5","url":"tanga_boundary.kmz"},{"revision":"03723d7c829e5e2feeda8a65d4e9e2fd","url":"earth.glb"},{"revision":"30775fb299419e4f756d355c9f0f23b8","url":"geologicalModel.glb"},{"revision":"b158b51bcfa36b3bf47493eb7e7af3bc","url":"geology_map.jpg"},{"revision":"fe10e7c4d4c8d35112be88101f94ef02","url":"resource_model.bin"},{"revision":"419892950068d4c0111c6f433749cb65","url":"Tanga Road Map.tiff"}] || []);
 
 
 
