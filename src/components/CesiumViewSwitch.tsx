@@ -14,6 +14,7 @@ import TerrainClippingPlanes from '@/components/terrain-clipping-planes'; // Cor
 import BlockModelBoxCutter from '@/components/block-model-box-cutter';
 import DrillholeLayer from '@/components/DrillholeLayer';
 import TilesetQualityToggle from '@/components/TilesetQualityToggle'; // Import the new component
+import BlockModelClipViewer from '@/components/BlockModelClipViewer'; // Import the new component
 
 type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'tanaga_accessibility' | 'tanga_geological_map' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location' | 'geospatial_lithology' | 'geospatial_assay' | 'drillhole_lithology_reveal' | 'subsurface_cutaway' | 'kml_focused_view' | 'terrain_traces' | 'resource_model_viewer' | 'cesium_three_block_model' | 'grand_canyon_assay' | 'grand_canyon_lithology' | 'drillhole_location_lithology' | 'drillhole_location_assay' | 'terrain_clipping' | 'block_model_box_cutter_grade' | 'block_model_box_cutter_class';
 
@@ -44,6 +45,22 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const [grandCanyonMode, setGrandCanyonMode] = useState<'assay' | 'lithology'>('assay');
   const [drillholeLocationMode, setDrillholeLocationMode] = useState<'assay' | 'lithology'>('assay');
   const [boxCutterMode, setBoxCutterMode] = useState<'grade' | 'class'>('grade');
+
+  const specialViewMap = {
+      drillhole_lithology_reveal: 'animatedReveal',
+      subsurface_cutaway: 'subsurfaceCutaway',
+      kml_focused_view: 'kmlFocused',
+      resource_model_viewer: 'resourceModel',
+      cesium_three_block_model: 'cesiumThreeBlockModel',
+      grand_canyon_assay: 'grandCanyon',
+      grand_canyon_lithology: 'grandCanyon',
+      drillhole_location_assay: 'drillholeLocation',
+      drillhole_location_lithology: 'drillholeLocation',
+      terrain_clipping: 'terrainClipping',
+      block_model_box_cutter_grade: 'boxCutter',
+      block_model_box_cutter_class: 'boxCutter',
+      block_model_clip_view: 'blockModelClip',
+  };
 
   // Apply transparency whenever sliders change (and when viewer is ready)
   useEffect(() => {
@@ -124,12 +141,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         }
       }
 
-      if (prev === 'geospatial_lithology' || prev === 'geospatial_assay') {
-        if (geospatialDsRef.current) {
-            v.dataSources.remove(geospatialDsRef.current, true);
-            geospatialDsRef.current = null;
-        }
-      }
+
 
       if (prev === 'project_location') {
         if (projectLocationLayerRef.current) {
@@ -210,19 +222,14 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
             console.error("Error loading ION imagery:", error);
         }
       }
-      else if (next === 'geojson_drillholes_lithology' || next === 'geojson_drillholes_assay') {
-        setDrillholeType(next === 'geojson_drillholes_lithology' ? 'lithology' : 'assay');
+      else if (
+        next === 'geojson_drillholes_lithology' || 
+        next === 'geojson_drillholes_assay' ||
+        next === 'geospatial_lithology' || 
+        next === 'geospatial_assay'
+      ) {
+        setDrillholeType(next.includes('lithology') ? 'lithology' : 'assay');
         setSpecialView('drillhole');
-      }
-      else if (next === 'geospatial_lithology' || next === 'geospatial_assay') {
-        const type = next === 'geospatial_lithology' ? 'lithology' : 'assay';
-        if (!drillholeData) return;
-        const dataToRender = type === 'lithology' ? drillholeData.lithology : drillholeData.assay;
-        const customDataSource = new Cesium.CustomDataSource(`geospatial-${type}`);
-        geospatialDsRef.current = customDataSource;
-        await v.dataSources.add(customDataSource);
-        // ... (rest of the logic)
-        await v.flyTo(customDataSource);
       }
       else if (next === 'project_location') {
         if (kmlDataSourceRef.current) kmlDataSourceRef.current.show = false;
@@ -231,6 +238,10 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         const marker = v.entities.add({ position: centerPoint, point: { pixelSize: 12, color: Cesium.Color.RED, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 } });
         projectLocationLayerRef.current = marker;
         await v.flyTo(marker, { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-90), 500000) });
+      }
+      else if (next === 'tiff_overlay') {
+        console.warn("TIFF overlay loading logic not implemented yet.");
+        // Placeholder for actual TIFF overlay loading logic
       }
       else {
         const specialViewMap = {
@@ -246,12 +257,13 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
             terrain_clipping: 'terrainClipping',
             block_model_box_cutter_grade: 'boxCutter',
             block_model_box_cutter_class: 'boxCutter',
+            block_model_clip_view: 'blockModelClip',
         };
-        if (specialViewMap[next]) {
+        if (next in specialViewMap) {
             if (next.startsWith('grand_canyon')) setGrandCanyonMode(next.endsWith('assay') ? 'assay' : 'lithology');
             if (next.startsWith('drillhole_location')) setDrillholeLocationMode(next.endsWith('assay') ? 'assay' : 'lithology');
             if (next.startsWith('block_model_box_cutter')) setBoxCutterMode(next.endsWith('grade') ? 'grade' : 'class');
-            setSpecialView(specialViewMap[next]);
+            setSpecialView(specialViewMap[next as keyof typeof specialViewMap]);
         }
       }
 
@@ -282,6 +294,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         {specialView === 'drillholeLocation' && <DrillholeLocationMap displayMode={drillholeLocationMode} />}
         {specialView === 'terrainClipping' && <TerrainClippingPlanes />}{/* Corrected component */}
         {specialView === 'boxCutter' && <BlockModelBoxCutter colorMode={boxCutterMode} />}
+        {specialView === 'blockModelClip' && <BlockModelClipViewer />}
 
       {/* Transparency controls */}
       <div

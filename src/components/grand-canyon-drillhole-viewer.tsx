@@ -3,31 +3,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData } from '@/lib/legend-definitions';
+import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData } from '@/lib/constants';
+import * as Cesium from 'cesium';
 
 interface GrandCanyonDrillholeViewerProps {
   displayMode: 'assay' | 'lithology';
 }
 
+// Generic tooltip from resource-model-viewer
 const TooltipContent = ({ data }: { data: any }) => {
     if (!data || !data.content) return null;
-
+    const propertyEntries = Object.entries(data.content).map(([key, value]) => {
+        const displayValue = typeof value === 'number' ? value.toFixed(3) : String(value);
+        return <li key={key}><strong>{key}:</strong> {displayValue}</li>;
+    });
     return (
         <div
-            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none"
+            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none z-50"
             style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
         >
-            <p className="font-bold text-base mb-1">Hole ID: {data.content.hole_id}</p>
-            <ul className="list-none space-y-1">
-                <li><strong>Lat:</strong> {data.content.latitude?.toFixed(5)}</li>
-                <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
-                <li><strong>Depth From:</strong> {data.content.depth_from?.toFixed(2)} m</li>
-                <li><strong>Depth To:</strong> {data.content.depth_to?.toFixed(2)} m</li>
-                {data.content.lithology && <li><strong>Lithology:</strong> {data.content.lithology}</li>}
-                {data.content.graphitic_carbon !== undefined && (
-                    <li><strong>Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
-                )}
-            </ul>
+            <p className="font-bold text-base mb-1">Entity Properties</p>
+            <ul className="list-none space-y-1">{propertyEntries}</ul>
         </div>
     );
 };
@@ -42,9 +38,15 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
   const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
   const kmzUrl = '/tanga_boundary.kmz';
 
+  // State from resource-model-viewer
+  const [blockModelData, setBlockModelData] = useState<any>(null);
+  const [properties, setProperties] = useState<string[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [blockTransparency, setBlockTransparency] = useState(0.5);
+  const blockModelEntitiesRef = useRef<any[]>([]);
+
   useEffect(() => {
     if (!ready || !viewer) return;
-    const Cesium = (window as any).Cesium as typeof import('cesium');
     let isMounted = true;
 
     Object.keys(LITHOLOGY_COLOR_MAP_CSS).forEach(key => {
@@ -69,8 +71,22 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
         // 1) Load drillhole GeoJSON depending on displayMode
         const geojsonPath =
           displayMode === 'lithology' ? '/lithology_data.geojson' : '/assay_data.geojson';
-        const response = await fetch(geojsonPath);
-        const geoJson = await response.json();
+        
+        const [geoJson, bm] = await Promise.all([
+            fetch(geojsonPath).then(res => res.json()),
+            fetch('/BlockModel.geojson').then(res => res.json())
+        ]);
+
+        if (!isMounted) return;
+
+        // Process and set block model data
+        setBlockModelData(bm);
+        const keys = Object.keys(bm?.features?.[0]?.properties ?? {});
+        setProperties(keys);
+        const preferred = keys.includes("Kr, GRAPHITIC_CARBON in GM_Litho: GRSC")
+            ? "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"
+            : (keys.includes("RescCalc") ? "RescCalc" : keys[0] ?? "");
+        setSelectedProperty(preferred);
 
         let minAssay = Infinity, maxAssay = -Infinity;
         if (displayMode === 'assay') {
@@ -106,8 +122,7 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
                 const direction = Cesium.Cartesian3.subtract(endCartesian, startCartesian, new Cesium.Cartesian3());
                 Cesium.Cartesian3.normalize(direction, direction);
 
-                // Create a rotation matrix that aligns the Z-axis with the direction vector
-                const up = Cesium.Cartesian3.normalize(midpoint, new Cesium.Cartesian3()); // Up vector for the local frame
+                const up = Cesium.Cartesian3.normalize(midpoint, new Cesium.Cartesian3());
                 const right = Cesium.Cartesian3.cross(direction, up, new Cesium.Cartesian3());
                 Cesium.Cartesian3.normalize(right, right);
                 const newUp = Cesium.Cartesian3.cross(right, direction, new Cesium.Cartesian3());
@@ -118,8 +133,6 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
                     right.y, newUp.y, direction.y,
                     right.z, newUp.z, direction.z
                 );
-
-                const modelMatrix = Cesium.Matrix4.fromRotationTranslation(rotation, midpoint, new Cesium.Matrix4());
 
                 customDataSource.entities.add({
                     position: midpoint,
@@ -132,20 +145,16 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
 
         if (!isMounted || viewer.isDestroyed()) return;
         await viewer.dataSources.add(customDataSource);
-        viewer.scene.requestRender();
         dataSourceRef.current = customDataSource;
 
         // 2) Load KMZ boundary to compute box clipping planes
         const ds = await Cesium.KmlDataSource.load(kmzUrl, { clampToGround: true });
         await viewer.dataSources.add(ds);
-        viewer.scene.requestRender();
         await viewer.flyTo(ds);
-        viewer.scene.requestRender();
 
         const rect = viewer.camera.computeViewRectangle();
         if (!rect) return;
 
-        // Compute local ENU at center
         const centerCarto = Cesium.Rectangle.center(rect);
         const center = Cesium.Cartesian3.fromRadians(
           centerCarto.longitude,
@@ -154,7 +163,6 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
         );
         const enu = Cesium.Transforms.eastNorthUpToFixedFrame(center);
 
-        // Project rectangle corners into ENU
         const corners = [
           Cesium.Cartesian3.fromRadians(rect.west, rect.north),
           Cesium.Cartesian3.fromRadians(rect.east, rect.north),
@@ -172,9 +180,8 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
         const ys = corners.map((c) => c.y);
         const hx = (Math.max(...xs) - Math.min(...xs)) / 2;
         const hy = (Math.max(...ys) - Math.min(...ys)) / 2;
-        const hz = Math.max(hx, hy) * 1.2; // make it tall
+        const hz = Math.max(hx, hy) * 1.2;
 
-        // 3) Build 6-plane box clipping
         const planes = new Cesium.ClippingPlaneCollection({
           modelMatrix: enu,
           planes: [
@@ -185,7 +192,7 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
             new Cesium.ClippingPlane(new Cesium.Cartesian3(0, 0, 1), -hz),
             new Cesium.ClippingPlane(new Cesium.Cartesian3(0, 0, -1), -hz),
           ],
-          unionClippingRegions: false, // intersect = hollow box
+          unionClippingRegions: false,
           edgeWidth: 1.0,
           edgeColor: Cesium.Color.WHITE,
           enabled: true,
@@ -198,9 +205,7 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
         globe.backFaceCulling = true;
         globe.showSkirts = true;
         globe.clippingPlanes = planes;
-        viewer.scene.requestRender();
 
-        // Add translucent box entity to visualize the clipping boundary
         const boxEntity = viewer.entities.add({
           position: center,
           orientation: Cesium.Transforms.headingPitchRollQuaternion(center, new Cesium.HeadingPitchRoll()),
@@ -211,19 +216,16 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
             outlineColor: Cesium.Color.WHITE,
           },
         });
-        viewer.scene.requestRender();
         boxEntityRef.current = boxEntity;
 
-        // 4) Frame the box
         const bs = Cesium.BoundingSphere.fromRectangle3D(rect);
         viewer.camera.viewBoundingSphere(
           bs,
           new Cesium.HeadingPitchRange(0.5, -0.5, bs.radius * 2.5)
         );
-        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+
         viewer.scene.requestRender();
 
-        // Cleanup
         return () => {
           globe.clippingPlanes?.removeAll();
           globe.clippingPlanes = undefined as any;
@@ -253,6 +255,65 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
     };
   }, [ready, viewer, displayMode]);
 
+  // Effect for rendering block model
+  useEffect(() => {
+    if (!viewer || !blockModelData || !selectedProperty) return;
+
+    blockModelEntitiesRef.current.forEach(entity => viewer.entities.remove(entity));
+    blockModelEntitiesRef.current = [];
+
+    let min = Infinity, max = -Infinity;
+    if (selectedProperty === "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC") {
+        blockModelData.features.forEach((f:any) => {
+            const v = parseFloat(f.properties[selectedProperty]);
+            if (!isNaN(v)) { if (v < min) min = v; if (v > max) max = v; }
+        });
+    }
+
+    blockModelData.features.forEach((feature: any) => {
+        const { geometry, properties } = feature;
+        let color;
+        let shouldPlot = false;
+
+        if (selectedProperty === "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC") {
+            const value = parseFloat(properties[selectedProperty]);
+            if (!isNaN(value)) {
+                shouldPlot = true;
+                const ratio = max > min ? (value - min) / (max - min) : 0.5;
+                color = Cesium.Color.fromHsl(0.6 - ratio * 0.6, 1.0, 0.5).withAlpha(blockTransparency);
+            }
+        } else if (selectedProperty === "RescCalc") {
+            const value = properties[selectedProperty];
+            if (["Indicated", "Measured", "Inferred"].includes(value)) {
+                shouldPlot = true;
+                switch (value) {
+                    case "Indicated": color = Cesium.Color.BLUE.withAlpha(blockTransparency); break;
+                    case "Measured": color = Cesium.Color.GREEN.withAlpha(blockTransparency); break;
+                    case "Inferred": color = Cesium.Color.YELLOW.withAlpha(blockTransparency); break;
+                }
+            }
+        }
+
+        if (shouldPlot) {
+            const { dX, dY, dZ } = properties;
+            const entity = viewer.entities.add({
+                position: Cesium.Cartesian3.fromDegrees(geometry.coordinates[0], geometry.coordinates[1], geometry.coordinates[2]),
+                box: { dimensions: new Cesium.Cartesian3(parseFloat(dX), parseFloat(dY), parseFloat(dZ)), material: color },
+                properties: properties
+            });
+            blockModelEntitiesRef.current.push(entity);
+        }
+    });
+    viewer.scene.requestRender();
+
+    return () => {
+        if (viewer && !viewer.isDestroyed()) {
+            blockModelEntitiesRef.current.forEach(entity => viewer.entities.remove(entity));
+            blockModelEntitiesRef.current = [];
+        }
+    };
+  }, [viewer, blockModelData, selectedProperty, blockTransparency]);
+
   return (
     <div className="h-full w-full relative">
         {displayMode === 'lithology' ? (
@@ -273,6 +334,19 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
             />
         )}
         <TooltipContent data={tooltip} />
+        <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(255,255,255,0.8)', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', borderRadius: '8px' }}>
+            <h4>Resource Model Controls</h4>
+            <div>
+                <label>Visualize Property: </label>
+                <select value={selectedProperty} onChange={(e) => setSelectedProperty(e.target.value)} style={{width: "100%"}}>
+                    {properties.map(prop => <option key={prop} value={prop}>{prop}</option>)}
+                </select>
+            </div>
+            <div>
+                <label>Block Transparency: </label>
+                <input type="range" min="0" max="1" step="0.05" value={blockTransparency} onChange={(e) => setBlockTransparency(parseFloat(e.target.value))} />
+            </div>
+        </div>
     </div>
   );
 };

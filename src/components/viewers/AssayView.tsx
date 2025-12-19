@@ -6,6 +6,7 @@ import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context';
+import { ErrorDisplay } from '@/components/ui/error-display';
 
 // ## Data Structures & Constants ##
 interface DrillholeSegment {
@@ -39,17 +40,20 @@ function getSegmentEnds(seg:{feature:any}) {
 
 export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
     const mountedRef = useRef(false);
-    const { drillholeData, loadingStatus, error } = useDataCache();
+    const { drillholeData, loadingStatus, error, refetch } = useDataCache();
     const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
 
     const assayRange = useMemo(() => {
         if (!drillholeData || !drillholeData.assay) return { min: 0, max: 1 };
         const assayValues = drillholeData.assay.map(d => d.graphitic_carbon).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
         if (assayValues.length === 0) return { min: 0, max: 1 };
-        return { min: Math.min(...assayValues), max: Math.max(...assayValues) };
+        const range = { min: Math.min(...assayValues), max: Math.max(...assayValues) };
+        console.log('Assay range:', range);
+        return range;
     }, [drillholeData]);
 
     useEffect(() => {
+    console.log('Rendering AssayView');
         if (!scene || !camera || !controls || !dynamicGroup) return;
         console.log('[AssayView] Initializing with:', { scene, camera, controls, dynamicGroup });
         if (!drillholeData || !Array.isArray(drillholeData.assay) || drillholeData.assay.length === 0) {
@@ -135,6 +139,7 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
             // Register mesh for tooltip
             registerTooltipObject(mesh, (instanceId: number) => {
                 const segment = features[instanceId];
+                console.log('AssayView tooltip segment:', segment);
                 return `Hole ID: ${segment.hole_id}<br/>Depth: ${segment.depth_from}-${segment.depth_to}<br/>Carbon: ${segment.graphitic_carbon?.toFixed(2)}`;
             });
         });
@@ -158,7 +163,7 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
         };
     }, [drillholeData, loadingStatus, assayRange, assayCutoff, scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject]);
 
-    if (error) return <div>Error: {error}</div>;
+    if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
     const assayLegendItems = Array.from({ length: 5 }).map((_, i) => {
         const value = assayRange.min + (assayRange.max - assayRange.min) * (i / 4);

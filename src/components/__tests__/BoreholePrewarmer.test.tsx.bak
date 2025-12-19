@@ -1,0 +1,141 @@
+// src/components/__tests__/BoreholePrewarmer.test.tsx
+import { render, waitFor } from '@testing-library/react';
+import { BoreholePrewarmer } from '../BoreholePrewarmer';
+import { useDataCache } from '@/lib/data-cache';
+import { hasCachedLithology, getLithologyCache, setLithologyCache } from '@/lib/boreholes/geometry-cache';
+import { processInChunks } from '@/lib/utils';
+import { colorFromLegend } from '@/lib/boreholes/legend-color';
+
+// Mock dependencies
+jest.mock('@/lib/data-cache', () => ({
+  useDataCache: jest.fn(),
+}));
+
+jest.mock('@/lib/boreholes/geometry-cache', () => ({
+  hasCachedLithology: jest.fn(),
+  getLithologyCache: jest.fn(),
+  setLithologyCache: jest.fn(),
+}));
+
+jest.mock('@/lib/utils', () => ({
+  processInChunks: jest.fn(),
+}));
+
+jest.mock('@/lib/boreholes/legend-color', () => ({
+  colorFromLegend: jest.fn(),
+}));
+
+// Mock Cesium global object
+const mockCartesian3 = jest.fn((x = 0, y = 0, z = 0) => ({ x, y, z }));
+mockCartesian3.fromDegrees = jest.fn(() => ({ x: 0, y: 0, z: 0 }));
+mockCartesian3.distance = jest.fn(() => 100);
+mockCartesian3.normalize = jest.fn(v => v);
+mockCartesian3.subtract = jest.fn((a, b, res) => res || { x: 0, y: 0, z: 0 });
+mockCartesian3.cross = jest.fn((a, b, res) => res || { x: 0, y: 0, z: 0 });
+
+const mockMatrix3 = jest.fn(() => ({}));
+mockMatrix3.setColumn = jest.fn();
+
+const mockMatrix4 = jest.fn(() => ({}));
+mockMatrix4.getTranslation = jest.fn(() => ({ x: 0, y: 0, z: 0 }));
+mockMatrix4.fromTranslationQuaternionRotationScale = jest.fn(() => ({ a: 1 }));
+
+global.window.Cesium = {
+    Cartesian3: mockCartesian3,
+    CylinderGeometry: jest.fn(),
+    Transforms: {
+        eastNorthUpToFixedFrame: jest.fn(() => ({ a: 1 })), // Mock a simple matrix
+    },
+    Matrix3: mockMatrix3,
+    Quaternion: {
+        fromRotationMatrix: jest.fn(() => ({ x: 0, y: 0, z: 0, w: 1 })),
+    },
+    Matrix4: mockMatrix4,
+    GeometryInstance: jest.fn(),
+    ColorGeometryInstanceAttribute: {
+        fromColor: jest.fn(),
+    },
+};
+
+
+describe('BoreholePrewarmer', () => {
+  beforeEach(() => {
+    // Reset mocks before each test
+    (useDataCache as jest.Mock).mockReset();
+    (hasCachedLithology as jest.Mock).mockReset();
+    (getLithologyCache as jest.Mock).mockReset();
+    (setLithologyCache as jest.Mock).mockReset();
+    (processInChunks as jest.Mock).mockReset();
+    (colorFromLegend as jest.Mock).mockReset();
+    mockCartesian3.mockClear();
+    mockMatrix3.mockClear();
+    mockMatrix4.mockClear();
+
+    // Default mock implementations
+    (hasCachedLithology as jest.Mock).mockReturnValue(false);
+    (useDataCache as jest.Mock).mockReturnValue({
+      drillholeData: {
+        lithology: [
+          { hole_id: 'DH001', depth_from: 0, depth_to: 10, feature: { geometry: { coordinates: [[0, 0, 0], [0, 0, 10]] } }, lithology: 'L1' },
+          { hole_id: 'DH001', depth_from: 10, depth_to: 20, feature: { geometry: { coordinates: [[0, 0, 10], [0, 0, 20]] } }, lithology: 'L2' },
+        ],
+      },
+    });
+    (processInChunks as jest.Mock).mockImplementation(async (items, processor) => {
+      const results = await Promise.all(items.map(processor));
+      return results.filter(Boolean); // Filter out nulls
+    });
+    (colorFromLegend as jest.Mock).mockReturnValue({ red: 1, green: 0, blue: 0, alpha: 1 }); // Mock Cesium Color
+    (global.window.Cesium.GeometryInstance as jest.Mock).mockImplementation(opts => opts); // Mock instance creation
+  });
+
+  it('should not run pre-warming if cache is already ready', () => {
+    (hasCachedLithology as jest.Mock).mockReturnValue(true);
+    render(<BoreholePrewarmer />);
+    expect(processInChunks).not.toHaveBeenCalled();
+    expect(setLithologyCache).not.toHaveBeenCalled();
+  });
+
+  it('should pre-warm borehole geometries if cache is not ready and data is available', async () => {
+    render(<BoreholePrewarmer />);
+
+    await waitFor(() => {
+      expect(processInChunks).toHaveBeenCalledTimes(1);
+      expect(processInChunks).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ hole_id: 'DH001', lithology: 'L1' }),
+          expect.objectContaining({ hole_id: 'DH001', lithology: 'L2' }),
+        ]),
+        expect.any(Function),
+        100,
+      );
+      expect(setLithologyCache).toHaveBeenCalledTimes(1);
+      expect(setLithologyCache).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'bh-DH001-0-10' }),
+          expect.objectContaining({ id: 'bh-DH001-10-20' }),
+        ]),
+      );
+      expect(hasCachedLithology()).toBe(false); // Ensure it's checked initially
+    });
+  });
+
+  it('should not run pre-warming if drillholeData is not available', () => {
+    (useDataCache as jest.Mock).mockReturnValue({ drillholeData: null });
+    render(<BoreholePrewarmer />);
+    expect(processInChunks).not.toHaveBeenCalled();
+    expect(setLithologyCache).not.toHaveBeenCalled();
+  });
+
+  it('should handle empty lithology data gracefully', async () => {
+    (useDataCache as jest.Mock).mockReturnValue({ drillholeData: { lithology: [] } });
+    render(<BoreholePrewarmer />);
+
+    await waitFor(() => {
+      expect(processInChunks).toHaveBeenCalledTimes(1);
+      expect(processInChunks).toHaveBeenCalledWith([], expect.any(Function), 100);
+      expect(setLithologyCache).toHaveBeenCalledTimes(1);
+      expect(setLithologyCache).toHaveBeenCalledWith([]);
+    });
+  });
+});

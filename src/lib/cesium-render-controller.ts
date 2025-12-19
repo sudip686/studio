@@ -13,7 +13,7 @@ export function createRenderController(viewer: any): RenderController {
   let rafId: number | null = null;
 
   const renderOnce = () => {
-    try { viewer.resize(); viewer.render(); } catch {}
+    try { viewer.resize(); viewer.render(); } catch (e) { console.error('[RenderController] Error in render loop:', e); }
   };
 
   const loop = () => {

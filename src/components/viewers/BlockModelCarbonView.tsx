@@ -5,9 +5,10 @@ import * as THREE from 'three';
 import { useThreeScene } from '@/contexts/three-scene-context';
 import { useDataCache, Block } from '@/lib/data-cache';
 import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
-import { CompassOverlay, getCameraHeadingDeg } from '@/components/ui/CompassOverlay';
+import CompassOverlay from '@/components/ui/CompassOverlay';
 import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
 import { Legend } from '@/components/ui/legend';
+import { ErrorDisplay } from '@/components/ui/error-display';
 
 const CARBON_COLOR_STEPS = 20;
 const carbonColorCache: { [step: number]: string } = {};
@@ -24,6 +25,12 @@ function colorForCarbon(vRaw: any): number {
     return color.getHex();
 }
 
+function getThreeHeading(camera: THREE.PerspectiveCamera, THREE: any) {
+    const v = new THREE.Vector3();
+    camera.getWorldDirection(v);
+    return Math.atan2(v.x, v.z);
+};
+
 
 export default function BlockModelCarbonViewer({
   opacity = 0.8, assayCutoff
@@ -31,7 +38,7 @@ export default function BlockModelCarbonViewer({
 
   const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
   const mountedRef = useRef(false);
-  const { blockModelData, drillholeData, loadingStatus, error } = useDataCache();
+  const { blockModelData, drillholeData, loadingStatus, error, refetch } = useDataCache();
   const [showTraces, setShowTraces] = useState(true);
 
   const modelCenter = useMemo(() => {
@@ -189,7 +196,7 @@ export default function BlockModelCarbonViewer({
   }, [blockModelData, opacity, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff, drillholeData, showTraces, registerTooltipObject, unregisterTooltipObject]);
 
   if (loadingStatus === 'loading') return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
   const carbonLegendItems = Array.from({ length: 5 }).map((_, i) => {
     const value = 0 + (10 - 0) * (i / 4);
@@ -207,7 +214,7 @@ export default function BlockModelCarbonViewer({
       </div>
       {camera && renderer && (
         <div style={{ position: 'absolute', top: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-          <CompassOverlay headingDeg={getCameraHeadingDeg(camera, THREE)} />
+          <CompassOverlay mode="three" getHeading={() => getThreeHeading(camera, THREE)} />
           <ScaleBarOverlay
             camera={camera}
             rendererDom={renderer.domElement}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import { graphiticCarbonLegendData } from '@/lib/legend-definitions';
+import { graphiticCarbonLegendData } from '@/lib/constants';
 
 declare global {
     interface Window {
@@ -17,9 +17,9 @@ const getAssayColor = (value: number, Cesium: any, alpha = 1.0) => {
     let color;
     if (!Number.isFinite(v)) {
         color = Cesium.Color.fromCssColorString('#CCCCCC');
-    } else if (v > 10.0) {
-        color = Cesium.Color.RED;
     } else if (v > 8.0) {
+        color = Cesium.Color.RED;
+    } else if (v > 6.0) {
         color = Cesium.Color.ORANGE;
     } else if (v > 4) {
         color = Cesium.Color.YELLOW;
@@ -40,14 +40,6 @@ const DrillholeControls = ({ onAnimate, onToggle, show }: { onAnimate: () => voi
         <div className={`absolute top-4 right-4 bg-white bg-opacity-80 p-4 rounded-lg shadow-md w-72 text-sm pointer-events-auto transition-opacity duration-500 ${show ? 'opacity-100' : 'opacity-0'}`}>
             <h3 className="font-bold text-lg mb-3">Drillhole Controls</h3>
             <div className="space-y-3">
-                <div>
-                    <label className="block font-medium mb-1">Visibility</label>
-                    <select onChange={(e) => onToggle(e.target.value)} className="w-full p-1 border rounded">
-                        <option value="all">All Drillholes</option>
-                        <option value="TGDD">TGDD Program</option>
-                        <option value="TGRC">TGRC Program</option>
-                    </select>
-                </div>
                 <div>
                     <button onClick={onAnimate} className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                         Animate Discovery

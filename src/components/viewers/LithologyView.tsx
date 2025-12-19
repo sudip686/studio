@@ -6,20 +6,14 @@ import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context';
+import { ErrorDisplay } from '@/components/ui/error-display';
+import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 
 // ## Data Structures & Constants ##
 interface DrillholeSegment {
     lon: number; lat: number; elevation: number; depth_from: number; depth_to: number; hole_id: string;
     lithology?: string; graphitic_carbon?: number; feature: any;
 }
-
-const LITHOLOGY_COLOR_MAP: Record<string,string> = {
-  'quartz-feldspathic':'#FAD7A0','grsc':'#212323','granulite':'#df26c4','khondalite':'#1a3523',
-  'marble':'#fafafa','not recovearble':'#515A5A','soil':'#6efe70','schist':'#46f1b2',
-  'nan':'#ffffff','unknown':'#cccccc'
-};
-const colorForLithology = (raw?: string) =>
-  LITHOLOGY_COLOR_MAP[String(raw ?? 'unknown').trim().toLowerCase()] ?? '#cccccc';
 
 function getSegmentEnds(seg:{feature:any}) {
   const g = seg?.feature?.geometry;
@@ -30,28 +24,24 @@ function getSegmentEnds(seg:{feature:any}) {
   return null; // skip bad segments
 }
 
-export default function LithologyViewer() {
+export default function LithologyViewer({ assayCutoff }: { assayCutoff?: number } = {}) {
     const mountedRef = useRef(false);
-    const { drillholeData, loadingStatus, error } = useDataCache();
+    const { processedLithologyData, loadingStatus, error, refetch } = useDataCache();
     const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
 
     useEffect(() => {
-        if (!scene || !camera || !controls || !dynamicGroup) return;
-        console.log('[LithologyView] Initializing with:', { scene, camera, controls, dynamicGroup });
-        if (!drillholeData || !Array.isArray(drillholeData.lithology) || drillholeData.lithology.length === 0) {
-            console.warn('[LithologyView] No drillhole lithology data available.');
-            return;
-        }
+    console.log('Rendering LithologyView');
+        if (!scene || !camera || !controls || !dynamicGroup || !processedLithologyData) return;
         if (mountedRef.current) return; // StrictMode guard
         mountedRef.current = true;
 
-        const filteredDrillholeData = drillholeData.lithology;
+        const { modelCenter, grouped } = processedLithologyData;
 
-        const allPoints = filteredDrillholeData.map(d => ({ lon: d.lon, lat: d.lat, elevation: d.elevation }));
-        const centerLon = allPoints.reduce((acc, p) => acc + p.lon, 0) / allPoints.length;
-        const centerLat = allPoints.reduce((acc, p) => acc + p.lat, 0) / allPoints.length;
-        const modelCenter = { lon: centerLon, lat: centerLat };
-        console.log("Model Center:", modelCenter);
+        // If grouped data is not available, don't render yet
+        if (!grouped || Object.keys(grouped).length === 0) {
+            console.warn('[LithologyView] No grouped data available yet');
+            return;
+        }
 
         const viewGroup = new THREE.Group();
         viewGroup.userData.view = 'lithology';
@@ -59,13 +49,6 @@ export default function LithologyViewer() {
 
         const geometries: THREE.BufferGeometry[] = [];
         const materials: THREE.Material[] = [];
-
-        const grouped: Record<string, DrillholeSegment[]> = {};
-        for (const seg of filteredDrillholeData) {
-            const color = colorForLithology(seg.lithology);
-            (grouped[color] ||= []).push(seg);
-        }
-
         const meshes: THREE.InstancedMesh[] = [];
 
         Object.entries(grouped).forEach(([hex, features]) => {
@@ -139,15 +122,18 @@ export default function LithologyViewer() {
             materials.forEach(m => m.dispose());
             mountedRef.current = false;
         };
-    }, [drillholeData, loadingStatus, scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject]);
+    }, [processedLithologyData, scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject]);
 
     if (loadingStatus === 'loading') return <div>Loading...</div>;
-    if (error) return <div>Error: {error}</div>;
+    if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
-    const lithologyLegendItems = Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
-        label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), // Format label nicely
-        color,
-    }));
+    // Only create legend items if LITHOLOGY_COLOR_MAP exists
+    const lithologyLegendItems = (LITHOLOGY_COLOR_MAP && Object.entries(LITHOLOGY_COLOR_MAP).length > 0)
+        ? Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+            label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            color,
+        }))
+        : [];
 
     return (
         <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>

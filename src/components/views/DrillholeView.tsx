@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import DrillholeLayer from '../DrillholeLayer';
 import { Legend } from '@/components/ui/legend';
-import { cesiumViewerLithologyLegendData } from '@/lib/legend-definitions';
+import { cesiumViewerLithologyLegendData } from '@/lib/constants';
 
 interface DrillholeViewProps {
     type: 'lithology' | 'assay';

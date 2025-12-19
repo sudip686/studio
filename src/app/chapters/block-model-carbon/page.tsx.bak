@@ -1,0 +1,5 @@
+import GeoVisionHost from '@/components/GeoVisionHost';
+
+export default function BlockModelCarbonPage() {
+  return <GeoVisionHost displayMode="BlockModelCarbon" />;
+}

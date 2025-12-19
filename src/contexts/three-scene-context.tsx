@@ -47,10 +47,12 @@ export const ThreeSceneProvider = ({ children }: { children: ReactNode }) => {
   const registeredTooltipObjects = useRef(new Map<THREE.InstancedMesh, (instanceId: number) => string>());
 
   const registerTooltipObject = useCallback((mesh: THREE.InstancedMesh, getData: (instanceId: number) => string) => {
+    console.log('Registering tooltip for mesh:', mesh, getData);
     registeredTooltipObjects.current.set(mesh, getData);
   }, []);
 
   const unregisterTooltipObject = useCallback((mesh: THREE.InstancedMesh) => {
+    console.log('Unregistering tooltip for mesh:', mesh);
     registeredTooltipObjects.current.delete(mesh);
   }, []);
 

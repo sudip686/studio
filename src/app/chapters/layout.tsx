@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { ThreeSceneProvider } from '@/contexts/three-scene-context';
 
 export default function ChaptersLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,7 +16,11 @@ export default function ChaptersLayout({ children }: { children: React.ReactNode
           </ul>
         </nav>
       </aside>
-      <main className="flex-1 p-4">{children}</main>
+      <main className="flex-1 p-4">
+        <ThreeSceneProvider>
+          {children}
+        </ThreeSceneProvider>
+      </main>
     </div>
   );
 }

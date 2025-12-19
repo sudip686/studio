@@ -16,18 +16,7 @@ if (workbox) {
   // __WB_MANIFEST is replaced at build time (InjectManifest)
   precaching.precacheAndRoute([{"revision":"c4f7b0a2780d1b6d328c7a90d09f839a","url":"topography.png"}] || []);
 
-  // --- App shell for SPA navigation (fallback to index.html) ---
-  const appShellHandler = precaching.createHandlerBoundToURL('/index.html');
-  routing.registerRoute(
-    ({ request, url }) => request.mode === 'navigate' && !url.pathname.startsWith('/api'),
-    async (args) => {
-      try {
-        return await appShellHandler(args);
-      } catch {
-        return await precaching.matchPrecache('/index.html');
-      }
-    }
-  );
+
 
   // --- Static JS/CSS ---
   routing.registerRoute(

@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { DataCacheProvider } from '@/lib/data-cache';
 import ServiceWorkerRegistrar from './ServiceWorkerRegistrar';
+import ErrorBoundary from '@/components/ui/error-boundary';
 
 export const metadata: Metadata = {
   title: 'GeoVision3D',
@@ -23,7 +24,7 @@ export default function RootLayout({
         <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
       </head>
       <body className="font-body antialiased">
-        <DataCacheProvider>{children}</DataCacheProvider>
+        <DataCacheProvider><ErrorBoundary>{children}</ErrorBoundary></DataCacheProvider>
         <ServiceWorkerRegistrar />
         </body>
     </html>

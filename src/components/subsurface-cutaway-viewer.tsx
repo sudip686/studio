@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import { graphiticCarbonLegendData } from '@/lib/legend-definitions';
+import { graphiticCarbonLegendData } from '@/lib/constants';
 
 declare global {
     interface Window {

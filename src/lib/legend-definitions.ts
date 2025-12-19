@@ -111,3 +111,28 @@ export const lithologyLegendData = {
 export const LITHOLOGY_COLOR_MAP_CSS = Object.fromEntries(
   drillholeLocationMapLithologyLegendData.items.map(item => [item.label, item.color])
 );
+
+// New format for colorFromLegend helper
+export const ASSAY_GRAPHITIC_CARBON = {
+  type: "numeric" as const,
+  bins: [
+    { max: 0.1, color: '#0000FF', label: '< 0.1 %' },
+    { min: 0.1, max: 0.3, color: '#00FFFF', label: '0.1 to 0.3 %' },
+    { min: 0.3, max: 0.5, color: '#00FF00', label: '0.3 to 0.5 %' },
+    { min: 0.5, max: 2.0, color: '#FFFF00', label: '0.5 to 2.0 %' },
+    { min: 2.0, max: 5.0, color: '#FFA500', label: '2.0 to 5.0 %' },
+    { min: 5.0, color: '#FF0000', label: '> 5.0 %' },
+  ],
+  default: "#cccccc",
+};
+
+const lithologyMap: Record<string, string> = {};
+drillholeLocationMapLithologyLegendData.items.forEach(item => {
+    lithologyMap[item.label.toLowerCase().trim().replace(/\s+/g, ' ')] = item.color;
+});
+
+export const LITHOLOGY_COLORS = {
+  type: "categorical" as const,
+  map: lithologyMap,
+  default: "#9e9e9e",
+};
