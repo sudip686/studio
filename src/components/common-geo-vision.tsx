@@ -1,5 +1,6 @@
 'use client';
 
+import * as THREE from 'three';
 import { useEffect, useRef, useState, ReactNode } from 'react';
 import {Scene, PerspectiveCamera, WebGLRenderer, Group, Vector3, Quaternion, Matrix4, HemisphereLight, DirectionalLight, Color, InstancedMesh, BoxGeometry, MeshStandardMaterial } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -32,7 +33,7 @@ const Compass = ({ rotation }: { rotation: number }) => { /* ... */ return null;
 export type GeoVisionDisplayMode = 'geovision_lithology' | 'geovision_assay' | 'geovision_block_carbon' | 'geovision_block_resc';
 
 interface CommonGeoVisionProps {
-    children: ReactNode;
+    children?: ReactNode;
     displayMode: GeoVisionDisplayMode;
 }
 
@@ -168,7 +169,18 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
                         if (displayMode === 'geovision_lithology') return lithologyFilter === 'All' || s.lithology === lithologyFilter;
                         if (displayMode === 'geovision_assay') return assayFilterValue === 0 || Number(s.graphitic_carbon ?? 0) >= assayFilterValue;
                         return true;
-                    });
+                    }).map((s:any) => ({
+                        hole_id: s.hole_id,
+                        lon: s.lon,
+                        lat: s.lat,
+                        top_z: s.elevation,
+                        bottom_z: s.elevation - (s.depth_to - s.depth_from),
+                        length: s.depth_to - s.depth_from,
+                        depth_from: s.depth_from,
+                        depth_to: s.depth_to,
+                        props: { lithology: s.lithology, graphitic_carbon: s.graphitic_carbon },
+                        path: []
+                    }));
                     const assayValues = processedDrillholeData.assay.map((p:any) => Number(p.graphitic_carbon ?? 0));
                     const min = Math.min(...assayValues), max = Math.max(...assayValues);
                     const colorFn = displayMode === 'geovision_lithology' ? lithologyColorThree() : assayColorThree(min, max);
@@ -187,7 +199,19 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
                 // Render drillhole traces as well
                 if (processedDrillholeData?.lithology) {
                     const material = new MeshStandardMaterial({ color: 0x404040 });
-                    const group = createThreeBoreholeMeshes(processedDrillholeData.lithology, () => material.color, project, { radius: 2 });
+                    const transformedSegments = processedDrillholeData.lithology.map((s:any) => ({
+                        hole_id: s.hole_id,
+                        lon: s.lon,
+                        lat: s.lat,
+                        top_z: s.elevation,
+                        bottom_z: s.elevation - (s.depth_to - s.depth_from),
+                        length: s.depth_to - s.depth_from,
+                        depth_from: s.depth_from,
+                        depth_to: s.depth_to,
+                        props: { lithology: s.lithology },
+                        path: []
+                    }));
+                    const group = createThreeBoreholeMeshes(transformedSegments, () => material.color, project, { radius: 2 });
                     meshGroupRef.current.add(group);
                 }
                 break;

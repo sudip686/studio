@@ -9,10 +9,12 @@ import { ThreeSceneProvider } from '@/contexts/three-scene-context';
 
 // Simplified view sequence
 const viewSequence = [
-  'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map',  'drillhole_location_assay', 'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal',
+  'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map',  
+  'drillhole_location_assay', 'geojson_drillholes_lithology', 
+  'geojson_drillholes_assay', 'geospatial_lithology', 
+  'geospatial_assay', 'drillhole_lithology_reveal',
   'lithology_view', 'assay_view', 'block_model_carbon_view', 'block_model_resc_view',
-   'grand_canyon_assay', 'grand_canyon_lithology',
-  'terrain_clipping','block_model_clip_view'
+  'block_model_clip_view'
 ] as const;
 
 type ViewType = typeof viewSequence[number];
@@ -37,17 +39,14 @@ const viewTitles: { [key in ViewType]: string } = {
   'assay_view': '3D Assay',
   'block_model_carbon_view': '3D Block Model - Carbon',
   'block_model_resc_view': '3D Block Model - Resource Classification',
-  // 'downhole_plot': 'Downhole Plot',
-  'grand_canyon_assay': 'Grand Canyon Assay',
-  'grand_canyon_lithology': 'Grand Canyon Lithology',
-  'terrain_clipping': 'Terrain Clipping',
   'block_model_clip_view': 'Block Model Clip View'
 };
 
 const cesiumSwitcherViews = new Set<string>([
     'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map', 
     'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'tiff_overlay', 'project_location',
-    'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer', 'grand_canyon_assay', 'grand_canyon_lithology', 'cesium_three_block_model', 'drillhole_location_lithology', 'drillhole_location_assay', 'terrain_clipping',    'block_model_box_cutter_grade', 'block_model_box_cutter_class', 'block_model_clip_view'
+    'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer',
+    'block_model_box_cutter_grade', 'block_model_box_cutter_class', 'block_model_clip_view'
 ]);
 
 const threeJsSwitcherViews = new Set<string>([

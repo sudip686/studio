@@ -1,5 +1,5 @@
 // borehole-cylinders.ts
-import * as Cesium from "cesium";
+// Lazy load Cesium to avoid HMR issues
 
 export type LatLonZ = [number, number, number];
 
@@ -11,9 +11,9 @@ export type Interval = {
 };
 
 export type Style = {
-  material: Cesium.Color;
+  material: any;
   outline?: boolean;
-  outlineColor?: Cesium.Color;
+  outlineColor?: any;
   opacity?: number;
   radiusMeters?: number;
   slices?: number;
@@ -21,12 +21,24 @@ export type Style = {
 
 const DEFAULT_RADIUS = 8;
 
+const getCesium = () => {
+  if (typeof window !== 'undefined') {
+    return (window as any).Cesium;
+  }
+  return null;
+};
+
 export function toFixed(latz: LatLonZ) {
+  const Cesium = getCesium();
+  if (!Cesium) throw new Error('Cesium not loaded');
   const [lat, lon, z] = latz;
   return Cesium.Cartesian3.fromDegrees(lon, lat, z || 0);
 }
 
-export function orientationFrom(start: Cesium.Cartesian3, end: Cesium.Cartesian3) {
+export function orientationFrom(start: any, end: any) {
+  const Cesium = getCesium();
+  if (!Cesium) throw new Error('Cesium not loaded');
+  
   const midpoint = Cesium.Cartesian3.midpoint(start, end, new Cesium.Cartesian3());
   const dirFixed = Cesium.Cartesian3.subtract(end, start, new Cesium.Cartesian3());
   const len = Cesium.Cartesian3.magnitude(dirFixed);
@@ -49,21 +61,24 @@ export function orientationFrom(start: Cesium.Cartesian3, end: Cesium.Cartesian3
   Cesium.Cartesian3.normalize(dirEnu, dirEnu);
 
   const heading = Math.atan2(dirEnu.x, dirEnu.y);
-  const horiz   = Math.hypot(dirEnu.x, dirEnu.y) || 1e-9;
-  const pitch   = Math.atan2(dirEnu.z, horiz);
-  const hpr     = new Cesium.HeadingPitchRoll(heading, pitch, 0.0);
+  const horiz = Math.hypot(dirEnu.x, dirEnu.y) || 1e-9;
+  const pitch = Math.atan2(dirEnu.z, horiz);
+  const hpr = new Cesium.HeadingPitchRoll(heading, pitch, 0.0);
   const quaternion = Cesium.Quaternion.fromHeadingPitchRoll(hpr);
 
   return { midpoint, quaternion };
 }
 
 async function seatBelowTerrain(
-  viewer: Cesium.Viewer,
+  viewer: any,
   startLLZ: LatLonZ,
   endLLZ: LatLonZ,
   nudge = -0.05,
   samples = 5
 ) {
+  const Cesium = getCesium();
+  if (!Cesium) throw new Error('Cesium not loaded');
+  
   const globe = viewer.scene.globe;
   const [lat0, lon0, z0] = startLLZ;
   const [lat1, lon1, z1] = endLLZ;
@@ -73,28 +88,30 @@ async function seatBelowTerrain(
     const t = samples === 1 ? 0 : i / (samples - 1);
     const lat = lat0 + (lat1 - lat0) * t;
     const lon = lon0 + (lon1 - lon0) * t;
-    const z   =  z0 +  (z1  -  z0) * t;
+    const z = z0 + (z1 - z0) * t;
 
     const h = globe.getHeight(Cesium.Cartographic.fromDegrees(lon, lat));
     if (h == null) continue;
-    const above = (z - h);
+    const above = z - h;
     if (above > dzNeeded) dzNeeded = above;
   }
   const dz = Math.max(0, dzNeeded) - nudge;
   const s = [startLLZ[0], startLLZ[1], startLLZ[2] - dz] as LatLonZ;
-  const e = [endLLZ[0],   endLLZ[1],   endLLZ[2]   - dz] as LatLonZ;
+  const e = [endLLZ[0], endLLZ[1], endLLZ[2] - dz] as LatLonZ;
   return { s, e };
 }
 
 export class BoreholeCylinderCache {
-  private map = new Map<string, Cesium.Entity>();
+  private map = new Map<string, any>();
 
-  constructor(private viewer: Cesium.Viewer) {
+  constructor(private viewer: any) {
     const { globe } = viewer.scene;
     globe.depthTestAgainstTerrain = true;
   }
 
   async getOrCreate(interval: Interval, style?: Style) {
+    const Cesium = getCesium();
+    if (!Cesium) throw new Error('Cesium not loaded');
     const { viewer } = this;
     const cached = this.map.get(interval.id);
     if (cached) {
@@ -115,7 +132,7 @@ export class BoreholeCylinderCache {
         length: length0,
         topRadius: style?.radiusMeters ?? DEFAULT_RADIUS,
         bottomRadius: style?.radiusMeters ?? DEFAULT_RADIUS,
-        slices: style?.slices ?? 16, // Reduced slices for entity performance
+        slices: style?.slices ?? 16,
         material: (style?.material ?? Cesium.Color.GREY).withAlpha(style?.opacity ?? 0.15),
         outline: style?.outline ?? true,
       },
@@ -126,26 +143,30 @@ export class BoreholeCylinderCache {
 
     try {
       const { s, e: seated } = await seatBelowTerrain(viewer, interval.start, interval.end);
-      const ps = toFixed(s), pe = toFixed(seated);
-      
+      const ps = toFixed(s);
+      const pe = toFixed(seated);
+
       const L = Cesium.Cartesian3.distance(ps, pe);
       if (!Number.isFinite(L) || L < 0.5) {
         e.show = false;
         return e;
       }
-      
+
       const { midpoint, quaternion } = orientationFrom(ps, pe);
       e.position = midpoint;
       e.orientation = quaternion;
       (e.cylinder as any).length = L;
-    } catch {}
+    } catch {
+      // Silent fail
+    }
 
     if (style) this.applyStyle(e, style);
     return e;
   }
 
-  applyStyle(entity: Cesium.Entity, style: Style) {
-    const Cesium = (window as any).Cesium;
+  applyStyle(entity: any, style: Style) {
+    const Cesium = getCesium();
+    if (!Cesium) throw new Error('Cesium not loaded');
     const cyl = entity.cylinder!;
     const alpha = style.opacity ?? 1.0;
     cyl.material = new Cesium.ColorMaterialProperty(style.material.withAlpha(alpha));
@@ -157,11 +178,15 @@ export class BoreholeCylinderCache {
 
   destroy() {
     if (!this.viewer || this.viewer.isDestroyed()) {
-        this.map.clear();
-        return;
+      this.map.clear();
+      return;
     }
-    for (const entity of this.map.values()) {
-      this.viewer.entities.remove(entity);
+    for (const e of this.map.values()) {
+      try {
+        this.viewer.entities.removeById(e.id);
+      } catch {
+        // Silent fail
+      }
     }
     this.map.clear();
   }

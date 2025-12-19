@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const LITHOLOGY_COLOR_MAP: Record<string, string> = {
+export const LITHOLOGY_COLOR_MAP: Record<string, string> = {
   "Quartz-Feldspathic": "#dead5f",
   GRSC: "#19292a",
   Granulite: "#a1089a",

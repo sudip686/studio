@@ -7,6 +7,7 @@ import { Legend } from '@/components/ui/legend';
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import { ErrorDisplay } from '@/components/ui/error-display';
+import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 
 // ## Data Structures & Constants ##
 interface DrillholeSegment {
@@ -14,7 +15,16 @@ interface DrillholeSegment {
     lithology?: string; graphitic_carbon?: number; feature: any;
 }
 
-export default function LithologyViewer() {
+function getSegmentEnds(seg:{feature:any}) {
+  const g = seg?.feature?.geometry;
+  if (g?.type === 'LineString' && g.coordinates?.length >= 2) {
+    const [a,b] = g.coordinates; // [lon,lat,z]
+    if (a?.length>=3 && b?.length>=3) return {a, b};
+  }
+  return null; // skip bad segments
+}
+
+export default function LithologyViewer({ assayCutoff }: { assayCutoff?: number } = {}) {
     const mountedRef = useRef(false);
     const { processedLithologyData, loadingStatus, error, refetch } = useDataCache();
     const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
@@ -25,7 +35,13 @@ export default function LithologyViewer() {
         if (mountedRef.current) return; // StrictMode guard
         mountedRef.current = true;
 
-        const { grouped, modelCenter } = processedLithologyData;
+        const { modelCenter, grouped } = processedLithologyData;
+
+        // If grouped data is not available, don't render yet
+        if (!grouped || Object.keys(grouped).length === 0) {
+            console.warn('[LithologyView] No grouped data available yet');
+            return;
+        }
 
         const viewGroup = new THREE.Group();
         viewGroup.userData.view = 'lithology';
@@ -111,10 +127,13 @@ export default function LithologyViewer() {
     if (loadingStatus === 'loading') return <div>Loading...</div>;
     if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
-    const lithologyLegendItems = Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
-        label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), // Format label nicely
-        color,
-    }));
+    // Only create legend items if LITHOLOGY_COLOR_MAP exists
+    const lithologyLegendItems = (LITHOLOGY_COLOR_MAP && Object.entries(LITHOLOGY_COLOR_MAP).length > 0)
+        ? Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+            label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            color,
+        }))
+        : [];
 
     return (
         <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLOR_MAP_CSS } from '@/lib/legend-definitions';
+import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLOR_MAP_CSS } from '@/lib/constants';
 
 declare global {
     interface Window {

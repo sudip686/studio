@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import * as THREE from 'three';
-import * as Cesium from 'cesium';
 import { toFixed, orientationFrom } from '@/lib/boreholes/borehole-cylinders';
+import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 
 // ## Data Structures & Constants ##
 export interface DrillholeSegment {
@@ -23,12 +23,14 @@ interface BoreholeInfo {
 interface ProcessedLithologyData {
     byHoleId: Record<string, BoreholeInfo>;
     modelCenter: { lon: number; lat: number; };
+    grouped?: Record<string, any[]>; // Pre-grouped by color for fast rendering
 }
 
 interface ProcessedAssayData {
     byHoleId: Record<string, BoreholeInfo>;
     modelCenter: { lon: number; lat: number; };
     assayRange: { min: number; max: number; };
+    grouped?: Record<string, any[]>; // Pre-grouped by color for fast rendering
 }
 
 interface DataCache {
@@ -79,7 +81,8 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                     blockModelResponse.json()
                 ]);
 
-                const parsedDrillholes: DrillholeSegment[] = [...(lithologyGeoJson.features || []), ...(assayGeoJson.features || [])].flatMap((f: any) => {
+                // Parse lithology features
+                const parsedLithologyFeatures: DrillholeSegment[] = (lithologyGeoJson.features || []).flatMap((f: any) => {
                     const p = f.properties;
                     if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) return [];
                     const [startCoords, endCoords] = f.geometry.coordinates;
@@ -91,6 +94,22 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                         feature: f
                     }];
                 });
+
+                // Parse assay features
+                const parsedAssayFeatures: DrillholeSegment[] = (assayGeoJson.features || []).flatMap((f: any) => {
+                    const p = f.properties;
+                    if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) return [];
+                    const [startCoords, endCoords] = f.geometry.coordinates;
+                    if (!startCoords || startCoords.length < 3 || !endCoords || endCoords.length < 3) return [];
+                    return [{
+                        lon: startCoords[0], lat: startCoords[1], elevation: startCoords[2],
+                        depth_from: p.depth_from, depth_to: p.depth_to, hole_id: p.hole_id,
+                        lithology: p.lithology, graphitic_carbon: p.graphitic_carbon,
+                        feature: f
+                    }];
+                });
+
+                const parsedDrillholes = [...parsedLithologyFeatures, ...parsedAssayFeatures];
                 
                 const parsedBlockModel: BlockSegment[] = blockModelGeoJson.features.map((f:any) => {
                     const p = f.properties ?? {};
@@ -106,11 +125,16 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                 });
 
                 console.log('Parsed drillholes:', parsedDrillholes);
+                console.log('Parsed lithology features:', parsedLithologyFeatures);
+                console.log('Parsed assay features:', parsedAssayFeatures);
 
-                const lithologyData = parsedDrillholes.filter(d => d.lithology);
+                // Use lithology features as lithology data
+                const lithologyData = parsedLithologyFeatures;
                 console.log('Lithology data:', lithologyData);
 
-                const assayData = parsedDrillholes.filter(d => d.graphitic_carbon !== undefined);
+                // Use assay features as assay data (not filtered by graphitic_carbon presence)
+                const assayData = parsedAssayFeatures;
+                console.log('Assay data:', assayData);
 
                 // Process Lithology Data
                 const lithologyByHoleId: Record<string, BoreholeInfo> = {};
@@ -136,10 +160,27 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
 
                         const p0 = toFixed([firstSegment.lat, firstSegment.lon, firstSegment.elevation]);
                         const p1 = toFixed([lastSegment.lat, lastSegment.lon, lastSegment.elevation]);
-                        const length = Cesium.Cartesian3.distance(p0, p1) || 0.01;
+                        // Calculate length manually: |p1 - p0|
+                        const dx = p1.x - p0.x;
+                        const dy = p1.y - p0.y;
+                        const dz = p1.z - p0.z;
+                        const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
                         const { midpoint, quaternion } = orientationFrom(p0, p1);
                         borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
                     }
+                });
+
+                // Pre-group lithology by color for fast rendering
+                const groupedLithology: Record<string, any[]> = {};
+                Object.values(lithologyByHoleId).forEach(borehole => {
+                    borehole.segments.forEach(segment => {
+                        const lith = String(segment.lithology ?? 'UNKNOWN');
+                        const css = LITHOLOGY_COLOR_MAP[lith] ?? LITHOLOGY_COLOR_MAP.UNKNOWN;
+                        if (!groupedLithology[css]) {
+                            groupedLithology[css] = [];
+                        }
+                        groupedLithology[css].push(segment);
+                    });
                 });
 
                 // Process Assay Data
@@ -169,10 +210,28 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
 
                         const p0 = toFixed([firstSegment.lat, firstSegment.lon, firstSegment.elevation]);
                         const p1 = toFixed([lastSegment.lat, lastSegment.lon, lastSegment.elevation]);
-                        const length = Cesium.Cartesian3.distance(p0, p1) || 0.01;
+                        // Calculate length manually: |p1 - p0|
+                        const dx = p1.x - p0.x;
+                        const dy = p1.y - p0.y;
+                        const dz = p1.z - p0.z;
+                        const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
                         const { midpoint, quaternion } = orientationFrom(p0, p1);
                         borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
                     }
+                });
+
+                // Pre-group assay by graphitic_carbon value for color mapping
+                const groupedAssay: Record<string, any[]> = {};
+                Object.values(assayByHoleId).forEach(borehole => {
+                    borehole.segments.forEach(segment => {
+                        const v = Number(segment.graphitic_carbon ?? 0);
+                        const t = assayRange.max > assayRange.min ? (v - assayRange.min) / (assayRange.max - assayRange.min) : 0.5;
+                        const colorKey = `assay_${t.toFixed(2)}`; // Group by normalized value
+                        if (!groupedAssay[colorKey]) {
+                            groupedAssay[colorKey] = [];
+                        }
+                        groupedAssay[colorKey].push({ ...segment, colorT: t });
+                    });
                 });
 
                 setCache({
@@ -184,11 +243,13 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                     processedLithologyData: {
                         byHoleId: lithologyByHoleId,
                         modelCenter: modelCenterLithology,
+                        grouped: groupedLithology,
                     },
                     processedAssayData: {
                         byHoleId: assayByHoleId,
                         modelCenter: modelCenterAssay,
                         assayRange: assayRange,
+                        grouped: groupedAssay,
                     },
                     loadingStatus: 'success',
                     error: null,

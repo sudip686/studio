@@ -29,9 +29,10 @@ export default function GeoVisionBlockCarbonView({
   getSegmentEndpoints: (seg: any) => { a: number[]; b: number[] } | null;
 }) {
   useEffect(() => {
-    console.log(`[block_carbon] input blocks:`, blocks?.length ?? 0);
-    console.log(`[block_carbon] input traces:`, traces?.length ?? 0);
-    if (!scene) return;
+  // Commented out debugging logs for production build
+  // console.log(`[block_carbon] input blocks:`, blocks?.length ?? 0);
+  // console.log(`[block_carbon] input traces:`, traces?.length ?? 0);
+  if (!scene) return;
 
     const group = new THREE.Group();
     group.userData.view = 'block_carbon';

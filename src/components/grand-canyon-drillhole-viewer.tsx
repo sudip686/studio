@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData } from '@/lib/legend-definitions';
+import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData } from '@/lib/constants';
 import * as Cesium from 'cesium';
 
 interface GrandCanyonDrillholeViewerProps {

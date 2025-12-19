@@ -4,7 +4,7 @@ import { Legend } from '@/components/ui/legend';
 import KmlBoundary from './KmlBoundary';
 import CompassOverlay from '@/components/ui/CompassOverlay';
 import MetricScaleOverlay from '@/components/ui/MetricScaleOverlay';
-import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/legend-definitions';
+import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/constants';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { BoreholeCylinderCache, Interval, Style } from '@/lib/boreholes/borehole-cylinders';
 import { colorFromLegend } from '@/lib/boreholes/legend-color';
