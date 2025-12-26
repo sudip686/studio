@@ -17,7 +17,7 @@ export { default as KmlBoundary } from '../KmlBoundary';
 export { default as KMZPolygonClippingPlanes } from '../KMZPolygonClippingPlanes';
 
 // Data preprocessing and utilities
-export { default as BoreholePrewarmer } from '../BoreholePrewarmer';
+export { BoreholePrewarmer } from '../BoreholePrewarmer';
 
 // NOTE: TilesetQualityToggle moved to overlays/
 // export { default as TilesetQualityToggle } from '../TilesetQualityToggle';
