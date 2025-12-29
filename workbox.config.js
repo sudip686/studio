@@ -16,5 +16,5 @@ module.exports = {
     '**/node_modules/**/*',
     'service-worker.js'
   ],
-  maximumFileSizeToCacheInBytes: 15 * 1024 * 1024 // allow large GeoJSON/KMZ if needed
+  maximumFileSizeToCacheInBytes: 65 * 1024 * 1024 // increased to support BlockModel.geojson (60.3MB)
 };

@@ -46,7 +46,7 @@ const cesiumSwitcherViews = new Set<string>([
     'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map', 
     'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'tiff_overlay', 'project_location',
     'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer',
-    'block_model_box_cutter_grade', 'block_model_box_cutter_class', 'block_model_clip_view'
+    'block_model_box_cutter_grade', 'block_model_box_cutter_class', 'block_model_clip_view', 'drillhole_location_assay'
 ]);
 
 const threeJsSwitcherViews = new Set<string>([
@@ -106,7 +106,7 @@ export default function Home() {
         {currentViewIndex > 0 && <div onClick={handlePrev} className="fixed top-1/2 left-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-30 select-none hover:bg-opacity-50 pointer-events-auto">&lt;</div>}
         {currentViewIndex < viewSequence.length - 1 && <div onClick={handleNext} className="fixed top-1/2 right-8 transform -translate-y-1/2 text-5xl font-bold text-white bg-black bg-opacity-30 p-2 px-6 rounded-lg cursor-pointer z-30 select-none hover:bg-opacity-50 pointer-events-auto">&gt;</div>}
 
-        <ThreeSceneProvider> {/* NEW: ThreeSceneProvider wraps the entire view area */}
+        <ThreeSceneProvider active={isThreeJsSwitcherView}> {/* NEW: ThreeSceneProvider wraps the entire view area */}
           <div className="h-full w-full absolute inset-0">
               {isCesiumSwitcherView && (
                   <CesiumProvider>
