@@ -22,7 +22,7 @@ const TooltipContent = ({ data }: { data: any }) => {
                 <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
                 {data.content.lithology && <li><strong>Lithologies:</strong> {data.content.lithology}</li>}
                 {data.content.graphitic_carbon !== undefined && (
-                    <li><strong>Avg. Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
+                    <li><strong>Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
                 )}
             </ul>
         </div>
@@ -54,7 +54,18 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     const uniqueIntervals = new Map<string, any>();
     for (const segment of allSegments) {
         const id = `${segment.hole_id}-${segment.depth_from}-${segment.depth_to}`;
-        if (uniqueIntervals.has(id)) continue;
+        
+        // Merge data if interval already exists
+        if (uniqueIntervals.has(id)) {
+            const existing = uniqueIntervals.get(id);
+            if (segment.graphitic_carbon !== undefined && segment.graphitic_carbon !== null) {
+                existing.props.graphitic_carbon = segment.graphitic_carbon;
+            }
+            if (segment.lithology) {
+                existing.props.lithology = segment.lithology;
+            }
+            continue;
+        }
 
         const coords = segment.feature.geometry.coordinates;
         if (!coords || coords.length < 2) continue;
