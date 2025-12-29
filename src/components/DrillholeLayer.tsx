@@ -76,10 +76,12 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
         console.log(`Creating ${intervalsRef.current.length} drillhole entities...`);
         
         viewer.entities.suspendEvents();
+        const entitiesCreated = [];
         for (const interval of intervalsRef.current) {
             if (isCancelled) break;
             // Creates with default transparent style
-            await cache.getOrCreate(interval);
+            const entity = await cache.getOrCreate(interval);
+            if (entity) entitiesCreated.push(entity);
         }
         viewer.entities.resumeEvents();
 
@@ -88,6 +90,18 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
         console.log("Finished creating entities.");
         // Initial styling is now handled by the style effect
         applyStyles();
+
+        // Fly to entities to ensure visibility
+        if (entitiesCreated.length > 0) {
+            viewer.flyTo(entitiesCreated, {
+                duration: 2.0,
+                offset: new (window as any).Cesium.HeadingPitchRange(
+                    0, 
+                    (window as any).Cesium.Math.toRadians(-45), 
+                    0
+                )
+            });
+        }
     };
 
     run();
@@ -125,30 +139,38 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
         const entity = viewer.entities.getById(`bh-${interval.id}`);
         if (!entity) continue;
 
-        let styleToApply: Style;
+        let styleToApply: Style | null = null;
+        let visible = false;
 
         if (type === 'assay') {
             const value = interval.props.graphitic_carbon;
-            // For assay, we always color, even if value is 0 or undefined
-            const color = colorFromLegend(legend, value ?? 0);
-            styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 8 };
+            // Only show segments that have assay data
+            if (value !== undefined && value !== null) {
+                const color = colorFromLegend(legend, value);
+                styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 8 };
+                visible = true;
+            }
         } else { // lithology
             const value = interval.props.lithology;
             if (value) {
                 const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+                // Only show segments that have lithology data and map to a color
                 if (LITHOLOGY_COLORS.map[normalizedValue]) {
                     const color = colorFromLegend(legend, normalizedValue);
                     styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 8 };
-                } else {
-                    // Has a lithology value, but it's not in our legend
-                    styleToApply = defaultStyle;
+                    visible = true;
+                } else if (normalizedValue === 'unknown' || normalizedValue === 'nan') {
+                     // Optionally hide or show unknowns. Here we show them grey.
+                     styleToApply = defaultStyle;
+                     visible = true;
                 }
-            } else {
-                // Has no lithology property at all
-                styleToApply = defaultStyle;
             }
         }
-        cache.applyStyle(entity, styleToApply);
+        
+        entity.show = visible;
+        if (visible && styleToApply) {
+            cache.applyStyle(entity, styleToApply);
+        }
     }
     
     viewer.scene.requestRender();

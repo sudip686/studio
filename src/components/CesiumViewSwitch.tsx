@@ -16,7 +16,7 @@ import DrillholeLayer from '@/components/DrillholeLayer';
 import TilesetQualityToggle from '@/components/TilesetQualityToggle'; // Import the new component
 import BlockModelClipViewer from '@/components/BlockModelClipViewer'; // Import the new component
 
-type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'tanaga_accessibility' | 'tanga_geological_map' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location' | 'geospatial_lithology' | 'geospatial_assay' | 'drillhole_lithology_reveal' | 'subsurface_cutaway' | 'kml_focused_view' | 'terrain_traces' | 'resource_model_viewer' | 'cesium_three_block_model' | 'grand_canyon_assay' | 'grand_canyon_lithology' | 'drillhole_location_lithology' | 'drillhole_location_assay' | 'terrain_clipping' | 'block_model_box_cutter_grade' | 'block_model_box_cutter_class';
+type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'tanaga_accessibility' | 'tanga_geological_map' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location' | 'geospatial_lithology' | 'geospatial_assay' | 'drillhole_lithology_reveal' | 'subsurface_cutaway' | 'kml_focused_view' | 'terrain_traces' | 'resource_model_viewer' | 'cesium_three_block_model' | 'grand_canyon_assay' | 'grand_canyon_lithology' | 'drillhole_location_lithology' | 'drillhole_location_assay' | 'terrain_clipping' | 'block_model_box_cutter_grade' | 'block_model_box_cutter_class' | 'block_model_clip_view';
 
 const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
     "Quartz-Feldspathic": "#f79a06ff",

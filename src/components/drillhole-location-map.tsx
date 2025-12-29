@@ -21,6 +21,7 @@ interface ProcessedDrillhole {
     lithologies: Set<string>;
     assayValues: number[];
     avgAssay: number | null;
+    maxAssay: number | null;
 }
 
 // --- Helper Functions ---
@@ -56,6 +57,9 @@ const TooltipContent = ({ data }: { data: any }) => {
                 {data.content.lithology && <li><strong>Lithologies:</strong> {data.content.lithology}</li>}
                 {data.content.graphitic_carbon !== undefined && (
                     <li><strong>Avg. Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
+                )}
+                {data.content.max_graphitic_carbon !== undefined && (
+                    <li><strong>Max. Graphitic Carbon:</strong> {data.content.max_graphitic_carbon?.toFixed(3)} %</li>
                 )}
             </ul>
         </div>
@@ -115,7 +119,7 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
                             outlineWidth: 1,
                             disableDepthTestDistance: Number.POSITIVE_INFINITY,
                         },
-                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay }
+                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay, max_graphitic_carbon: data.maxAssay }
                     });
                     viewer.entities.add(entity);
                     entitiesRef.current.push(entity);
@@ -154,15 +158,18 @@ interface AssayMapViewProps {
     viewer: any;
     ready: boolean;
     processedData: Map<string, ProcessedDrillhole>;
-    assayRange: { min: number; max: number };
+    ranges: { avg: { min: number, max: number }, max: { min: number, max: number } };
 }
 
-function AssayMapView({ viewer, ready, processedData, assayRange }: AssayMapViewProps) {
+function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProps) {
     const [assayFilterValue, setAssayFilterValue] = useState(0);
+    const [metric, setMetric] = useState<'average' | 'max'>('max');
     const [scaleType, setScaleType] = useState<'continuous' | 'discrete'>('continuous');
     const [continuousPalette, setContinuousPalette] = useState('Viridis');
     const [manualBreaks, setManualBreaks] = useState('1, 1.5, 2');
     const entitiesRef = useRef<any[]>([]);
+
+    const currentRange = ranges[metric];
 
     useEffect(() => {
         if (!viewer || !ready || processedData.size === 0) return;
@@ -180,16 +187,17 @@ function AssayMapView({ viewer, ready, processedData, assayRange }: AssayMapView
                 const hTop = Number(clamped[i]?.height ?? 0);
                 if (typeof data.longitude !== 'number' || typeof data.latitude !== 'number' || !Number.isFinite(data.longitude) || !Number.isFinite(data.latitude)) return;
 
-                if (!(assayFilterValue > 0 && (data.avgAssay === null || data.avgAssay < assayFilterValue))) {
+                const value = metric === 'average' ? data.avgAssay : data.maxAssay;
+
+                if (!(assayFilterValue > 0 && (value === null || value < assayFilterValue))) {
                     let color;
-                    if (data.avgAssay !== null) {
+                    if (value !== null) {
                         if (scaleType === 'continuous') {
-                            if (Number.isFinite(data.avgAssay)) {
-                                color = getContinuousColor(data.avgAssay, assayRange.min, assayRange.max, continuousPalette, Cesium);
+                            if (Number.isFinite(value)) {
+                                color = getContinuousColor(value, currentRange.min, currentRange.max, continuousPalette, Cesium);
                             }
                         } else {
                             const breaks = manualBreaks.split(',').map(Number);
-                            const value = data.avgAssay;
                             let breakIndex = breaks.findIndex(b => value <= b);
                             if (breakIndex === -1) breakIndex = breaks.length;
                             const palette = CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis'];
@@ -208,14 +216,14 @@ function AssayMapView({ viewer, ready, processedData, assayRange }: AssayMapView
                             outlineWidth: 1,
                             disableDepthTestDistance: Number.POSITIVE_INFINITY,
                         },
-                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay }
+                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay, max_graphitic_carbon: data.maxAssay }
                     });
                     viewer.entities.add(entity);
                     entitiesRef.current.push(entity);
                     plotted++;
                 }
             });
-            console.log(`[DrillholeLocationMap] plotted=${plotted} mode=assay`);
+            console.log(`[DrillholeLocationMap] plotted=${plotted} mode=assay metric=${metric}`);
         })();
 
         return () => {
@@ -223,11 +231,18 @@ function AssayMapView({ viewer, ready, processedData, assayRange }: AssayMapView
                 entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
             }
         };
-    }, [viewer, ready, processedData, assayFilterValue, scaleType, continuousPalette, manualBreaks, assayRange]);
+    }, [viewer, ready, processedData, assayFilterValue, scaleType, continuousPalette, manualBreaks, currentRange, metric]);
 
     return (
         <>
             <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }} className="pointer-events-auto">
+                 <div>
+                    <label>Metric: </label>
+                    <select value={metric} onChange={(e) => setMetric(e.target.value as 'average' | 'max')}>
+                        <option value="max">Maximum</option>
+                        <option value="average">Average</option>
+                    </select>
+                </div>
                 <div>
                     <label>Min. Graphitic Carbon (%): </label>
                     <input type="number" min="0" step="0.5" value={assayFilterValue} onChange={(e) => setAssayFilterValue(Number(e.target.value))} />
@@ -255,11 +270,11 @@ function AssayMapView({ viewer, ready, processedData, assayRange }: AssayMapView
                 )}
             </div>
             <Legend
-                title="Avg. Assay (Graphitic Carbon)"
+                title={`${metric === 'average' ? 'Avg.' : 'Max.'} Assay (Graphitic Carbon)`}
                 type="gradient"
                 gradient={`linear-gradient(to right, ${(CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis']).join(', ')})`}
-                minLabel={assayRange.min.toFixed(2)}
-                maxLabel={assayRange.max.toFixed(2)}
+                minLabel={currentRange.min.toFixed(2)}
+                maxLabel={currentRange.max.toFixed(2)}
                 show={true}
             />
         </>
@@ -279,11 +294,12 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
     const [processedData, setProcessedData] = useState<Map<string, ProcessedDrillhole>>(new Map());
     const [uniqueLithologies, setUniqueLithologies] = useState<string[]>(['All']);
-    const [assayRange, setAssayRange] = useState({ min: 0, max: 1 });
+    const [ranges, setRanges] = useState<{ avg: { min: number, max: number }, max: { min: number, max: number } }>({ avg: { min: 0, max: 1 }, max: { min: 0, max: 1 } });
     const hasFlownRef = useRef(false);
 
     // Data Processing Hook
     useEffect(() => {
+        console.log('[DrillholeLocationMap] drillholeData:', drillholeData);
         if (!drillholeData) return;
 
         const collarData = new Map<string, ProcessedDrillhole>();
@@ -291,7 +307,7 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
             const { hole_id, lon, lat } = segment;
             if (!collarData.has(hole_id)) {
                 collarData.set(hole_id, {
-                    hole_id, longitude: lon, latitude: lat, lithologies: new Set(), assayValues: [] as number[], avgAssay: null
+                    hole_id, longitude: lon, latitude: lat, lithologies: new Set(), assayValues: [] as number[], avgAssay: null, maxAssay: null
                 });
             }
             return collarData.get(hole_id)!;
@@ -310,25 +326,35 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
             }
         });
         
-        let minAvgAssay = Infinity, maxAvgAssay = -Infinity;
+        let minAvg = Infinity, maxAvg = -Infinity;
+        let minMax = Infinity, maxMax = -Infinity;
+
         collarData.forEach((data: ProcessedDrillhole) => {
             if (data.assayValues.length > 0) {
                 const sum = data.assayValues.reduce((a: number, b: number) => a + b, 0);
                 data.avgAssay = sum / data.assayValues.length;
-                if (data.avgAssay < minAvgAssay) minAvgAssay = data.avgAssay;
-                if (data.avgAssay > maxAvgAssay) maxAvgAssay = data.avgAssay;
+                data.maxAssay = Math.max(...data.assayValues);
+
+                if (data.avgAssay < minAvg) minAvg = data.avgAssay;
+                if (data.avgAssay > maxAvg) maxAvg = data.avgAssay;
+                if (data.maxAssay < minMax) minMax = data.maxAssay;
+                if (data.maxAssay > maxMax) maxMax = data.maxAssay;
             } else {
                 data.avgAssay = null;
+                data.maxAssay = null;
             }
         });
         
-        if (minAvgAssay === Infinity || maxAvgAssay === -Infinity) {
-            setAssayRange({ min: 0, max: 1 });
-        } else if (minAvgAssay === maxAvgAssay) {
-            setAssayRange({ min: Math.max(0, minAvgAssay - 0.5), max: maxAvgAssay + 0.5 });
-        } else {
-            setAssayRange({ min: minAvgAssay, max: maxAvgAssay });
-        }
+        const calcRange = (min: number, max: number) => {
+             if (min === Infinity || max === -Infinity) return { min: 0, max: 1 };
+             if (min === max) return { min: Math.max(0, min - 0.5), max: max + 0.5 };
+             return { min, max };
+        };
+
+        setRanges({
+            avg: calcRange(minAvg, maxAvg),
+            max: calcRange(minMax, maxMax)
+        });
 
         setProcessedData(collarData);
 
@@ -393,7 +419,7 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
                     viewer={viewer}
                     ready={ready}
                     processedData={processedData}
-                    assayRange={assayRange}
+                    ranges={ranges}
                 />
             )}
         </div>

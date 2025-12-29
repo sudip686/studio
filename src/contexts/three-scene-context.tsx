@@ -27,7 +27,7 @@ interface SceneContextType {
 
 const ThreeSceneContext = createContext<SceneContextType | undefined>(undefined);
 
-export const ThreeSceneProvider = ({ children }: { children: ReactNode }) => {
+export const ThreeSceneProvider = ({ children, active = true }: { children: ReactNode, active?: boolean }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -43,6 +43,17 @@ export const ThreeSceneProvider = ({ children }: { children: ReactNode }) => {
     x: 0,
     y: 0,
   });
+
+  // Handle active state visibility/interaction
+  useEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.domElement.style.display = active ? 'block' : 'none';
+      rendererRef.current.domElement.style.pointerEvents = active ? 'auto' : 'none';
+    }
+    if (controlsRef.current) {
+      controlsRef.current.enabled = active;
+    }
+  }, [active]);
 
   const registeredTooltipObjects = useRef(new Map<THREE.InstancedMesh, (instanceId: number) => string>());
 
