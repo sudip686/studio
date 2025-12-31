@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import KmlBoundary from './KmlBoundary';
+import IonKmlLayer from './IonKmlLayer';
 import CompassOverlay from '@/components/ui/CompassOverlay';
 import MetricScaleOverlay from '@/components/ui/MetricScaleOverlay';
 import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/constants';
@@ -86,14 +86,38 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     const run = async () => {
         console.log(`Creating ${intervalsRef.current.length} drillhole entities...`);
         
-        viewer.entities.suspendEvents();
+        // Batch processing to prevent UI blocking
+        const BATCH_SIZE = 200;
+        const total = intervalsRef.current.length;
         const entitiesCreated = [];
-        for (const interval of intervalsRef.current) {
+        
+        viewer.entities.suspendEvents();
+        
+        for (let i = 0; i < total; i += BATCH_SIZE) {
             if (isCancelled) break;
-            // Creates with default transparent style
-            const entity = await cache.getOrCreate(interval);
-            if (entity) entitiesCreated.push(entity);
+            
+            const batch = intervalsRef.current.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(interval => cache.getOrCreate(interval));
+            
+            // Wait for this batch to complete
+            const newEntities = await Promise.all(batchPromises);
+            
+            // Filter out nulls and add to list
+            newEntities.forEach(e => {
+                if (e) entitiesCreated.push(e);
+            });
+            
+            // Resume events briefly to let Cesium render this batch
+            viewer.entities.resumeEvents();
+            viewer.scene.requestRender();
+            
+            // Yield to main thread to keep UI responsive
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            
+            // Suspend again for next batch
+            viewer.entities.suspendEvents();
         }
+        
         viewer.entities.resumeEvents();
 
         if (isCancelled) return;
@@ -193,6 +217,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     const Cesium = (window as any).Cesium;
 
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    // ...
     handler.setInputAction((movement: any) => {
       const picked = viewer.scene.pick(movement.endPosition);
 
@@ -247,7 +272,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
 
   return (
     <div className="h-full w-full relative z-20 pointer-events-none">
-        <KmlBoundary />
+        <IonKmlLayer assetId={4310565} />
         <CompassOverlay mode="cesium" getHeading={getHeading} />
         <MetricScaleOverlay mode="cesium" getMetersIn100px={getMetersIn100px} />
         <TooltipContent data={tooltip} />

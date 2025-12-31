@@ -3,7 +3,7 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { useThreeScene } from '@/contexts/three-scene-context';
-import { useDataCache, Block } from '@/lib/data-cache';
+import { useDataCache, BlockSegment } from '@/lib/data-cache';
 import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
 import CompassOverlay from '@/components/ui/CompassOverlay';
 import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
@@ -75,7 +75,7 @@ export default function BlockModelCarbonViewer({
       return;
     }
 
-    const blocks = filteredBlocks as Block[];
+    const blocks = filteredBlocks as BlockSegment[];
 
     const viewGroup = new THREE.Group();
     viewGroup.name = 'BlockModelCarbonView_Group';
@@ -88,7 +88,7 @@ export default function BlockModelCarbonViewer({
     let traceMesh: THREE.InstancedMesh | null = null;
 
     // group blocks by color
-    const buckets = new Map<number, Block[]>();
+    const buckets = new Map<number, BlockSegment[]>();
     for (const b of blocks) {
       const color = colorForCarbon(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
       if (!buckets.has(color)) buckets.set(color, []);
@@ -111,10 +111,11 @@ export default function BlockModelCarbonViewer({
       const quat = new THREE.Quaternion();
       const scl = new THREE.Vector3();
 
+      const VERTICAL_EXAGGERATION = 10.0;
       items.forEach((bl, i) => {
         const { x, z } = projectLonLat(bl.lon, bl.lat, modelCenter);
-        pos.set(x, bl.elevation, -z);
-        scl.set(bl.dX, bl.dY, bl.dZ);
+        pos.set(x, bl.elevation * VERTICAL_EXAGGERATION, -z);
+        scl.set(bl.dX, bl.dY * VERTICAL_EXAGGERATION, bl.dZ);
         M.compose(pos, quat, scl);
         mesh.setMatrixAt(i, M);
       });
@@ -152,8 +153,14 @@ export default function BlockModelCarbonViewer({
 
         const { x:sx, z:sz } = projectLonLat(a[0], a[1], modelCenter); 
         const { x:ex, z:ez } = projectLonLat(b[0], b[1], modelCenter); 
-        const A = new THREE.Vector3(sx, a[2], -sz);
-        const B = new THREE.Vector3(ex, b[2], -ez);
+        const VERTICAL_EXAGGERATION = 10.0;
+        const A = new THREE.Vector3(sx, a[2] * VERTICAL_EXAGGERATION, -sz);
+        // Exaggerate horizontal displacement to match vertical stretch
+        const B = new THREE.Vector3(
+            sx + (ex - sx) * VERTICAL_EXAGGERATION, 
+            b[2] * VERTICAL_EXAGGERATION, 
+            -sz + ((-ez) - (-sz)) * VERTICAL_EXAGGERATION
+        );
         const L = A.distanceTo(B);
         if (!(L > 0)) continue;
 

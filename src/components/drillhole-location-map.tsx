@@ -5,6 +5,7 @@ import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
 import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLOR_MAP_CSS } from '@/lib/constants';
+import IonKmlLayer from '@/components/IonKmlLayer';
 
 declare global {
     interface Window {
@@ -286,9 +287,10 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
 
 interface DrillholeLocationMapProps {
     displayMode: 'lithology' | 'assay';
+    imageryAlpha?: number;
 }
 
-const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
+const DrillholeLocationMap = ({ displayMode, imageryAlpha }: DrillholeLocationMapProps) => {
     const { viewer, ready } = useCesium();
     const { drillholeData } = useDataCache();
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
@@ -405,6 +407,7 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
 
     return (
         <div className="h-full w-full relative">
+            <IonKmlLayer assetId={4310565} />
             {tooltip.display && <TooltipContent data={tooltip} />}
             
             {displayMode === 'lithology' ? (

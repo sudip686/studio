@@ -122,9 +122,10 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
 
           // BLOCKS are (lat, lon, elev) in source → swap when projecting: 
           const { x, z } = projectLonLat(lon, lat, modelCenter);  
-          P.set(x, ele, -z);
+          const VERTICAL_EXAGGERATION = 10.0;
+          P.set(x, ele * VERTICAL_EXAGGERATION, -z);
           Q.identity();
-          S.set(Math.max(0.25, asNumber(b.dX, 1)), Math.max(0.25, asNumber(b.dY, 1)), Math.max(0.25, asNumber(b.dZ, 1)));
+          S.set(Math.max(0.25, asNumber(b.dX, 1)), Math.max(0.25, asNumber(b.dY, 1)) * VERTICAL_EXAGGERATION, Math.max(0.25, asNumber(b.dZ, 1)));
           M.compose(P, Q, S);
           mesh.setMatrixAt(i++, M);
         }
@@ -156,8 +157,14 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
 
           const { x:sx, z:sz } = projectLonLat(a[0], a[1], modelCenter); 
           const { x:ex, z:ez } = projectLonLat(b[0], b[1], modelCenter); 
-          const A = new THREE.Vector3(sx, a[2], -sz);
-          const B = new THREE.Vector3(ex, b[2], -ez);
+          const VERTICAL_EXAGGERATION = 10.0;
+          const A = new THREE.Vector3(sx, a[2] * VERTICAL_EXAGGERATION, -sz);
+          // Exaggerate horizontal displacement to match vertical stretch
+          const B = new THREE.Vector3(
+              sx + (ex - sx) * VERTICAL_EXAGGERATION, 
+              b[2] * VERTICAL_EXAGGERATION, 
+              -sz + ((-ez) - (-sz)) * VERTICAL_EXAGGERATION
+          );
           const L = A.distanceTo(B);
           if (!(L > 0)) continue;
 

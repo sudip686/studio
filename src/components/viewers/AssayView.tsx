@@ -14,7 +14,7 @@ interface DrillholeSegment {
     lithology?: string; graphitic_carbon?: number; feature: any;
 }
 
-const ASSAY_COLOR_STEPS = 20;
+const ASSAY_COLOR_STEPS = 100;
 const assayColorCache: { [step: number]: string } = {};
 function colorForAssay(vRaw: any, min: number, max: number): string {
     const v = Number(vRaw);
@@ -40,42 +40,35 @@ function getSegmentEnds(seg:{feature:any}) {
 
 export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
     const mountedRef = useRef(false);
-    const { drillholeData, loadingStatus, error, refetch } = useDataCache();
+    const { processedAssayData, loadingStatus, error, refetch } = useDataCache();
     const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
 
     const assayRange = useMemo(() => {
-        if (!drillholeData || !drillholeData.assay) return { min: 0, max: 1 };
-        const assayValues = drillholeData.assay.map(d => d.graphitic_carbon).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
-        if (assayValues.length === 0) return { min: 0, max: 1 };
-        const range = { min: Math.min(...assayValues), max: Math.max(...assayValues) };
-        console.log('Assay range:', range);
-        return range;
-    }, [drillholeData]);
+        if (!processedAssayData || !processedAssayData.assayRange) return { min: 0, max: 1 };
+        return processedAssayData.assayRange;
+    }, [processedAssayData]);
+
+    const assayGradient = useMemo(() => {
+        // Create CSS gradient: linear-gradient(to right, colorAtMin, colorAtMax)
+        // Since colorForAssay is t=0 (green) to t=1 (red)
+        const startColor = colorForAssay(assayRange.min, assayRange.min, assayRange.max);
+        const midColor = colorForAssay((assayRange.min + assayRange.max) / 2, assayRange.min, assayRange.max);
+        const endColor = colorForAssay(assayRange.max, assayRange.min, assayRange.max);
+        return `linear-gradient(to right, ${startColor}, ${midColor}, ${endColor})`;
+    }, [assayRange]);
 
     useEffect(() => {
     console.log('Rendering AssayView');
         if (!scene || !camera || !controls || !dynamicGroup) return;
         console.log('[AssayView] Initializing with:', { scene, camera, controls, dynamicGroup });
-        if (!drillholeData || !Array.isArray(drillholeData.assay) || drillholeData.assay.length === 0) {
-            console.warn('[AssayView] No drillhole assay data available.');
+        if (!processedAssayData || !processedAssayData.grouped) {
+            console.warn('[AssayView] No processed assay data available.');
             return;
         }
         if (mountedRef.current) return; // StrictMode guard
         mountedRef.current = true;
 
-        const filteredDrillholeData = assayCutoff !== undefined
-            ? drillholeData.assay.filter(d => (d.graphitic_carbon ?? 0) > assayCutoff)
-            : drillholeData.assay;
-
-        if (filteredDrillholeData.length === 0) {
-            console.warn('[AssayView] No drillhole assay data after filtering.');
-            return;
-        }
-
-        const allPoints = filteredDrillholeData.map(d => ({ lon: d.lon, lat: d.lat, elevation: d.elevation }));
-        const centerLon = allPoints.reduce((acc, p) => acc + p.lon, 0) / allPoints.length;
-        const centerLat = allPoints.reduce((acc, p) => acc + p.lat, 0) / allPoints.length;
-        const modelCenter = { lon: centerLon, lat: centerLat };
+        const { modelCenter, grouped, byHoleId } = processedAssayData;
         console.log('[AssayView] Model Center:', modelCenter);
 
         const viewGroup = new THREE.Group();
@@ -84,63 +77,124 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
 
         const geometries: THREE.BufferGeometry[] = [];
         const materials: THREE.Material[] = [];
-
-        const grouped: Record<string, DrillholeSegment[]> = {};
-        for (const seg of filteredDrillholeData) {
-            const hex = colorForAssay(seg.graphitic_carbon, assayRange.min, assayRange.max);
-            (grouped[hex] ||= []).push(seg);
-        }
-
         const meshes: THREE.InstancedMesh[] = [];
 
-        Object.entries(grouped).forEach(([hex, features]) => {
-            const mat = new THREE.MeshStandardMaterial({ color: hex });
-            const geo = new THREE.CylinderGeometry(1,1,1,8);
-            materials.push(mat);
-            geometries.push(geo);
+        // Pre-calculate traces for all holes to ensure continuity
+        // Key is `${hole_id}_${depth_from}` because object references might differ between `byHoleId` and `grouped`
+        const segmentTraces = new Map<string, { start: THREE.Vector3, end: THREE.Vector3 }>();
+        const VERTICAL_EXAGGERATION = 10.0;
+        const Y_UP = new THREE.Vector3(0, 1, 0);
+        const radius = 7.5; 
 
-            const mesh = new THREE.InstancedMesh(geo, mat, features.length);
-            mesh.frustumCulled = false;
-            mesh.userData.isDrillhole = true;
-            mesh.userData.instanceData = features;
-            viewGroup.add(mesh);
-            meshes.push(mesh);
+        if (byHoleId) {
+            Object.values(byHoleId).forEach(hole => {
+                // Sort segments by depth
+                const sortedSegments = [...hole.segments].sort((a, b) => a.depth_from - b.depth_from);
+                if (sortedSegments.length === 0) return;
 
-            const M = new THREE.Matrix4(), pos=new THREE.Vector3(), q=new THREE.Quaternion(), s=new THREE.Vector3();
-            const Y_UP = new THREE.Vector3(0, 1, 0);
-            const radius = 50;
-            let idx = 0;
-            for (const f of features) {
-                const ends = getSegmentEnds(f); if (!ends) continue;
-                const a = ends.a;
-                const b = ends.b;
+                // Initialize Start Point from the first segment's geometry (Collar)
+                const firstSeg = sortedSegments[0];
+                const g = firstSeg.feature?.geometry;
+                let currentPos: THREE.Vector3;
 
-                const { x: sx, z: sz } = projectLonLat(a[0], a[1], modelCenter);
-                const { x: ex, z: ez } = projectLonLat(b[0], b[1], modelCenter);
-                const A = new THREE.Vector3(sx, a[2], -sz);
-                const B = new THREE.Vector3(ex, b[2], -ez);
+                if (g?.type === 'LineString' && g.coordinates?.length > 0) {
+                    const [lon, lat, elev] = g.coordinates[0];
+                    const { x: sx, z: sz } = projectLonLat(lon, lat, modelCenter);
+                    currentPos = new THREE.Vector3(sx, elev * VERTICAL_EXAGGERATION, -sz);
+                } else {
+                    currentPos = new THREE.Vector3(0, 0, 0);
+                }
 
-                if (idx === 1) console.log('projected A:', A.toArray());
+                for (const seg of sortedSegments) {
+                    const props = seg.feature?.properties || {};
+                    const azimuth = Number(props.azimuth ?? 0);
+                    const inclination = Number(props.inclination ?? 0); 
+                    const depthFrom = props.depth_from ?? 0;
+                    const depthTo = props.depth_to ?? 0;
+                    const intervalLength = Math.abs(depthTo - depthFrom);
+                    const traceKey = `${seg.hole_id}_${depthFrom}`;
 
-                const L = A.distanceTo(B);
-                if (!(L > 0)) continue; // skip degenerate
+                    if (intervalLength <= 0) {
+                         segmentTraces.set(traceKey, { start: currentPos.clone(), end: currentPos.clone() });
+                         continue;
+                    }
 
-                pos.copy(A).add(B).multiplyScalar(0.5);
-                const dir = new THREE.Vector3().subVectors(B, A).normalize();
-                q.setFromUnitVectors(Y_UP, dir);
-                s.set(radius, L, radius);
-                M.compose(pos, q, s);
-                mesh.setMatrixAt(idx++, M);
+                    const azRad = THREE.MathUtils.degToRad(azimuth);
+                    const incRad = THREE.MathUtils.degToRad(inclination);
+
+                    const dy_real = -intervalLength * Math.cos(incRad);
+                    const horiz_real = intervalLength * Math.sin(incRad);
+
+                    const dx_visual = horiz_real * Math.sin(azRad) * VERTICAL_EXAGGERATION;
+                    const dz_visual = horiz_real * -Math.cos(azRad) * VERTICAL_EXAGGERATION;
+                    const dy_visual = dy_real * VERTICAL_EXAGGERATION;
+
+                    const nextPos = currentPos.clone().add(new THREE.Vector3(dx_visual, dy_visual, dz_visual));
+
+                    segmentTraces.set(traceKey, { start: currentPos.clone(), end: nextPos.clone() });
+                    currentPos = nextPos;
+                }
+            });
+        }
+
+        Object.entries(grouped).forEach(([key, features]) => {
+            // Filter by cutoff if provided
+            const filteredFeatures = assayCutoff !== undefined
+                ? features.filter(f => (f.graphitic_carbon ?? 0) > assayCutoff)
+                : features;
+                
+            if (filteredFeatures.length === 0) return;
+
+            const colorGroups: Record<string, any[]> = {};
+            for (const f of filteredFeatures) {
+                 const hex = colorForAssay(f.graphitic_carbon, assayRange.min, assayRange.max);
+                 (colorGroups[hex] ||= []).push(f);
             }
-            mesh.count = idx;
-            mesh.instanceMatrix.needsUpdate = true;
-            console.log('[assay] instances:', mesh.count);
 
-            // Register mesh for tooltip
-            registerTooltipObject(mesh, (instanceId: number) => {
-                const segment = features[instanceId];
-                console.log('AssayView tooltip segment:', segment);
-                return `Hole ID: ${segment.hole_id}<br/>Depth: ${segment.depth_from}-${segment.depth_to}<br/>Carbon: ${segment.graphitic_carbon?.toFixed(2)}`;
+            Object.entries(colorGroups).forEach(([hex, groupFeats]) => {
+                const mat = new THREE.MeshStandardMaterial({ color: hex });
+                const geo = new THREE.CylinderGeometry(1,1,1,8);
+                materials.push(mat);
+                geometries.push(geo);
+
+                // Filter using the string key
+                const validFeatures = groupFeats.filter(f => segmentTraces.has(`${f.hole_id}_${f.depth_from}`));
+                if (validFeatures.length === 0) return;
+
+                const mesh = new THREE.InstancedMesh(geo, mat, validFeatures.length);
+                mesh.frustumCulled = false;
+                mesh.userData.isDrillhole = true;
+                mesh.userData.instanceData = validFeatures;
+                viewGroup.add(mesh);
+                meshes.push(mesh);
+
+                let idx = 0;
+                for (const f of validFeatures) {
+                    const traceKey = `${f.hole_id}_${f.depth_from}`;
+                    const trace = segmentTraces.get(traceKey);
+                    if (!trace) continue;
+
+                    const { start, end } = trace;
+                    const L = start.distanceTo(end);
+                    if (L <= 0.0001) {
+                         mesh.setMatrixAt(idx++, new THREE.Matrix4().makeScale(0,0,0));
+                         continue;
+                    }
+
+                    const pos = start.clone().add(end).multiplyScalar(0.5);
+                    const dir = new THREE.Vector3().subVectors(end, start).normalize();
+                    const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir);
+                    const scl = new THREE.Vector3(radius, L, radius);
+                    const M = new THREE.Matrix4().compose(pos, quat, scl);
+                    mesh.setMatrixAt(idx++, M);
+                }
+                mesh.count = idx;
+                mesh.instanceMatrix.needsUpdate = true;
+
+                registerTooltipObject(mesh, (instanceId: number) => {
+                    const segment = validFeatures[instanceId];
+                    return `Hole ID: ${segment.hole_id}<br/>Depth: ${segment.depth_from}-${segment.depth_to}<br/>Carbon: ${segment.graphitic_carbon?.toFixed(2)}`;
+                });
             });
         });
 
@@ -161,19 +215,19 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
             materials.forEach(m => m.dispose());
             mountedRef.current = false;
         };
-    }, [drillholeData, loadingStatus, assayRange, assayCutoff, scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject]);
+    }, [processedAssayData, loadingStatus, assayRange, assayCutoff, scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject]);
 
     if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
-    const assayLegendItems = Array.from({ length: 5 }).map((_, i) => {
-        const value = assayRange.min + (assayRange.max - assayRange.min) * (i / 4);
-        const color = colorForAssay(value, assayRange.min, assayRange.max);
-        return { label: value.toFixed(2), color };
-    });
-
     return (
         <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-            <Legend title="Assay Value" items={assayLegendItems} />
+            <Legend 
+                title="Assay Value" 
+                type="gradient"
+                gradient={assayGradient}
+                minLabel={assayRange.min.toFixed(2)}
+                maxLabel={assayRange.max.toFixed(2)}
+            />
         </div>
     );
 }

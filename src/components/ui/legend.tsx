@@ -22,7 +22,7 @@ export const Legend: React.FC<LegendProps> = ({
   if (!show) return null;
 
   return (
-    <div className="absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-3 rounded-lg shadow-lg z-50">
+    <div className={`absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-3 rounded-lg shadow-lg z-50 ${type === 'gradient' ? 'w-96' : 'min-w-[200px]'}`}>
       <h4 className="font-bold text-lg mb-2">{title}</h4>
       {type === 'categorical' && items && (
         <div className="space-y-1">
@@ -40,10 +40,10 @@ export const Legend: React.FC<LegendProps> = ({
       {type === 'gradient' && gradient && (
         <div className="flex flex-col items-stretch mt-2">
           <div
-            className="h-4 w-full rounded-md"
+            className="h-6 w-full rounded-md border border-white/20"
             style={{ background: gradient }}
           ></div>
-          <div className="flex justify-between text-xs mt-1">
+          <div className="flex justify-between text-sm mt-1 font-medium">
             <span>{minLabel}</span>
             <span>{maxLabel}</span>
           </div>
