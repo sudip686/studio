@@ -11,6 +11,7 @@ export { default as CesiumThreeBlockModel } from '../CesiumThreeBlockModel';
 
 // Imagery and terrain layers
 export { default as IonImageryLayer } from '../IonImageryLayer';
+export { default as IonKmlLayer } from '../IonKmlLayer';
 
 // KML/KMZ support for boundary visualization
 export { default as KmlBoundary } from '../KmlBoundary';

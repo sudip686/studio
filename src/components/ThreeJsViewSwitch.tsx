@@ -6,7 +6,7 @@ import BlockModelRescViewer from './viewers/BlockModelRescView';
 export default function ThreeJsViewSwitch({ view, assayCutoff }: { view: string; assayCutoff?: number }) {
     switch (view) {
         case 'lithology_view':
-            return <LithologyViewer key="lith" assayCutoff={assayCutoff} />;
+            return <LithologyViewer key="lith" />;
         case 'assay_view':
             return <AssayViewer key="assay" assayCutoff={assayCutoff} />;
         case 'block_model_carbon_view':

@@ -1,0 +1,62 @@
+src/app/page.tsx(30,3): error TS2353: Object literal may only specify known properties, and ''geospatial_lithology'' does not exist in type '{ original: string; exaggerated_kml: string; styled_kml: string; tanaga_accessibility: string; tanga_geological_map: string; geojson_drillholes_lithology: string; geojson_drillholes_assay: string; ... 6 more ...; block_model_resc_view: string; }'.
+src/components/block-model-box-cutter.tsx(38,54): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/components/block-model-box-cutter.tsx(38,110): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/components/BoreholePrewarmer.tsx(6,10): error TS2305: Module '"@/lib/utils"' has no exported member 'processInChunks'.
+src/components/BoreholePrewarmer.tsx(80,53): error TS7006: Parameter 'inst' implicitly has an 'any' type.
+src/components/drillhole-location-map.tsx(173,26): error TS7053: Element implicitly has an 'any' type because expression of type '"max" | "average"' can't be used to index type '{ avg: { min: number; max: number; }; max: { min: number; max: number; }; }'.
+  Property 'average' does not exist on type '{ avg: { min: number; max: number; }; max: { min: number; max: number; }; }'.
+src/components/DrillholeLayer.tsx(92,15): error TS7034: Variable 'entitiesCreated' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/components/DrillholeLayer.tsx(131,26): error TS7005: Variable 'entitiesCreated' implicitly has an 'any[]' type.
+src/components/KMZPolygonClippingPlanes.tsx(114,28): error TS2345: Argument of type 'import("cesium").ClippingPlane' is not assignable to parameter of type 'Cesium.ClippingPlane'.
+  Types of property 'normal' are incompatible.
+    Type 'Cartesian3' is missing the following properties from type 'Cartesian3': isConstant, definitionChanged, referenceFrame, getValue, getValueInReferenceFrame
+src/components/terrain-clipping-viewer.tsx(48,35): error TS2339: Property 'clippingPlanes' does not exist on type 'Cesium3DTilesetGraphics'.
+src/components/terrain-clipping-viewer.tsx(54,58): error TS2339: Property 'translation' does not exist on type 'Matrix4'.
+src/components/terrain-clipping-viewer.tsx(104,29): error TS2322: Type 'import("cesium").Color' is not assignable to type 'Cesium.Color'.
+  Types of property 'brighten' are incompatible.
+    Type '(magnitude: number, result: import("cesium").Color) => import("cesium").Color' is not assignable to type '(magnitude: number, result: Cesium.Color) => Cesium.Color'.
+      Types of parameters 'result' and 'result' are incompatible.
+        Property 'toCssHexString' is missing in type 'Cesium.Color' but required in type 'import("cesium").Color'.
+src/components/terrain-clipping-viewer.tsx(105,29): error TS2322: Type 'import("cesium").Color' is not assignable to type 'Cesium.Color'.
+  Types of property 'brighten' are incompatible.
+    Type '(magnitude: number, result: import("cesium").Color) => import("cesium").Color' is not assignable to type '(magnitude: number, result: Cesium.Color) => Cesium.Color'.
+      Types of parameters 'result' and 'result' are incompatible.
+        Property 'toCssHexString' is missing in type 'Cesium.Color' but required in type 'import("cesium").Color'.
+src/components/terrain-clipping-viewer.tsx(106,29): error TS2322: Type 'import("cesium").Color' is not assignable to type 'Cesium.Color'.
+  Types of property 'brighten' are incompatible.
+    Type '(magnitude: number, result: import("cesium").Color) => import("cesium").Color' is not assignable to type '(magnitude: number, result: Cesium.Color) => Cesium.Color'.
+      Types of parameters 'result' and 'result' are incompatible.
+        Property 'toCssHexString' is missing in type 'Cesium.Color' but required in type 'import("cesium").Color'.
+src/components/terrain-clipping-viewer.tsx(107,29): error TS2322: Type 'import("cesium").Color' is not assignable to type 'Cesium.Color'.
+  Types of property 'brighten' are incompatible.
+    Type '(magnitude: number, result: import("cesium").Color) => import("cesium").Color' is not assignable to type '(magnitude: number, result: Cesium.Color) => Cesium.Color'.
+      Types of parameters 'result' and 'result' are incompatible.
+        Property 'toCssHexString' is missing in type 'Cesium.Color' but required in type 'import("cesium").Color'.
+src/components/terrain-clipping-viewer.tsx(109,38): error TS2345: Argument of type 'Color' is not assignable to parameter of type 'SetStateAction<Color>'.
+  Property 'toCssHexString' is missing in type 'Cesium.Color' but required in type 'import("cesium").Color'.
+src/components/TerrainSingleClippingPlane.tsx(46,9): error TS2741: Property 'getIndex' is missing in type 'import("cesium").ClippingPlaneCollection' but required in type 'Cesium.ClippingPlaneCollection'.
+src/components/TerrainSingleClippingPlane.tsx(58,9): error TS2322: Type 'import("cesium").Matrix4' is not assignable to type 'Cesium.Matrix4'.
+  Types of property 'clone' are incompatible.
+    Type '(result?: import("cesium").Matrix4 | undefined) => import("cesium").Matrix4' is not assignable to type '(result?: Cesium.Matrix4 | undefined) => Cesium.Matrix4'.
+      Types of parameters 'result' and 'result' are incompatible.
+        Type 'Cesium.Matrix4 | undefined' is not assignable to type 'import("cesium").Matrix4 | undefined'.
+          Property 'length' is missing in type 'Cesium.Matrix4' but required in type 'import("cesium").Matrix4'.
+src/components/TerrainSingleClippingPlane.tsx(81,5): error TS2322: Type 'import("cesium").ScreenSpaceEventHandler' is not assignable to type 'Cesium.ScreenSpaceEventHandler'.
+  The types returned by 'getInputAction(...)' are incompatible between these types.
+    Type 'PositionedEventCallback | MotionEventCallback | WheelEventCallback | TwoPointEventCallback | TwoPointMotionEventCallback' is not assignable to type '() => void'.
+      Type 'PositionedEventCallback' is not assignable to type '() => void'.
+        Target signature provides too few arguments. Expected 1 or more, but got 0.
+src/components/ui/ScaleBarOverlay.tsx(6,11): error TS2503: Cannot find namespace 'THREE'.
+src/components/ui/ScaleBarOverlay.tsx(34,56): error TS2503: Cannot find namespace 'THREE'.
+src/lib/boreholes/useCesiumBoreholes.ts(4,10): error TS2305: Module '"./cesium-borehole-layer"' has no exported member 'addBoreholeLayer'.
+src/lib/boreholes/useCesiumBoreholes.ts(4,28): error TS2305: Module '"./cesium-borehole-layer"' has no exported member 'fitToBoreholeLayer'.
+src/lib/boreholes/useCesiumBoreholes.ts(4,48): error TS2305: Module '"./cesium-borehole-layer"' has no exported member 'removeDataSource'.
+src/lib/boreholes/useCesiumBoreholes.ts(4,66): error TS2305: Module '"./cesium-borehole-layer"' has no exported member 'BoreholeColorFn'.
+src/lib/index.ts(9,10): error TS2305: Module '"./utils/cesium-fit"' has no exported member 'cesiumFit'.
+src/lib/index.ts(10,10): error TS2305: Module '"./utils/cesium-helpers"' has no exported member 'cesiumHelpers'.
+src/lib/index.ts(13,10): error TS2305: Module '"./utils/three-fit"' has no exported member 'threeFit'.
+src/lib/index.ts(14,10): error TS2305: Module '"./utils/three-helpers"' has no exported member 'threeHelpers'.
+src/lib/index.ts(23,10): error TS2459: Module '"./boreholes/borehole-cylinders"' declares 'getCesium' locally, but it is not exported.
+src/lib/index.ts(27,10): error TS2305: Module '"./utils/aoi-clip"' has no exported member 'aoi_clip'.
+src/lib/index.ts(28,10): error TS2305: Module '"./utils/drillholes"' has no exported member 'drillholes_utils'.
+src/lib/index.ts(29,10): error TS2305: Module '"./utils/rectangle-utils"' has no exported member 'rectangleUtils'.

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Mode = 'three' | 'cesium';
 
@@ -17,7 +17,15 @@ export default function CompassOverlay({
   useEffect(() => {
     let raf = 0;
     const tick = () => {
-      try { setDeg((-getHeading() * 180) / Math.PI); } catch {}
+      try { 
+          const rad = getHeading();
+          // Cesium heading is in radians, clockwise from North.
+          const d = (rad * 180) / Math.PI;
+          // We convert to positive degrees 0-360
+          // If heading is 90 (East), North is -90 (Left).
+          // 360 - 90 = 270. Rotation 270 deg moves top (North) to Left.
+          setDeg((360 - d) % 360); 
+      } catch {}
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -26,17 +34,34 @@ export default function CompassOverlay({
 
   return (
     <div className={`pointer-events-none absolute left-6 bottom-24 select-none ${className}`}>
-      <div className="relative w-20 h-20 rounded-full bg-white/90 shadow-xl">
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ transform: `rotate(${deg}deg)`, transition: 'transform 80ms linear' }}
-        >
-          <div className="absolute top-1 text-red-600 font-bold">N</div>
-          <div className="absolute bottom-1 text-gray-400">S</div>
-          <div className="absolute left-1/2 -translate-x-1/2 top-2 w-0.5 h-6 bg-red-600 rounded origin-bottom" />
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-0.5 h-6 bg-gray-500 rounded origin-top" />
-        </div>
-      </div>
+         <div className="bg-white/80 rounded-full w-16 h-16 flex items-center justify-center shadow-xl border-2 border-white/50 backdrop-blur-md">
+            <svg
+                viewBox="0 0 100 100"
+                className="w-full h-full p-1"
+                style={{ transform: `rotate(${deg}deg)` }}
+            >
+                {/* Decorative Ring */}
+                <circle cx="50" cy="50" r="46" fill="none" stroke="#cbd5e1" strokeWidth="1" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="1 3" />
+                
+                {/* Cardinal Points */}
+                <text x="50" y="16" textAnchor="middle" className="font-bold fill-red-600" style={{ fontSize: '14px', fontFamily: 'sans-serif' }}>N</text>
+                <text x="50" y="94" textAnchor="middle" className="font-bold fill-slate-700" style={{ fontSize: '12px', fontFamily: 'sans-serif' }}>S</text>
+                <text x="90" y="54" textAnchor="middle" className="font-bold fill-slate-700" style={{ fontSize: '12px', fontFamily: 'sans-serif' }}>E</text>
+                <text x="10" y="54" textAnchor="middle" className="font-bold fill-slate-700" style={{ fontSize: '12px', fontFamily: 'sans-serif' }}>W</text>
+
+                {/* Center Dot */}
+                <circle cx="50" cy="50" r="3" fill="#475569" />
+
+                {/* Needle Design */}
+                <g>
+                    {/* North (Red) Tip */}
+                    <path d="M50 20 L56 50 L50 50 L44 50 Z" fill="#dc2626" />
+                    {/* South (Dark) Tip */}
+                    <path d="M50 80 L56 50 L50 50 L44 50 Z" fill="#1e293b" />
+                </g>
+            </svg>
+         </div>
     </div>
   );
 }

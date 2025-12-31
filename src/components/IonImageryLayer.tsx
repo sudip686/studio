@@ -4,9 +4,10 @@ import { useCesium } from '@/contexts/cesium-context';
 
 interface IonImageryLayerProps {
     assetId: number;
+    alpha?: number;
 }
 
-const IonImageryLayer = ({ assetId }: IonImageryLayerProps) => {
+const IonImageryLayer = ({ assetId, alpha = 1.0 }: IonImageryLayerProps) => {
     const { viewer } = useCesium();
     const imageryLayerRef = useRef<any>(null);
 
@@ -21,6 +22,8 @@ const IonImageryLayer = ({ assetId }: IonImageryLayerProps) => {
                 const provider = await Cesium.IonImageryProvider.fromAssetId(assetId);
                 if (isMounted && viewer && !viewer.isDestroyed()) {
                     const layer = viewer.imageryLayers.addImageryProvider(provider);
+                    layer.alpha = alpha;
+                    
                     imageryLayerRef.current = layer;
                     viewer.scene.requestRender();
                 }
@@ -38,7 +41,7 @@ const IonImageryLayer = ({ assetId }: IonImageryLayerProps) => {
                 imageryLayerRef.current = null;
             }
         };
-    }, [viewer, assetId]);
+    }, [viewer, assetId, alpha]);
 
     return null;
 };
