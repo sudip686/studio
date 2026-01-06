@@ -63,12 +63,16 @@ export default function BlockModelCarbonViewer({
       return;
     }
 
-    const filteredBlocks = assayCutoff !== undefined
-      ? blockModelData.filter(b => {
-          const carbonValue = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
-          return Number.isFinite(carbonValue) && carbonValue > assayCutoff;
-        })
-      : blockModelData;
+    const filteredBlocks = blockModelData.filter(b => {
+      const idVal = Number(b.Id);
+      if (idVal === 0) return false;
+
+      if (assayCutoff !== undefined) {
+        const carbonValue = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+        return Number.isFinite(carbonValue) && carbonValue > assayCutoff;
+      }
+      return true;
+    });
 
     if (filteredBlocks.length === 0) {
       console.warn('[BlockModelCarbonViewer] No blocks after filtering.');
@@ -111,7 +115,7 @@ export default function BlockModelCarbonViewer({
       const quat = new THREE.Quaternion();
       const scl = new THREE.Vector3();
 
-      const VERTICAL_EXAGGERATION = 10.0;
+      const VERTICAL_EXAGGERATION = 1.0;
       items.forEach((bl, i) => {
         const { x, z } = projectLonLat(bl.lon, bl.lat, modelCenter);
         pos.set(x, bl.elevation * VERTICAL_EXAGGERATION, -z);
@@ -134,7 +138,7 @@ export default function BlockModelCarbonViewer({
     // REPLACED TRACE LOGIC
     if (showTraces && processedLithologyData?.byHoleId) {
         const segmentTraces = new Map<any, { start: THREE.Vector3, end: THREE.Vector3 }>();
-        const VERTICAL_EXAGGERATION = 10.0;
+        const VERTICAL_EXAGGERATION = 1.0;
         const Y_UP = new THREE.Vector3(0, 1, 0);
         
         // Calculate traces
@@ -253,11 +257,20 @@ export default function BlockModelCarbonViewer({
   if (loadingStatus === 'loading') return <div>Loading...</div>;
   if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
-  const carbonLegendItems = Array.from({ length: 5 }).map((_, i) => {
-    const value = 0 + (10 - 0) * (i / 4);
-    const color = new THREE.Color(value / 10, 1 - (value / 10), 0).getStyle();
-    return { label: value.toFixed(2), color };
-  });
+  const carbonRange = useMemo(() => {
+    if (!blockModelData) return { min: 0, max: 10 };
+    let min = Infinity, max = -Infinity;
+    blockModelData.forEach(b => {
+      const v = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+      if (Number.isFinite(v)) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    });
+    return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 10 : max };
+  }, [blockModelData]);
+
+  const carbonGradient = "linear-gradient(to right, #00ff00, #ff0000)";
 
   return (
     <>
@@ -279,7 +292,13 @@ export default function BlockModelCarbonViewer({
         </div>
       )}
       <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-        <Legend title="Carbon Value" items={carbonLegendItems} />
+        <Legend 
+            title="Carbon Value" 
+            type="gradient" 
+            gradient={carbonGradient}
+            minLabel={carbonRange.min.toFixed(2)}
+            maxLabel={carbonRange.max.toFixed(2)}
+        />
       </div>
     </>
   );

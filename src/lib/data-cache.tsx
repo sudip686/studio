@@ -113,7 +113,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                 
                 const parsedBlockModel: BlockSegment[] = blockModelGeoJson.features.map((f:any) => {
                     const p = f.properties ?? {};
-                    const [lat, lon, elev] = f.geometry.coordinates;
+                    const [lon, lat, elev] = f.geometry.coordinates;
                     return {
                         lon, lat, elevation: elev,
                         Id: String(p.Id ?? ''),

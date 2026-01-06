@@ -27,6 +27,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
     const { blockModelData, processedLithologyData, loadingStatus, error, refetch } = useDataCache();
     const [blockOpacity, setBlockOpacity] = useState(0.8);
     const [showTraces, setShowTraces] = useState(true);
+    const [selectedClassification, setSelectedClassification] = useState('All');
 
     // simple pick/asNumber helpers used in your file
     const pick = (o: any, keys: string[]) => {
@@ -63,16 +64,27 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         return;
       }
 
-      const filteredBlocks = assayCutoff !== undefined
-        ? blockModelData.filter(b => {
-            const carbonValue = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
-            return Number.isFinite(carbonValue) && carbonValue > assayCutoff;
-          })
-        : blockModelData;
+      const filteredBlocks = blockModelData.filter(b => {
+        const idVal = Number(b.Id);
+        if (idVal === 0) return false;
+
+        // Filter by Classification
+        if (selectedClassification !== 'All') {
+             const rescKeys = ["RescCalc","rescCalc","classification","CLASS","Class"];
+             const val = String(pick(b, rescKeys) ?? "Unknown").trim();
+             if (val !== selectedClassification) return false;
+        }
+
+        if (assayCutoff !== undefined) {
+          const carbonValue = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+          return Number.isFinite(carbonValue) && carbonValue > assayCutoff;
+        }
+        return true;
+      });
 
       if (filteredBlocks.length === 0) {
         console.warn('[BlockModelRescViewer] No blocks after filtering.');
-        return;
+        // Don't return here, let the traces draw if available
       }
 
       const blocks = filteredBlocks as BlockSegment[];
@@ -124,7 +136,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
 
           // BLOCKS are (lat, lon, elev) in source → swap when projecting: 
           const { x, z } = projectLonLat(lon, lat, modelCenter);  
-          const VERTICAL_EXAGGERATION = 10.0;
+          const VERTICAL_EXAGGERATION = 1.0;
           P.set(x, ele * VERTICAL_EXAGGERATION, -z);
           Q.identity();
           S.set(Math.max(0.25, asNumber(b.dX, 1)), Math.max(0.25, asNumber(b.dY, 1)) * VERTICAL_EXAGGERATION, Math.max(0.25, asNumber(b.dZ, 1)));
@@ -144,7 +156,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
       // REPLACED TRACE LOGIC
       if (showTraces && processedLithologyData?.byHoleId) {
           const segmentTraces = new Map<any, { start: THREE.Vector3, end: THREE.Vector3 }>();
-          const VERTICAL_EXAGGERATION = 10.0;
+          const VERTICAL_EXAGGERATION = 1.0;
           const Y_UP = new THREE.Vector3(0, 1, 0);
           
           // Calculate traces
@@ -262,7 +274,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         materials.forEach(m => m.dispose());
         mountedRef.current = false;
       };
-    }, [blockModelData, processedLithologyData, loadingStatus, blockOpacity, showTraces, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff, registerTooltipObject, unregisterTooltipObject]);
+    }, [blockModelData, processedLithologyData, loadingStatus, blockOpacity, showTraces, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff, registerTooltipObject, unregisterTooltipObject, selectedClassification]); // added selectedClassification dependency
 
     useEffect(() => {
       if (!camera || !controls || !dynamicGroup) return;
@@ -287,6 +299,18 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
           <Legend title="Classification" items={RESC_LEGEND} />
         </div>
         <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2">
+          <label className="block text-sm">Classification</label>
+          <select 
+            value={selectedClassification} 
+            onChange={e => setSelectedClassification(e.target.value)}
+            className="w-full p-1 rounded bg-gray-700 text-white border border-gray-600 text-sm"
+          >
+            <option value="All">All</option>
+            <option value="Measured">Measured</option>
+            <option value="Indicated">Indicated</option>
+            <option value="Inferred">Inferred</option>
+            <option value="Unknown">Unknown</option>
+          </select>
           <label className="block text-sm">Block opacity</label>
           <input type="range" min="0.05" max="1" step="0.05"
                  value={blockOpacity}

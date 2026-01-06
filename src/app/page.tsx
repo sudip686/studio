@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ChapterMenu } from "@/components/ui/chapter-menu";
 import { CesiumProvider } from '@/contexts/cesium-context';
 import CesiumViewSwitch from '@/components/CesiumViewSwitch';
 import ThreeJsViewSwitch from '@/components/ThreeJsViewSwitch';
 import { ThreeSceneProvider } from '@/contexts/three-scene-context';
+import { useDataCache } from '@/lib/data-cache';
 
 // Simplified view sequence
 const viewSequence = [
@@ -61,6 +62,17 @@ export default function Home() {
   const [title, setTitle] = useState(viewTitles[viewSequence[0]]);
   const [titleVisible, setTitleVisible] = useState(true);
   const [assayCutoff, setAssayCutoff] = useState<number | undefined>(undefined);
+  const { blockModelData } = useDataCache();
+
+  const maxAssayValue = useMemo(() => {
+      if (!blockModelData) return 100;
+      let max = 0;
+      for (const b of blockModelData) {
+          const v = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+          if (!isNaN(v) && v > max) max = v;
+      }
+      return max;
+  }, [blockModelData]);
 
   useEffect(() => {
     setTitleVisible(false);
@@ -90,15 +102,21 @@ export default function Home() {
         <div className="fixed top-4 left-4 z-[9999] pointer-events-auto">
           <ChapterMenu viewSequence={viewSequence} viewTitles={viewTitles} currentViewIndex={currentViewIndex} setCurrentViewIndex={setCurrentViewIndex} />
         </div>
-        {isThreeJsSwitcherView && (
-            <div className="fixed top-4 right-4 z-[9999] pointer-events-auto bg-black bg-opacity-70 p-2 rounded-lg text-white">
-                <label htmlFor="assayCutoff" className="mr-2">Assay Cutoff:</label>
+        {isThreeJsSwitcherView && currentView !== 'lithology_view' && (
+            <div className="fixed top-64 right-4 z-[9999] pointer-events-auto bg-black bg-opacity-70 p-2 rounded-lg text-white">
+                <label htmlFor="assayCutoff" className="mr-2">Assay Cutoff (Max {maxAssayValue.toFixed(1)}):</label>
                 <input
                     id="assayCutoff"
                     type="number"
                     step="0.1"
+                    min="0"
+                    max={maxAssayValue}
                     value={assayCutoff ?? ''}
-                    onChange={(e) => setAssayCutoff(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                    onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val)) setAssayCutoff(undefined);
+                        else setAssayCutoff(Math.min(val, maxAssayValue));
+                    }}
                     className="w-24 p-1 rounded bg-gray-800 text-white border border-gray-700"
                 />
             </div>

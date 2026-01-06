@@ -34,10 +34,22 @@ const CONTINUOUS_PALETTES: { [key: string]: string[] } = {
 };
 
 const getContinuousColor = (value: number, min: number, max: number, paletteName: string, Cesium: any) => {
+    const palette = CONTINUOUS_PALETTES[paletteName] || CONTINUOUS_PALETTES['Viridis'];
     const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
-    const startColor = Cesium.Color.fromCssColorString('#440154');
-    const endColor = Cesium.Color.fromCssColorString('#fde725');
-    return Cesium.Color.lerp(startColor, endColor, ratio, new Cesium.Color());
+    
+    // Map ratio to segments
+    const segmentCount = palette.length - 1;
+    const index = Math.min(Math.floor(ratio * segmentCount), segmentCount - 1);
+    const startColorHex = palette[index];
+    const endColorHex = palette[index + 1];
+    
+    // Local ratio within the segment
+    const localRatio = (ratio * segmentCount) - index;
+
+    const startColor = Cesium.Color.fromCssColorString(startColorHex);
+    const endColor = Cesium.Color.fromCssColorString(endColorHex);
+    
+    return Cesium.Color.lerp(startColor, endColor, localRatio, new Cesium.Color());
 };
 
 const norm = (s: any) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -168,6 +180,7 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
     const [scaleType, setScaleType] = useState<'continuous' | 'discrete'>('continuous');
     const [continuousPalette, setContinuousPalette] = useState('Viridis');
     const [manualBreaks, setManualBreaks] = useState('1, 1.5, 2');
+    const [pointSize, setPointSize] = useState(20);
     const entitiesRef = useRef<any[]>([]);
 
     const currentRange = ranges[metric];
@@ -211,7 +224,7 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                     const entity = new Cesium.Entity({
                         position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude, hTop),
                         point: {
-                            pixelSize: 20,
+                            pixelSize: pointSize,
                             color,
                             outlineColor: Cesium.Color.BLACK,
                             outlineWidth: 1,
@@ -232,7 +245,7 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                 entitiesRef.current.forEach(entity => viewer.entities.remove(entity));
             }
         };
-    }, [viewer, ready, processedData, assayFilterValue, scaleType, continuousPalette, manualBreaks, currentRange, metric]);
+    }, [viewer, ready, processedData, assayFilterValue, scaleType, continuousPalette, manualBreaks, currentRange, metric, pointSize]);
 
     return (
         <>
@@ -243,6 +256,10 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                         <option value="max">Maximum</option>
                         <option value="average">Average</option>
                     </select>
+                </div>
+                <div>
+                    <label>Point Size: {pointSize}</label>
+                    <input type="range" min="5" max="50" value={pointSize} onChange={(e) => setPointSize(Number(e.target.value))} />
                 </div>
                 <div>
                     <label>Min. Graphitic Carbon (%): </label>
