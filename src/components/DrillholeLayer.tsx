@@ -51,36 +51,113 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     const cache = cacheRef.current;
 
     const allSegments = [...(drillholeData.lithology || []), ...(drillholeData.assay || [])];
-    const uniqueIntervals = new Map<string, any>();
-    for (const segment of allSegments) {
-        const id = `${segment.hole_id}-${segment.depth_from}-${segment.depth_to}`;
-        
-        // Merge data if interval already exists
-        if (uniqueIntervals.has(id)) {
-            const existing = uniqueIntervals.get(id);
-            if (segment.graphitic_carbon !== undefined && segment.graphitic_carbon !== null) {
-                existing.props.graphitic_carbon = segment.graphitic_carbon;
-            }
-            if (segment.lithology) {
-                existing.props.lithology = segment.lithology;
-            }
-            continue;
-        }
-
-        const coords = segment.feature.geometry.coordinates;
-        if (!coords || coords.length < 2) continue;
-
-        const [lon0, lat0, z0] = coords[0];
-        const [lon1, lat1, z1] = coords[1];
-
-        const interval: Interval = {
-            id: id,
-            start: [lat0, lon0, z0],
-            end: [lat1, lon1, z1],
-            props: { ...segment, latitude: lat0, longitude: lon0 }
-        };
-        uniqueIntervals.set(id, interval);
+    
+    // Group by Hole ID
+    const holes: Record<string, DrillholeSegment[]> = {};
+    for (const seg of allSegments) {
+        if (!holes[seg.hole_id]) holes[seg.hole_id] = [];
+        holes[seg.hole_id].push(seg);
     }
+
+    const uniqueIntervals = new Map<string, any>();
+    const Cesium = (window as any).Cesium;
+
+    Object.values(holes).forEach(segments => {
+        // Sort by depth
+        segments.sort((a, b) => a.depth_from - b.depth_from);
+        if (segments.length === 0) return;
+
+        // Determine Collar Position (Start of first segment)
+        const firstSeg = segments[0];
+        const g = firstSeg.feature?.geometry;
+        if (!g || g.type !== 'LineString' || g.coordinates.length < 1) return;
+        
+        // GeoJSON is [lon, lat, elev]
+        const [startLon, startLat, startElev] = g.coordinates[0];
+        let currentPos = Cesium.Cartesian3.fromDegrees(startLon, startLat, startElev);
+
+        segments.forEach(seg => {
+            const props = seg.feature?.properties || {};
+            const azimuth = Number(props.azimuth ?? 0);
+            const inclination = Number(props.inclination ?? 0); // 0 = Vertical Down
+            const depthFrom = props.depth_from ?? 0;
+            const depthTo = props.depth_to ?? 0;
+            const len = Math.abs(depthTo - depthFrom);
+            
+            if (len <= 0) return;
+
+            // Calculate direction in Local ENU Frame
+            // Inclination 0 = Down (-Z in ENU? No, Down is -Z).
+            // ThreeJS logic was: dy = -len * cos(inc). horiz = len * sin(inc).
+            // If inc=0, dy = -len (Down), horiz=0. Correct.
+            
+            const incRad = Cesium.Math.toRadians(inclination);
+            const azRad = Cesium.Math.toRadians(azimuth);
+
+            // In ENU: X=East, Y=North, Z=Up
+            // We want 'Down' to be -Z.
+            const verticalComponent = -Math.cos(incRad); // Down
+            const horizontalComponent = Math.sin(incRad); 
+
+            // Azimuth 0 = North (Y), 90 = East (X)
+            const x = horizontalComponent * Math.sin(azRad); // East
+            const y = horizontalComponent * Math.cos(azRad); // North
+            const z = verticalComponent; // Up/Down
+
+            const localDirection = new Cesium.Cartesian3(x, y, z);
+            
+            // Transform Local Direction to Fixed Frame (ECEF)
+            // We need the transform matrix at the current position
+            const enuToFixed = Cesium.Transforms.eastNorthUpToFixedFrame(currentPos);
+            // Remove translation from matrix to rotate vector only
+            const rotationMatrix = Cesium.Matrix4.getMatrix3(enuToFixed, new Cesium.Matrix3());
+            
+            const fixedDirection = Cesium.Matrix3.multiplyByVector(rotationMatrix, localDirection, new Cesium.Cartesian3());
+            Cesium.Cartesian3.normalize(fixedDirection, fixedDirection);
+            
+            const nextPos = new Cesium.Cartesian3();
+            Cesium.Cartesian3.add(currentPos, Cesium.Cartesian3.multiplyByScalar(fixedDirection, len, new Cesium.Cartesian3()), nextPos);
+
+            // Create Interval
+            const id = `${seg.hole_id}-${depthFrom}-${depthTo}`;
+            
+            // Convert back to Lat/Lon/Alt for the cache interface (overhead but keeps interface clean)
+            const startCart = Cesium.Cartographic.fromCartesian(currentPos);
+            const endCart = Cesium.Cartographic.fromCartesian(nextPos);
+
+            const interval: Interval = {
+                id: id,
+                start: [
+                    Cesium.Math.toDegrees(startCart.latitude),
+                    Cesium.Math.toDegrees(startCart.longitude),
+                    startCart.height
+                ],
+                end: [
+                    Cesium.Math.toDegrees(endCart.latitude),
+                    Cesium.Math.toDegrees(endCart.longitude),
+                    endCart.height
+                ],
+                props: { ...seg, latitude: Cesium.Math.toDegrees(startCart.latitude), longitude: Cesium.Math.toDegrees(startCart.longitude) }
+            };
+
+            // Handling duplicates (e.g. assay vs lithology overlap)
+            if (uniqueIntervals.has(id)) {
+                const existing = uniqueIntervals.get(id);
+                if (seg.graphitic_carbon !== undefined && seg.graphitic_carbon !== null) {
+                    existing.props.graphitic_carbon = seg.graphitic_carbon;
+                }
+                if (seg.lithology) {
+                    existing.props.lithology = seg.lithology;
+                }
+            } else {
+                uniqueIntervals.set(id, interval);
+            }
+
+            // Advance
+            currentPos = nextPos;
+        });
+    });
+
     intervalsRef.current = Array.from(uniqueIntervals.values());
 
     const run = async () => {
@@ -164,10 +241,10 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
 
     const defaultStyle: Style = {
         material: Cesium.Color.GREY,
-        opacity: 0.15,
+        opacity: 0.5,
         outline: true,
         outlineColor: Cesium.Color.WHITE,
-        radiusMeters: 8,
+        radiusMeters: 2.5,
     };
 
     for (const interval of intervalsRef.current) {
@@ -182,7 +259,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
             // Only show segments that have assay data
             if (value !== undefined && value !== null) {
                 const color = colorFromLegend(legend, value);
-                styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 8 };
+                styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 2.5 };
                 visible = true;
             }
         } else { // lithology
@@ -192,7 +269,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
                 // Only show segments that have lithology data and map to a color
                 if (LITHOLOGY_COLORS.map[normalizedValue]) {
                     const color = colorFromLegend(legend, normalizedValue);
-                    styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 8 };
+                    styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 2.5 };
                     visible = true;
                 } else if (normalizedValue === 'unknown' || normalizedValue === 'nan') {
                      // Optionally hide or show unknowns. Here we show them grey.

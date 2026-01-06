@@ -115,12 +115,12 @@ export const LITHOLOGY_COLOR_MAP_CSS = Object.fromEntries(
 export const ASSAY_GRAPHITIC_CARBON = {
   type: "numeric" as const,
   bins: [
-    { max: 0.1, color: '#0000FF', label: '< 0.1 %' },
-    { min: 0.1, max: 0.3, color: '#00FFFF', label: '0.1 to 0.3 %' },
-    { min: 0.3, max: 0.5, color: '#00FF00', label: '0.3 to 0.5 %' },
-    { min: 0.5, max: 2.0, color: '#FFFF00', label: '0.5 to 2.0 %' },
-    { min: 2.0, max: 5.0, color: '#FFA500', label: '2.0 to 5.0 %' },
-    { min: 5.0, color: '#FF0000', label: '> 5.0 %' },
+    { max: 2.5, color: '#0000FF', label: '< 2.5 %' },
+    { min: 2.5, max: 3.0, color: '#00FFFF', label: '2.5 to 3.0 %' },
+    { min: 3.0, max: 4.0, color: '#00FF00', label: '3.0 to 4.0 %' },
+    { min: 4.0, max: 5.0, color: '#FFFF00', label: '4.0 to 5.0 %' },
+    { min: 5.0, max: 6.0, color: '#FFA500', label: '5.0 to 6.0 %' },
+    { min: 6.0, color: '#FF0000', label: '> 6.0 %' },
   ],
   default: "#cccccc",
 };

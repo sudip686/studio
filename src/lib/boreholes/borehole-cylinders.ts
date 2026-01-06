@@ -19,7 +19,7 @@ export type Style = {
   slices?: number;
 };
 
-const DEFAULT_RADIUS = 8;
+const DEFAULT_RADIUS = 2.5;
 
 const getCesium = () => {
   if (typeof window !== 'undefined') {
@@ -40,31 +40,42 @@ export function orientationFrom(start: any, end: any) {
   if (!Cesium) throw new Error('Cesium not loaded');
   
   const midpoint = Cesium.Cartesian3.midpoint(start, end, new Cesium.Cartesian3());
-  const dirFixed = Cesium.Cartesian3.subtract(end, start, new Cesium.Cartesian3());
-  const len = Cesium.Cartesian3.magnitude(dirFixed);
+  const direction = Cesium.Cartesian3.subtract(end, start, new Cesium.Cartesian3());
+  const length = Cesium.Cartesian3.magnitude(direction);
 
-  if (!Number.isFinite(len) || len < 0.5) {
+  if (!Number.isFinite(length) || length < 0.001) {
     return { midpoint, quaternion: Cesium.Quaternion.IDENTITY };
   }
-  Cesium.Cartesian3.divideByScalar(dirFixed, len, dirFixed);
+  Cesium.Cartesian3.normalize(direction, direction);
 
-  const enu = Cesium.Transforms.eastNorthUpToFixedFrame(midpoint);
-  const fixedToEnu3 = Cesium.Matrix4.getMatrix3(
-    Cesium.Matrix4.inverse(enu, new Cesium.Matrix4()),
-    new Cesium.Matrix3()
-  );
-
-  const dirEnu = Cesium.Matrix3.multiplyByVector(fixedToEnu3, dirFixed, new Cesium.Cartesian3());
-  if (!Number.isFinite(dirEnu.x) || !Number.isFinite(dirEnu.y) || !Number.isFinite(dirEnu.z)) {
-    return { midpoint, quaternion: Cesium.Quaternion.IDENTITY };
+  // We want to align the cylinder's Z axis (0,0,1) with 'direction'.
+  // We construct a rotation matrix from basis vectors.
+  const up = new Cesium.Cartesian3(0, 0, 1);
+  // Check for degenerate case (direction parallel to up)
+  if (Math.abs(Cesium.Cartesian3.dot(direction, up)) > 0.99) {
+      up.x = 1; up.y = 0; up.z = 0;
   }
-  Cesium.Cartesian3.normalize(dirEnu, dirEnu);
-
-  const heading = Math.atan2(dirEnu.x, dirEnu.y);
-  const horiz = Math.hypot(dirEnu.x, dirEnu.y) || 1e-9;
-  const pitch = Math.atan2(dirEnu.z, horiz);
-  const hpr = new Cesium.HeadingPitchRoll(heading, pitch, 0.0);
-  const quaternion = Cesium.Quaternion.fromHeadingPitchRoll(hpr);
+  
+  // Create basis vectors
+  // Z axis = direction
+  // X axis = cross(up, direction)
+  // Y axis = cross(direction, X axis)
+  const xAxis = new Cesium.Cartesian3();
+  Cesium.Cartesian3.cross(up, direction, xAxis);
+  Cesium.Cartesian3.normalize(xAxis, xAxis);
+  
+  const yAxis = new Cesium.Cartesian3();
+  Cesium.Cartesian3.cross(direction, xAxis, yAxis);
+  Cesium.Cartesian3.normalize(yAxis, yAxis);
+  
+  // Build Rotation Matrix (Columns: X, Y, Z)
+  const rotMatrix = new Cesium.Matrix3();
+  Cesium.Matrix3.setColumn(rotMatrix, 0, xAxis, rotMatrix);
+  Cesium.Matrix3.setColumn(rotMatrix, 1, yAxis, rotMatrix);
+  Cesium.Matrix3.setColumn(rotMatrix, 2, direction, rotMatrix);
+  
+  const quaternion = new Cesium.Quaternion();
+  Cesium.Quaternion.fromRotationMatrix(rotMatrix, quaternion);
 
   return { midpoint, quaternion };
 }
@@ -132,7 +143,7 @@ export class BoreholeCylinderCache {
         length: length0,
         topRadius: style?.radiusMeters ?? DEFAULT_RADIUS,
         bottomRadius: style?.radiusMeters ?? DEFAULT_RADIUS,
-        slices: style?.slices ?? 16,
+        slices: style?.slices ?? 32,
         material: (style?.material ?? Cesium.Color.GREY).withAlpha(style?.opacity ?? 0.15),
         outline: style?.outline ?? true,
       },
@@ -141,24 +152,24 @@ export class BoreholeCylinderCache {
 
     this.map.set(interval.id, e);
 
-    try {
-      const { s, e: seated } = await seatBelowTerrain(viewer, interval.start, interval.end);
-      const ps = toFixed(s);
-      const pe = toFixed(seated);
+    // try {
+    //   const { s, e: seated } = await seatBelowTerrain(viewer, interval.start, interval.end);
+    //   const ps = toFixed(s);
+    //   const pe = toFixed(seated);
 
-      const L = Cesium.Cartesian3.distance(ps, pe);
-      if (!Number.isFinite(L) || L < 0.5) {
-        e.show = false;
-        return e;
-      }
+    //   const L = Cesium.Cartesian3.distance(ps, pe);
+    //   if (!Number.isFinite(L) || L < 0.5) {
+    //     e.show = false;
+    //     return e;
+    //   }
 
-      const { midpoint, quaternion } = orientationFrom(ps, pe);
-      e.position = midpoint;
-      e.orientation = quaternion;
-      (e.cylinder as any).length = L;
-    } catch {
-      // Silent fail
-    }
+    //   const { midpoint, quaternion } = orientationFrom(ps, pe);
+    //   e.position = midpoint;
+    //   e.orientation = quaternion;
+    //   (e.cylinder as any).length = L;
+    // } catch {
+    //   // Silent fail
+    // }
 
     if (style) this.applyStyle(e, style);
     return e;
