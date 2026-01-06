@@ -298,7 +298,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
           <Legend title="Classification" items={RESC_LEGEND} />
         </div>
-        <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2">
+        <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2 pointer-events-auto">
           <label className="block text-sm">Classification</label>
           <select 
             value={selectedClassification} 

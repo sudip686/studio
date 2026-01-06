@@ -13,7 +13,7 @@ const viewSequence = [
   'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map',  
   'drillhole_location_assay', 'geojson_drillholes_lithology', 
   'geojson_drillholes_assay', 
-  'drillhole_lithology_reveal',
+  // 'drillhole_lithology_reveal',
   'lithology_view', 'assay_view', 'block_model_carbon_view', 'block_model_resc_view',
   'block_model_clip_view'
 ] as const;
