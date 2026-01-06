@@ -23,7 +23,8 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
     const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
     const mountedRef = useRef(false);
 
-    const { blockModelData, drillholeData, loadingStatus, error, refetch } = useDataCache();
+    // Added processedLithologyData
+    const { blockModelData, processedLithologyData, loadingStatus, error, refetch } = useDataCache();
     const [blockOpacity, setBlockOpacity] = useState(0.8);
     const [showTraces, setShowTraces] = useState(true);
 
@@ -82,6 +83,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
 
       const geometries: THREE.BufferGeometry[] = [];
       const materials: THREE.Material[] = [];
+      const meshes: THREE.InstancedMesh[] = [];
 
       // COLOR BY RescCalc
       const colorForResc = (v: any) => {
@@ -132,51 +134,109 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         mesh.count = i;
         mesh.instanceMatrix.needsUpdate = true;
         viewGroup.add(mesh);
+        meshes.push(mesh); // Keep track of block meshes for cleanup/tooltips if needed
         totalDrawn += i;
       }
       console.log('[block_resc] in:', blockModelData.length, 'drawn:', totalDrawn);
 
-      // OPTIONAL THIN TRACES (drillholes are lon,lat,z → no swap)
-      if (showTraces && drillholeData?.lithology?.length) {
-        const tGeo = new THREE.CylinderGeometry(1,1,1,8);
-        const tMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-        geometries.push(tGeo); materials.push(tMat);
+      let traceMesh: THREE.InstancedMesh | null = null;
 
-        const trace = new THREE.InstancedMesh(tGeo, tMat, drillholeData.lithology.length);
-        trace.frustumCulled = false;
-        viewGroup.add(trace);
-
-        const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3();
-        const Y = new THREE.Vector3(0,1,0);
-        let i = 0;
-        for (const seg of drillholeData.lithology) {
-          const g = seg.feature?.geometry;
-          if (!(g?.type === 'LineString' && g.coordinates?.length >= 2)) continue;
-          const [a,b] = g.coordinates; // [lon, lat, z]
-          if (!a || !b || a.length < 3 || b.length < 3) continue;
-
-          const { x:sx, z:sz } = projectLonLat(a[0], a[1], modelCenter); 
-          const { x:ex, z:ez } = projectLonLat(b[0], b[1], modelCenter); 
+      // REPLACED TRACE LOGIC
+      if (showTraces && processedLithologyData?.byHoleId) {
+          const segmentTraces = new Map<any, { start: THREE.Vector3, end: THREE.Vector3 }>();
           const VERTICAL_EXAGGERATION = 10.0;
-          const A = new THREE.Vector3(sx, a[2] * VERTICAL_EXAGGERATION, -sz);
-          // Exaggerate horizontal displacement to match vertical stretch
-          const B = new THREE.Vector3(
-              sx + (ex - sx) * VERTICAL_EXAGGERATION, 
-              b[2] * VERTICAL_EXAGGERATION, 
-              -sz + ((-ez) - (-sz)) * VERTICAL_EXAGGERATION
-          );
-          const L = A.distanceTo(B);
-          if (!(L > 0)) continue;
+          const Y_UP = new THREE.Vector3(0, 1, 0);
+          
+          // Calculate traces
+          Object.values(processedLithologyData.byHoleId).forEach(hole => {
+              const sortedSegments = [...hole.segments].sort((a, b) => a.depth_from - b.depth_from);
+              if (sortedSegments.length === 0) return;
 
-          P.copy(A).add(B).multiplyScalar(0.5);
-          const dir = new THREE.Vector3().subVectors(B, A).normalize();
-          Q.setFromUnitVectors(Y, dir);
-          S.set(3, L, 3);
-          M.compose(P, Q, S);
-          trace.setMatrixAt(i++, M);
-        }
-        trace.count = i;
-        trace.instanceMatrix.needsUpdate = true;
+              const firstSeg = sortedSegments[0];
+              const g = firstSeg.feature?.geometry;
+              let currentPos: THREE.Vector3;
+
+              if (g?.type === 'LineString' && g.coordinates?.length > 0) {
+                  const [lon, lat, elev] = g.coordinates[0];
+                  const { x: sx, z: sz } = projectLonLat(lon, lat, modelCenter);
+                  currentPos = new THREE.Vector3(sx, elev * VERTICAL_EXAGGERATION, -sz);
+              } else {
+                  currentPos = new THREE.Vector3(0, 0, 0);
+              }
+
+              for (const seg of sortedSegments) {
+                  const props = seg.feature?.properties || {};
+                  const azimuth = Number(props.azimuth ?? 0);
+                  const inclination = Number(props.inclination ?? 0);
+                  const depthFrom = props.depth_from ?? 0;
+                  const depthTo = props.depth_to ?? 0;
+                  const intervalLength = Math.abs(depthTo - depthFrom);
+
+                  if (intervalLength <= 0) {
+                       segmentTraces.set(seg, { start: currentPos.clone(), end: currentPos.clone() });
+                       continue;
+                  }
+
+                  const azRad = THREE.MathUtils.degToRad(azimuth);
+                  const incRad = THREE.MathUtils.degToRad(inclination);
+
+                  const dy_real = -intervalLength * Math.cos(incRad);
+                  const horiz_real = intervalLength * Math.sin(incRad);
+
+                  const dx_visual = horiz_real * Math.sin(azRad) * VERTICAL_EXAGGERATION;
+                  const dz_visual = horiz_real * -Math.cos(azRad) * VERTICAL_EXAGGERATION;
+                  const dy_visual = dy_real * VERTICAL_EXAGGERATION;
+
+                  const nextPos = currentPos.clone().add(new THREE.Vector3(dx_visual, dy_visual, dz_visual));
+
+                  segmentTraces.set(seg, { start: currentPos.clone(), end: nextPos.clone() });
+                  currentPos = nextPos;
+              }
+          });
+
+          // Gather all segments that have a trace
+          const allSegments = Object.values(processedLithologyData.byHoleId)
+              .flatMap(h => h.segments)
+              .filter(s => segmentTraces.has(s));
+
+          if (allSegments.length > 0) {
+              const tGeo = new THREE.CylinderGeometry(1, 1, 1, 8);
+              const tMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+              geometries.push(tGeo); materials.push(tMat);
+
+              const trace = new THREE.InstancedMesh(tGeo, tMat, allSegments.length);
+              trace.frustumCulled = false;
+              viewGroup.add(trace);
+              traceMesh = trace;
+
+              let idx = 0;
+              const radius = 3.0; // Keeping thin trace style
+
+              for (const seg of allSegments) {
+                  const tr = segmentTraces.get(seg);
+                  if (!tr) continue;
+                  const { start, end } = tr;
+                  const L = start.distanceTo(end);
+                  if (L <= 0.0001) {
+                       trace.setMatrixAt(idx++, new THREE.Matrix4().makeScale(0,0,0));
+                       continue;
+                  }
+                  const pos = start.clone().add(end).multiplyScalar(0.5);
+                  const dir = new THREE.Vector3().subVectors(end, start).normalize();
+                  const quat = new THREE.Quaternion().setFromUnitVectors(Y_UP, dir);
+                  const scl = new THREE.Vector3(radius, L, radius);
+                  
+                  const M = new THREE.Matrix4().compose(pos, quat, scl);
+                  trace.setMatrixAt(idx++, M);
+              }
+              trace.count = idx;
+              trace.instanceMatrix.needsUpdate = true;
+
+              registerTooltipObject(trace, (instanceId: number) => {
+                   const segment = allSegments[instanceId];
+                   return `Hole ID: ${segment.hole_id}<br/>Depth: ${segment.depth_from}-${segment.depth_to}`;
+              });
+          }
       }
 
       // >>> NEW: Fit camera once content is there
@@ -187,6 +247,10 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
       return () => {
         // Cleanup: remove view-specific group and dispose its resources
         dynamicGroup.remove(viewGroup);
+        if (traceMesh) unregisterTooltipObject(traceMesh);
+        // Also unregister block meshes if needed, though RescView didn't have tooltips for blocks in previous version?
+        // Ah, current code didn't use tooltips for blocks. But I should clear them if I add them.
+        
         viewGroup.traverse(o => {
           if ((o as THREE.Mesh).geometry) (o as THREE.Mesh).geometry.dispose();
           if ((o as THREE.Mesh).material) {
@@ -198,7 +262,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         materials.forEach(m => m.dispose());
         mountedRef.current = false;
       };
-    }, [blockModelData, drillholeData, loadingStatus, blockOpacity, showTraces, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff]);
+    }, [blockModelData, processedLithologyData, loadingStatus, blockOpacity, showTraces, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff, registerTooltipObject, unregisterTooltipObject]);
 
     useEffect(() => {
       if (!camera || !controls || !dynamicGroup) return;
