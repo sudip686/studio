@@ -24,7 +24,7 @@ function getSegmentEnds(seg:{feature:any}) {
   return null; // skip bad segments
 }
 
-export default function LithologyViewer({ assayCutoff }: { assayCutoff?: number } = {}) {
+export default function LithologyViewer() {
     const mountedRef = useRef(false);
     const { processedLithologyData, loadingStatus, error, refetch } = useDataCache();
     const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
