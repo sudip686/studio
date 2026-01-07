@@ -48,10 +48,33 @@ export default function MetricScaleOverlay({
   }, [getMetersIn100px]);
 
   return (
-    <div className={`pointer-events-none absolute left-6 bottom-6 ${className}`}>
+    <div className={`pointer-events-none ${className}`}>
       <div className="flex flex-col items-start">
-        <div className="h-2 bg-white/90 shadow rounded" style={{ width: `${barPx}px` }} />
-        <div className="mt-1 text-white/90 text-xs font-semibold drop-shadow">{label}</div>
+        {/* Enhanced scale bar with orange-black-grey gradient */}
+        <div
+          className="h-12 shadow-2xl rounded-xl border-4 border-orange-500 relative overflow-hidden"
+          style={{
+            width: `${Math.max(barPx * 3, 240)}px`,
+            background: 'linear-gradient(90deg, #ff7f00 0%, #000000 25%, #666666 50%, #ff4500 75%, #333333 100%)',
+            boxShadow: '0 0 20px rgba(255, 127, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+          }}
+        >
+          {/* Scale markings */}
+          <div className="absolute inset-0 flex items-center justify-between px-3">
+            <div className="w-2 h-8 bg-grey-300 rounded-full shadow-md"></div>
+            <div className="w-2 h-8 bg-grey-300 rounded-full shadow-md"></div>
+          </div>
+        </div>
+
+        {/* Enhanced label with black background and orange text */}
+        <div className="mt-4 text-orange-400 text-2xl font-black drop-shadow-2xl px-5 py-3 rounded-xl relative bg-black/80 border-3 border-grey-500"
+             style={{
+               boxShadow: '0 0 15px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 127, 0, 0.1)',
+               textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+               border: '3px solid #666666'
+             }}>
+          📏 {label}
+        </div>
       </div>
     </div>
   );

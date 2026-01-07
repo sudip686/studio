@@ -183,9 +183,39 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       v.scene.globe.translucency.enabled = false;
       v.scene.globe.depthTestAgainstTerrain = true;
       v.scene.globe.enableLighting = true;
+      // Increase brightness for more vibrancy
+      v.scene.light.intensity = 2.0; // Boost lighting intensity
+      v.scene.globe.baseColor = Cesium.Color.WHITE.withAlpha(0.1); // Add slight base color for vibrancy
+      v.scene.atmosphere.brightnessShift = 0.2; // Brighten atmosphere
+      v.scene.skyBox.brightnessShift = 0.1; // Brighten skybox
       try { v.scene.terrainExaggeration = 1.3; } catch {}
 
-      // 6. Fly camera to AOI
+      // 6. Enable VR-like navigation with look controls
+      const controller = v.scene.screenSpaceCameraController;
+      controller.enableInputs = true;
+      controller.enableRotate = false; // Disable orbit rotation
+      controller.enableTranslate = true; // Keep translate for panning
+      controller.enableZoom = true;
+      controller.enableTilt = false; // Disable tilt, use look instead
+      controller.enableLook = true; // Enable look for VR-style viewing
+
+      // Assign left-drag to look (VR-style camera rotation without moving position)
+      controller.rotateEventTypes = []; // Clear rotate events
+      controller.lookEventTypes = [Cesium.CameraEventType.LEFT_DRAG]; // Left drag for looking around
+      controller.translateEventTypes = [Cesium.CameraEventType.MIDDLE_DRAG]; // Middle drag for panning
+
+      // Configure zoom with right drag for convenience
+      controller.zoomEventTypes = [Cesium.CameraEventType.RIGHT_DRAG, Cesium.CameraEventType.WHEEL];
+
+      // Minimize inertia for immediate response
+      controller.inertiaSpin = 0;
+      controller.inertiaTranslate = 0.1;
+      controller.inertiaZoom = 0.1;
+
+      // Set damping for smooth look movement
+      controller.lookDamping = 0.05; // Very low for responsive look
+
+      // 7. Fly camera to AOI
       if (aoiBuffered) {
         await flyToRectangleFill(v, aoiBuffered);
       }
@@ -193,10 +223,10 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       v.scene.requestRender();
 
       // 7. Final setup
-      const controller = createRenderController(v);
-      controller.bindUserInput();
-      controllerRef.current = controller;
-      setRenderController(controller);
+      const renderCtrl = createRenderController(v);
+      renderCtrl.bindUserInput();
+      controllerRef.current = renderCtrl;
+      setRenderController(renderCtrl);
       setReady(true);
 
     })();

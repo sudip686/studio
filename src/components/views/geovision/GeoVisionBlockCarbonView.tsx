@@ -19,14 +19,17 @@ const carbonColor = (v:any) => {
 };
 
 export default function GeoVisionBlockCarbonView({
-  scene, blocks, traces, modelCenter, opacity=0.8, getSegmentEndpoints
+  scene, blocks, traces, modelCenter, opacity=0.8, getSegmentEndpoints,
+  registerTooltipObject, unregisterTooltipObject
 }:{
   scene: THREE.Scene;
   blocks: BlockSegment[];
-  traces: any[]; // drillhole segments for thin grey cylinders
+  traces: any[];
   modelCenter: { lon:number; lat:number };
   opacity?: number;
   getSegmentEndpoints: (seg: any) => { a: number[]; b: number[] } | null;
+  registerTooltipObject?: (mesh: THREE.InstancedMesh, getData: (instanceId: number) => string) => void;
+  unregisterTooltipObject?: (mesh: THREE.InstancedMesh) => void;
 }) {
   useEffect(() => {
   // Commented out debugging logs for production build
@@ -51,7 +54,7 @@ export default function GeoVisionBlockCarbonView({
         (buckets[hex] ||= []).push(b);
       }
       Object.entries(buckets).forEach(([hex, list]) => {
-        const mat = new THREE.MeshStandardMaterial({ color: hex, transparent: true, opacity });
+        const mat = new THREE.MeshStandardMaterial({ color: hex, transparent: false, opacity: 1.0 });
         const geo = new THREE.BoxGeometry(1,1,1);
         const mesh = new THREE.InstancedMesh(geo, mat, list.length);
         mesh.frustumCulled = false;
@@ -79,6 +82,17 @@ export default function GeoVisionBlockCarbonView({
         mesh.count = idx;
         mesh.instanceMatrix.needsUpdate = true;
         console.log(`[block_carbon] drew blocks:`, mesh.count);
+
+        // Register tooltip for block meshes
+        if (registerTooltipObject) {
+          registerTooltipObject(mesh, (instanceId: number) => {
+            const block = list[instanceId];
+            return `Lat: ${block.lat?.toFixed(4) || 'N/A'}<br/>` +
+                   `Lon: ${block.lon?.toFixed(4) || 'N/A'}<br/>` +
+                   `Elevation: ${block.elevation?.toFixed(2) || 'N/A'}m<br/>` +
+                   `Carbon: ${Number(block['Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'])?.toFixed(2) || 'N/A'}`;
+          });
+        }
       });
     }
 

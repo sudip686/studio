@@ -5,8 +5,7 @@ import * as THREE from 'three';
 import { useThreeScene } from '@/contexts/three-scene-context';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
 import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
-import CompassOverlay from '@/components/ui/CompassOverlay';
-import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
+
 import { Legend } from '@/components/ui/legend';
 import { ErrorDisplay } from '@/components/ui/error-display';
 
@@ -101,7 +100,7 @@ export default function BlockModelCarbonViewer({
 
     // build instances per color
     buckets.forEach((items, color) => {
-      const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity });
+      const mat = new THREE.MeshStandardMaterial({ color, transparent: false, opacity: 1.0 });
       const geom = new THREE.BoxGeometry(1, 1, 1);
       materials.push(mat);
       geometries.push(geom);
@@ -280,21 +279,11 @@ export default function BlockModelCarbonViewer({
           Show traces
         </label>
       </div>
-      {camera && renderer && (
-        <div style={{ position: 'absolute', top: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-          <CompassOverlay mode="three" getHeading={() => getThreeHeading(camera, THREE)} />
-          <ScaleBarOverlay
-            camera={camera}
-            rendererDom={renderer.domElement}
-            THREE={THREE}
-            planeY={0}
-          />
-        </div>
-      )}
+
       <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-        <Legend 
-            title="Carbon Value" 
-            type="gradient" 
+        <Legend
+            title="Carbon Value"
+            type="gradient"
             gradient={carbonGradient}
             minLabel={carbonRange.min.toFixed(2)}
             maxLabel={carbonRange.max.toFixed(2)}

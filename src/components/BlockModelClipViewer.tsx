@@ -82,7 +82,7 @@ export default function BlockModelClipViewer() {
 
     const tmpObj = new THREE.Object3D();
     for (const [hex, arr] of groups.entries()) {
-        const mat = new THREE.MeshPhongMaterial({ color: new THREE.Color(hex), transparent: true, opacity: 0.8 });
+        const mat = new THREE.MeshPhongMaterial({ color: new THREE.Color(hex), transparent: false, opacity: 1.0 });
         const geom = new THREE.BoxGeometry(1, 1, 1);
         const mesh = new THREE.InstancedMesh(geom, mat, arr.length);
 

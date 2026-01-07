@@ -200,7 +200,7 @@
             }
 
             async function loadExaggeratedView() {
-                console.log("Loading Exaggerated KML View...");
+                console.log("Loading Tanga Topography View...");
                 const kmlDataSource = viewer.dataSources.get(0);
                 const kmlEntity = kmlDataSource.entities.values.find(e => e.polygon);
                 if (!kmlEntity) return;
@@ -218,13 +218,13 @@
             }
 
             async function unloadExaggeratedView() {
-                console.log("Unloading Exaggerated KML View...");
+                console.log("Unloading Tanga Topography View...");
                 toolbar.style.display = 'none';
                 viewer.scene.verticalExaggeration = 1.0;
             }
 
             async function loadStyledKmlView() {
-                console.log("Loading Styled KML View...");
+                console.log("Loading Tanga Licenses View...");
                 
                 const kmlDataSource = viewer.dataSources.get(0);
                 if (!kmlDataSource) return;
@@ -263,7 +263,7 @@
             }
 
             async function unloadStyledKmlView() {
-                console.log("Unloading Styled KML View...");
+                console.log("Unloading Tanga Licenses View...");
                 if (styledKmlHandler && !styledKmlHandler.isDestroyed()) {
                     styledKmlHandler.destroy();
                 }

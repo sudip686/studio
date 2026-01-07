@@ -162,8 +162,8 @@ export default function CesiumThreeBlockModel({
             color: new Color(hex),
             clippingPlanes: threePlanes,
             clipShadows: true,
-            transparent: true,
-            opacity: 0.95,
+            transparent: false,
+            opacity: 1.0,
             depthWrite: true,
           });
 

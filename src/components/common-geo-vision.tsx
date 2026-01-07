@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { useEffect, useRef, useState, ReactNode } from 'react';
-import {Scene, PerspectiveCamera, WebGLRenderer, Group, Vector3, Quaternion, Matrix4, HemisphereLight, DirectionalLight, Color, InstancedMesh, BoxGeometry, MeshStandardMaterial } from 'three';
+import {Scene, PerspectiveCamera, WebGLRenderer, Group, Vector3, Quaternion, Matrix4, HemisphereLight, DirectionalLight, PointLight, AmbientLight, Color, InstancedMesh, BoxGeometry, MeshStandardMaterial } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
@@ -60,7 +60,8 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
 
         // Scene
         const scene = new Scene();
-        scene.background = new Color(0x000000);
+        scene.background = new Color(0x1a365d); // Brighter, vibrant blue background
+        scene.fog = new THREE.Fog(0x1a365d, 5000, 30000); // Add fog for depth
         sceneRef.current = scene;
 
         // Camera
@@ -74,7 +75,7 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.0;
+        renderer.toneMappingExposure = 1.2; // Slightly increased exposure for vibrancy
         el.appendChild(renderer.domElement);
         rendererRef.current = renderer;
 
@@ -84,10 +85,26 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
         controls.dampingFactor = 0.08;
         controlsRef.current = controls;
 
-        // Lights
-        scene.add(new HemisphereLight(0xffffff, 0x666688, 1.1));
-        const key = new DirectionalLight(0xffffff, 1.25); key.position.set(-1500, 2000, 1200); scene.add(key);
-        const fill = new DirectionalLight(0xffffff, 0.8);  fill.position.set(1500, 600, -1200); scene.add(fill);
+        // Enhanced vibrant lighting setup
+        // Main hemisphere light for overall illumination
+        scene.add(new HemisphereLight(0xffffff, 0x87ceeb, 2.5));
+
+        // Primary directional lights with increased intensity
+        const key = new DirectionalLight(0xffffff, 3.0); key.position.set(-1500, 2000, 1200); scene.add(key);
+        const fill = new DirectionalLight(0xffffff, 2.2); fill.position.set(1500, 600, -1200); scene.add(fill);
+
+        // Additional colored accent lights for vibrancy
+        const accent1 = new DirectionalLight(0x87ceeb, 1.8); accent1.position.set(2000, 1500, 2000); scene.add(accent1); // Sky blue accent
+        const accent2 = new DirectionalLight(0xffdab9, 1.4); accent2.position.set(-2000, 1000, -2000); scene.add(accent2); // Warm peach accent
+        const accent3 = new DirectionalLight(0xe6e6fa, 1.2); accent3.position.set(0, 2500, 0); scene.add(accent3); // Soft lavender from above
+
+        // Point lights for extra vibrancy and depth
+        const point1 = new PointLight(0xffffff, 2.5, 6000); point1.position.set(0, 1200, 0); scene.add(point1);
+        const point2 = new PointLight(0x87ceeb, 1.8, 4000); point2.position.set(1200, 600, 1200); scene.add(point2);
+        const point3 = new PointLight(0xffdab9, 1.4, 4000); point3.position.set(-1200, 600, -1200); scene.add(point3);
+
+        // Ambient light boost
+        const ambient = new AmbientLight(0xffffff, 1.0); scene.add(ambient);
 
         // Render loop
         let isMounted = true;
