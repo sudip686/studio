@@ -22,8 +22,8 @@ type ViewType = typeof viewSequence[number];
 
 const viewTitles: { [key in ViewType]: string } = {
   'original': 'Original View',
-  'exaggerated_kml': 'Exaggerated KML',
-  'styled_kml': 'Styled KML',
+  'exaggerated_kml': 'Tanga Topography',
+  'styled_kml': 'Tanga Licenses',
   'tanaga_accessibility': 'Tanaga Accessibility',
   'tanga_geological_map': 'Tanga Geological Map',
   'geojson_drillholes_lithology': 'GeoJSON Drillholes Lithology',

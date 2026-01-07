@@ -33,32 +33,98 @@ export default function CompassOverlay({
   }, [getHeading]);
 
   return (
-    <div className={`pointer-events-none absolute left-6 bottom-24 select-none ${className}`}>
-         <div className="bg-white/80 rounded-full w-16 h-16 flex items-center justify-center shadow-xl border-2 border-white/50 backdrop-blur-md">
+    <div className={`pointer-events-none select-none ${className}`}>
+         <div className="bg-black/80 rounded-full w-48 h-48 flex items-center justify-center shadow-2xl border-4 border-orange-500 backdrop-blur-md relative">
+            <div className="absolute top-3 right-3 text-2xl opacity-90 text-orange-400" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.8)' }}>
+              🧭
+            </div>
             <svg
                 viewBox="0 0 100 100"
-                className="w-full h-full p-1"
+                className="w-full h-full p-3"
                 style={{ transform: `rotate(${deg}deg)` }}
             >
-                {/* Decorative Ring */}
-                <circle cx="50" cy="50" r="46" fill="none" stroke="#cbd5e1" strokeWidth="1" />
-                <circle cx="50" cy="50" r="42" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="1 3" />
-                
-                {/* Cardinal Points */}
-                <text x="50" y="16" textAnchor="middle" className="font-bold fill-red-600" style={{ fontSize: '14px', fontFamily: 'sans-serif' }}>N</text>
-                <text x="50" y="94" textAnchor="middle" className="font-bold fill-slate-700" style={{ fontSize: '12px', fontFamily: 'sans-serif' }}>S</text>
-                <text x="90" y="54" textAnchor="middle" className="font-bold fill-slate-700" style={{ fontSize: '12px', fontFamily: 'sans-serif' }}>E</text>
-                <text x="10" y="54" textAnchor="middle" className="font-bold fill-slate-700" style={{ fontSize: '12px', fontFamily: 'sans-serif' }}>W</text>
+                <defs>
+                    {/* Outer ring orange gradient */}
+                    <radialGradient id="outerRing" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#ff7f00" />
+                        <stop offset="50%" stopColor="#ff4500" />
+                        <stop offset="100%" stopColor="#cc3300" />
+                    </radialGradient>
 
-                {/* Center Dot */}
-                <circle cx="50" cy="50" r="3" fill="#475569" />
+                    {/* Inner ring black */}
+                    <radialGradient id="innerRing" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#000000" />
+                        <stop offset="100%" stopColor="#333333" />
+                    </radialGradient>
 
-                {/* Needle Design */}
-                <g>
-                    {/* North (Red) Tip */}
-                    <path d="M50 20 L56 50 L50 50 L44 50 Z" fill="#dc2626" />
-                    {/* South (Dark) Tip */}
-                    <path d="M50 80 L56 50 L50 50 L44 50 Z" fill="#1e293b" />
+                    {/* Decorative ring grey */}
+                    <radialGradient id="decorativeRing" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#666666" />
+                        <stop offset="100%" stopColor="#999999" />
+                    </radialGradient>
+
+                    {/* North needle orange */}
+                    <linearGradient id="northGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#ff7f00" />
+                        <stop offset="50%" stopColor="#ff4500" />
+                        <stop offset="100%" stopColor="#cc3300" />
+                    </linearGradient>
+
+                    {/* South needle black */}
+                    <linearGradient id="southGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#000000" />
+                        <stop offset="100%" stopColor="#333333" />
+                    </linearGradient>
+
+                    {/* Center glow grey */}
+                    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#cccccc" />
+                        <stop offset="100%" stopColor="#666666" />
+                    </radialGradient>
+                </defs>
+
+                {/* Multiple concentric rings */}
+                <circle cx="50" cy="50" r="49" fill="none" stroke="url(#outerRing)" strokeWidth="4" opacity="0.9" />
+                <circle cx="50" cy="50" r="45" fill="none" stroke="url(#innerRing)" strokeWidth="3" strokeDasharray="4 8" />
+                <circle cx="50" cy="50" r="40" fill="none" stroke="url(#decorativeRing)" strokeWidth="2" opacity="0.7" />
+
+                {/* Cardinal Points with orange and grey */}
+                <text x="50" y="12" textAnchor="middle" className="font-black fill-orange-400" style={{ fontSize: '36px', fontFamily: 'sans-serif', filter: 'drop-shadow(0 0 6px rgba(255, 127, 0, 0.8))' }}>N</text>
+                <text x="50" y="98" textAnchor="middle" className="font-bold text-grey-300" style={{ fontSize: '32px', fontFamily: 'sans-serif', filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.8))' }}>S</text>
+                <text x="94" y="54" textAnchor="middle" className="font-bold text-grey-300" style={{ fontSize: '32px', fontFamily: 'sans-serif', filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.8))' }}>E</text>
+                <text x="6" y="54" textAnchor="middle" className="font-bold text-grey-300" style={{ fontSize: '32px', fontFamily: 'sans-serif', filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.8))' }}>W</text>
+
+                {/* Degree markers */}
+                <g opacity="0.8">
+                    {Array.from({ length: 36 }, (_, i) => {
+                        const angle = (i * 10) * Math.PI / 180;
+                        const x1 = (50 + 42 * Math.cos(angle - Math.PI/2)).toFixed(2);
+                        const y1 = (50 + 42 * Math.sin(angle - Math.PI/2)).toFixed(2);
+                        const x2 = (50 + 38 * Math.cos(angle - Math.PI/2)).toFixed(2);
+                        const y2 = (50 + 38 * Math.sin(angle - Math.PI/2)).toFixed(2);
+                        return (
+                            <line
+                                key={i}
+                                x1={x1}
+                                y1={y1}
+                                x2={x2}
+                                y2={y2}
+                                stroke={i % 9 === 0 ? "#666666" : "#cccccc"}
+                                strokeWidth={i % 9 === 0 ? "2" : "1"}
+                            />
+                        );
+                    })}
+                </g>
+
+                {/* Center */}
+                <circle cx="50" cy="50" r="8" fill="url(#centerGlow)" />
+                <circle cx="50" cy="50" r="6" fill="#000000" stroke="#cccccc" strokeWidth="1" />
+                <circle cx="50" cy="50" r="3" fill="#666666" />
+
+                {/* Enhanced needle */}
+                <g filter="drop-shadow(0 3px 6px rgba(0,0,0,0.5))">
+                    <path d="M50 10 L62 50 L50 50 L38 50 Z" fill="url(#northGradient)" stroke="#cc3300" strokeWidth="2" />
+                    <path d="M50 90 L62 50 L50 50 L38 50 Z" fill="url(#southGradient)" stroke="#000000" strokeWidth="2" />
                 </g>
             </svg>
          </div>

@@ -183,6 +183,11 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       v.scene.globe.translucency.enabled = false;
       v.scene.globe.depthTestAgainstTerrain = true;
       v.scene.globe.enableLighting = true;
+      // Increase brightness for more vibrancy
+      v.scene.light.intensity = 2.0; // Boost lighting intensity
+      v.scene.globe.baseColor = Cesium.Color.WHITE.withAlpha(0.1); // Add slight base color for vibrancy
+      v.scene.atmosphere.brightnessShift = 0.2; // Brighten atmosphere
+      v.scene.skyBox.brightnessShift = 0.1; // Brighten skybox
       try { v.scene.terrainExaggeration = 1.3; } catch {}
 
       // 6. Fly camera to AOI

@@ -108,8 +108,8 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a202c);
-    scene.fog = new THREE.Fog(0x1a202c, 2000, 15000);
+    scene.background = new THREE.Color(0x2a4a7a); // Brighter blue background for more vibrancy
+    scene.fog = new THREE.Fog(0x2a4a7a, 3000, 20000); // Adjusted fog for brighter scene
     sceneRef.current = scene;
 
     // Static Group (for grid, lights, etc. that don't change per view)
@@ -117,10 +117,11 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     staticGroup.name = 'static-scene-elements';
     scene.add(staticGroup);
 
-    staticGroup.add(new THREE.HemisphereLight(0xffffff, 0x666688, 1.2));
-    const d1 = new THREE.DirectionalLight(0xffffff, 1.5); d1.position.set(-1500, 2000, 1200); staticGroup.add(d1);
-    const d2 = new THREE.DirectionalLight(0xffffff, 0.8); d2.position.set(1500, 600, -1200); staticGroup.add(d2);
-    const grid = new THREE.GridHelper(10000, 100, 0x888888, 0x888888);
+    // Increased light intensities for more brightness and vibrancy
+    staticGroup.add(new THREE.HemisphereLight(0xffffff, 0x87ceeb, 2.0)); // Brighter hemisphere light
+    const d1 = new THREE.DirectionalLight(0xffffff, 2.5); d1.position.set(-1500, 2000, 1200); staticGroup.add(d1); // Increased intensity
+    const d2 = new THREE.DirectionalLight(0xffffff, 1.8); d2.position.set(1500, 600, -1200); staticGroup.add(d2); // Increased intensity
+    const grid = new THREE.GridHelper(10000, 100, 0xaaaaaa, 0xaaaaaa); // Brighter grid
     grid.frustumCulled = false;
     staticGroup.add(grid);
 
