@@ -138,6 +138,14 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    // Enable full 360-degree navigation
+    controls.enableRotate = true;
+    controls.enablePan = true;
+    controls.enableZoom = true;
+    controls.minPolarAngle = 0; // Allow full vertical rotation
+    controls.maxPolarAngle = Math.PI;
+    controls.minAzimuthAngle = -Infinity; // Unlimited horizontal rotation
+    controls.maxAzimuthAngle = Infinity;
     controlsRef.current = controls;
 
     setContextValue({
