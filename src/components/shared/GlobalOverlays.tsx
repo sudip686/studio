@@ -15,7 +15,7 @@ interface GlobalOverlaysProps {
 
 const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, currentView }: GlobalOverlaysProps) => {
   const { viewer: cesiumViewer } = useCesium();
-  const { camera: threeCamera, controls: threeControls } = useThreeScene();
+  const { camera: threeCamera, controls: threeControls, renderer: threeRenderer } = useThreeScene();
 
   if (hidden) return null;
 
@@ -55,10 +55,24 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
   };
 
   const getThreeMetersIn100px = () => {
-    if (!threeCamera) return 1000;
-    // Simplified scale calculation for Three.js
-    // This would need more sophisticated implementation based on your scene scale
-    return 1000;
+    if (!threeCamera || !threeRenderer) return 1000;
+
+    try {
+      const canvas = threeRenderer.domElement;
+      if (!canvas) return 1000;
+
+      // Get camera distance to scene center (assuming scene is centered at origin)
+      const cameraDistance = threeCamera.position.length();
+
+      // Use camera's field of view to calculate meters per pixel
+      const fovRadians = (threeCamera.fov * Math.PI) / 180;
+      const metersPerPixel = (2 * cameraDistance * Math.tan(fovRadians / 2)) / canvas.clientHeight;
+
+      return metersPerPixel * 100;
+    } catch (error) {
+      console.warn('Error calculating Three.js scale:', error);
+      return 1000;
+    }
   };
 
   return (

@@ -118,7 +118,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
       for (const [hex, list] of Object.entries(grouped)) {
         if (!list.length) continue;
 
-        const mat = new THREE.MeshStandardMaterial({ color: hex, transparent: true, opacity: Math.max(0.05, blockOpacity) });
+        const mat = new THREE.MeshStandardMaterial({ color: hex, transparent: false, opacity: 1.0 });
         const geo = new THREE.BoxGeometry(1,1,1);
         materials.push(mat); geometries.push(geo);
 

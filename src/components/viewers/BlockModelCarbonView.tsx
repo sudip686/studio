@@ -100,7 +100,7 @@ export default function BlockModelCarbonViewer({
 
     // build instances per color
     buckets.forEach((items, color) => {
-      const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity });
+      const mat = new THREE.MeshStandardMaterial({ color, transparent: false, opacity: 1.0 });
       const geom = new THREE.BoxGeometry(1, 1, 1);
       materials.push(mat);
       geometries.push(geom);

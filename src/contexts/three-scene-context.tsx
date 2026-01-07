@@ -108,8 +108,8 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x2a4a7a); // Brighter blue background for more vibrancy
-    scene.fog = new THREE.Fog(0x2a4a7a, 3000, 20000); // Adjusted fog for brighter scene
+    scene.background = new THREE.Color(0x4a6fa5); // Brighter, more vibrant blue background
+    scene.fog = new THREE.Fog(0x4a6fa5, 4000, 25000); // Adjusted fog for brighter scene
     sceneRef.current = scene;
 
     // Static Group (for grid, lights, etc. that don't change per view)
@@ -117,11 +117,29 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     staticGroup.name = 'static-scene-elements';
     scene.add(staticGroup);
 
-    // Increased light intensities for more brightness and vibrancy
-    staticGroup.add(new THREE.HemisphereLight(0xffffff, 0x87ceeb, 2.0)); // Brighter hemisphere light
-    const d1 = new THREE.DirectionalLight(0xffffff, 2.5); d1.position.set(-1500, 2000, 1200); staticGroup.add(d1); // Increased intensity
-    const d2 = new THREE.DirectionalLight(0xffffff, 1.8); d2.position.set(1500, 600, -1200); staticGroup.add(d2); // Increased intensity
-    const grid = new THREE.GridHelper(10000, 100, 0xaaaaaa, 0xaaaaaa); // Brighter grid
+    // Enhanced vibrant lighting setup
+    // Main hemisphere light for overall illumination
+    staticGroup.add(new THREE.HemisphereLight(0xffffff, 0x87ceeb, 3.0));
+
+    // Primary directional lights with increased intensity
+    const d1 = new THREE.DirectionalLight(0xffffff, 4.0); d1.position.set(-1500, 2000, 1200); staticGroup.add(d1);
+    const d2 = new THREE.DirectionalLight(0xffffff, 3.0); d2.position.set(1500, 600, -1200); staticGroup.add(d2);
+
+    // Additional colored accent lights for vibrancy
+    const accent1 = new THREE.DirectionalLight(0x87ceeb, 1.5); accent1.position.set(2000, 1500, 2000); staticGroup.add(accent1); // Sky blue accent
+    const accent2 = new THREE.DirectionalLight(0xffdab9, 1.2); accent2.position.set(-2000, 1000, -2000); staticGroup.add(accent2); // Warm peach accent
+    const accent3 = new THREE.DirectionalLight(0xe6e6fa, 1.0); accent3.position.set(0, 2500, 0); staticGroup.add(accent3); // Soft lavender from above
+
+    // Point lights for extra vibrancy and depth
+    const point1 = new THREE.PointLight(0xffffff, 2.0, 5000); point1.position.set(0, 1000, 0); staticGroup.add(point1);
+    const point2 = new THREE.PointLight(0x87ceeb, 1.5, 3000); point2.position.set(1000, 500, 1000); staticGroup.add(point2);
+    const point3 = new THREE.PointLight(0xffdab9, 1.2, 3000); point3.position.set(-1000, 500, -1000); staticGroup.add(point3);
+
+    // Ambient light boost
+    const ambient = new THREE.AmbientLight(0xffffff, 0.8); staticGroup.add(ambient);
+
+    // Enhanced grid with more vibrant colors
+    const grid = new THREE.GridHelper(10000, 100, 0xcccccc, 0x888888); // Brighter grid lines
     grid.frustumCulled = false;
     staticGroup.add(grid);
 

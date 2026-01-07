@@ -10,7 +10,8 @@ const RESC: Record<string,string> = { Indicated:'#ff0000', Measured:'#0000ff', I
 const rescColor = (v:any) => RESC[String(v ?? 'Unknown').trim()] ?? RESC.Unknown;
 
 export default function GeoVisionBlockRescView({
-  scene, blocks, traces, modelCenter, opacity=0.8, getSegmentEndpoints
+  scene, blocks, traces, modelCenter, opacity=0.8, getSegmentEndpoints,
+  registerTooltipObject, unregisterTooltipObject
 }:{
   scene: THREE.Scene;
   blocks: BlockSegment[];
@@ -18,6 +19,8 @@ export default function GeoVisionBlockRescView({
   modelCenter: { lon:number; lat:number };
   opacity?: number;
   getSegmentEndpoints: (seg: any) => { a: number[]; b: number[] } | null;
+  registerTooltipObject?: (mesh: THREE.InstancedMesh, getData: (instanceId: number) => string) => void;
+  unregisterTooltipObject?: (mesh: THREE.InstancedMesh) => void;
 }) {
   useEffect(() => {
     console.log(`[block_resc] input blocks:`, blocks?.length ?? 0);
@@ -41,7 +44,7 @@ export default function GeoVisionBlockRescView({
         (buckets[hex] ||= []).push(b);
       }
       Object.entries(buckets).forEach(([hex, list]) => {
-        const mat = new THREE.MeshStandardMaterial({ color: hex, transparent:true, opacity });
+        const mat = new THREE.MeshStandardMaterial({ color: hex, transparent: false, opacity: 1.0 });
         const geo = new THREE.BoxGeometry(1,1,1);
         const mesh = new THREE.InstancedMesh(geo, mat, list.length);
         mesh.frustumCulled = false;
@@ -69,6 +72,17 @@ export default function GeoVisionBlockRescView({
         mesh.count = idx;
         mesh.instanceMatrix.needsUpdate = true;
         console.log(`[block_resc] drew blocks:`, mesh.count);
+
+        // Register tooltip for block meshes
+        if (registerTooltipObject) {
+          registerTooltipObject(mesh, (instanceId: number) => {
+            const block = list[instanceId];
+            return `Lat: ${block.lat?.toFixed(4) || 'N/A'}<br/>` +
+                   `Lon: ${block.lon?.toFixed(4) || 'N/A'}<br/>` +
+                   `Elevation: ${block.elevation?.toFixed(2) || 'N/A'}m<br/>` +
+                   `Classification: ${block.RescCalc || 'Unknown'}`;
+          });
+        }
       });
     }
 
