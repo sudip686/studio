@@ -15,7 +15,7 @@ interface GlobalOverlaysProps {
 
 const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, currentView }: GlobalOverlaysProps) => {
   const { viewer: cesiumViewer } = useCesium();
-  const { camera: threeCamera } = useThreeScene();
+  const { camera: threeCamera, controls: threeControls } = useThreeScene();
 
   if (hidden) return null;
 
@@ -48,12 +48,10 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
   };
 
   const getThreeHeading = () => {
-    if (!threeCamera) return 0;
-    // For Three.js, we need to calculate heading from camera direction
-    // This is a simplified implementation
-    const direction = threeCamera.getWorldDirection(new (window as any).THREE.Vector3());
-    const heading = Math.atan2(direction.x, direction.z);
-    return heading;
+    if (!threeControls) return 0;
+    // For Three.js OrbitControls, getAzimuthalAngle() gives the horizontal rotation
+    // This is the correct way to get compass heading in Three.js views
+    return threeControls.getAzimuthalAngle();
   };
 
   const getThreeMetersIn100px = () => {
@@ -66,11 +64,13 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
   return (
     <>
       {mode === 'cesium' && (
-        <div className={`absolute right-4 bottom-4 flex flex-row gap-4 items-end ${hidden ? 'opacity-0' : ''}`}>
-          <MetricScaleOverlay
-            mode="cesium"
-            getMetersIn100px={getCesiumMetersIn100px}
-          />
+        <div className={`absolute right-8 bottom-4 flex flex-row gap-4 items-end ${hidden ? 'opacity-0' : ''}`}>
+          <div style={{ marginLeft: '109cm' }}>
+            <MetricScaleOverlay
+              mode="cesium"
+              getMetersIn100px={getCesiumMetersIn100px}
+            />
+          </div>
           <CompassOverlay
             mode="cesium"
             getHeading={getCesiumHeading}
@@ -78,11 +78,13 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
         </div>
       )}
       {mode === 'three' && (
-        <div className={`absolute right-4 bottom-4 flex flex-row gap-4 items-end ${hidden ? 'opacity-0' : ''}`}>
-          <MetricScaleOverlay
-            mode="three"
-            getMetersIn100px={getThreeMetersIn100px}
-          />
+        <div className={`absolute right-8 bottom-4 flex flex-row gap-4 items-end ${hidden ? 'opacity-0' : ''}`}>
+          <div style={{ marginLeft: '109cm' }}>
+            <MetricScaleOverlay
+              mode="three"
+              getMetersIn100px={getThreeMetersIn100px}
+            />
+          </div>
           <CompassOverlay
             mode="three"
             getHeading={getThreeHeading}

@@ -2,8 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
 import IonKmlLayer from './IonKmlLayer';
-import CompassOverlay from '@/components/ui/CompassOverlay';
-import MetricScaleOverlay from '@/components/ui/MetricScaleOverlay';
+
 import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/constants';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { BoreholeCylinderCache, Interval, Style } from '@/lib/boreholes/borehole-cylinders';
@@ -166,7 +165,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
         // Batch processing to prevent UI blocking
         const BATCH_SIZE = 200;
         const total = intervalsRef.current.length;
-        const entitiesCreated = [];
+        const entitiesCreated: any[] = [];
         
         viewer.entities.suspendEvents();
         
@@ -350,8 +349,6 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
   return (
     <div className="h-full w-full relative z-20 pointer-events-none">
         <IonKmlLayer assetId={4310565} />
-        <CompassOverlay mode="cesium" getHeading={getHeading} />
-        <MetricScaleOverlay mode="cesium" getMetersIn100px={getMetersIn100px} />
         <TooltipContent data={tooltip} />
         {type === 'lithology' ? (
             <Legend

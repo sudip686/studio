@@ -5,8 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Legend } from '@/components/ui/legend';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
-import CompassOverlay from '@/components/ui/CompassOverlay';
-import { ScaleBarOverlay } from '@/components/ui/ScaleBarOverlay';
+
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context'; // NEW: Import useThreeScene
 import { ErrorDisplay } from '@/components/ui/error-display';
@@ -300,8 +299,8 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         </div>
         <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2 pointer-events-auto">
           <label className="block text-sm">Classification</label>
-          <select 
-            value={selectedClassification} 
+          <select
+            value={selectedClassification}
             onChange={e => setSelectedClassification(e.target.value)}
             className="w-full p-1 rounded bg-gray-700 text-white border border-gray-600 text-sm"
           >
@@ -320,17 +319,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
             Show traces
           </label>
         </div>
-        {camera && renderer && ( // Check camera and renderer for overlays
-          <div style={{ position: 'absolute', top: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-            <CompassOverlay mode="three" getHeading={() => getThreeHeading(camera, THREE)} />
-            <ScaleBarOverlay
-              camera={camera}
-              rendererDom={renderer.domElement} // Get canvas from renderer
-              THREE={THREE}
-              planeY={0}
-            />
-          </div>
-        )}
+
       </>
     );
 }
