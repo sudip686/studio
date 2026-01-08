@@ -42,13 +42,10 @@
     "cesium": "^1.132.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.9.1",
     "genkit": "^1.26.0",
-    "gsap": "^3.13.0",
-    "jszip": "^3.10.1",
     "lucide-react": "^0.475.0",
     "next": "^16.1.0",
     "patch-package": "^8.0.0",
@@ -64,6 +61,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.1.1",
     "@types/cesium": "^1.67.14",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
