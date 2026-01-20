@@ -348,6 +348,11 @@ function PresentationScene({
     if (processedAssayData?.byHoleId) {
       Object.values(processedAssayData.byHoleId).slice(0, 100).forEach((borehole) => {
         borehole.segments.slice(0, 5).forEach((segment, segIndex) => {
+          // Validate segment data to prevent NaN values
+          if (isNaN(segment.lon) || isNaN(segment.lat) || isNaN(segment.elevation)) {
+            return; // Skip invalid segment
+          }
+
           const value = segment.graphitic_carbon || 0;
           const intensity = Math.max(0, Math.min(1, (value - processedAssayData.assayRange.min) /
             (processedAssayData.assayRange.max - processedAssayData.assayRange.min)));
@@ -379,6 +384,13 @@ function PresentationScene({
     // Create block model cubes
     if (blockModelData) {
       blockModelData.slice(0, 200).forEach((block, index) => {
+        // Validate block data to prevent NaN values
+        if (isNaN(block.lon) || isNaN(block.lat) || isNaN(block.elevation) ||
+            isNaN(block.dX) || isNaN(block.dY) || isNaN(block.dZ) ||
+            block.dX <= 0 || block.dY <= 0 || block.dZ <= 0) {
+          return; // Skip invalid block
+        }
+
         const geometry = new THREE.BoxGeometry(block.dX * 0.05, block.dZ * 0.05, block.dY * 0.05);
         const value = block['Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'];
         const intensity = typeof value === 'number' ? Math.max(0, Math.min(1, value / 10)) : 0.5;
