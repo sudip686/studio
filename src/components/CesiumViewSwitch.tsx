@@ -334,6 +334,15 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     };
   }, [viewer, ready, view, drillholeData]);
 
+  // Ensure AOI cutaway applies once KML is available for non-original views
+  useEffect(() => {
+    if (!viewer || !ready || viewer.isDestroyed()) return;
+    if (!kmlDataSource) return;
+    if (view !== 'original' && view !== 'block_model_clip_view') {
+      enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
+    }
+  }, [viewer, ready, kmlDataSource, view, enableAoiCutaway]);
+
   return (
     <>
         {specialView === 'drillhole' && <DrillholeLayer type={drillholeType} />}

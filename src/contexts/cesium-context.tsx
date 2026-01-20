@@ -122,21 +122,56 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         prevBackFaceRef.current = globe.backFaceCulling;
         prevSkirtsRef.current = globe.showSkirts;
       }
-      globe.backFaceCulling = true;
-      globe.showSkirts = true;
+
+      // Compute a spherical cutout around the AOI center as a robust fallback (BlockModelClip style)
+      let center = Cesium.Cartesian3.fromDegrees(38.78, -4.8, 0.0);
+      let distance = 40000.0;
+      if (polygons.length > 0) {
+        try {
+          const bs = Cesium.BoundingSphere.fromPoints(polygons[0]);
+          if (bs && Cesium.defined(bs.center)) {
+            center = bs.center;
+            distance = Math.max(bs.radius, 25000.0);
+          }
+        } catch {}
+      }
+
+      // Always use a local spherical/cylindrical "puck" cutout around AOI center (matches BlockModelClip look)
+      globe.backFaceCulling = false;
+      globe.showSkirts = false;
 
       globe.clippingPlanes = new Cesium.ClippingPlaneCollection({
-        planes,
-        unionClippingRegions: false, // keep inside
+        modelMatrix: Cesium.Transforms.eastNorthUpToFixedFrame(center),
+        planes: [
+          new Cesium.ClippingPlane(new Cesium.Cartesian3(1.0, 0.0, 0.0), distance),
+          new Cesium.ClippingPlane(new Cesium.Cartesian3(-1.0, 0.0, 0.0), distance),
+          new Cesium.ClippingPlane(new Cesium.Cartesian3(0.0, 1.0, 0.0), distance),
+          new Cesium.ClippingPlane(new Cesium.Cartesian3(0.0, -1.0, 0.0), distance),
+        ],
+        unionClippingRegions: true,
         edgeWidth: edgeStyling ? 1.0 : 0.0,
         edgeColor: Cesium.Color.WHITE,
         enabled: true,
       });
 
+      // Apply same clipping to OSM Buildings tileset if present
+      try {
+        if (tileset) {
+          const dup = (globe.clippingPlanes?.planes || []).map((pl: any) => new Cesium.ClippingPlane(pl.normal, pl.distance));
+          tileset.clippingPlanes = new Cesium.ClippingPlaneCollection({
+            planes: dup,
+            unionClippingRegions: globe.clippingPlanes?.unionClippingRegions,
+            edgeWidth: edgeStyling ? 1.0 : 0.0,
+            edgeColor: Cesium.Color.WHITE,
+            enabled: true,
+          });
+        }
+      } catch {}
+
       cutawayActiveRef.current = true;
       viewer.scene.requestRender();
     } catch {}
-  }, [viewer, kmlDataSource]);
+  }, [viewer, kmlDataSource, tileset]);
 
   const disableAoiCutaway = React.useCallback(() => {
     try {
@@ -147,13 +182,22 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         globe.clippingPlanes.removeAll();
         globe.clippingPlanes = undefined as any;
       }
+      // Clear tileset clipping as well
+      try {
+        if (tileset && tileset.clippingPlanes) {
+          tileset.clippingPlanes.enabled = false;
+          tileset.clippingPlanes.removeAll();
+          tileset.clippingPlanes = undefined as any;
+        }
+      } catch {}
+
       if (prevBackFaceRef.current !== null) globe.backFaceCulling = prevBackFaceRef.current;
       if (prevSkirtsRef.current !== null) globe.showSkirts = prevSkirtsRef.current;
 
       cutawayActiveRef.current = false;
       viewer.scene.requestRender();
     } catch {}
-  }, [viewer]);
+  }, [viewer, tileset]);
 
   useEffect(() => {
     if (!containerRef.current) return;
