@@ -5,6 +5,7 @@
 
 // Core view components
 export { default as DrillholeView } from './DrillholeView';
+export { default as CinematicDrillholeView } from './CinematicDrillholeView';
 export { default as ImageryView } from './ImageryView';
 export { default as IonImageryView } from './IonImageryView';
 export { default as OriginalKmlView } from './OriginalKmlView';

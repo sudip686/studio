@@ -190,7 +190,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       v.scene.skyBox.brightnessShift = 0.1; // Brighten skybox
       try { v.scene.terrainExaggeration = 1.3; } catch {}
 
-      // 6. Enable VR-like navigation with look controls
+      // 6. Enable smooth VR-like navigation for cinematic experience
       const controller = v.scene.screenSpaceCameraController;
       controller.enableInputs = true;
       controller.enableRotate = false; // Disable orbit rotation
@@ -204,16 +204,20 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       controller.lookEventTypes = [Cesium.CameraEventType.LEFT_DRAG]; // Left drag for looking around
       controller.translateEventTypes = [Cesium.CameraEventType.MIDDLE_DRAG]; // Middle drag for panning
 
-      // Configure zoom with right drag for convenience
+      // Configure zoom with right drag and wheel for convenience
       controller.zoomEventTypes = [Cesium.CameraEventType.RIGHT_DRAG, Cesium.CameraEventType.WHEEL];
 
-      // Minimize inertia for immediate response
+      // Minimize inertia for immediate, responsive feel
       controller.inertiaSpin = 0;
-      controller.inertiaTranslate = 0.1;
-      controller.inertiaZoom = 0.1;
+      controller.inertiaTranslate = 0.05; // Reduced for smoother feel
+      controller.inertiaZoom = 0.05; // Reduced for smoother feel
 
-      // Set damping for smooth look movement
-      controller.lookDamping = 0.05; // Very low for responsive look
+      // Set damping for ultra-smooth look movement
+      controller.lookDamping = 0.02; // Very low for cinematic feel
+
+      // Enable smooth camera movements with minimal bounce
+      controller.bounceAnimationTime = 0; // Disable bounce for immediate response
+      controller.maximumMovementRatio = 1.0; // Allow full movement range
 
       // 7. Fly camera to AOI
       if (aoiBuffered) {

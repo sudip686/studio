@@ -5,6 +5,33 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Process an array in chunks to avoid blocking the main thread
+ */
+export async function processInChunks<T, R>(
+  items: T[],
+  processor: (item: T) => Promise<R | null>,
+  options: { chunkSize?: number } = {}
+): Promise<R[]> {
+  const { chunkSize = 10 } = options;
+  const results: R[] = [];
+
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkPromises = chunk.map(processor);
+
+    // Wait for this chunk to complete before starting the next
+    const chunkResults = await Promise.all(chunkPromises);
+    for (const result of chunkResults) {
+      if (result !== null) {
+        results.push(result);
+      }
+    }
+  }
+
+  return results;
+}
+
 // Expects coords in [lon, lat, z] order
 export function seatSegment(
   Cesium: typeof import('cesium'),

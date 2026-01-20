@@ -3,8 +3,9 @@
  */
 
 import { useCesium } from '@/contexts/cesium-context';
-import { useThreeScene } from '@/contexts/three-scene-context';
+import { useThreeSceneSafe } from '@/contexts/three-scene-context';
 import { CompassOverlay, MetricScaleOverlay } from '@/components/overlays';
+import { Panel } from '@/components/ui/panel';
 
 interface GlobalOverlaysProps {
   mode: 'cesium' | 'three' | 'none';
@@ -15,7 +16,8 @@ interface GlobalOverlaysProps {
 
 const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, currentView }: GlobalOverlaysProps) => {
   const { viewer: cesiumViewer } = useCesium();
-  const { camera: threeCamera, controls: threeControls, renderer: threeRenderer } = useThreeScene();
+  const threeSceneContext = useThreeSceneSafe();
+  const { camera: threeCamera, controls: threeControls, renderer: threeRenderer } = threeSceneContext || {};
 
   if (hidden) return null;
 
@@ -77,34 +79,35 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
 
   return (
     <>
-      {mode === 'cesium' && (
-        <div className={`absolute right-8 bottom-4 flex flex-row gap-4 items-end ${hidden ? 'opacity-0' : ''}`}>
-          <div style={{ marginLeft: '109cm' }}>
-            <MetricScaleOverlay
-              mode="cesium"
-              getMetersIn100px={getCesiumMetersIn100px}
-            />
-          </div>
+      {/* Always show compass and scale on all pages */}
+      <div className={`pointer-events-none absolute right-4 bottom-4 flex flex-col items-end gap-4 z-50 ${hidden ? 'opacity-0' : ''}`}>
+        {mode === 'cesium' && (
           <CompassOverlay
             mode="cesium"
             getHeading={getCesiumHeading}
+            className="pointer-events-auto"
           />
-        </div>
-      )}
-      {mode === 'three' && (
-        <div className={`absolute right-8 bottom-4 flex flex-row gap-4 items-end ${hidden ? 'opacity-0' : ''}`}>
-          <div style={{ marginLeft: '109cm' }}>
-            <MetricScaleOverlay
-              mode="three"
-              getMetersIn100px={getThreeMetersIn100px}
-            />
-          </div>
+        )}
+        {mode === 'three' && (
           <CompassOverlay
             mode="three"
             getHeading={getThreeHeading}
+            className="pointer-events-auto"
           />
-        </div>
-      )}
+        )}
+        {mode === 'none' && (
+          <CompassOverlay
+            mode="cesium"
+            getHeading={() => 0}
+            className="pointer-events-auto"
+          />
+        )}
+        <MetricScaleOverlay
+          mode={mode === 'cesium' ? 'cesium' : mode === 'three' ? 'three' : 'cesium'}
+          getMetersIn100px={mode === 'cesium' ? getCesiumMetersIn100px : mode === 'three' ? getThreeMetersIn100px : () => 100}
+          className="pointer-events-auto"
+        />
+      </div>
     </>
   );
 };

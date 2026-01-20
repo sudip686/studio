@@ -11,5 +11,5 @@
 export { default as TilesetQualityToggle } from '../TilesetQualityToggle';
 
 // Navigation and spatial indicators
-export { default as CompassOverlay } from '../ui/CompassOverlay';
-export { default as MetricScaleOverlay } from '../ui/MetricScaleOverlay';
+export { CompassOverlay } from '../ui/CompassOverlay';
+export { MetricScaleOverlay } from '../ui/MetricScaleOverlay';

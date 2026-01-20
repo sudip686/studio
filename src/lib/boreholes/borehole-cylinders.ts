@@ -21,7 +21,7 @@ export type Style = {
 
 const DEFAULT_RADIUS = 2.5;
 
-const getCesium = () => {
+export const getCesium = () => {
   if (typeof window !== 'undefined') {
     return (window as any).Cesium;
   }
@@ -115,7 +115,7 @@ async function seatBelowTerrain(
 export class BoreholeCylinderCache {
   private map = new Map<string, any>();
 
-  constructor(private viewer: any) {
+  constructor(private viewer: any, private idPrefix: string = 'bh') {
     const { globe } = viewer.scene;
     globe.depthTestAgainstTerrain = true;
   }
@@ -130,13 +130,23 @@ export class BoreholeCylinderCache {
       return cached;
     }
 
+    // Check if entity already exists in viewer to prevent duplicate ID errors
+    const entityId = `${this.idPrefix}-${interval.id}`;
+    const existingEntity = viewer.entities.getById(entityId);
+    if (existingEntity) {
+      console.warn(`Entity with id ${entityId} already exists, reusing it`);
+      this.map.set(interval.id, existingEntity);
+      if (style) this.applyStyle(existingEntity, style);
+      return existingEntity;
+    }
+
     const p0 = toFixed(interval.start);
     const p1 = toFixed(interval.end ?? interval.start);
     const length0 = Cesium.Cartesian3.distance(p0, p1) || 0.01;
     const { midpoint: mid0, quaternion: q0 } = orientationFrom(p0, p1);
 
     const e = viewer.entities.add({
-      id: `bh-${interval.id}`,
+      id: entityId,
       position: mid0,
       orientation: q0,
       cylinder: {

@@ -77,7 +77,7 @@ export function BoreholePrewarmer() {
 
         (async () => {
             const instances = await processInChunks(segments, createInstance, { chunkSize: 100 });
-            const validInstances = instances.filter(inst => inst !== null);
+            const validInstances = instances.filter((inst: any) => inst !== null);
             setLithologyCache(validInstances);
             console.log('[BoreholePrewarmer] Pre-calculation complete.');
         })();
