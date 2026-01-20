@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '../contexts/cesium-context';
 import { waitOneFrame } from '../lib/utils/cesium-helpers';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
-import { bufferRectangleMeters } from '@/lib/utils/rectangle-utils';
 import AnimatedRevealViewer from '@/components/animated-reveal-viewer';
 import SubsurfaceCutawayViewer from '@/components/subsurface-cutaway-viewer';
 import KmlFocusedViewer from '@/components/kml-focused-viewer';
@@ -35,7 +34,7 @@ const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
 };
 
 export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
-  const { viewer, ready, kmlDataSource, kmlLabel } = useCesium();
+  const { viewer, ready, kmlDataSource, kmlLabel, enableAoiCutaway, disableAoiCutaway } = useCesium();
   const { drillholeData } = useDataCache();
   const lastViewRef = useRef<CesiumView | null>(null);
 
@@ -73,25 +72,6 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     if (!viewer || !ready || viewer.isDestroyed()) return;
     const Cesium = (window as any).Cesium;
 
-    if (view !== 'original') {
-      // Add code to change background view here
-      const aoi = kmlDataSourceRef.current?.entities.values.find((e: any) => e.polygon);
-      if (aoi) {
-        const rectangle = Cesium.Rectangle.fromCartesianArray(aoi.polygon.hierarchy.getValue(viewer.clock.currentTime).positions, Cesium.Ellipsoid.WGS84);
-        const bufferedRectangle = bufferRectangleMeters(Cesium, rectangle, 25000);
-        viewer.camera.flyTo({
-          destination: bufferedRectangle,
-          orientation: {
-            heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-90),
-            roll: 0
-          }
-        });
-        viewer.scene.globe.translucency.enabled = true;
-        viewer.scene.globe.translucency.frontFaceAlpha = 0.0;
-      }
-    }
-
     // Globe translucency (terrain/globe)
     // Enable Cesium’s built-in translucency pipeline
     if (viewer.scene.globe) { // Add this check
@@ -105,7 +85,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     }
 
     viewer.scene.requestRender();
-  }, [viewer, ready, view, globeAlpha, imageryAlpha]);
+  }, [viewer, ready, globeAlpha, imageryAlpha]);
 
   // Refs for persistent data
   const kmlDataSourceRef = useRef<any>(null);
@@ -177,6 +157,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     const unload = async (prev: CesiumView | null) => {
       if (!prev || cancelled || v.isDestroyed()) return;
       setSpecialView(null);
+      disableAoiCutaway?.();
 
       if (prev === 'exaggerated_kml') {
         v.scene.verticalExaggeration = 1.0;
@@ -231,6 +212,12 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       v.camera.cancelFlight?.();
       await waitOneFrame(v);
       if (cancelled || v.isDestroyed()) return;
+
+      if (next === 'original' || next === 'block_model_clip_view') {
+        disableAoiCutaway?.();
+      } else {
+        enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
+      }
 
       if (next === 'original') {
         if (kmlDataSourceRef.current) {

@@ -14,6 +14,8 @@ type CesiumCtx = {
   kmlDataSource: any | null;
   kmlLabel: any | null;
   applyTilesetProfile: ((tileset: any, p: PerfProfile) => void) | null;
+  enableAoiCutaway: ((opts?: { keepInside?: boolean; edgeStyling?: boolean }) => void) | null;
+  disableAoiCutaway: (() => void) | null;
 };
 
 const Ctx = createContext<CesiumCtx>({ 
@@ -23,7 +25,9 @@ const Ctx = createContext<CesiumCtx>({
   tileset: null, 
   kmlDataSource: null,
   kmlLabel: null,
-  applyTilesetProfile: null 
+  applyTilesetProfile: null,
+  enableAoiCutaway: null,
+  disableAoiCutaway: null
 });
 
 export const useCesium = () => useContext(Ctx);
@@ -40,6 +44,116 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const applyTilesetProfileRef = useRef<((tileset: any, p: PerfProfile) => void) | null>(null);
   const controllerRef = useRef<RenderController | null>(null);
+
+  // AOI cutaway state
+  const cutawayActiveRef = useRef(false);
+  const prevBackFaceRef = useRef<boolean | null>(null);
+  const prevSkirtsRef = useRef<boolean | null>(null);
+
+  const enableAoiCutaway = React.useCallback((opts?: { keepInside?: boolean; edgeStyling?: boolean }) => {
+    try {
+      if (!viewer || !kmlDataSource) return;
+      const Cesium = (window as any).Cesium as any;
+      if (!Cesium) return;
+
+      const keepInside = opts?.keepInside ?? true;
+      const edgeStyling = opts?.edgeStyling ?? true;
+
+      // Collect rings from KML polygons
+      const time = Cesium.JulianDate.now();
+      const polygons: any[] = [];
+      for (const e of kmlDataSource.entities.values) {
+        const poly = e.polygon;
+        if (!poly || !poly.hierarchy) continue;
+        const hierarchy = poly.hierarchy.getValue(time);
+        if (!hierarchy) continue;
+
+        const collect = (h: any) => {
+          const ring = (h.positions || h).slice?.() || [];
+          if (ring.length >= 3) polygons.push(ring);
+          if (h.holes && h.holes.length) {
+            for (const hole of h.holes) collect(hole);
+          }
+        };
+        collect(hierarchy);
+      }
+      if (!polygons.length) return;
+
+      const planes: any[] = [];
+      for (const ring of polygons) {
+        const pts = ring;
+        const n = pts.length;
+        for (let i = 0; i < n; i++) {
+          const curr = pts[i];
+          const next = pts[(i + 1) % n];
+
+          const midpoint = Cesium.Cartesian3.multiplyByScalar(
+            Cesium.Cartesian3.add(curr, next, new Cesium.Cartesian3()),
+            0.5,
+            new Cesium.Cartesian3()
+          );
+
+          const up = Cesium.Cartesian3.normalize(
+            Cesium.Cartesian3.clone(midpoint),
+            new Cesium.Cartesian3()
+          );
+
+          const right = Cesium.Cartesian3.normalize(
+            Cesium.Cartesian3.subtract(next, midpoint, new Cesium.Cartesian3()),
+            new Cesium.Cartesian3()
+          );
+
+          let normal = Cesium.Cartesian3.cross(right, up, new Cesium.Cartesian3());
+          normal = Cesium.Cartesian3.normalize(normal, normal);
+
+          const finalNormal = keepInside
+            ? Cesium.Cartesian3.negate(normal, new Cesium.Cartesian3())
+            : normal;
+
+          const originCentered = new Cesium.Plane(finalNormal, 0.0);
+          const distance = Cesium.Plane.getPointDistance(originCentered, midpoint);
+
+          planes.push(new Cesium.ClippingPlane(finalNormal, distance));
+        }
+      }
+
+      const globe = viewer.scene.globe;
+      if (!cutawayActiveRef.current) {
+        prevBackFaceRef.current = globe.backFaceCulling;
+        prevSkirtsRef.current = globe.showSkirts;
+      }
+      globe.backFaceCulling = true;
+      globe.showSkirts = true;
+
+      globe.clippingPlanes = new Cesium.ClippingPlaneCollection({
+        planes,
+        unionClippingRegions: false, // keep inside
+        edgeWidth: edgeStyling ? 1.0 : 0.0,
+        edgeColor: Cesium.Color.WHITE,
+        enabled: true,
+      });
+
+      cutawayActiveRef.current = true;
+      viewer.scene.requestRender();
+    } catch {}
+  }, [viewer, kmlDataSource]);
+
+  const disableAoiCutaway = React.useCallback(() => {
+    try {
+      if (!viewer) return;
+      const globe = viewer.scene.globe;
+      if (globe.clippingPlanes) {
+        globe.clippingPlanes.enabled = false;
+        globe.clippingPlanes.removeAll();
+        globe.clippingPlanes = undefined as any;
+      }
+      if (prevBackFaceRef.current !== null) globe.backFaceCulling = prevBackFaceRef.current;
+      if (prevSkirtsRef.current !== null) globe.showSkirts = prevSkirtsRef.current;
+
+      cutawayActiveRef.current = false;
+      viewer.scene.requestRender();
+    } catch {}
+  }, [viewer]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -250,7 +364,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   return (
-    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current }}>
+    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current, enableAoiCutaway, disableAoiCutaway }}>
       <div className="absolute inset-0 pointer-events-auto" ref={containerRef} />
       {children}
     </Ctx.Provider>
