@@ -69,7 +69,7 @@ export default function Home() {
     setTimeout(() => {
       setTitle(viewTitles[viewSequence[currentViewIndex]]);
       setTitleVisible(true);
-    }, 300);
+    }, 500); // Increased delay for smoother transition
   }, [currentViewIndex]);
 
   // Autoplay effect
@@ -97,6 +97,12 @@ export default function Home() {
     setIsAutoplay(true);
   };
 
+  const resetToHomeView = () => {
+    console.log('Reset to home view triggered');
+    setCurrentViewIndex(0);
+    setIsAutoplay(false);
+  };
+
   const currentView: ViewType = viewSequence[currentViewIndex];
   const handleNext = () => setCurrentViewIndex(i => Math.min(i + 1, viewSequence.length - 1));
   const handlePrev = () => setCurrentViewIndex(i => Math.max(i - 1, 0));
@@ -109,7 +115,7 @@ export default function Home() {
   console.log(`[page.tsx] Rendering view: ${currentView}`);
 
   return (
-      <div className="h-full w-full relative bg-canvas text-gray-100">
+      <div className="h-full w-full relative bg-canvas text-gray-100 transition-all duration-700 ease-in-out">
         <main className="absolute top-0 left-0 h-full w-full pointer-events-none z-20">
           <div className={`absolute top-8 left-1/2 -translate-x-1/2 text-3xl font-bold text-white bg-black bg-opacity-50 p-4 rounded-lg transition-opacity duration-300 ${titleVisible ? "opacity-100" : "opacity-0"}`}>
             {title}
@@ -167,6 +173,7 @@ export default function Home() {
                 mode="cesium"
                 hidden={false}
                 currentView={currentView}
+                onLogoClick={resetToHomeView}
               />
             </CesiumProvider>
           )}
@@ -178,6 +185,7 @@ export default function Home() {
                 mode="three"
                 hidden={false}
                 currentView={currentView}
+                onLogoClick={resetToHomeView}
               />
             </ThreeSceneProvider>
           )}

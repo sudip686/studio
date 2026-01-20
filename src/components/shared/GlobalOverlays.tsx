@@ -4,7 +4,7 @@
 
 import { useCesium } from '@/contexts/cesium-context';
 import { useThreeSceneSafe } from '@/contexts/three-scene-context';
-import { CompassOverlay, MetricScaleOverlay } from '@/components/overlays';
+import { CompassOverlay, LogoOverlay, MetricScaleOverlay } from '@/components/overlays';
 import { Panel } from '@/components/ui/panel';
 
 interface GlobalOverlaysProps {
@@ -12,9 +12,10 @@ interface GlobalOverlaysProps {
   hidden?: boolean;
   measurementMode?: boolean;
   currentView?: string;
+  onLogoClick?: () => void;
 }
 
-const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, currentView }: GlobalOverlaysProps) => {
+const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, currentView, onLogoClick }: GlobalOverlaysProps) => {
   const { viewer: cesiumViewer } = useCesium();
   const threeSceneContext = useThreeSceneSafe();
   const { camera: threeCamera, controls: threeControls, renderer: threeRenderer } = threeSceneContext || {};
@@ -78,37 +79,45 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
   };
 
   return (
-    <>
-      {/* Always show compass and scale on all pages */}
-      <div className={`pointer-events-none absolute right-4 bottom-4 flex flex-col items-end gap-4 z-50 ${hidden ? 'opacity-0' : ''}`}>
-        {mode === 'cesium' && (
-          <CompassOverlay
-            mode="cesium"
-            getHeading={getCesiumHeading}
+    <div className={`absolute inset-0 pointer-events-none z-50 ${hidden ? 'opacity-0' : ''}`}>
+      {/* Global overlay grid layout */}
+      <div className="w-full h-full grid grid-cols-12 grid-rows-12 gap-4 p-4">
+        {/* Logo in top-left area (avoiding hero overlay area) */}
+        <div className="col-start-1 col-span-3 row-start-3 row-span-2 flex items-start justify-start">
+          <LogoOverlay className="pointer-events-auto" onClick={onLogoClick} />
+        </div>
+
+        {/* Compass and scale in bottom-right area */}
+        <div className="col-start-10 col-span-3 row-start-9 row-span-4 flex flex-col items-end justify-end gap-4">
+          {mode === 'cesium' && (
+            <CompassOverlay
+              mode="cesium"
+              getHeading={getCesiumHeading}
+              className="pointer-events-auto"
+            />
+          )}
+          {mode === 'three' && (
+            <CompassOverlay
+              mode="three"
+              getHeading={getThreeHeading}
+              className="pointer-events-auto"
+            />
+          )}
+          {mode === 'none' && (
+            <CompassOverlay
+              mode="cesium"
+              getHeading={() => 0}
+              className="pointer-events-auto"
+            />
+          )}
+          <MetricScaleOverlay
+            mode={mode === 'cesium' ? 'cesium' : mode === 'three' ? 'three' : 'cesium'}
+            getMetersIn100px={mode === 'cesium' ? getCesiumMetersIn100px : mode === 'three' ? getThreeMetersIn100px : () => 100}
             className="pointer-events-auto"
           />
-        )}
-        {mode === 'three' && (
-          <CompassOverlay
-            mode="three"
-            getHeading={getThreeHeading}
-            className="pointer-events-auto"
-          />
-        )}
-        {mode === 'none' && (
-          <CompassOverlay
-            mode="cesium"
-            getHeading={() => 0}
-            className="pointer-events-auto"
-          />
-        )}
-        <MetricScaleOverlay
-          mode={mode === 'cesium' ? 'cesium' : mode === 'three' ? 'three' : 'cesium'}
-          getMetersIn100px={mode === 'cesium' ? getCesiumMetersIn100px : mode === 'three' ? getThreeMetersIn100px : () => 100}
-          className="pointer-events-auto"
-        />
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 

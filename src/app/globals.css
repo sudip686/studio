@@ -6,6 +6,22 @@
 @layer base {
   html, body {
     @apply h-full w-full m-0 p-0 overflow-hidden;
+    /* Enhanced brightness and contrast for presentation feel */
+    filter: brightness(1.05) contrast(1.08) saturate(1.1);
+    transition: filter 0.5s ease-in-out;
+  }
+
+  /* Smooth transitions for all elements */
+  * {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Enhanced text rendering */
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   :root {
     --background: 195 23% 95%;

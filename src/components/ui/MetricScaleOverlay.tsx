@@ -52,19 +52,24 @@ export function MetricScaleOverlay({ mode, getMetersIn100px, className }: Metric
 
   return (
     <div className={`flex flex-col items-center gap-1 ${className || ''}`}>
-      <div className="flex flex-col items-center gap-1 bg-black/50 rounded-lg px-3 py-2 backdrop-blur-sm border border-gray-500/30 shadow-lg transition-all duration-200 hover:shadow-xl">
+      <div className="flex flex-col items-center gap-2 bg-gradient-to-br from-black/60 via-black/50 to-black/40 rounded-xl px-4 py-3 backdrop-blur-md border border-orange-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_12px_48px_rgba(249,115,22,0.2)] transition-all duration-300">
+        {/* Enhanced scale bar container */}
         <div className="flex items-center gap-2">
-          {/* Left tick */}
-          <div className="w-0.5 h-3 bg-orange-500/80 transition-all duration-200" />
-          {/* Scale bar */}
+          {/* Left tick with glow */}
+          <div className="w-1 h-4 bg-gradient-to-t from-orange-400 to-orange-300 rounded-sm shadow-lg transition-all duration-300" />
+          {/* Scale bar with enhanced gradient */}
           <div
-            className="h-1 bg-gradient-to-r from-orange-500 to-orange-400 rounded-full shadow-sm transition-all duration-200"
+            className="h-2 bg-gradient-to-r from-orange-500 via-orange-400 to-orange-500 rounded-full shadow-lg transition-all duration-300 hover:shadow-[0_0_12px_rgba(249,115,22,0.6)]"
             style={{ width: `${pixelWidth}px` }}
           />
-          {/* Right tick */}
-          <div className="w-0.5 h-3 bg-orange-500/80 transition-all duration-200" />
+          {/* Right tick with glow */}
+          <div className="w-1 h-4 bg-gradient-to-t from-orange-400 to-orange-300 rounded-sm shadow-lg transition-all duration-300" />
         </div>
-        <span className="text-xs font-semibold text-gray-200 tracking-wide transition-all duration-200">{scaleLabel}</span>
+        {/* Enhanced label */}
+        <span className="text-sm font-bold text-white tracking-wide drop-shadow-lg transition-all duration-300">{scaleLabel}</span>
+
+        {/* Subtle glow effect */}
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-400/5 via-transparent to-gray-400/5 pointer-events-none" />
       </div>
     </div>
   );
