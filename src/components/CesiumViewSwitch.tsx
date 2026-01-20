@@ -34,7 +34,7 @@ const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
 };
 
 export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
-  const { viewer, ready, kmlDataSource, kmlLabel } = useCesium();
+  const { viewer, ready, kmlDataSource, kmlLabel, enableAoiCutaway, disableAoiCutaway } = useCesium();
   const { drillholeData } = useDataCache();
   const lastViewRef = useRef<CesiumView | null>(null);
 
@@ -157,6 +157,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     const unload = async (prev: CesiumView | null) => {
       if (!prev || cancelled || v.isDestroyed()) return;
       setSpecialView(null);
+      disableAoiCutaway?.();
 
       if (prev === 'exaggerated_kml') {
         v.scene.verticalExaggeration = 1.0;
@@ -211,6 +212,12 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       v.camera.cancelFlight?.();
       await waitOneFrame(v);
       if (cancelled || v.isDestroyed()) return;
+
+      if (next === 'original' || next === 'block_model_clip_view') {
+        disableAoiCutaway?.();
+      } else {
+        enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
+      }
 
       if (next === 'original') {
         if (kmlDataSourceRef.current) {
@@ -326,6 +333,15 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       cancelled = true;
     };
   }, [viewer, ready, view, drillholeData]);
+
+  // Ensure AOI cutaway applies once KML is available for non-original views
+  useEffect(() => {
+    if (!viewer || !ready || viewer.isDestroyed()) return;
+    if (!kmlDataSource) return;
+    if (view !== 'original' && view !== 'block_model_clip_view') {
+      enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
+    }
+  }, [viewer, ready, kmlDataSource, view, enableAoiCutaway]);
 
   return (
     <>
