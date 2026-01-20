@@ -249,6 +249,80 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
+  // InteractionQualityScaler: lighten rendering during active interaction (pointer/touch/wheel),
+  // then restore crisp quality shortly after idle. Cesium-only; fully guarded.
+  useEffect(() => {
+    if (!viewer || !ready || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
+    const v: any = viewer;
+    const scene = v.scene;
+    const canvas: HTMLCanvasElement | undefined = scene?.canvas;
+    if (!canvas) return;
+
+    let destroyed = false;
+    let restoreTimer: number | null = null;
+    let lastInputAt = 0;
+
+    const fxaaStage = (scene.postProcessStages as any)?.fxaa;
+    const baseline = {
+      res: v.resolutionScale ?? 1.0,
+      fxaa: fxaaStage ? fxaaStage.enabled : undefined,
+      sse: tileset ? tileset.maximumScreenSpaceError : undefined,
+    };
+
+    const restore = () => {
+      if (destroyed) return;
+      try { v.resolutionScale = baseline.res ?? 1.0; } catch {}
+      try { if (tileset && baseline.sse !== undefined) tileset.maximumScreenSpaceError = baseline.sse; } catch {}
+      try { if (fxaaStage && baseline.fxaa !== undefined) fxaaStage.enabled = baseline.fxaa; } catch {}
+      scene?.requestRender?.();
+    };
+
+    const scheduleRestore = () => {
+      if (restoreTimer) clearTimeout(restoreTimer);
+      restoreTimer = window.setTimeout(() => {
+        if (destroyed) return;
+        if (performance.now() - lastInputAt >= 280) {
+          restore();
+        }
+      }, 320) as unknown as number;
+    };
+
+    const activate = () => {
+      if (destroyed) return;
+      lastInputAt = performance.now();
+      try {
+        const base = baseline.res ?? 1.0;
+        v.resolutionScale = Math.max(0.7, Math.min(0.85, base * 0.85));
+      } catch {}
+      try { if (tileset) tileset.maximumScreenSpaceError = 16; } catch {}
+      try { if (fxaaStage) fxaaStage.enabled = false; } catch {}
+      scene?.requestRender?.();
+      scheduleRestore();
+    };
+
+    const onPointerDown = () => activate();
+    const onPointerMove = () => activate();
+    const onPointerUp = () => scheduleRestore();
+    const onWheel = () => activate();
+
+    canvas.addEventListener('pointerdown', onPointerDown, { passive: true });
+    canvas.addEventListener('pointermove', onPointerMove, { passive: true });
+    canvas.addEventListener('pointerup', onPointerUp, { passive: true });
+    canvas.addEventListener('wheel', onWheel, { passive: true });
+
+    return () => {
+      destroyed = true;
+      try {
+        canvas.removeEventListener('pointerdown', onPointerDown);
+        canvas.removeEventListener('pointermove', onPointerMove);
+        canvas.removeEventListener('pointerup', onPointerUp);
+        canvas.removeEventListener('wheel', onWheel);
+      } catch {}
+      if (restoreTimer) clearTimeout(restoreTimer);
+      restore();
+    };
+  }, [viewer, ready, tileset]);
+
   return (
     <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current }}>
       <div className="absolute inset-0 pointer-events-auto" ref={containerRef} />
