@@ -91,6 +91,11 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 

@@ -80,7 +80,7 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
   return (
     <>
       {/* Always show compass and scale on all pages */}
-      <div className={`pointer-events-none absolute right-4 bottom-4 flex flex-col items-end gap-4 ${hidden ? 'opacity-0' : ''}`}>
+      <div className={`pointer-events-none absolute right-4 bottom-4 flex flex-col items-end gap-4 z-50 ${hidden ? 'opacity-0' : ''}`}>
         {mode === 'cesium' && (
           <CompassOverlay
             mode="cesium"

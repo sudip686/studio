@@ -5,6 +5,7 @@ import { ChapterMenu } from "@/components/ui/chapter-menu";
 import { CesiumProvider } from '@/contexts/cesium-context';
 import CesiumViewSwitch from '@/components/CesiumViewSwitch';
 import ThreeJsViewSwitch from '@/components/ThreeJsViewSwitch';
+import ImmersivePresentationViewer from '@/components/ImmersivePresentationViewer';
 import { ThreeSceneProvider } from '@/contexts/three-scene-context';
 import GlobalOverlays from '@/components/shared/GlobalOverlays';
 
@@ -54,9 +55,7 @@ const threeJsSwitcherViews = new Set<string>([
     'lithology_view',
     'assay_view',
     'block_model_carbon_view',
-    'block_model_resc_view',
-    // Immersive Presentation
-    'immersive_presentation'
+    'block_model_resc_view'
 ]);
 
 export default function Home() {
@@ -104,6 +103,7 @@ export default function Home() {
 
   const isCesiumSwitcherView = cesiumSwitcherViews.has(currentView);
   const isThreeJsSwitcherView = threeJsSwitcherViews.has(currentView);
+  const isImmersivePresentation = currentView === 'immersive_presentation';
   const isStandalone2D = ['downhole_plot'].includes(currentView);
 
   console.log(`[page.tsx] Rendering view: ${currentView}`);
@@ -180,6 +180,10 @@ export default function Home() {
                 currentView={currentView}
               />
             </ThreeSceneProvider>
+          )}
+
+          {isImmersivePresentation && (
+            <ImmersivePresentationViewer viewType="presentation" />
           )}
 
           {isStandalone2D && <div className="h-full w-full bg-transparent">{/* Standalone 2D content */}</div>}
