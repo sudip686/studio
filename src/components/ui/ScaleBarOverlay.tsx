@@ -3,9 +3,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 type Props = {
-  camera: THREE.Camera | null;
+  camera: any; // THREE.Camera | null;
   rendererDom: HTMLCanvasElement | null;
-  THREE: any; // Add THREE prop
+  THREE: any; // THREE instance
   planeY?: number;           // ground plane Y (default 0)
   targetWidthPx?: number;    // desired visual length (px) we try to approximate
   units?: 'm';               // future extension (km/ft/etc.)
@@ -31,7 +31,7 @@ export function ScaleBarOverlay({
     if (!camera || !rendererDom) return;
 
     const ray = new THREE.Ray();
-    const ndcToRay = (xNdc: number, yNdc: number, out: THREE.Ray) => {
+    const ndcToRay = (xNdc: number, yNdc: number, out: any) => {
       // from NDC to world ray
       const origin = new THREE.Vector3();
       const direction = new THREE.Vector3();
@@ -107,9 +107,9 @@ export function ScaleBarOverlay({
 
   return (
     <div className="pointer-events-none select-none absolute bottom-4 left-4">
-      <div className="flex items-center gap-2 text-white">
-        <div className="h-2 bg-white/90 rounded-sm shadow" style={{ width: px }} />
-        <div className="text-xs bg-black/60 px-2 py-0.5 rounded">{label}</div>
+      <div className="flex items-center gap-2 text-orange-400">
+        <div className="h-2 bg-orange-500/90 rounded-sm shadow transition-all duration-200" style={{ width: px }} />
+        <div className="text-xs bg-black/60 px-2 py-0.5 rounded border border-gray-500/30 transition-all duration-200">{label}</div>
       </div>
     </div>
   );

@@ -43,6 +43,9 @@ interface DataCache {
     processedAssayData: ProcessedAssayData | null;
     loadingStatus: 'idle' | 'loading' | 'success' | 'error';
     error: string | null;
+    // Performance monitoring
+    memoryUsage: number;
+    dataSize: { lithology: number; assay: number; blockModel: number };
 }
 
 const DataCacheContext = createContext<(DataCache & { refetch: () => void; }) | undefined>(undefined);
@@ -55,6 +58,8 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
         processedAssayData: null,
         loadingStatus: 'idle',
         error: null,
+        memoryUsage: 0,
+        dataSize: { lithology: 0, assay: 0, blockModel: 0 },
     });
 
     const refetch = () => {
@@ -234,6 +239,20 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                     });
                 });
 
+                // Calculate data sizes for performance monitoring
+                const dataSizes = {
+                    lithology: JSON.stringify(lithologyData).length,
+                    assay: JSON.stringify(assayData).length,
+                    blockModel: JSON.stringify(parsedBlockModel).length,
+                };
+
+                // Estimate memory usage (rough approximation)
+                const memoryUsage = dataSizes.lithology + dataSizes.assay + dataSizes.blockModel +
+                    JSON.stringify(lithologyByHoleId).length +
+                    JSON.stringify(assayByHoleId).length +
+                    JSON.stringify(groupedLithology).length +
+                    JSON.stringify(groupedAssay).length;
+
                 setCache({
                     drillholeData: {
                         lithology: lithologyData,
@@ -253,6 +272,8 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                     },
                     loadingStatus: 'success',
                     error: null,
+                    memoryUsage,
+                    dataSize: dataSizes,
                 });
                 console.log('Processed Lithology Data:', lithologyByHoleId);
                 console.log('Processed Assay Data:', assayByHoleId);

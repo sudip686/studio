@@ -40,7 +40,7 @@ export async function createBoreholeEntities(
   }>
 ): Promise<any> { // Returns a CustomDataSource
   console.log('[createBoreholeEntities] start for', holes.length, 'holes');
-  
+
   const dataSource = new Cesium.CustomDataSource('boreholes');
   const width = 0.5; // Borehole width
   const collarOffset = 0.4; // Raise a bit above mesh to avoid z-fight
@@ -49,7 +49,7 @@ export async function createBoreholeEntities(
     if (h.depth <= 0) continue;
 
     const top = Cartesian3.fromDegrees(h.lon, h.lat, h.topHeight + collarOffset);
-    
+
     // Create a local frame at the top of the borehole to calculate the bottom point
     const enu = Transforms.eastNorthUpToFixedFrame(top);
     const bottomLocal = new Cartesian3(0, 0, -h.depth); // Down is -Z in this local frame
@@ -66,7 +66,51 @@ export async function createBoreholeEntities(
       },
     });
   }
-  
+
   console.log('[createBoreholeEntities] end, created 1 data source.');
   return dataSource;
+}
+
+// Type for borehole color functions
+export type BoreholeColorFn = (segment: any) => Color;
+
+/**
+ * Adds a borehole layer to the Cesium viewer
+ */
+export async function addBoreholeLayer(
+  viewer: any,
+  segments: any[],
+  colorFn: BoreholeColorFn,
+  options?: { radius?: number; name?: string }
+): Promise<any> {
+  const holes = segments.map(seg => ({
+    lon: seg.lon,
+    lat: seg.lat,
+    depth: seg.depth,
+    color: colorFn(seg),
+    topHeight: seg.topHeight,
+    id: seg.id,
+    properties: seg.properties
+  }));
+
+  const dataSource = await createBoreholeEntities((window as any).Cesium, holes);
+  await viewer.dataSources.add(dataSource);
+  return dataSource;
+}
+
+/**
+ * Fits the camera to the borehole layer
+ */
+export async function fitToBoreholeLayer(viewer: any, dataSource: any): Promise<void> {
+  const entities = dataSource.entities.values;
+  if (entities.length > 0) {
+    await viewer.zoomTo(dataSource);
+  }
+}
+
+/**
+ * Removes a data source from the viewer
+ */
+export function removeDataSource(viewer: any, dataSource: any): void {
+  viewer.dataSources.remove(dataSource, true);
 }

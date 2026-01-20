@@ -151,11 +151,19 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
 
     return (
         <>
-            <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000 }} className="pointer-events-auto">
-                <label>Filter by Lithology: </label>
-                <select value={lithologyFilter} onChange={(e) => setLithologyFilter(e.target.value)}>
-                    {uniqueLithologies.map((lith: string) => <option key={lith} value={lith}>{lith}</option>)}
-                </select>
+            <div className="absolute top-4 right-4 z-20 pointer-events-auto p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Filter by Lithology</label>
+                    <select
+                        value={lithologyFilter}
+                        onChange={(e) => setLithologyFilter(e.target.value)}
+                        className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                    >
+                        {uniqueLithologies.map((lith: string) => (
+                            <option key={lith} value={lith}>{lith}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
             <Legend
                 title={drillholeLocationMapLithologyLegendData.title}
@@ -183,7 +191,7 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
     const [pointSize, setPointSize] = useState(20);
     const entitiesRef = useRef<any[]>([]);
 
-    const currentRange = ranges[metric];
+    const currentRange = ranges[metric === 'average' ? 'avg' : 'max'];
 
     useEffect(() => {
         if (!viewer || !ready || processedData.size === 0) return;
@@ -249,41 +257,99 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
 
     return (
         <>
-            <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }} className="pointer-events-auto">
-                 <div>
-                    <label>Metric: </label>
-                    <select value={metric} onChange={(e) => setMetric(e.target.value as 'average' | 'max')}>
+            <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-3 p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Metric</label>
+                    <select
+                        value={metric}
+                        onChange={(e) => setMetric(e.target.value as 'average' | 'max')}
+                        className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                    >
                         <option value="max">Maximum</option>
                         <option value="average">Average</option>
                     </select>
                 </div>
-                <div>
-                    <label>Point Size: {pointSize}</label>
-                    <input type="range" min="5" max="50" value={pointSize} onChange={(e) => setPointSize(Number(e.target.value))} />
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Point Size: {pointSize}px</label>
+                    <input
+                        type="range"
+                        min="5"
+                        max="50"
+                        value={pointSize}
+                        onChange={(e) => setPointSize(Number(e.target.value))}
+                        className="w-full h-2 bg-black/30 rounded-lg appearance-none cursor-pointer range-slider"
+                        style={{
+                            background: `linear-gradient(to right, #f97316 0%, #f97316 ${(pointSize - 5) / (50 - 5) * 100}%, rgba(0,0,0,0.3) ${(pointSize - 5) / (50 - 5) * 100}%, rgba(0,0,0,0.3) 100%)`
+                        }}
+                    />
                 </div>
-                <div>
-                    <label>Min. Graphitic Carbon (%): </label>
-                    <input type="number" min="0" step="0.5" value={assayFilterValue} onChange={(e) => setAssayFilterValue(Number(e.target.value))} />
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Min. Graphitic Carbon (%)</label>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={assayFilterValue}
+                        onChange={(e) => setAssayFilterValue(Number(e.target.value))}
+                        className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                    />
                 </div>
-                <div>
-                    <label>Scale Type: </label>
-                    <button onClick={() => setScaleType('continuous')} disabled={scaleType === 'continuous'}>Continuous</button>
-                    <button onClick={() => setScaleType('discrete')} disabled={scaleType === 'discrete'}>Discrete</button>
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Scale Type</label>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setScaleType('continuous')}
+                            disabled={scaleType === 'continuous'}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                                scaleType === 'continuous'
+                                    ? 'bg-orange-500 text-white shadow-lg'
+                                    : 'bg-black/40 text-white/70 border border-white/20 hover:bg-black/60'
+                            }`}
+                        >
+                            Continuous
+                        </button>
+                        <button
+                            onClick={() => setScaleType('discrete')}
+                            disabled={scaleType === 'discrete'}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                                scaleType === 'discrete'
+                                    ? 'bg-orange-500 text-white shadow-lg'
+                                    : 'bg-black/40 text-white/70 border border-white/20 hover:bg-black/60'
+                            }`}
+                        >
+                            Discrete
+                        </button>
+                    </div>
                 </div>
+
                 {scaleType === 'continuous' && (
-                    <div>
-                        <label>Continuous Color Scale: </label>
-                        <select value={continuousPalette} onChange={(e) => setContinuousPalette(e.target.value)}>
+                    <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Color Palette</label>
+                        <select
+                            value={continuousPalette}
+                            onChange={(e) => setContinuousPalette(e.target.value)}
+                            className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                        >
                             <option value="Viridis">Viridis</option>
                             <option value="Plasma">Plasma</option>
                             <option value="Inferno">Inferno</option>
                         </select>
                     </div>
                 )}
+
                 {scaleType === 'discrete' && (
-                    <div>
-                        <label>Interval Breaks (comma-separated): </label>
-                        <input type="text" value={manualBreaks} onChange={(e) => setManualBreaks(e.target.value)} />
+                    <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Interval Breaks</label>
+                        <input
+                            type="text"
+                            value={manualBreaks}
+                            onChange={(e) => setManualBreaks(e.target.value)}
+                            placeholder="1, 1.5, 2"
+                            className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                        />
                     </div>
                 )}
             </div>

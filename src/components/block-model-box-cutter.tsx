@@ -35,7 +35,7 @@ const BlockModelBoxCutter = ({ colorMode }: BlockModelBoxCutterProps) => {
                 if (entities.length === 0) return;
 
                 // Create a bounding sphere for the entire block model to center the clipping box
-                const boundingSpheres = entities.map(e => e.position.getValue(viewer.clock.currentTime)).map(p => new Cesium.BoundingSphere(p, 1));
+                const boundingSpheres = entities.map((e: any) => e.position.getValue(viewer.clock.currentTime)).map((p: any) => new Cesium.BoundingSphere(p, 1));
                 const union = Cesium.BoundingSphere.fromBoundingSpheres(boundingSpheres);
                 const center = union.center;
                 const enu = Cesium.Transforms.eastNorthUpToFixedFrame(center);

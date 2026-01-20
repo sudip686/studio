@@ -13,11 +13,12 @@ import DrillholeLocationMap from '@/components/drillhole-location-map';
 import TerrainClippingPlanes from '@/components/terrain-clipping-planes'; // Corrected import
 import BlockModelBoxCutter from '@/components/block-model-box-cutter';
 import DrillholeLayer from '@/components/DrillholeLayer';
+import CinematicDrillholeViewer from '@/components/cinematic-drillhole-viewer';
 import TilesetQualityToggle from '@/components/TilesetQualityToggle'; // Import the new component
 import BlockModelClipViewer from '@/components/BlockModelClipViewer'; // Import the new component
 import GlobalOverlays from '@/components/shared/GlobalOverlays';
 
-type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'tanaga_accessibility' | 'tanga_geological_map' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location' | 'geospatial_lithology' | 'geospatial_assay' | 'drillhole_lithology_reveal' | 'subsurface_cutaway' | 'kml_focused_view' | 'terrain_traces' | 'resource_model_viewer' | 'cesium_three_block_model' | 'grand_canyon_assay' | 'grand_canyon_lithology' | 'drillhole_location_lithology' | 'drillhole_location_assay' | 'terrain_clipping' | 'block_model_box_cutter_grade' | 'block_model_box_cutter_class' | 'block_model_clip_view';
+type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'tanaga_accessibility' | 'tanga_geological_map' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location' | 'geospatial_lithology' | 'geospatial_assay' | 'drillhole_lithology_reveal' | 'subsurface_cutaway' | 'kml_focused_view' | 'terrain_traces' | 'resource_model_viewer' | 'cesium_three_block_model' | 'grand_canyon_assay' | 'grand_canyon_lithology' | 'drillhole_location_lithology' | 'drillhole_location_assay' | 'terrain_clipping' | 'block_model_box_cutter_grade' | 'block_model_box_cutter_class' | 'block_model_clip_view' | 'cinematic_drillhole_assay' | 'cinematic_drillhole_lithology';
 
 const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
     "Quartz-Feldspathic": "#f79a06ff",
@@ -37,7 +38,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const { drillholeData } = useDataCache();
   const lastViewRef = useRef<CesiumView | null>(null);
 
-  const [globeAlpha, setGlobeAlpha] = useState(0.8);   // 0..1
+  const [globeAlpha, setGlobeAlpha] = useState(1.0);   // 0..1 - Default to 100% opacity
   const [imageryAlpha, setImageryAlpha] = useState(1.0);
 
   // State
@@ -46,6 +47,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const [grandCanyonMode, setGrandCanyonMode] = useState<'assay' | 'lithology'>('assay');
   const [drillholeLocationMode, setDrillholeLocationMode] = useState<'assay' | 'lithology'>('assay');
   const [boxCutterMode, setBoxCutterMode] = useState<'grade' | 'class'>('grade');
+  const [cinematicDrillholeMode, setCinematicDrillholeMode] = useState<'assay' | 'lithology'>('assay');
 
   const specialViewMap = {
       drillhole_lithology_reveal: 'animatedReveal',
@@ -61,6 +63,8 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       block_model_box_cutter_grade: 'boxCutter',
       block_model_box_cutter_class: 'boxCutter',
       block_model_clip_view: 'blockModelClip',
+      cinematic_drillhole_assay: 'cinematicDrillhole',
+      cinematic_drillhole_lithology: 'cinematicDrillhole',
   };
 
   // Apply transparency whenever sliders change (and when viewer is ready)
@@ -112,6 +116,43 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     if (lastViewRef.current === view) return;
 
     const Cesium = (window as any).Cesium;
+
+    // Cleanup function for proper memory management
+    const cleanup = () => {
+      if (cancelled) return;
+
+      // Dispose of any existing special views
+      setSpecialView(null);
+
+      // Clear any existing event handlers
+      if (styledKmlHandlerRef.current && !styledKmlHandlerRef.current.isDestroyed()) {
+        styledKmlHandlerRef.current.destroy();
+        styledKmlHandlerRef.current = null;
+      }
+
+      // Clear temporary entities and data sources
+      if (projectLocationLayerRef.current) {
+        v.entities.remove(projectLocationLayerRef.current);
+        projectLocationLayerRef.current = null;
+      }
+
+      if (terrainTracesKmlRef.current) {
+        v.dataSources.remove(terrainTracesKmlRef.current, true);
+        terrainTracesKmlRef.current = null;
+      }
+
+      terrainTracesEntitiesRef.current.forEach((entity: any) => v.entities.remove(entity));
+      terrainTracesEntitiesRef.current = [];
+
+      // Clear imagery layers if not needed for new view
+      if (ionImageryLayerRef.current && !['tanaga_accessibility', 'tanga_geological_map', 'drillhole_location_lithology'].includes(view)) {
+        v.imageryLayers.remove(ionImageryLayerRef.current, true);
+        ionImageryLayerRef.current = null;
+      }
+
+      // Force render update
+      v.scene.requestRender();
+    };
 
     const unload = async (prev: CesiumView | null) => {
       if (!prev || cancelled || v.isDestroyed()) return;
@@ -259,11 +300,14 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
             block_model_box_cutter_grade: 'boxCutter',
             block_model_box_cutter_class: 'boxCutter',
             block_model_clip_view: 'blockModelClip',
+            cinematic_drillhole_assay: 'cinematicDrillhole',
+            cinematic_drillhole_lithology: 'cinematicDrillhole',
         };
         if (next in specialViewMap) {
             if (next.startsWith('grand_canyon')) setGrandCanyonMode(next.endsWith('assay') ? 'assay' : 'lithology');
             if (next.startsWith('drillhole_location')) setDrillholeLocationMode(next.endsWith('assay') ? 'assay' : 'lithology');
             if (next.startsWith('block_model_box_cutter')) setBoxCutterMode(next.endsWith('grade') ? 'grade' : 'class');
+            if (next.startsWith('cinematic_drillhole')) setCinematicDrillholeMode(next.endsWith('assay') ? 'assay' : 'lithology');
             setSpecialView(specialViewMap[next as keyof typeof specialViewMap]);
         }
       }
@@ -296,41 +340,46 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         {specialView === 'terrainClipping' && <TerrainClippingPlanes />}{/* Corrected component */}
         {specialView === 'boxCutter' && <BlockModelBoxCutter colorMode={boxCutterMode} />}
         {specialView === 'blockModelClip' && <BlockModelClipViewer />}
+        {specialView === 'cinematicDrillhole' && <CinematicDrillholeViewer type={cinematicDrillholeMode} />}
 
       {/* Transparency controls */}
-      <div
-        className="absolute top-4 right-4 z-20 pointer-events-auto bg-white/85 backdrop-blur p-3 rounded-lg shadow"
-        style={{ minWidth: 220 }}
-      >
-        <div className="text-sm font-semibold mb-1">Transparency</div>
-        <label className="block text-xs mt-2">
-          Globe opacity&nbsp;({Math.round(globeAlpha * 100)}%)
-        </label>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={globeAlpha}
-          onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
-          className="w-full"
-        />
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 z-20 pointer-events-auto flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-white/80 drop-shadow-sm">
+            Globe opacity {Math.round(globeAlpha * 100)}%
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={globeAlpha}
+            onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
+            className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
+            style={{
+              background: `linear-gradient(to right, #f97316 0%, #f97316 ${globeAlpha * 100}%, rgba(0,0,0,0.3) ${globeAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
+            }}
+          />
+        </div>
 
         {view === 'drillhole_location_lithology' && (
-            <>
-                <label className="block text-xs mt-2">
-                  Geological Map Opacity&nbsp;({Math.round(imageryAlpha * 100)}%)
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={imageryAlpha}
-                  onChange={(e) => setImageryAlpha(parseFloat(e.target.value))}
-                  className="w-full"
-                />
-            </>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-white/80 drop-shadow-sm">
+              Map opacity {Math.round(imageryAlpha * 100)}%
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={imageryAlpha}
+              onChange={(e) => setImageryAlpha(parseFloat(e.target.value))}
+              className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
+              style={{
+                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${imageryAlpha * 100}%, rgba(0,0,0,0.3) ${imageryAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
+              }}
+            />
+          </div>
         )}
       </div>
 

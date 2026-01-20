@@ -288,3 +288,7 @@ export const useThreeScene = () => {
   }
   return context;
 };
+
+export const useThreeSceneSafe = () => {
+  return useContext(ThreeSceneContext);
+};
