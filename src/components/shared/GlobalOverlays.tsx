@@ -25,6 +25,7 @@ function Slot({
   children,
   position,
   align = "start",
+  className = "",
 }: {
   children: React.ReactNode;
   position:
@@ -35,14 +36,10 @@ function Slot({
     | "top-center"
     | "bottom-center";
   align?: "start" | "center" | "end";
+  className?: string;
 }) {
   const base =
     "fixed z-50 pointer-events-none p-3 sm:p-4 md:p-5 flex gap-3 md:gap-4";
-  const safeAreaTop =
-    "pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
-  const safeAreaBottom =
-    "pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
-
   const alignMap: Record<string, string> = {
     start: "items-start",
     center: "items-center",
@@ -51,32 +48,46 @@ function Slot({
 
   let posClass = "";
   let layout = "flex-col"; // stack by default in a column
+  const style: React.CSSProperties = {};
 
   switch (position) {
     case "top-left":
-      posClass = `top-0 left-0 ${safeAreaTop}`;
+      posClass = "top-0 left-0";
+      style.paddingTop = "calc(env(safe-area-inset-top) + var(--header-height, 0px))";
+      style.paddingLeft = "calc(env(safe-area-inset-left) + var(--chapter-sidebar-width, 0px))";
       break;
     case "top-right":
-      posClass = `top-0 right-0 ${safeAreaTop}`;
+      posClass = "top-0 right-0";
+      style.paddingTop = "calc(env(safe-area-inset-top) + var(--header-height, 0px))";
+      style.paddingRight = "calc(env(safe-area-inset-right) + var(--chapter-trigger-width, 0px))";
       break;
     case "bottom-left":
-      posClass = `bottom-0 left-0 ${safeAreaBottom}`;
+      posClass = "bottom-0 left-0";
+      style.paddingBottom = "env(safe-area-inset-bottom)";
+      style.paddingLeft = "calc(env(safe-area-inset-left) + var(--chapter-sidebar-width, 0px))";
       break;
     case "bottom-right":
-      posClass = `bottom-0 right-0 ${safeAreaBottom}`;
+      posClass = "bottom-0 right-0";
+      style.paddingBottom = "env(safe-area-inset-bottom)";
+      style.paddingRight = "env(safe-area-inset-right)";
       break;
     case "top-center":
-      posClass = `top-0 left-1/2 -translate-x-1/2 ${safeAreaTop}`;
-      layout = "flex-row"; // center slots can row-stack
+      posClass = "top-0 left-1/2 -translate-x-1/2";
+      layout = "flex-row";
+      style.paddingTop = "calc(env(safe-area-inset-top) + var(--header-height, 0px))";
       break;
     case "bottom-center":
-      posClass = `bottom-0 left-1/2 -translate-x-1/2 ${safeAreaBottom}`;
-      layout = "flex-row"; // center slots can row-stack
+      posClass = "bottom-0 left-1/2 -translate-x-1/2";
+      layout = "flex-row";
+      style.paddingBottom = "env(safe-area-inset-bottom)";
       break;
   }
 
   return (
-    <div className={`${base} ${posClass} ${layout} ${alignMap[align]} max-w-full`}>
+    <div
+      className={`${base} ${posClass} ${layout} ${alignMap[align]} max-w-full ${className}`}
+      style={style}
+    >
       <div className="pointer-events-auto flex flex-col gap-3 md:gap-4 max-w-full">
         {children}
       </div>
@@ -165,8 +176,33 @@ const GlobalOverlays = ({
         <LogoOverlay className="will-change-transform transition-transform duration-150" onClick={onLogoClick} />
       </Slot>
 
-      {/* Top-right slot: Compass (stacked), room for additional controls if needed */}
-      <Slot position="top-right" align="end">
+      {/* Top-right slot: Compass (desktop/tablet). Hidden on small screens to avoid header/hamburger. */}
+      <Slot position="top-right" align="end" className="hidden md:flex">
+        {isCesium && (
+          <CompassOverlay
+            mode="cesium"
+            getHeading={getCesiumHeading}
+            className="will-change-transform transition-transform duration-150"
+          />
+        )}
+        {isThree && (
+          <CompassOverlay
+            mode="three"
+            getHeading={getThreeHeading}
+            className="will-change-transform transition-transform duration-150"
+          />
+        )}
+        {!isCesium && !isThree && (
+          <CompassOverlay
+            mode="cesium"
+            getHeading={() => 0}
+            className="will-change-transform transition-transform duration-150"
+          />
+        )}
+      </Slot>
+
+      {/* Bottom-right slot: Compass (mobile-first) */}
+      <Slot position="bottom-right" align="end" className="flex md:hidden">
         {isCesium && (
           <CompassOverlay
             mode="cesium"

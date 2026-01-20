@@ -3,6 +3,7 @@ import './globals.css';
 import { DataCacheProvider } from '@/lib/data-cache';
 import ServiceWorkerRegistrar from './ServiceWorkerRegistrar';
 import ErrorBoundary from '@/components/ui/error-boundary';
+import UiChromeMeasure from '@/components/shared/UiChromeMeasure';
 
 export const metadata: Metadata = {
   title: 'GeoVision3D',
@@ -24,6 +25,7 @@ export default function RootLayout({
         <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
       </head>
       <body className="bg-canvas text-gray-100 font-body antialiased">
+        <UiChromeMeasure />
         <DataCacheProvider><ErrorBoundary>{children}</ErrorBoundary></DataCacheProvider>
         <ServiceWorkerRegistrar />
         </body>
