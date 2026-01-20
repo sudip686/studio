@@ -16,6 +16,9 @@ type CesiumCtx = {
   applyTilesetProfile: ((tileset: any, p: PerfProfile) => void) | null;
   enableAoiCutaway: ((opts?: { keepInside?: boolean; edgeStyling?: boolean }) => void) | null;
   disableAoiCutaway: (() => void) | null;
+  enterUndergroundMode: (() => void) | null;
+  exitUndergroundMode: (() => void) | null;
+  applyFastNavProfile: (() => void) | null;
 };
 
 const Ctx = createContext<CesiumCtx>({ 
@@ -27,7 +30,10 @@ const Ctx = createContext<CesiumCtx>({
   kmlLabel: null,
   applyTilesetProfile: null,
   enableAoiCutaway: null,
-  disableAoiCutaway: null
+  disableAoiCutaway: null,
+  enterUndergroundMode: null,
+  exitUndergroundMode: null,
+  applyFastNavProfile: null
 });
 
 export const useCesium = () => useContext(Ctx);
@@ -198,6 +204,52 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       viewer.scene.requestRender();
     } catch {}
   }, [viewer, tileset]);
+
+  const applyFastNavProfile = React.useCallback(() => {
+    try {
+      if (!viewer) return;
+      const ctrl = viewer.scene.screenSpaceCameraController;
+      ctrl.inertiaTranslate = 0.0;
+      ctrl.inertiaZoom = 0.0;
+      ctrl.inertiaSpin = 0.0;
+      ctrl.lookDamping = 0.0;
+      ctrl.zoomFactor = 20.0; // faster zoom speed
+      ctrl.minimumZoomDistance = 1.0; // allow close to/under surface
+      viewer.resolutionScale = 0.85; // lighter rendering
+      viewer.scene.requestRender();
+    } catch {}
+  }, [viewer]);
+
+  const undergroundRef = useRef(false);
+  const enterUndergroundMode = React.useCallback(() => {
+    try {
+      if (!viewer) return;
+      const Cesium = (window as any).Cesium;
+      const globe = viewer.scene.globe;
+      const ctrl = viewer.scene.screenSpaceCameraController;
+      ctrl.enableCollisionDetection = false; // allow camera below terrain
+      globe.translucency.enabled = true;
+      globe.translucency.frontFaceAlpha = 0.35; // see-through terrain
+      if (Cesium?.Color) {
+        (globe as any).undergroundColor = new Cesium.Color(0.0, 0.0, 0.0, 0.6);
+      }
+      globe.depthTestAgainstTerrain = true;
+      undergroundRef.current = true;
+      viewer.scene.requestRender();
+    } catch {}
+  }, [viewer]);
+
+  const exitUndergroundMode = React.useCallback(() => {
+    try {
+      if (!viewer) return;
+      const globe = viewer.scene.globe;
+      const ctrl = viewer.scene.screenSpaceCameraController;
+      ctrl.enableCollisionDetection = true;
+      globe.translucency.enabled = false;
+      undergroundRef.current = false;
+      viewer.scene.requestRender();
+    } catch {}
+  }, [viewer]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -377,6 +429,9 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       controller.bounceAnimationTime = 0; // Disable bounce for immediate response
       controller.maximumMovementRatio = 1.0; // Allow full movement range
 
+      // Apply faster, lighter navigation defaults
+      applyFastNavProfile?.();
+
       // 7. Fly camera to AOI
       if (aoiBuffered) {
         await flyToRectangleFill(v, aoiBuffered);
@@ -407,8 +462,26 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
+  // Keyboard toggles for convenience: U = underground toggle, P = apply fast nav profile
+  useEffect(() => {
+    if (!viewer || !ready) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'u' || e.key === 'U') {
+        if (undergroundRef.current) {
+          exitUndergroundMode?.();
+        } else {
+          enterUndergroundMode?.();
+        }
+      } else if (e.key === 'p' || e.key === 'P') {
+        applyFastNavProfile?.();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [viewer, ready, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile]);
+
   return (
-    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current, enableAoiCutaway, disableAoiCutaway }}>
+    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current, enableAoiCutaway, disableAoiCutaway, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile }}>
       <div className="absolute inset-0 pointer-events-auto" ref={containerRef} />
       {children}
     </Ctx.Provider>
