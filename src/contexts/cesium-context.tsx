@@ -19,6 +19,8 @@ type CesiumCtx = {
   enterUndergroundMode: (() => void) | null;
   exitUndergroundMode: (() => void) | null;
   applyFastNavProfile: (() => void) | null;
+  enableFreeFly: (() => void) | null;
+  disableFreeFly: (() => void) | null;
 };
 
 const Ctx = createContext<CesiumCtx>({ 
@@ -33,7 +35,9 @@ const Ctx = createContext<CesiumCtx>({
   disableAoiCutaway: null,
   enterUndergroundMode: null,
   exitUndergroundMode: null,
-  applyFastNavProfile: null
+  applyFastNavProfile: null,
+  enableFreeFly: null,
+  disableFreeFly: null
 });
 
 export const useCesium = () => useContext(Ctx);
@@ -58,7 +62,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const enableAoiCutaway = React.useCallback((opts?: { keepInside?: boolean; edgeStyling?: boolean }) => {
     try {
-      if (!viewer || !kmlDataSource) return;
+      if (!viewer || !kmlDataSource || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
       const Cesium = (window as any).Cesium as any;
       if (!Cesium) return;
 
@@ -123,7 +127,8 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      const globe = viewer.scene.globe;
+      const globe = (viewer as any).scene?.globe;
+      if (!globe) return;
       if (!cutawayActiveRef.current) {
         prevBackFaceRef.current = globe.backFaceCulling;
         prevSkirtsRef.current = globe.showSkirts;
@@ -181,8 +186,9 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const disableAoiCutaway = React.useCallback(() => {
     try {
-      if (!viewer) return;
-      const globe = viewer.scene.globe;
+      if (!viewer || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
+      const globe = (viewer as any).scene?.globe;
+      if (!globe) return;
       if (globe.clippingPlanes) {
         globe.clippingPlanes.enabled = false;
         globe.clippingPlanes.removeAll();
@@ -207,8 +213,9 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const applyFastNavProfile = React.useCallback(() => {
     try {
-      if (!viewer) return;
-      const ctrl = viewer.scene.screenSpaceCameraController;
+      if (!viewer || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
+      const ctrl = (viewer as any).scene?.screenSpaceCameraController;
+      if (!ctrl) return;
       ctrl.inertiaTranslate = 0.0;
       ctrl.inertiaZoom = 0.0;
       ctrl.inertiaSpin = 0.0;
@@ -216,17 +223,18 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ctrl.zoomFactor = 20.0; // faster zoom speed
       ctrl.minimumZoomDistance = 1.0; // allow close to/under surface
       viewer.resolutionScale = 0.85; // lighter rendering
-      viewer.scene.requestRender();
+      (viewer as any).scene?.requestRender?.();
     } catch {}
   }, [viewer]);
 
   const undergroundRef = useRef(false);
   const enterUndergroundMode = React.useCallback(() => {
     try {
-      if (!viewer) return;
+      if (!viewer || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
       const Cesium = (window as any).Cesium;
-      const globe = viewer.scene.globe;
-      const ctrl = viewer.scene.screenSpaceCameraController;
+      const globe = (viewer as any).scene?.globe;
+      const ctrl = (viewer as any).scene?.screenSpaceCameraController;
+      if (!globe || !ctrl) return;
       ctrl.enableCollisionDetection = false; // allow camera below terrain
       globe.translucency.enabled = true;
       globe.translucency.frontFaceAlpha = 0.35; // see-through terrain
@@ -235,21 +243,185 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       globe.depthTestAgainstTerrain = true;
       undergroundRef.current = true;
-      viewer.scene.requestRender();
+      (viewer as any).scene?.requestRender?.();
     } catch {}
   }, [viewer]);
 
   const exitUndergroundMode = React.useCallback(() => {
     try {
-      if (!viewer) return;
-      const globe = viewer.scene.globe;
-      const ctrl = viewer.scene.screenSpaceCameraController;
+      if (!viewer || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
+      const globe = (viewer as any).scene?.globe;
+      const ctrl = (viewer as any).scene?.screenSpaceCameraController;
+      if (!globe || !ctrl) return;
       ctrl.enableCollisionDetection = true;
       globe.translucency.enabled = false;
       undergroundRef.current = false;
-      viewer.scene.requestRender();
+      (viewer as any).scene?.requestRender?.();
     } catch {}
   }, [viewer]);
+
+  // =========================
+  // Free-Fly Navigation Mode
+  // =========================
+  const freeFlyActiveRef = useRef(false);
+  const freeFlyRafRef = useRef<number | null>(null);
+  const keysRef = useRef<Set<string>>(new Set());
+  const baseSpeedRef = useRef<number>(50); // meters per second baseline
+  const lastTimeRef = useRef<number>(0);
+  const throttleRef = useRef<{ forward: number; strafe: number; vertical: number }>({ forward: 0, strafe: 0, vertical: 0 });
+  const inputActiveUntilRef = useRef<number>(0);
+  const rightDragRef = useRef<{ active: boolean; last?: { x: number; y: number } }>({ active: false });
+
+  const markInputActive = () => {
+    inputActiveUntilRef.current = performance.now() + 300; // keep lower resolution for 300ms after input
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    keysRef.current.add(e.key);
+    if (e.key === '+' || e.key === '=') { baseSpeedRef.current = Math.min(baseSpeedRef.current * 1.2, 2000); }
+    if (e.key === '-' || e.key === '_') { baseSpeedRef.current = Math.max(baseSpeedRef.current / 1.2, 1); }
+    markInputActive();
+  };
+  const handleKeyUp = (e: KeyboardEvent) => {
+    keysRef.current.delete(e.key);
+    markInputActive();
+  };
+
+  const buildScreenHandler = () => {
+    const Cesium = (window as any).Cesium as any;
+    const handler = new Cesium.ScreenSpaceEventHandler((viewer as any).scene?.canvas);
+    handler.setInputAction(() => {
+      rightDragRef.current.active = true;
+      rightDragRef.current.last = undefined;
+      markInputActive();
+    }, Cesium.ScreenSpaceEventType.RIGHT_DOWN);
+    handler.setInputAction(() => {
+      rightDragRef.current.active = false;
+      throttleRef.current.forward = 0;
+      throttleRef.current.strafe = 0;
+      throttleRef.current.vertical = 0;
+      markInputActive();
+    }, Cesium.ScreenSpaceEventType.RIGHT_UP);
+    handler.setInputAction((movement: any) => {
+      if (!rightDragRef.current.active) return;
+      const end = movement.endPosition;
+      const last = rightDragRef.current.last;
+      if (last) {
+        const dx = end.x - last.x;
+        const dy = end.y - last.y;
+        // Forward/back from vertical drag; strafe from horizontal
+        throttleRef.current.forward = Math.max(-1, Math.min(1, throttleRef.current.forward + (-dy * 0.01)));
+        throttleRef.current.strafe = Math.max(-1, Math.min(1, throttleRef.current.strafe + (dx * 0.01)));
+        // If Shift is held, vertical move from dy (hold shift for climb/dive)
+        const shiftHeld = keysRef.current.has('Shift') || keysRef.current.has('ShiftLeft') || keysRef.current.has('ShiftRight');
+        throttleRef.current.vertical = shiftHeld ? Math.max(-1, Math.min(1, throttleRef.current.vertical + (-dy * 0.01))) : 0;
+      }
+      rightDragRef.current.last = { x: end.x, y: end.y };
+      markInputActive();
+    }, Cesium.ScreenSpaceEventType.RIGHT_DRAG);
+    return handler;
+  };
+
+  const stepFreeFly = (now: number) => {
+    if (!viewer || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene || !freeFlyActiveRef.current) {
+      freeFlyRafRef.current = null;
+      return;
+    }
+    const Cesium = (window as any).Cesium as any;
+    const camera = (viewer as any).camera;
+    const scene = (viewer as any).scene;
+
+    const dt = Math.min(0.05, Math.max(0.0, (now - (lastTimeRef.current || now)) / 1000));
+    lastTimeRef.current = now;
+
+    // Performance scaling during active input
+    if (performance.now() < inputActiveUntilRef.current) {
+      (viewer as any).resolutionScale = 0.75;
+    } else {
+      (viewer as any).resolutionScale = 0.85;
+    }
+
+    // Movement inputs
+    const keys = keysRef.current;
+    const shift = keys.has('Shift') || keys.has('ShiftLeft') || keys.has('ShiftRight');
+    const speed = baseSpeedRef.current * (shift ? 3.0 : 1.0);
+
+    let forward = 0;
+    if (keys.has('w') || keys.has('W')) forward += 1;
+    if (keys.has('s') || keys.has('S')) forward -= 1;
+    forward += throttleRef.current.forward;
+
+    let strafe = 0;
+    if (keys.has('d') || keys.has('D')) strafe += 1;
+    if (keys.has('a') || keys.has('A')) strafe -= 1;
+    strafe += throttleRef.current.strafe;
+
+    let vertical = 0;
+    if (keys.has('e') || keys.has('E')) vertical += 1;
+    if (keys.has('q') || keys.has('Q')) vertical -= 1;
+    vertical += throttleRef.current.vertical;
+
+    // Apply motion in camera local axes
+    if (forward !== 0) camera.moveForward(forward * speed * dt);
+    if (strafe !== 0) camera.moveRight(strafe * speed * dt);
+    if (vertical !== 0) camera.moveUp(vertical * speed * dt);
+
+    // Optional: auto underground visuals when moving below surface (simple heuristic)
+    try {
+      const carto = Cesium.Ellipsoid.WGS84.cartesianToCartographic(camera.position);
+      if (carto && carto.height < 0) {
+        enterUndergroundMode?.();
+      }
+    } catch {}
+
+    scene.requestRender?.();
+    freeFlyRafRef.current = requestAnimationFrame(stepFreeFly);
+  };
+
+  const screenHandlerRef = useRef<any>(null);
+  const keyHandlersRef = useRef<{ down?: any; up?: any }>({});
+
+  const enableFreeFly = React.useCallback(() => {
+    try {
+      if (!viewer || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
+      if (freeFlyActiveRef.current) return;
+      // Attach listeners
+      keyHandlersRef.current.down = handleKeyDown;
+      keyHandlersRef.current.up = handleKeyUp;
+      window.addEventListener('keydown', keyHandlersRef.current.down);
+      window.addEventListener('keyup', keyHandlersRef.current.up);
+      screenHandlerRef.current = buildScreenHandler();
+      // Start loop
+      freeFlyActiveRef.current = true;
+      lastTimeRef.current = performance.now();
+      freeFlyRafRef.current = requestAnimationFrame(stepFreeFly);
+      markInputActive();
+    } catch {}
+  }, [viewer, enterUndergroundMode]);
+
+  const disableFreeFly = React.useCallback(() => {
+    try {
+      if (!freeFlyActiveRef.current) return;
+      freeFlyActiveRef.current = false;
+      // Remove listeners
+      if (keyHandlersRef.current.down) window.removeEventListener('keydown', keyHandlersRef.current.down);
+      if (keyHandlersRef.current.up) window.removeEventListener('keyup', keyHandlersRef.current.up);
+      keyHandlersRef.current.down = undefined;
+      keyHandlersRef.current.up = undefined;
+      if (screenHandlerRef.current && !screenHandlerRef.current.isDestroyed?.()) {
+        screenHandlerRef.current.destroy?.();
+      }
+      screenHandlerRef.current = null;
+      // Stop RAF
+      if (freeFlyRafRef.current) cancelAnimationFrame(freeFlyRafRef.current);
+      freeFlyRafRef.current = null;
+      // Restore resolution
+      if (viewer && !(viewer as any)?.isDestroyed?.()) (viewer as any).resolutionScale = 0.85;
+      throttleRef.current = { forward: 0, strafe: 0, vertical: 0 };
+      rightDragRef.current = { active: false, last: undefined };
+    } catch {}
+  }, [viewer]);
+
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -462,7 +634,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  // Keyboard toggles for convenience: U = underground toggle, P = apply fast nav profile
+  // Keyboard toggles for convenience: U = underground toggle, P = fast nav, F = free-fly toggle
   useEffect(() => {
     if (!viewer || !ready) return;
     const handler = (e: KeyboardEvent) => {
@@ -474,14 +646,20 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       } else if (e.key === 'p' || e.key === 'P') {
         applyFastNavProfile?.();
+      } else if (e.key === 'f' || e.key === 'F') {
+        if (freeFlyActiveRef.current) {
+          disableFreeFly?.();
+        } else {
+          enableFreeFly?.();
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [viewer, ready, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile]);
+  }, [viewer, ready, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile, enableFreeFly, disableFreeFly]);
 
   return (
-    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current, enableAoiCutaway, disableAoiCutaway, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile }}>
+    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current, enableAoiCutaway, disableAoiCutaway, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile, enableFreeFly, disableFreeFly }}>
       <div className="absolute inset-0 pointer-events-auto" ref={containerRef} />
       {children}
     </Ctx.Provider>
