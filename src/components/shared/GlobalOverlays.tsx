@@ -1,24 +1,100 @@
 /**
  * Global overlays that appear on all views - compass, scale, and measurement tool
+ * Centralized fixed slots to prevent overlap and ensure smooth UI across resolutions
  */
 
-import { useCesium } from '@/contexts/cesium-context';
-import { useThreeSceneSafe } from '@/contexts/three-scene-context';
-import { CompassOverlay, LogoOverlay, MetricScaleOverlay } from '@/components/overlays';
-import { Panel } from '@/components/ui/panel';
+import { useCesium } from "@/contexts/cesium-context";
+import { useThreeSceneSafe } from "@/contexts/three-scene-context";
+import { CompassOverlay, LogoOverlay, MetricScaleOverlay } from "@/components/overlays";
 
 interface GlobalOverlaysProps {
-  mode: 'cesium' | 'three' | 'none';
+  mode: "cesium" | "three" | "none";
   hidden?: boolean;
   measurementMode?: boolean;
   currentView?: string;
   onLogoClick?: () => void;
 }
 
-const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, currentView, onLogoClick }: GlobalOverlaysProps) => {
+/**
+ * Fixed UI slot container (top-left/right, bottom-left/right, top-center, bottom-center)
+ * - slot wrappers are pointer-events-none; children are pointer-events-auto to avoid blocking scene
+ * - includes safe-area padding to avoid notches
+ * - responsive stacking and gap to avoid collisions
+ */
+function Slot({
+  children,
+  position,
+  align = "start",
+}: {
+  children: React.ReactNode;
+  position:
+    | "top-left"
+    | "top-right"
+    | "bottom-left"
+    | "bottom-right"
+    | "top-center"
+    | "bottom-center";
+  align?: "start" | "center" | "end";
+}) {
+  const base =
+    "fixed z-50 pointer-events-none p-3 sm:p-4 md:p-5 flex gap-3 md:gap-4";
+  const safeAreaTop =
+    "pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
+  const safeAreaBottom =
+    "pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
+
+  const alignMap: Record<string, string> = {
+    start: "items-start",
+    center: "items-center",
+    end: "items-end",
+  };
+
+  let posClass = "";
+  let layout = "flex-col"; // stack by default in a column
+
+  switch (position) {
+    case "top-left":
+      posClass = `top-0 left-0 ${safeAreaTop}`;
+      break;
+    case "top-right":
+      posClass = `top-0 right-0 ${safeAreaTop}`;
+      break;
+    case "bottom-left":
+      posClass = `bottom-0 left-0 ${safeAreaBottom}`;
+      break;
+    case "bottom-right":
+      posClass = `bottom-0 right-0 ${safeAreaBottom}`;
+      break;
+    case "top-center":
+      posClass = `top-0 left-1/2 -translate-x-1/2 ${safeAreaTop}`;
+      layout = "flex-row"; // center slots can row-stack
+      break;
+    case "bottom-center":
+      posClass = `bottom-0 left-1/2 -translate-x-1/2 ${safeAreaBottom}`;
+      layout = "flex-row"; // center slots can row-stack
+      break;
+  }
+
+  return (
+    <div className={`${base} ${posClass} ${layout} ${alignMap[align]} max-w-full`}>
+      <div className="pointer-events-auto flex flex-col gap-3 md:gap-4 max-w-full">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const GlobalOverlays = ({
+  mode,
+  hidden = false,
+  measurementMode = false,
+  currentView,
+  onLogoClick,
+}: GlobalOverlaysProps) => {
   const { viewer: cesiumViewer } = useCesium();
   const threeSceneContext = useThreeSceneSafe();
-  const { camera: threeCamera, controls: threeControls, renderer: threeRenderer } = threeSceneContext || {};
+  const { camera: threeCamera, controls: threeControls, renderer: threeRenderer } =
+    threeSceneContext || {};
 
   if (hidden) return null;
 
@@ -34,14 +110,17 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
     const camera = scene.camera;
     const canvas = scene.canvas;
 
+    const Cesium = (window as any).Cesium;
+    if (!Cesium) return 1000;
+
     // Get distance to center of screen
-    const center = new (window as any).Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
+    const center = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
     const ray = camera.getPickRay(center);
     const intersection = scene.globe.pick(ray, scene);
 
-    if (!(window as any).Cesium.defined(intersection)) return 1000;
+    if (!Cesium.defined(intersection)) return 1000;
 
-    const distance = (window as any).Cesium.Cartesian3.distance(camera.positionWC, intersection);
+    const distance = Cesium.Cartesian3.distance(camera.positionWC, intersection);
 
     // Estimate meters per pixel at this distance
     const fov = camera.frustum.fovy;
@@ -52,8 +131,7 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
 
   const getThreeHeading = () => {
     if (!threeControls) return 0;
-    // For Three.js OrbitControls, getAzimuthalAngle() gives the horizontal rotation
-    // This is the correct way to get compass heading in Three.js views
+    // OrbitControls getAzimuthalAngle = horizontal rotation (heading)
     return threeControls.getAzimuthalAngle();
   };
 
@@ -64,60 +142,69 @@ const GlobalOverlays = ({ mode, hidden = false, measurementMode = false, current
       const canvas = threeRenderer.domElement;
       if (!canvas) return 1000;
 
-      // Get camera distance to scene center (assuming scene is centered at origin)
       const cameraDistance = threeCamera.position.length();
-
-      // Use camera's field of view to calculate meters per pixel
-      const fovRadians = (threeCamera.fov * Math.PI) / 180;
-      const metersPerPixel = (2 * cameraDistance * Math.tan(fovRadians / 2)) / canvas.clientHeight;
+      const fovRadians = (threeCamera as any).fov
+        ? ((threeCamera as any).fov * Math.PI) / 180
+        : Math.PI / 4;
+      const metersPerPixel =
+        (2 * cameraDistance * Math.tan(fovRadians / 2)) / canvas.clientHeight;
 
       return metersPerPixel * 100;
-    } catch (error) {
-      console.warn('Error calculating Three.js scale:', error);
+    } catch {
       return 1000;
     }
   };
 
-  return (
-    <div className={`absolute inset-0 pointer-events-none z-50 ${hidden ? 'opacity-0' : ''}`}>
-      {/* Global overlay grid layout */}
-      <div className="w-full h-full grid grid-cols-12 grid-rows-12 gap-4 p-4">
-        {/* Logo in top-left area (avoiding hero overlay area) */}
-        <div className="col-start-1 col-span-3 row-start-3 row-span-2 flex items-start justify-start">
-          <LogoOverlay className="pointer-events-auto" onClick={onLogoClick} />
-        </div>
+  const isCesium = mode === "cesium";
+  const isThree = mode === "three";
 
-        {/* Compass and scale in bottom-right area */}
-        <div className="col-start-10 col-span-3 row-start-9 row-span-4 flex flex-col items-end justify-end gap-4">
-          {mode === 'cesium' && (
-            <CompassOverlay
-              mode="cesium"
-              getHeading={getCesiumHeading}
-              className="pointer-events-auto"
-            />
-          )}
-          {mode === 'three' && (
-            <CompassOverlay
-              mode="three"
-              getHeading={getThreeHeading}
-              className="pointer-events-auto"
-            />
-          )}
-          {mode === 'none' && (
-            <CompassOverlay
-              mode="cesium"
-              getHeading={() => 0}
-              className="pointer-events-auto"
-            />
-          )}
-          <MetricScaleOverlay
-            mode={mode === 'cesium' ? 'cesium' : mode === 'three' ? 'three' : 'cesium'}
-            getMetersIn100px={mode === 'cesium' ? getCesiumMetersIn100px : mode === 'three' ? getThreeMetersIn100px : () => 100}
-            className="pointer-events-auto"
+  return (
+    <>
+      {/* Top-left slot: Logo */}
+      <Slot position="top-left" align="start">
+        <LogoOverlay className="will-change-transform transition-transform duration-150" onClick={onLogoClick} />
+      </Slot>
+
+      {/* Top-right slot: Compass (stacked), room for additional controls if needed */}
+      <Slot position="top-right" align="end">
+        {isCesium && (
+          <CompassOverlay
+            mode="cesium"
+            getHeading={getCesiumHeading}
+            className="will-change-transform transition-transform duration-150"
           />
-        </div>
-      </div>
-    </div>
+        )}
+        {isThree && (
+          <CompassOverlay
+            mode="three"
+            getHeading={getThreeHeading}
+            className="will-change-transform transition-transform duration-150"
+          />
+        )}
+        {!isCesium && !isThree && (
+          <CompassOverlay
+            mode="cesium"
+            getHeading={() => 0}
+            className="will-change-transform transition-transform duration-150"
+          />
+        )}
+      </Slot>
+
+      {/* Bottom-left slot: Metric scale */}
+      <Slot position="bottom-left" align="start">
+        <MetricScaleOverlay
+          mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
+          getMetersIn100px={
+            isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
+          }
+          className="will-change-transform transition-transform duration-150"
+        />
+      </Slot>
+
+      {/* Reserve top-center/bottom-center for future unique controls if needed */}
+      {/* <Slot position="top-center" align="center"></Slot>
+      <Slot position="bottom-center" align="center"></Slot> */}
+    </>
   );
 };
 

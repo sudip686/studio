@@ -184,10 +184,10 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       v.scene.globe.depthTestAgainstTerrain = true;
       v.scene.globe.enableLighting = true;
       // Increase brightness for more vibrancy
-      v.scene.light.intensity = 2.0; // Boost lighting intensity
-      v.scene.globe.baseColor = Cesium.Color.WHITE.withAlpha(0.1); // Add slight base color for vibrancy
-      v.scene.atmosphere.brightnessShift = 0.2; // Brighten atmosphere
-      v.scene.skyBox.brightnessShift = 0.1; // Brighten skybox
+      v.scene.light.intensity = 2.4; // Boost lighting intensity (+20%)
+      v.scene.globe.baseColor = Cesium.Color.WHITE.withAlpha(0.12); // Slightly brighter base color
+      v.scene.atmosphere.brightnessShift = 0.24; // Brighten atmosphere (+20%)
+      v.scene.skyBox.brightnessShift = 0.12; // Brighten skybox (+20%)
       try { v.scene.terrainExaggeration = 1.3; } catch {}
 
       // 6. Enable smooth VR-like navigation for cinematic experience
