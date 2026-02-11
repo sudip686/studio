@@ -1,3 +1,21 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:34c44c1e58c91af860baf000f416b5d921b645d868850ef7008acae0620eef0a
-size 709
+import * as React from 'react';
+
+import {cn} from '@/lib/utils';
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'textarea'>>(
+  ({className, ...props}, ref) => {
+    return (
+      <textarea
+        className={cn(
+          'flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
+Textarea.displayName = 'Textarea';
+
+export {Textarea};

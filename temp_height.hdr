@@ -1,3 +1,17 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:b681239c1b07e8d81bac2ae9926ebda067f165757182ccd340ffa7892658f445
-size 791
+ENVI
+description = {
+temp_height.bin}
+samples = 7221
+lines   = 7194
+bands   = 1
+header offset = 0
+file type = ENVI Standard
+data type = 4
+interleave = bsq
+byte order = 0
+map info = {UTM, 1, 1, 388973.231817064, 9557887.96189229, 30.7498078768075, 30.7498078768075, 37, South,WGS-84}
+coordinate system string = {PROJCS["WGS_1984_UTM_Zone_37S",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",10000000.0],PARAMETER["Central_Meridian",39.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]}
+band names = {
+Band 1}
+data ignore value = -32767
+default bands = {1}

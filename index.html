@@ -1,3 +1,346 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:06117b045ee84dce77ecfb0a8145046bd618d3ed897f99de722bf5c47bd16456
-size 15934
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cesium KML Viewer</title>
+
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.19.10/dist/proj4.min.js"></script>
+
+    <style>
+        html, body, #cesiumContainer {
+            width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+        }
+        .nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 50px;
+            font-weight: bold;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 1000;
+            user-select: none;
+        }
+        .nav-arrow:hover {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .left {
+            left: 30px;
+        }
+        .right {
+            right: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+    <div id="prevButton" class="nav-arrow left">&lt;</div>
+    <div id="nextButton" class="nav-arrow right">&gt;</div>
+
+    <div id="toolbar" style="position: absolute; top: 10px; left: 10px; background: rgba(42, 42, 42, 0.8); padding: 4px; border-radius: 4px; color: white; z-index: 1000; display: none;">
+        <table>
+            <tbody>
+            <tr>
+                <td>Exaggeration</td>
+                <td><input type="range" min="1" max="10" step="0.1" data-bind="value: exaggeration, valueUpdate: 'input'"></td>
+                <td><input type="text" size="5" data-bind="value: exaggeration"></td>
+            </tr>
+        </tbody></table>
+    </div>
+
+    <script>
+        async function main() {
+            // --- SETUP ---
+            const mapTilerKey = 'T0BS3DODPGtl4cMNTebt'; // Your active MapTiler key
+            Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzMmJlZTgxYi0wMjE5LTRhYzAtYTM1ZS02NzE0MDYxMGQzODMiLCJpZCI6MzMxMTEyLCJpYXQiOjE3NTgxNzk2Njh9.oqTC-DWfZOq776pNzMR9eYnS3VA17n6y3jOcuoXkJqs';
+
+            const imageryProvider = new Cesium.UrlTemplateImageryProvider({
+                url: `https://api.maptiler.com/maps/bright-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`,
+                tilingScheme: new Cesium.WebMercatorTilingScheme(),
+                maximumLevel: 19,
+                credit: new Cesium.Credit('<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>')
+            });
+
+            // Disable InfoBox/selectionIndicator to avoid sandboxed about:blank script warnings
+            const viewer = new Cesium.Viewer('cesiumContainer', {
+                animation: false,
+                timeline: false,
+                infoBox: false,
+                selectionIndicator: false,
+                imageryProvider: imageryProvider
+            });
+
+            // Keep references for flow between views
+            let boundaryDataSource = undefined;
+            let boundaryEntity = undefined;
+            let isReady = false;
+
+            // --- LOAD INITIAL KML DATA ---
+            async function tryLoadKmz(url) {
+                return Cesium.KmlDataSource.load(url, {
+                    clampToGround: true,
+                    camera: viewer.scene.camera,
+                    canvas: viewer.scene.canvas,
+                });
+            }
+            try {
+                // Try common dev server mappings (http-server serves files from project root)
+                const candidateUrls = [
+                    '/public/tanga_boundary.kmz',        // http-server or Next public folder
+                    '/tanga_boundary.kmz',               // direct at web root
+                    './public/tanga_boundary.kmz',       // relative fallback
+                    './tanga_boundary.kmz'               // relative at root
+                ];
+                let loaded = false;
+                for (const url of candidateUrls) {
+                    try {
+                        console.log('Attempting to load KMZ from', url);
+                        boundaryDataSource = await tryLoadKmz(url);
+                        loaded = true;
+                        break;
+                    } catch (e) {
+                        console.warn('KMZ load failed for', url, e);
+                    }
+                }
+                if (!loaded) throw new Error('KMZ not found in expected locations.');
+                await viewer.dataSources.add(boundaryDataSource);
+
+                // Find the polygon entity and style outline
+                const entities = boundaryDataSource.entities.values;
+                let labelAdded = false;
+                for (const entity of entities) {
+                    if (entity.polygon) {
+                        boundaryEntity = entity;
+                        entity.polygon.fill = false;
+                        entity.polygon.outline = true;
+                        entity.polygon.outlineColor = Cesium.Color.RED;
+                        entity.polygon.outlineWidth = 5;
+
+                        const polyPositions = entity.polygon.hierarchy.getValue(viewer.clock.currentTime).positions;
+                        if (!labelAdded && polyPositions && polyPositions.length > 0) {
+                            const polyCenter = Cesium.BoundingSphere.fromPoints(polyPositions).center;
+                            // Add-or-update label entity to avoid duplicate id errors
+                            let tangaLabelEntity = viewer.entities.getById('tanga_label');
+                            if (!tangaLabelEntity) {
+                                try {
+                                    tangaLabelEntity = new Cesium.Entity({ id: 'tanga_label' });
+                                    viewer.entities.add(tangaLabelEntity);
+                                } catch (e) {
+                                    // As a last resort, remove and re-add if an orphan exists
+                                    const existing = viewer.entities.getById('tanga_label');
+                                    if (existing) viewer.entities.remove(existing);
+                                    tangaLabelEntity = new Cesium.Entity({ id: 'tanga_label' });
+                                    viewer.entities.add(tangaLabelEntity);
+                                }
+                            }
+                            tangaLabelEntity.position = polyCenter;
+                            tangaLabelEntity.label = {
+                                text: 'Tanga Graphite',
+                                font: 'bold 20px sans-serif',
+                                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                                fillColor: Cesium.Color.YELLOW,
+                                outlineColor: Cesium.Color.BLACK,
+                                outlineWidth: 3,
+                                showBackground: true,
+                                backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+                                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                                pixelOffset: new Cesium.Cartesian2(0, -20),
+                                disableDepthTestDistance: Number.POSITIVE_INFINITY
+                            };
+                            labelAdded = true;
+                        }
+                    }
+                }
+                await viewer.flyTo(boundaryDataSource);
+                isReady = true;
+            } catch (error) {
+                console.error('Error loading KMZ file: ', error);
+                alert('Could not load KMZ file. Ensure "/public/tanga_boundary.kmz" exists and you are running the dev server.');
+            }
+
+            // --- VERTICAL EXAGGERATION UI SETUP ---
+            const toolbar = document.getElementById("toolbar");
+            const viewModel = {
+                exaggeration: viewer.scene.verticalExaggeration,
+            };
+            Cesium.knockout.track(viewModel);
+            Cesium.knockout.applyBindings(viewModel, toolbar);
+            
+            function updateExaggeration() {
+                viewer.scene.verticalExaggeration = Number(viewModel.exaggeration);
+            }
+            Cesium.knockout.getObservable(viewModel, 'exaggeration').subscribe(updateExaggeration);
+            
+            // --- NAVIGATION LOGIC ---
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+            let currentView = 'original';
+            let styledKmlHandler;
+            let ionImageryLayer;
+
+            const viewStates = ['original', 'exaggerated_kml', 'styled_kml', 'ion_imagery'];
+            
+            function updateNavButtons() {
+                const currentIndex = viewStates.indexOf(currentView);
+                const show = isReady;
+                prevButton.style.display = show && (currentIndex > 0) ? 'block' : 'none';
+                nextButton.style.display = show && (currentIndex < viewStates.length - 1) ? 'block' : 'none';
+            }
+
+            async function switchToView(viewName) {
+                console.log(`Switching from ${currentView} to ${viewName} view...`);
+                
+                // Unload the current view
+                if (currentView === 'exaggerated_kml') await unloadExaggeratedView();
+                if (currentView === 'styled_kml') await unloadStyledKmlView();
+                if (currentView === 'ion_imagery') await unloadIonImageryView();
+                
+                // Load the new view
+                if (viewName === 'original') await loadOriginalView();
+                if (viewName === 'exaggerated_kml') await loadExaggeratedView();
+                if (viewName === 'styled_kml') await loadStyledKmlView();
+                if (viewName === 'ion_imagery') await loadIonImageryView();
+
+                currentView = viewName;
+                updateNavButtons();
+            }
+
+            nextButton.addEventListener('click', () => {
+                const currentIndex = viewStates.indexOf(currentView);
+                if (currentIndex < viewStates.length - 1) {
+                    switchToView(viewStates[currentIndex + 1]);
+                }
+            });
+
+            prevButton.addEventListener('click', () => {
+                const currentIndex = viewStates.indexOf(currentView);
+                if (currentIndex > 0) {
+                    switchToView(viewStates[currentIndex - 1]);
+                }
+            });
+
+            // --- View Implementations ---
+
+            async function loadOriginalView() {
+                console.log("Loading Original View...");
+                viewer.imageryLayers.removeAll();
+                viewer.imageryLayers.addImageryProvider(imageryProvider);
+                viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
+                    `https://api.maptiler.com/tiles/terrain-quantized-mesh-v2/?key=${mapTilerKey}`
+                );
+                if (boundaryDataSource) {
+                    boundaryDataSource.show = true;
+                    if (boundaryEntity) {
+                        boundaryEntity.polygon.fill = false;
+                        boundaryEntity.polygon.material = Cesium.Color.TRANSPARENT;
+                    }
+                    const tangaLabel = viewer.entities.getById('tanga_label');
+                    if (tangaLabel) tangaLabel.show = true;
+                    await viewer.flyTo(boundaryDataSource);
+                }
+            }
+
+            async function loadExaggeratedView() {
+                console.log("Loading Tanga Topography View...");
+                if (!boundaryEntity) return;
+
+                const tangaLabel = viewer.entities.getById('tanga_label');
+                if (tangaLabel) tangaLabel.show = false;
+                
+                await viewer.flyTo(boundaryEntity, {
+                    duration: 3.0,
+                    offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(30.0), Cesium.Math.toRadians(-45.0), 80000)
+                });
+
+                viewer.scene.verticalExaggeration = 3.0;
+                toolbar.style.display = 'block';
+            }
+
+            async function unloadExaggeratedView() {
+                console.log("Unloading Tanga Topography View...");
+                toolbar.style.display = 'none';
+                viewer.scene.verticalExaggeration = 1.0;
+            }
+
+            async function loadStyledKmlView() {
+                console.log("Loading Tanga Licenses View...");
+                
+                if (!boundaryEntity) return;
+
+                const tangaLabel = viewer.entities.getById('tanga_label');
+                if (tangaLabel) tangaLabel.show = false;
+
+                const originalMaterial = Cesium.Color.WHITE.withAlpha(0.5);
+                boundaryEntity.polygon.fill = true;
+                boundaryEntity.polygon.material = originalMaterial;
+
+                await viewer.flyTo(boundaryEntity, {
+                    duration: 3.0,
+                    offset: new Cesium.HeadingPitchRange(
+                        Cesium.Math.toRadians(0.0),
+                        Cesium.Math.toRadians(-50.0),
+                        15000
+                    )
+                });
+
+                styledKmlHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+                let highlightedEntity = undefined;
+                styledKmlHandler.setInputAction(function onMouseMove(movement) {
+                    const pickedObject = viewer.scene.pick(movement.endPosition);
+                    if (Cesium.defined(highlightedEntity)) {
+                        highlightedEntity.polygon.material = originalMaterial;
+                        highlightedEntity = undefined;
+                    }
+                    if (Cesium.defined(pickedObject) && pickedObject.id === boundaryEntity) {
+                        highlightedEntity = pickedObject.id;
+                        pickedObject.id.polygon.material = Cesium.Color.YELLOW.withAlpha(0.5);
+                    }
+                }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            }
+
+            async function unloadStyledKmlView() {
+                console.log("Unloading Tanga Licenses View...");
+                if (styledKmlHandler && !styledKmlHandler.isDestroyed()) {
+                    styledKmlHandler.destroy();
+                }
+            }
+
+            async function loadIonImageryView() {
+                console.log("Loading ION Imagery View...");
+                try {
+                    ionImageryLayer = await viewer.imageryLayers.addImageryProvider(
+                        await Cesium.IonImageryProvider.fromAssetId(3678736)
+                    );
+                    console.log("Added ION imagery layer.");
+                } catch (error) {
+                    console.error("Error loading ION imagery:", error);
+                    alert("Failed to load the ION imagery layer. Please check the asset ID and your token.");
+                }
+            }
+
+            async function unloadIonImageryView() {
+                console.log("Unloading ION Imagery View...");
+                if (ionImageryLayer) {
+                    viewer.imageryLayers.remove(ionImageryLayer, true);
+                    ionImageryLayer = undefined;
+                }
+            }
+
+            // Initial setup
+            updateNavButtons();
+            if (isReady) {
+                await loadOriginalView();
+                updateNavButtons();
+            }
+        }
+        main();
+    </script>
+</body>
+</html>

@@ -1,3 +1,21 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:2f87fe4e90972f38d8a3181fc65c4e7c01d2f2a0487575e060fcaeb836a6d4f6
-size 603
+<PAMDataset>
+  <Metadata>
+    <MDI key="AREA_OR_POINT">Area</MDI>
+  </Metadata>
+  <Metadata domain="ENVI">
+    <MDI key="samples">7221</MDI>
+    <MDI key="lines">7194</MDI>
+    <MDI key="bands">1</MDI>
+    <MDI key="header_offset">0</MDI>
+    <MDI key="file_type">ENVI Standard</MDI>
+    <MDI key="data_type">4</MDI>
+    <MDI key="interleave">bsq</MDI>
+    <MDI key="byte_order">0</MDI>
+  </Metadata>
+  <Metadata domain="IMAGE_STRUCTURE">
+    <MDI key="INTERLEAVE">BAND</MDI>
+  </Metadata>
+  <PAMRasterBand band="1">
+    <NoDataValue>-3.27670000000000E+04</NoDataValue>
+  </PAMRasterBand>
+</PAMDataset>

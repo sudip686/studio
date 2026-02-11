@@ -1,3 +1,20 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:3c18f1aad0add595ec9170577148d3fc82d0cd8b51a632f4d136cdc0df978971
-size 579
+'use client';
+
+import { useEffect } from 'react';
+
+export default function ServiceWorkerRegistrar() {
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      // Service worker registration enabled
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').then(registration => {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, err => {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
+  }, []);
+
+  return null;
+}

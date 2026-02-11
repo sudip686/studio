@@ -1,3 +1,13 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:20b2376077e2af3e8210e554753e437be06eb9da302c86f57eb8fb2a0efc9a9f
-size 376
+'use client';
+import dynamic from 'next/dynamic';
+
+// TerrainGlbBuilder uses Three/DOM APIs; ensure it renders on client only
+const TerrainGlbBuilder = dynamic(() => import('@/components/tools/TerrainGlbBuilder'), { ssr: false });
+
+export default function Page() {
+  return (
+    <div style={{ height: '100vh', width: '100vw' }}>
+      <TerrainGlbBuilder />
+    </div>
+  );
+}

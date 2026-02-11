@@ -1,3 +1,14 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:449c60066b9dc928b6dbbcdb67c9f1583b94bebc779ac4682e35a50a28513770
-size 314
+# Project Context
+
+## Definition
+- [Product Definition](./product.md)
+- [Product Guidelines](./product-guidelines.md)
+- [Tech Stack](./tech-stack.md)
+
+## Workflow
+- [Workflow](./workflow.md)
+- [Code Style Guides](./code_styleguides/)
+
+## Management
+- [Tracks Registry](./tracks.md)
+- [Tracks Directory](./tracks/)

@@ -1,3 +1,14 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:dc1ec1f91673137016dcc5f7955553f40cfe9f461f7dff6f67999823854616b0
-size 389
+import { Panel } from './ui/panel';
+import { CompassOverlay } from './ui/CompassOverlay';
+import { MetricScaleOverlay } from './ui/MetricScaleOverlay';
+
+export function ControlDock() {
+  return (
+    <div className="absolute bottom-4 right-4 z-20">
+      <Panel className="flex items-center gap-4">
+        <CompassOverlay />
+        <MetricScaleOverlay />
+      </Panel>
+    </div>
+  );
+}

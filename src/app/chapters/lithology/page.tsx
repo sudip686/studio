@@ -1,3 +1,33 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:6696e143faa24dbd3b752708c4b03a1b3d65991675f7b57f5e4e1798adb6d5fa
-size 1148
+'use client';
+
+import { useState } from 'react';
+import DrillholeLocationMap from '@/components/drillhole-location-map';
+import LithologyViewer from '@/components/viewers/LithologyView';
+
+export default function LithologyPage() {
+  const [view, setView] = useState('2d'); // '2d' for map, '3d' for viewer
+
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
+        <button 
+          onClick={() => setView('2d')} 
+          disabled={view === '2d'}
+          style={{ background: view === '2d' ? 'lightblue' : 'white', padding: '8px', marginRight: '5px', border: '1px solid black' }}
+        >
+          2D Map
+        </button>
+        <button 
+          onClick={() => setView('3d')} 
+          disabled={view === '3d'}
+          style={{ background: view === '3d' ? 'lightblue' : 'white', padding: '8px', border: '1px solid black' }}
+        >
+          3D View
+        </button>
+      </div>
+
+      {view === '2d' && <DrillholeLocationMap displayMode="lithology" />}
+      {view === '3d' && <LithologyViewer />}
+    </div>
+  );
+}

@@ -1,3 +1,8 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:46632b086851a3f64ac0172c5ae57c19d14b3648f231d522eea73c3f25df374b
-size 274
+'use client';
+
+import { TerrainAscLayer } from './TerrainAscLayer';
+
+// This is now a wrapper around the high-quality TerrainAscLayer to ensure consistency across the app.
+export default function TerrainSurfaceLayer(props: any) {
+    return <TerrainAscLayer {...props} />;
+}
