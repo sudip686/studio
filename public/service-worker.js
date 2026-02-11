@@ -14,20 +14,7 @@ if (workbox) {
   navigationPreload.enable();
 
   // __WB_MANIFEST is replaced at build time (InjectManifest)
-  precaching.precacheAndRoute([
-    {"revision":"c97cf2641541d4d5d8bcf10ae302a0a1","url":"A_Logo.png"},
-    {"revision":"v20260211b","url":"texture_rgb_8192.png"},
-    {"revision":"a0dfd68399deef910f885a05df9e39f0","url":"assay_data.geojson"},
-    {"revision":"b4b59d6b46198c33fcedd651aaae99af","url":"BlockModel.geojson"},
-    {"revision":"e3924df8c4b5d51befa4b0189488ba2c","url":"boundary.kmz"},
-    {"revision":"f7570b55f5370211de7c3eee2bebf2aa","url":"lithology_data.geojson"},
-    {"revision":"5cf5bd8fef0972d887c9e24b90a4a8a7","url":"mining_license_boundary.kml"},
-    {"revision":"a8834c491497a2a8852aaf7e95459fc5","url":"tanga_boundary.kmz"},
-    {"revision":"b158b51bcfa36b3bf47493eb7e7af3bc","url":"geology_map.jpg"},
-    {"revision":"v20260211b","url":"height.bin"},
-    {"revision":"v20260211b","url":"terrain_meta.json"},
-    {"revision":"v20260211b","url":"drillholes_utm.json"},
-  ] || []);
+  precaching.precacheAndRoute([{"revision":"c4f7b0a2780d1b6d328c7a90d09f839a","url":"topography.png"},{"revision":"a4d6a853c53e7ce9f5c194663c583749","url":"icon.png"},{"revision":"c97cf2641541d4d5d8bcf10ae302a0a1","url":"A_Logo.png"},{"revision":"2501d8995f17014a540798535d39c96c","url":"terrain_runtime.json"},{"revision":"5d65658c3b1cb4988b7748e7019d4f55","url":"terrain_meta.json"},{"revision":"a8834c491497a2a8852aaf7e95459fc5","url":"tanga_boundary.kmz"},{"revision":"5a280c1bdb6562780a079442b02331c3","url":"mining_license_boundary.kml"},{"revision":"5c2b40a32d353866d37bf05cc00fcb2a","url":"lithology_data.geojson"},{"revision":"0d4f7d6ca41a7cfb5c6d280f79d196e0","url":"drillholes_utm.json"},{"revision":"e3924df8c4b5d51befa4b0189488ba2c","url":"boundary.kmz"},{"revision":"d607dac9837aece7b958ccc5f0257228","url":"BlockModel.geojson"},{"revision":"0716939f0ccfc85d574c1d68eb0d6aaf","url":"assay_data.geojson"},{"revision":"3d490ead38543b61b9842966ae0aa34d","url":"terrain_texture_8k.jpg"},{"revision":"b158b51bcfa36b3bf47493eb7e7af3bc","url":"geology_map.jpg"}] || []);
 
 
 
@@ -127,7 +114,6 @@ self.addEventListener('activate', (event) => {
     'tiles-swr-v2',
     'img-swr-v2',
     'default-nf-v2',
-    // precache managed by workbox uses a custom name; leave it
   ]);
   event.waitUntil(
     (async () => {
@@ -140,48 +126,6 @@ self.addEventListener('activate', (event) => {
           return Promise.resolve(false);
         })
       );
-      // Purge specific stale URLs from all caches (old terrain files, unused textures)
-      const STALE_URLS = [
-        '/terrain_min.glb',
-        '/terrain.glb',
-        '/texture_rgb_4096.png',
-        '/earth.glb',
-        '/geologicalModel.glb',
-        // Newly added stale URLs due to file cleanup
-        '/height_2049.png',
-        '/terrain/index.html',
-        '/resource_model.bin',
-        '/Tanga Road Map.tiff',
-        '/assay_data.json',
-        '/lithology_data.json',
-        '/Topography.asc',
-        '/app.R',
-        '/terrain_surface.glb',
-        '/dem_height_4097_u16.png',
-        '/dem_height_4097_u8.png',
-        '/dem_hillshade_4097.png',
-        '/rgb_input_georef.tif',
-        '/rgb_match_dem.tif',
-        '/terrain/', // For the directory
-      ];
-      await Promise.all(
-        names.map(async (name) => {
-          const cache = await caches.open(name);
-          const requests = await cache.keys();
-          await Promise.all(
-            requests.map((req) => {
-              try {
-                const url = new URL(req.url);
-                if (STALE_URLS.includes(url.pathname)) {
-                  return cache.delete(req);
-                }
-              } catch {}
-              return Promise.resolve(false);
-            })
-          );
-        })
-      );
-      // Take control immediately after cleanup
       await (self as any).clients?.claim?.();
     })()
   );
