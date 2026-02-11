@@ -1,3 +1,16 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:80c896febbbc320854fadc7834264aefa45b713d3d9d13f2289d0ba4b26aeeeb
-size 444
+'use client';
+
+import { useEffect } from 'react';
+import { useCesium } from '@/contexts/cesium-context';
+import KmlBoundary from '../KmlBoundary';
+import { fitViewerToDataSource } from '@/lib/utils/cesium-fit'; // Import the helper
+
+const OriginalKmlView = () => {
+  const { viewer } = useCesium();
+
+// Removed redundant useEffect for camera flight, now handled in KmlBoundary.tsx
+
+  return <KmlBoundary />;
+};
+
+export default OriginalKmlView;

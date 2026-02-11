@@ -1,3 +1,15 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d2b9a6a8e3eb5d9a93f98b26f966476459b0e3a0844186b5a02921ac4afdd813
-size 577
+/**
+ * Three.js-based visualization components
+ * These components use Three.js for client-side 3D rendering
+ * Includes lithology visualization, assay plotting, and block model display
+ */
+
+// Core Three.js scene setup and management
+export { default as CommonGeoVision } from '../common-geo-vision';
+export { default as GeoVisionHost } from '../GeoVisionHost';
+
+// View switching and layer management
+export { default as ThreeJsViewSwitch } from '../ThreeJsViewSwitch';
+
+// Block model visualization
+export { default as BlockModelClipViewer } from '../BlockModelClipViewer';

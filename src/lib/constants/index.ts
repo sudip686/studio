@@ -1,3 +1,19 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:9d8b02a5fbcd541b04ec0df1593d007876f240886b77c4c02a18703f9a2b8bd0
-size 497
+/**
+ * Application constants
+ * Centralized definitions for legends, color maps, and static data
+ */
+
+export {
+  graphiticCarbonLegendData,
+  mineralDomainsLegendData,
+  cesiumViewerLithologyLegendData,
+  drillholeLocationMapLithologyLegendData,
+  geoVisionLithologyLegendData,
+  carbonGradeLegendData,
+  classificationLegendData,
+  geospatialViewerLithologyLegendData,
+  lithologyLegendData,
+  LITHOLOGY_COLOR_MAP_CSS,
+  ASSAY_GRAPHITIC_CARBON,
+  LITHOLOGY_COLORS,
+} from './legend-definitions';
