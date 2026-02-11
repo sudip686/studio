@@ -144,7 +144,12 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
         console.log("CesiumViewer: Lithology color map created.");
 
         const mapTilerKey = 'MQ8jhB5F57QiT1CrsiUJ';
-        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkMDFlYzZkOC00ZmQ0LTRhZDYtYjkxOC1mYzNiNzg3YWEyYWIiLCJpZCI6MzMxMTEyLCJpYXQiOjE3NTYzODcxMTh9.Wr0NYWSQJXkzlvwNerpP7k6xUQqklGQdPbUELgnw9VU';
+        const ionToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
+        if (ionToken && typeof ionToken === 'string') {
+            Cesium.Ion.defaultAccessToken = ionToken;
+        } else {
+            console.warn('CesiumViewer: NEXT_PUBLIC_CESIUM_ION_TOKEN is not defined. Cesium Ion assets may fail to authenticate.');
+        }
 
         const imageryProvider = new Cesium.UrlTemplateImageryProvider({
             url: `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${mapTilerKey}`,
