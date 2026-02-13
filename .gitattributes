@@ -17,3 +17,4 @@
 public/A_Logo.png filter=lfs diff=lfs merge=lfs -text
 public/boundary.kmz filter=lfs diff=lfs merge=lfs -text
 public/tanga_boundary.kmz filter=lfs diff=lfs merge=lfs -text
+public/*.json filter=lfs diff=lfs merge=lfs -text

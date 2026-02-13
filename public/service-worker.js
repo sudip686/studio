@@ -80,33 +80,23 @@ if (workbox) {
   console.log(`Boo! Workbox didn't load 😬`);
 }
 
-// --- INSTALL-TIME WARMUP ---
+// --- INSTALL-TIME WARMUP (disabled to prevent runtime errors) ---
+// Keep lightweight stubs so the SW remains valid JS.
 const WARM_CACHE_NAME = 'tiles-swr-v2';
-const AREA = {
-  bbox: [38.5, -5.3, 38.9, -4.9],
-  zooms: [9, 10]
-};
-
-function lonLatToTileXY(lon, lat, z) {
-    // ... (same as before)
-}
-function buildWarmUrls({ bbox, zooms }) {
-    // ... (same as before)
-}
-
-self.addEventListener('install', (event) => {
-  const warmUrls = buildWarmUrls(AREA);
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(WARM_CACHE_NAME);
-      try {
-        await cache.addAll(warmUrls);
-      } catch {
-        // Ignore failures
-      }
-    })()
-  );
-});
+function buildWarmUrls() { return []; }
+// self.addEventListener('install', (event) => {
+//   const warmUrls = buildWarmUrls();
+//   event.waitUntil(
+//     (async () => {
+//       const cache = await caches.open(WARM_CACHE_NAME);
+//       try {
+//         await cache.addAll(warmUrls);
+//       } catch {
+//         // Ignore failures
+//       }
+//     })()
+//   );
+// });
 
 self.addEventListener('activate', (event) => {
   const CURRENT_CACHES = new Set([
@@ -126,7 +116,9 @@ self.addEventListener('activate', (event) => {
           return Promise.resolve(false);
         })
       );
-      await (self as any).clients?.claim?.();
+      if (self && self.clients && typeof self.clients.claim === 'function') {
+        await self.clients.claim();
+      }
     })()
   );
 });
