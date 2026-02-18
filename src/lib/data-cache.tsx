@@ -64,9 +64,9 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
         dataSize: { lithology: 0, assay: 0, blockModel: 0 },
     });
 
-    const refetch = () => {
+    const refetch = useCallback(() => {
         setCache(c => ({ ...c, loadingStatus: 'idle' }));
-    };
+    }, []);
 
     useEffect(() => {
         const loadData = async () => {
@@ -174,6 +174,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                         const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
                         const { midpoint, quaternion } = orientationFrom(p0, p1);
                         borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
+                        borehole.length = length;
                     }
                 });
 
@@ -224,6 +225,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                         const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
                         const { midpoint, quaternion } = orientationFrom(p0, p1);
                         borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
+                        borehole.length = length;
                     }
                 });
 
@@ -295,8 +297,10 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [cache.loadingStatus]);
 
+    const value = React.useMemo(() => ({ ...cache, refetch }), [cache, refetch]);
+
     return (
-        <DataCacheContext.Provider value={{...cache, refetch}}>
+        <DataCacheContext.Provider value={value}>
             {children}
         </DataCacheContext.Provider>
     );
