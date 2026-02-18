@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData } from '@/lib/constants';
+import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData, ASSET_BASE_URL } from '@/lib/constants';
 import * as Cesium from 'cesium';
 
 interface GrandCanyonDrillholeViewerProps {
@@ -74,7 +74,7 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
         
         const [geoJson, bm] = await Promise.all([
             fetch(geojsonPath).then(res => res.json()),
-            fetch('/BlockModel.geojson').then(res => res.json())
+            fetch(`${ASSET_BASE_URL}/BlockModel.geojson`).then(res => res.json())
         ]);
 
         if (!isMounted) return;

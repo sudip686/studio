@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import * as THREE from 'three';
 import { useSubsurface } from '@/contexts/subsurface-context';
+import { ASSET_BASE_URL } from '@/lib/constants';
 
 const CARBON_COLOR_MAP: { [key: string]: string } = { 
     LOW: '#00ff00', 
@@ -35,7 +36,7 @@ function getBlockRescColor(value: any): string {
 }
 
 export default function BlockModelLayer({
-    dataUrl = '/BlockModel.geojson',
+    dataUrl = `${ASSET_BASE_URL}/BlockModel.geojson`,
     colorMode = 'carbon'
 }: {
     dataUrl?: string;

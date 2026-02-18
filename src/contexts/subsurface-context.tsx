@@ -7,7 +7,7 @@ export interface SubsurfaceState {
     // Clipping
     clippingPlanes: any[] | null; // Using any for Cesium.ClippingPlane
     threeClippingPlanes: THREE.Plane[] | null;
-    clippingMode: 'none' | 'box' | 'polygon';
+    clippingMode: 'none' | 'box' | 'polygon' | 'elevation';
     clippingCenter: [number, number] | null; // [lon, lat]
     clippingRadius: number;
 
@@ -27,7 +27,7 @@ export interface SubsurfaceState {
 
 interface SubsurfaceContextType extends SubsurfaceState {
     setClippingPlanes: (planes: any[], threePlanes: THREE.Plane[]) => void;
-    setClippingMode: (mode: 'none' | 'box' | 'polygon') => void;
+    setClippingMode: (mode: 'none' | 'box' | 'polygon' | 'elevation') => void;
     setClippingCenter: (center: [number, number] | null) => void;
     setClippingRadius: (radius: number) => void;
     setSelectedProperty: (prop: string) => void;

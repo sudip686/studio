@@ -1,5 +1,3 @@
-import { BoreholeRowBase, BoreholeSegment } from "../boreholes/borehole-core";
-
 // utils/drillholes.ts
 export async function clampCollarsToSurface(viewer: any, lonLatArr: Array<{lon:number, lat:number}>) {
   const Cesium = (window as any).Cesium;

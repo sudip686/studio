@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
+import { ASSET_BASE_URL } from '@/lib/constants';
 
 interface BlockModelBoxCutterProps {
     colorMode: 'grade' | 'class';
@@ -22,7 +23,7 @@ const BlockModelBoxCutter = ({ colorMode }: BlockModelBoxCutterProps) => {
         const setupScene = async () => {
             try {
                 // Load the block model data, but don't show the default point entities
-                const ds = await Cesium.GeoJsonDataSource.load('/BlockModel.geojson');
+                const ds = await Cesium.GeoJsonDataSource.load(`${ASSET_BASE_URL}/BlockModel.geojson`);
                 ds.show = false;
                 blockModelDsRef.current = ds;
                 await viewer.dataSources.add(ds);

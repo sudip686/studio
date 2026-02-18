@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import proj4 from 'proj4';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import { projectLonLat } from '@/lib/utils/three-helpers';
+import { ASSET_BASE_URL } from '@/lib/constants';
 
 // Register UTM Zone 37S
 proj4.defs("EPSG:32737", "+proj=utm +zone=37 +south +datum=WGS84 +units=m +no_defs");
@@ -48,7 +49,7 @@ export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = 
 
         Promise.all([
             fetch('/terrain_meta.json').then(res => res.json()),
-            fetch('/height.bin').then(res => res.arrayBuffer())
+            fetch(`${ASSET_BASE_URL}/height.bin`).then(res => res.arrayBuffer())
         ]).then(([meta, heightBuffer]) => {
             const { bounds_utm, width: dataW, height: dataH } = meta;
             const { minX, maxX, minY, maxY } = bounds_utm;
@@ -149,7 +150,7 @@ export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = 
 
             // Load Baked Texture
             const textureLoader = new THREE.TextureLoader();
-            const texPath = `/${meta.rgb_texture || 'terrain_texture_8k.jpg'}`;
+            const texPath = `${ASSET_BASE_URL}/${meta.rgb_texture || 'terrain_texture_8k.jpg'}`;
             
             textureLoader.load(texPath, (texture) => {
                 texture.colorSpace = THREE.SRGBColorSpace;

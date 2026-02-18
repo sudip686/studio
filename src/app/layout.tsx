@@ -25,7 +25,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
         {/* Preload critical terrain height data */}
-        <link rel="preload" as="fetch" href="/height.bin" crossOrigin="anonymous" />
+        <link rel="preload" as="fetch" href={`${process.env.NEXT_PUBLIC_ASSET_BASE_URL || ''}/height.bin`} crossOrigin="anonymous" />
         <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
       </head>
       <body className="bg-canvas text-gray-100 font-body antialiased">

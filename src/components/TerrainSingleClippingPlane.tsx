@@ -50,12 +50,12 @@ const TerrainSingleClippingPlane = () => {
           edgeWidth,
           edgeColor: Cesium.Color.WHITE,
           enabled: true
-        });
+        }) as any;
         globe.clippingPlanes = planeCollectionRef.current;
         viewer.scene.requestRender();
       } else {
         // Move existing collection by updating its modelMatrix (cheapest way to "drag")
-        planeCollectionRef.current.modelMatrix = modelMatrix;
+        (planeCollectionRef.current as any).modelMatrix = modelMatrix;
         viewer.scene.requestRender();
       }
     };
@@ -77,7 +77,7 @@ const TerrainSingleClippingPlane = () => {
     };
 
     // Input handling
-    const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
+    const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas) as any;
     handlerRef.current = handler;
 
     // Left click: place plane (or start drag if it exists)

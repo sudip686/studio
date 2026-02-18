@@ -2,12 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '../contexts/cesium-context';
 import { waitOneFrame } from '../lib/utils/cesium-helpers';
-import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
+import { useDataCache } from '@/lib/data-cache';
 import AnimatedRevealViewer from '@/components/animated-reveal-viewer';
 import SubsurfaceCutawayViewer from '@/components/subsurface-cutaway-viewer';
 import KmlFocusedViewer from '@/components/kml-focused-viewer';
-import ResourceModelViewer from '@/components/resource-model-viewer';
-import CesiumThreeBlockModel from '@/components/CesiumThreeBlockModel';
 import GrandCanyonDrillholeViewer from '@/components/grand-canyon-drillhole-viewer';
 import DrillholeLocationMap from '@/components/drillhole-location-map';
 import TerrainClippingPlanes from '@/components/terrain-clipping-planes'; // Corrected import

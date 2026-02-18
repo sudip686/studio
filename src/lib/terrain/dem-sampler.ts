@@ -5,11 +5,15 @@
 // provides sampleElevationAtLonLat(lon, lat) in meters AMSL.
 
 import proj4 from 'proj4';
+import { ASSET_BASE_URL } from '@/lib/constants';
 
 type TerrainMeta = {
   crs_epsg: number;
   bounds_utm: { minX: number; minY: number; maxX: number; maxY: number };
   elevation_m: { min: number; max: number };
+  width: number;
+  height: number;
+  rgb_texture?: string;
 };
 
 // Register UTM Zone 37S once (EPSG:32737) — matches terrain_meta.json
@@ -35,15 +39,16 @@ async function ensureLoaded(): Promise<void> {
     // Load meta
     const metaResp = await fetch('/terrain_meta.json');
     if (!metaResp.ok) throw new Error(`Failed to load terrain_meta.json: ${metaResp.statusText}`);
-    _meta = await metaResp.json();
+    _meta = await metaResp.json() as TerrainMeta;
 
     // Load height.bin
-    const binResp = await fetch('/height.bin');
+    const binResp = await fetch(`${ASSET_BASE_URL}/height.bin`);
     if (!binResp.ok) throw new Error(`Failed to load height.bin: ${binResp.statusText}`);
     const arrayBuffer = await binResp.arrayBuffer();
     _heightData = new Float32Array(arrayBuffer);
 
     // Get dimensions from meta
+    if (!_meta) throw new Error("Meta loaded but is null");
     _dataWidth = _meta.width;
     _dataHeight = _meta.height;
 
