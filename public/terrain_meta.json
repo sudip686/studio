@@ -1,3 +1,16 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:c4c2ffcb3bdc017651973bca8fb1cdf02a510b285394fe6422ae485424ed72e3
-size 314
+{
+  "bounds_utm": {
+    "minX": 388973.2318170635,
+    "maxX": 611017.5944954907,
+    "minY": 9336673.844026534,
+    "maxY": 9557887.961892288
+  },
+  "width": 7221,
+  "height": 7194,
+  "elevation_m": {
+    "min": 0.0,
+    "max": 2300.63623046875
+  },
+  "crs_epsg": 32737,
+  "rgb_texture": "texture_rgb_8192.png"
+}

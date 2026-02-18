@@ -1,3 +1,5 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:9a4d8d2fa3c62e80605e751420949e872fd01625620fc74c9bd376776d17c76d
-size 145
+import GeoVisionHost from '@/components/GeoVisionHost';
+
+export default function AssayPage() {
+  return <GeoVisionHost displayMode="Assay" />;
+}

@@ -1,3 +1,32 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:b34b51957074478d228859ee39e71effa4b6a20eb5939178538a330d75ada158
-size 922
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Mining License Boundary</name>
+    <Style id="boundaryStyle">
+      <LineStyle>
+        <color>ff00ff00</color> <width>4</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>4000ff00</color> </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>License Area</name>
+      <styleUrl>#boundaryStyle</styleUrl>
+      <Polygon>
+        <extrude>1</extrude>
+        <altitudeMode>relativeToGround</altitudeMode>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              -75.165222,39.952583,100
+              -75.164222,39.952583,100
+              -75.164222,39.951583,100
+              -75.165222,39.951583,100
+              -75.165222,39.952583,100
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

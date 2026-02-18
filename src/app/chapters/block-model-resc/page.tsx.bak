@@ -1,3 +1,5 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:8204dc134483078d4a5d6d7017e984fb1c5885dfcc6e23cf4483502a9f674153
-size 163
+import GeoVisionHost from '@/components/GeoVisionHost';
+
+export default function BlockModelRescPage() {
+  return <GeoVisionHost displayMode="BlockModelResc" />;
+}
