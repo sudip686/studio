@@ -489,7 +489,7 @@ const DrillholeLocationMap = ({ displayMode, imageryAlpha }: DrillholeLocationMa
     }, [viewer, processedData, displayMode]); // Rerun fly-to when mode changes if needed
 
     return (
-        <div className="h-full w-full relative">
+        <div className="h-full w-full relative pointer-events-none">
             <IonKmlLayer assetId={4310565} />
             {tooltip.display && <TooltipContent data={tooltip} />}
             

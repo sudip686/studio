@@ -45,13 +45,13 @@ const TerrainClippingViewer = () => {
                     return;
                 }
                 const blockModelTileset = blockModelEntity.tileset;
-                blockModelTileset.clippingPlanes = clippingPlanes;
+                (blockModelTileset as any).clippingPlanes = clippingPlanes;
                 viewer.scene.primitives.add(blockModelTileset);
                 viewer.scene.requestRender();
 
                 // Create a plane to visualize the clipping plane
                 const planeEntity = viewer.entities.add({
-                    position: clippingPlanes.modelMatrix.translation,
+                    position: (clippingPlanes.modelMatrix as any).translation,
                     plane: {
                         dimensions: new Cesium.Cartesian2(300.0, 300.0),
                         material: Cesium.Color.WHITE.withAlpha(0.1),
@@ -100,7 +100,7 @@ const TerrainClippingViewer = () => {
                 <label style={{ color: "white" }}>Edge Color</label>
                 <select
                     onChange={(e) => {
-                        const colorMap: { [key: string]: Cesium.Color } = {
+                        const colorMap: { [key: string]: any } = {
                             WHITE: Cesium.Color.WHITE,
                             RED: Cesium.Color.RED,
                             GREEN: Cesium.Color.GREEN,

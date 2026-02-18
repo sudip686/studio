@@ -2,14 +2,8 @@ import LithologyViewer from './viewers/LithologyView';
 import AssayViewer from './viewers/AssayView';
 import BlockModelCarbonViewer from './viewers/BlockModelCarbonView';
 import BlockModelRescViewer from './viewers/BlockModelRescView';
-import ImmersivePresentationViewer from './ImmersivePresentationViewer';
 
 export default function ThreeJsViewSwitch({ view, assayCutoff }: { view: string; assayCutoff?: number }) {
-
-    // Check for immersive presentation view
-    if (view === 'immersive_presentation') {
-        return <ImmersivePresentationViewer viewType="presentation" />;
-    }
 
     return (
         <>

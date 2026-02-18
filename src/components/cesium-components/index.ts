@@ -7,7 +7,6 @@
 // Core Cesium viewers and layers
 export { default as CesiumViewSwitch } from '../CesiumViewSwitch';
 export { default as DrillholeLayer } from '../DrillholeLayer';
-export { default as CesiumThreeBlockModel } from '../CesiumThreeBlockModel';
 
 // Imagery and terrain layers
 export { default as IonImageryLayer } from '../IonImageryLayer';

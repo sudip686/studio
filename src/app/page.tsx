@@ -5,7 +5,6 @@ import { ChapterMenu } from "@/components/ui/chapter-menu";
 import { CesiumProvider } from '@/contexts/cesium-context';
 import CesiumViewSwitch from '@/components/CesiumViewSwitch';
 import ThreeJsViewSwitch from '@/components/ThreeJsViewSwitch';
-import ImmersivePresentationViewer from '@/components/ImmersivePresentationViewer';
 import { ThreeSceneProvider } from '@/contexts/three-scene-context';
 import GlobalOverlays from '@/components/shared/GlobalOverlays';
 
@@ -16,10 +15,7 @@ const viewSequence = [
   'geojson_drillholes_lithology',
   'geojson_drillholes_assay',
   // 'drillhole_lithology_reveal',
-  'lithology_view', 'assay_view', 'block_model_carbon_view', 'block_model_resc_view',
-  'block_model_clip_view',
-  // Immersive Presentation
-  'immersive_presentation'
+  'lithology_view', 'assay_view', 'block_model_carbon_view', 'block_model_resc_view'
 ] as const;
 
 type ViewType = typeof viewSequence[number];
@@ -37,18 +33,14 @@ const viewTitles: { [key in ViewType]: string } = {
   'lithology_view': '3D Lithology',
   'assay_view': '3D Assay',
   'block_model_carbon_view': '3D Block Model - Carbon',
-  'block_model_resc_view': '3D Block Model - Resource Classification',
-  'block_model_clip_view': 'Block Model Clip View',
-
-  // Immersive Presentation
-  'immersive_presentation': 'Immersive Presentation Experience'
+  'block_model_resc_view': '3D Block Model - Resource Classification'
 };
 
 const cesiumSwitcherViews = new Set<string>([
     'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map',
     'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'tiff_overlay', 'project_location',
     'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer',
-    'block_model_box_cutter_grade', 'block_model_box_cutter_class', 'block_model_clip_view', 'drillhole_location_assay'
+    'block_model_box_cutter_class', 'block_model_clip_view', 'drillhole_location_assay', 'modular_subsurface'
 ]);
 
 const threeJsSwitcherViews = new Set<string>([
@@ -88,6 +80,28 @@ export default function Home() {
     };
   }, [isAutoplay, currentViewIndex]);
 
+  // Scrolling functionality
+  useEffect(() => {
+    let lastScrollTime = 0;
+    const handleWheel = (e: WheelEvent) => {
+      // Ignore scroll if interacting with a canvas (3D Viewer zoom)
+      if ((e.target as HTMLElement).tagName === 'CANVAS') return;
+
+      const now = Date.now();
+      if (now - lastScrollTime < 1000) return; // 1 second throttle
+
+      if (e.deltaY > 50) {
+        setCurrentViewIndex(i => Math.min(i + 1, viewSequence.length - 1));
+        lastScrollTime = now;
+      } else if (e.deltaY < -50) {
+        setCurrentViewIndex(i => Math.max(i - 1, 0));
+        lastScrollTime = now;
+      }
+    };
+    window.addEventListener('wheel', handleWheel);
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+
   const toggleAutoplay = () => {
     setIsAutoplay(!isAutoplay);
   };
@@ -109,7 +123,6 @@ export default function Home() {
 
   const isCesiumSwitcherView = cesiumSwitcherViews.has(currentView);
   const isThreeJsSwitcherView = threeJsSwitcherViews.has(currentView);
-  const isImmersivePresentation = currentView === 'immersive_presentation';
   const isStandalone2D = ['downhole_plot'].includes(currentView);
 
   console.log(`[page.tsx] Rendering view: ${currentView}`);
@@ -136,16 +149,6 @@ export default function Home() {
             >
               Start guided tour
               <span>’</span>
-            </button>
-            <button
-              onClick={() => {
-                // Navigate to immersive presentation
-                const presentationIndex = viewSequence.indexOf('immersive_presentation');
-                setCurrentViewIndex(presentationIndex);
-              }}
-              className="mt-2 inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-purple-500 transition"
-            >
-              🎭 Immersive Experience
             </button>
           </div>
         </div>
@@ -188,10 +191,6 @@ export default function Home() {
                 onLogoClick={resetToHomeView}
               />
             </ThreeSceneProvider>
-          )}
-
-          {isImmersivePresentation && (
-            <ImmersivePresentationViewer viewType="presentation" />
           )}
 
           {isStandalone2D && <div className="h-full w-full bg-transparent">{/* Standalone 2D content */}</div>}

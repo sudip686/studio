@@ -111,7 +111,7 @@ const KMZPolygonClippingPlanes = ({
             const originCentered = new Cesium.Plane(finalNormal, 0.0);
             const distance = Cesium.Plane.getPointDistance(originCentered, midpoint);
 
-            allPlanes.push(new Cesium.ClippingPlane(finalNormal, distance));
+            allPlanes.push(new Cesium.ClippingPlane(finalNormal, distance) as any);
           }
         }
 

@@ -2,17 +2,20 @@
 
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { VRButton, XR, useXR } from '@react-three/xr';
+import { VRButton, XR, useXR, createXRStore } from '@react-three/xr';
 import { Text, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDataCache } from '@/lib/data-cache';
+
+const store = createXRStore();
 
 // VR Scene Component
 function VRScene({ viewType }: { viewType: 'lithology' | 'assay' | 'block-model' }) {
   const { processedLithologyData, processedAssayData, blockModelData } = useDataCache();
   const { camera } = useThree();
   const groupRef = useRef<THREE.Group>(null);
-  const { isPresenting } = useXR();
+  // isPresenting is not directly exposed in v6 hook, check state or assume active inside XR
+  const isPresenting = (store as any).useStore((s: any) => s.session !== null);
 
   useEffect(() => {
     if (isPresenting) {
@@ -160,7 +163,7 @@ export default function VRViewer({ viewType }: { viewType: 'lithology' | 'assay'
     <div className="h-full w-full relative">
       {/* VR Button */}
       <div className="absolute top-4 left-4 z-50">
-        <VRButton />
+        <VRButton store={store} />
       </div>
 
       {/* VR Instructions */}
@@ -180,7 +183,7 @@ export default function VRViewer({ viewType }: { viewType: 'lithology' | 'assay'
         gl={{ antialias: true }}
         style={{ background: 'linear-gradient(to bottom, #001122, #000000)' }}
       >
-        <XR>
+        <XR store={store}>
           <Suspense fallback={
             <Html center>
               <div className="text-white text-xl">Loading VR Experience...</div>

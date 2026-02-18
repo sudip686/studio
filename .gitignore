@@ -1,7 +1,9 @@
-# Git LFS pointer for .gitignore itself (if tracked)
-# version https://git-lfs.github.com/spec/v1
-# oid sha256:74af36ea11bd36be8937ec0ed459c9d9eccd2020fe6a438b2ee522f3ac2fb6b5
-# size 490
+# Large files hosted on Cloudflare R2
+public/height.bin
+public/BlockModel.geojson
+public/texture_rgb_8192.png
+public/dem_utm.tif
+.env.local
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
@@ -13,10 +15,12 @@
 # testing
 /coverage
 
+# next.js
+/.next/
+/out/
+
 # production
 /build
-/dist
-/out
 
 # misc
 .DS_Store
@@ -26,24 +30,13 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
-.pnpm-error.log*
-.vitest.json
-.vscode/
-.modified
-.idx/dev.nix
-.idx/icon.png
-compile_errors.txt
-error.log
-temp_height.bin.aux.xml
-temp_height.hdr
-temp_hill.png.aux.xml
-temp_rgb.png.aux.xml
 
-# local .env files
+# local env files
 .env*.local
 
-# Next.js
-.next/
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
 next-env.d.ts
-tsconfig.tsbuildinfo

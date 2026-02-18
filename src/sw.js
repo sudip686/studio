@@ -22,7 +22,7 @@ if (workbox) {
   routing.registerRoute(
     ({ request }) => request.destination === 'style' || request.destination === 'script' || request.destination === 'worker',
     new strategies.StaleWhileRevalidate({
-      cacheName: 'assets-swr-v1',
+      cacheName: 'assets-swr-v2',
       plugins: [
         new cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] }),
         new expiration.ExpirationPlugin({ maxEntries: 200, purgeOnQuotaError: true })
@@ -50,7 +50,7 @@ if (workbox) {
       (request.destination === 'image' || request.destination === 'document' || request.destination === 'empty') &&
       ionHosts.some((h) => url.hostname.endsWith(h)),
     new strategies.StaleWhileRevalidate({
-      cacheName: 'tiles-swr-v1',
+      cacheName: 'tiles-swr-v2',
       plugins: [
         new cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] }),
         new expiration.ExpirationPlugin({ maxEntries: 1500, maxAgeSeconds: 60 * 60 * 24 * 7, purgeOnQuotaError: true })
@@ -62,7 +62,7 @@ if (workbox) {
   routing.registerRoute(
     ({ request }) => request.destination === 'image',
     new strategies.StaleWhileRevalidate({
-      cacheName: 'img-swr-v1',
+      cacheName: 'img-swr-v2',
       plugins: [new expiration.ExpirationPlugin({ maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 })]
     })
   );
@@ -70,7 +70,7 @@ if (workbox) {
   // --- Default handler ---
   routing.setDefaultHandler(
     new strategies.NetworkFirst({
-      cacheName: 'default-nf-v1',
+      cacheName: 'default-nf-v2',
       networkTimeoutSeconds: 4,
       plugins: [new cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] })]
     })
@@ -80,29 +80,44 @@ if (workbox) {
   console.log(`Boo! Workbox didn't load 😬`);
 }
 
-// --- INSTALL-TIME WARMUP ---
-const WARM_CACHE_NAME = 'tiles-swr-v1';
-const AREA = {
-  bbox: [38.5, -5.3, 38.9, -4.9],
-  zooms: [9, 10]
-};
+// --- INSTALL-TIME WARMUP (disabled to prevent runtime errors) ---
+// Keep lightweight stubs so the SW remains valid JS.
+const WARM_CACHE_NAME = 'tiles-swr-v2';
+function buildWarmUrls() { return []; }
+// self.addEventListener('install', (event) => {
+//   const warmUrls = buildWarmUrls();
+//   event.waitUntil(
+//     (async () => {
+//       const cache = await caches.open(WARM_CACHE_NAME);
+//       try {
+//         await cache.addAll(warmUrls);
+//       } catch {
+//         // Ignore failures
+//       }
+//     })()
+//   );
+// });
 
-function lonLatToTileXY(lon, lat, z) {
-    // ... (same as before)
-}
-function buildWarmUrls({ bbox, zooms }) {
-    // ... (same as before)
-}
-
-self.addEventListener('install', (event) => {
-  const warmUrls = buildWarmUrls(AREA);
+self.addEventListener('activate', (event) => {
+  const CURRENT_CACHES = new Set([
+    'assets-swr-v2',
+    'tiles-swr-v2',
+    'img-swr-v2',
+    'default-nf-v2',
+  ]);
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(WARM_CACHE_NAME);
-      try {
-        await cache.addAll(warmUrls);
-      } catch {
-        // Ignore failures
+      const names = await caches.keys();
+      await Promise.all(
+        names.map((name) => {
+          if (!CURRENT_CACHES.has(name) && !/workbox-precache/i.test(name)) {
+            return caches.delete(name);
+          }
+          return Promise.resolve(false);
+        })
+      );
+      if (self && self.clients && typeof self.clients.claim === 'function') {
+        await self.clients.claim();
       }
     })()
   );

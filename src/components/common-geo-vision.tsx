@@ -61,7 +61,6 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
         // Scene
         const scene = new Scene();
         scene.background = new Color(0x1a365d); // Brighter, vibrant blue background
-        scene.fog = new THREE.Fog(0x1a365d, 5000, 30000); // Add fog for depth
         sceneRef.current = scene;
 
         // Camera

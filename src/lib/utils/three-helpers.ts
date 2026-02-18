@@ -12,13 +12,15 @@ export function projectLonLat(lon: number, lat: number, center: Center) {
   return { x, z };
 }
 
-function computeBoxFromObject(object: THREE.Object3D): THREE.Box3 {
+function computeBoxFromObject(object: THREE.Object3D, filter?: (o: THREE.Object3D) => boolean): THREE.Box3 {
     const box = new THREE.Box3();
     const v1 = new THREE.Vector3();
 
     object.updateMatrixWorld(true);
 
     object.traverse((node) => {
+        if (filter && !filter(node)) return;
+
         if (node instanceof THREE.InstancedMesh) {
             const mesh = node;
             if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
@@ -28,22 +30,6 @@ function computeBoxFromObject(object: THREE.Object3D): THREE.Box3 {
                 const matrix = new THREE.Matrix4();
                 for (let i = 0; i < mesh.count; i++) {
                     mesh.getMatrixAt(i, matrix);
-                    // Matrix is local to the InstancedMesh.
-                    // We need to apply the InstancedMesh's world matrix to get to world space.
-                    // But wait, box.setFromObject works in World Space.
-                    // InstancedMesh.getMatrixAt returns local transformation of the instance relative to the Mesh.
-                    // The Mesh itself has a world matrix.
-                    
-                    const instanceMatrix = matrix.multiply(mesh.matrixWorld); // Wrong order? 
-                    // Instance local * Mesh world = Instance World
-                    // Actually: Instance Matrix is (I * M_instance).
-                    // World Position = M_mesh * M_instance * v_local.
-                    // So we should multiply mesh.matrixWorld * matrix.
-                    
-                    // But matrix multiplication in Three.js: a.multiply(b) -> a = a * b.
-                    // We want: World = MeshWorld * InstanceLocal.
-                    // So: newMatrix.copy(mesh.matrixWorld).multiply(matrix).
-                    
                     const worldMatrix = new THREE.Matrix4().copy(mesh.matrixWorld).multiply(matrix);
                     const instanceBox = geomBox.clone().applyMatrix4(worldMatrix);
                     box.union(instanceBox);
@@ -62,16 +48,49 @@ function computeBoxFromObject(object: THREE.Object3D): THREE.Box3 {
     return box;
 }
 
+type FitOptions = {
+  padding?: number;
+  // Limit the horizontal (XZ) area considered when fitting. Helps avoid huge terrain meshes
+  // forcing the camera to zoom out too far. Units are in scene meters.
+  clampXZRadius?: number;
+  // Safety clamps for distance from target
+  minDistance?: number;
+  maxDistance?: number;
+  // Optional direction from which to view the scene (defaults to slightly top-down)
+  viewDir?: THREE.Vector3;
+  // Optional filter to include only specific objects in bounds calculation
+  filter?: (object: THREE.Object3D) => boolean;
+};
+
 export function fitCameraToGroupWorldAware(
   camera: THREE.PerspectiveCamera,
   controls: OrbitControls,
   group: THREE.Object3D,
-  padding = 1.2
+  paddingOrOptions: number | FitOptions = 1.2
 ) {
+  const opts: FitOptions = typeof paddingOrOptions === 'number' ? { padding: paddingOrOptions } : (paddingOrOptions ?? {});
+  const padding = opts.padding ?? 1.2;
+  const clampR = opts.clampXZRadius;
+  const minDistance = opts.minDistance ?? 25;
+  const maxDistance = opts.maxDistance ?? Infinity;
+  const viewDir = opts.viewDir ?? new THREE.Vector3(0, 1, 1).normalize();
+  
   // Use custom box computation to handle InstancedMesh
-  const box = computeBoxFromObject(group);
+  const box = computeBoxFromObject(group, opts.filter);
 
   if (!box.isEmpty()) {
+    // Optionally clamp the horizontal extent to avoid over-zoom when a very large
+    // terrain mesh is present but we only want to frame a local region.
+    if (Number.isFinite(clampR as number)) {
+      const preCenter = new THREE.Vector3();
+      box.getCenter(preCenter);
+      const clampBox = new THREE.Box3(
+        new THREE.Vector3(preCenter.x - (clampR as number), box.min.y, preCenter.z - (clampR as number)),
+        new THREE.Vector3(preCenter.x + (clampR as number), box.max.y, preCenter.z + (clampR as number))
+      );
+      box.intersect(clampBox);
+    }
+
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
     box.getSize(size);
@@ -84,11 +103,17 @@ export function fitCameraToGroupWorldAware(
     const fov = (camera.fov * Math.PI) / 180;
     let distance = (effectiveSize / 2) / Math.tan(fov / 2);
     distance *= padding;
+    // Apply distance clamps
+    distance = Math.max(minDistance, Math.min(distance, maxDistance));
 
-    const dir = new THREE.Vector3(0, 0, 1);
+    // Use an oblique angle (Bird's eye view) instead of side view
+    const dir = viewDir.clone().normalize();
     const newPos = center.clone().add(dir.multiplyScalar(distance));
-    camera.near = Math.max(0.5, distance / 1000);
-    camera.far = distance * 10000; // Increased far plane just in case
+    
+    // Ensure far plane is sufficient
+    const far = Math.max(distance * 10, 5_000_000);
+    camera.near = Math.max(0.1, Math.min(distance / 1000, 10));
+    camera.far = far;
     camera.updateProjectionMatrix();
 
     camera.position.copy(newPos);

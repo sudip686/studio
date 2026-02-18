@@ -10,6 +10,3 @@ export { default as GeoVisionHost } from '../GeoVisionHost';
 
 // View switching and layer management
 export { default as ThreeJsViewSwitch } from '../ThreeJsViewSwitch';
-
-// Block model visualization
-export { default as BlockModelClipViewer } from '../BlockModelClipViewer';

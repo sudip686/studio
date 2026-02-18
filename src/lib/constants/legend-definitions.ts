@@ -24,14 +24,14 @@ export const mineralDomainsLegendData = {
 export const cesiumViewerLithologyLegendData = {
     title: 'Lithology',
     items: [
-        { color: "#d39127ff", label: "Quartz-Feldspathic" },
-        { color: "#19292aff", label: "GRSC" },
-        { color: "#a1089aff", label: "Granulite" },
-        { color: "#4f1dc4ff", label: "Khondalite" },
+        { color: "#d39127", label: "Quartz-Feldspathic" },
+        { color: "#19292a", label: "GRSC" },
+        { color: "#a1089a", label: "Granulite" },
+        { color: "#4f1dc4", label: "Khondalite" },
         { color: "#D4E6F1", label: "Marble" },
         { color: "#515A5A", label: "Not Recovearble" },
-        { color: "#2df27cff", label: "SOIL" },
-        { color: "#153224ff", label: "Schist" },
+        { color: "#2df27c", label: "SOIL" },
+        { color: "#153224", label: "Schist" },
     ]
 };
 
@@ -40,11 +40,11 @@ export const drillholeLocationMapLithologyLegendData = {
     items: [
         { color: "#FAD7A0", label: "Quartz-Feldspathic" },
         { color: "#839192", label: "GRSC" },
-        { color: "#be028fff", label: "Granulite" },
-        { color: "#189ad6ff", label: "Khondalite" },
+        { color: "#be028f", label: "Granulite" },
+        { color: "#189ad6", label: "Khondalite" },
         { color: "#D4E6F1", label: "Marble" },
         { color: "#515A5A", label: "Not Recovearble" },
-        { color: "#17fc73ff", label: "SOIL" },
+        { color: "#17fc73", label: "SOIL" },
         { color: "#AED6F1", label: "Schist" },
     ]
 };
@@ -86,14 +86,14 @@ export const classificationLegendData = {
 export const geospatialViewerLithologyLegendData = {
     title: 'Lithology',
     items: [
-        { color: "#e1f6f3ff", label: "Quartz-Feldspathic" },
-        { color: "#4c54549c", label: "GRSC" },
-        { color: "#b90b79ff", label: "Granulite" },
-        { color: "#433e43ff", label: "Khondalite" },
+        { color: "#e1f6f3", label: "Quartz-Feldspathic" },
+        { color: "#4c5454", label: "GRSC" },
+        { color: "#b90b79", label: "Granulite" },
+        { color: "#433e43", label: "Khondalite" },
         { color: "#D4E6F1", label: "Marble" },
-        { color: "#0b1414ff", label: "Not Recovearble" },
-        { color: "#70f35fff", label: "SOIL" },
-        { color: "#445751ff", label: "Schist" },
+        { color: "#0b1414", label: "Not Recovearble" },
+        { color: "#70f35f", label: "SOIL" },
+        { color: "#445751", label: "Schist" },
     ]
 };
 

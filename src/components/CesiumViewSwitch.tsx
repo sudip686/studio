@@ -2,12 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '../contexts/cesium-context';
 import { waitOneFrame } from '../lib/utils/cesium-helpers';
-import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
+import { useDataCache } from '@/lib/data-cache';
 import AnimatedRevealViewer from '@/components/animated-reveal-viewer';
 import SubsurfaceCutawayViewer from '@/components/subsurface-cutaway-viewer';
 import KmlFocusedViewer from '@/components/kml-focused-viewer';
-import ResourceModelViewer from '@/components/resource-model-viewer';
-import CesiumThreeBlockModel from '@/components/CesiumThreeBlockModel';
 import GrandCanyonDrillholeViewer from '@/components/grand-canyon-drillhole-viewer';
 import DrillholeLocationMap from '@/components/drillhole-location-map';
 import TerrainClippingPlanes from '@/components/terrain-clipping-planes'; // Corrected import
@@ -15,10 +13,20 @@ import BlockModelBoxCutter from '@/components/block-model-box-cutter';
 import DrillholeLayer from '@/components/DrillholeLayer';
 import CinematicDrillholeViewer from '@/components/cinematic-drillhole-viewer';
 import TilesetQualityToggle from '@/components/TilesetQualityToggle'; // Import the new component
-import BlockModelClipViewer from '@/components/BlockModelClipViewer'; // Import the new component
 import GlobalOverlays from '@/components/shared/GlobalOverlays';
+import SubsurfaceViewer from '@/components/viewers/SubsurfaceViewer';
+import BlockModelLayer from '@/components/viewers/BlockModelLayer';
+import BoreholeLayer from '@/components/viewers/BoreholeLayer';
+import ClippingControls from '@/components/viewers/ClippingControls';
 
-type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'tanaga_accessibility' | 'tanga_geological_map' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location' | 'geospatial_lithology' | 'geospatial_assay' | 'drillhole_lithology_reveal' | 'subsurface_cutaway' | 'kml_focused_view' | 'terrain_traces' | 'resource_model_viewer' | 'cesium_three_block_model' | 'grand_canyon_assay' | 'grand_canyon_lithology' | 'drillhole_location_lithology' | 'drillhole_location_assay' | 'terrain_clipping' | 'block_model_box_cutter_grade' | 'block_model_box_cutter_class' | 'block_model_clip_view' | 'cinematic_drillhole_assay' | 'cinematic_drillhole_lithology';
+type CesiumView = 'original' | 'exaggerated_kml' | 'styled_kml' | 'tanaga_accessibility' | 'tanga_geological_map' | 'geojson_drillholes_lithology' | 'geojson_drillholes_assay' | 'tiff_overlay' | 'project_location' | 'geospatial_lithology' | 'geospatial_assay' | 'drillhole_lithology_reveal' | 'subsurface_cutaway' | 'kml_focused_view' | 'terrain_traces' | 'resource_model_viewer' | 'cesium_three_block_model' | 'grand_canyon_assay' | 'grand_canyon_lithology' | 'drillhole_location_lithology' | 'drillhole_location_assay' | 'terrain_clipping' | 'block_model_box_cutter_grade' | 'block_model_box_cutter_class' | 'block_model_clip_view' | 'cinematic_drillhole_assay' | 'cinematic_drillhole_lithology' | 'modular_subsurface';
+
+const TERRAIN_BOUNDS = {
+    west: 37.9,
+    south: -6.1,
+    east: 40.1,
+    north: -3.9
+};
 
 const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
     "Quartz-Feldspathic": "#f79a06ff",
@@ -65,6 +73,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       block_model_clip_view: 'blockModelClip',
       cinematic_drillhole_assay: 'cinematicDrillhole',
       cinematic_drillhole_lithology: 'cinematicDrillhole',
+      modular_subsurface: 'modularSubsurface',
   };
 
   // Apply transparency whenever sliders change (and when viewer is ready)
@@ -213,7 +222,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       await waitOneFrame(v);
       if (cancelled || v.isDestroyed()) return;
 
-      if (next === 'original' || next === 'block_model_clip_view') {
+      if (next === 'original' || next === 'block_model_clip_view' || next === 'tanaga_accessibility') { // Explicitly disable AOI cutaway for tanaga_accessibility
         disableAoiCutaway?.();
       } else {
         enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
@@ -262,11 +271,29 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       }
       else if (next === 'tanaga_accessibility' || next === 'tanga_geological_map' || next === 'drillhole_location_lithology') {
         if (kmlDataSourceRef.current) kmlDataSourceRef.current.show = false;
+        
+        // Clear clipping planes for full visibility
+        if (v.scene.globe.clippingPlanes) {
+             v.scene.globe.clippingPlanes.enabled = false;
+             v.scene.globe.clippingPlanes = undefined;
+        }
+
         try {
             const assetId = next === 'tanaga_accessibility' ? 3733958 : 3678736;
             const layer = await v.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(assetId));
             ionImageryLayerRef.current = layer;
-            if (next !== 'drillhole_location_lithology') await v.flyTo(layer);
+            
+            // Fly to the specific terrain bounds
+            const rect = Cesium.Rectangle.fromDegrees(
+                TERRAIN_BOUNDS.west, 
+                TERRAIN_BOUNDS.south, 
+                TERRAIN_BOUNDS.east, 
+                TERRAIN_BOUNDS.north
+            );
+            await v.flyTo(layer, { 
+                destination: rect,
+                duration: 2.0 
+            });
         } catch (error) {
             console.error("Error loading ION imagery:", error);
         }
@@ -309,6 +336,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
             block_model_clip_view: 'blockModelClip',
             cinematic_drillhole_assay: 'cinematicDrillhole',
             cinematic_drillhole_lithology: 'cinematicDrillhole',
+            modular_subsurface: 'modularSubsurface',
         };
         if (next in specialViewMap) {
             if (next.startsWith('grand_canyon')) setGrandCanyonMode(next.endsWith('assay') ? 'assay' : 'lithology');
@@ -338,7 +366,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   useEffect(() => {
     if (!viewer || !ready || viewer.isDestroyed()) return;
     if (!kmlDataSource) return;
-    if (view !== 'original' && view !== 'block_model_clip_view') {
+    if (view !== 'original' && view !== 'block_model_clip_view' && view !== 'tanaga_accessibility') { // Explicitly exclude tanaga_accessibility
       enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
     }
   }, [viewer, ready, kmlDataSource, view, enableAoiCutaway]);
@@ -349,14 +377,37 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         {specialView === 'animatedReveal' && <AnimatedRevealViewer />}
         {specialView === 'subsurfaceCutaway' && <SubsurfaceCutawayViewer />}
         {specialView === 'kmlFocused' && <KmlFocusedViewer />}
-        {specialView === 'resourceModel' && <ResourceModelViewer />}
-        {specialView === 'cesiumThreeBlockModel' && <CesiumThreeBlockModel />}
+        {specialView === 'resourceModel' && (
+            <SubsurfaceViewer initialState={{ transparency: 0.5 }}>
+                <BlockModelLayer colorMode="classification" />
+                <BoreholeLayer />
+                <ClippingControls />
+            </SubsurfaceViewer>
+        )}
+        {specialView === 'cesiumThreeBlockModel' && (
+            <SubsurfaceViewer initialState={{ clippingMode: 'polygon' }}>
+                <BlockModelLayer colorMode="json" />
+                <ClippingControls />
+            </SubsurfaceViewer>
+        )}
         {specialView === 'grandCanyon' && <GrandCanyonDrillholeViewer displayMode={grandCanyonMode} />}
         {specialView === 'drillholeLocation' && <DrillholeLocationMap displayMode={drillholeLocationMode} />}
         {specialView === 'terrainClipping' && <TerrainClippingPlanes />}{/* Corrected component */}
         {specialView === 'boxCutter' && <BlockModelBoxCutter colorMode={boxCutterMode} />}
-        {specialView === 'blockModelClip' && <BlockModelClipViewer />}
+        {specialView === 'blockModelClip' && (
+            <SubsurfaceViewer initialState={{ clippingMode: 'box' }}>
+                <BlockModelLayer colorMode="carbon" />
+                <ClippingControls />
+            </SubsurfaceViewer>
+        )}
         {specialView === 'cinematicDrillhole' && <CinematicDrillholeViewer type={cinematicDrillholeMode} />}
+        {specialView === 'modularSubsurface' && (
+            <SubsurfaceViewer>
+                <BlockModelLayer />
+                <BoreholeLayer />
+                <ClippingControls />
+            </SubsurfaceViewer>
+        )}
 
       {/* Transparency controls */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 z-20 pointer-events-auto flex flex-col gap-2">

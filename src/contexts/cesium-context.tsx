@@ -462,10 +462,17 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       Cesium.Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN || '';
 
       // 1. Viewer with terrain
-      const terrainProvider = await Cesium.createWorldTerrainAsync({
-        requestVertexNormals: true,
-        requestWaterMask: true,
-      });
+      let terrainProvider;
+      try {
+        terrainProvider = await Cesium.createWorldTerrainAsync({
+            requestVertexNormals: true,
+            requestWaterMask: true,
+        });
+      } catch (e) {
+        console.warn("Failed to load World Terrain (likely missing/invalid Ion token). Falling back to Ellipsoid.", e);
+        terrainProvider = new Cesium.EllipsoidTerrainProvider();
+      }
+      
       if (destroyed) return;
 
       v = new Cesium.Viewer(containerRef.current, {
@@ -611,6 +618,11 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (destroyed) return;
       v.scene.requestRender();
 
+      // 7.1 Removed global zoom clamp.
+      // Previously we clamped zoom relative to the initial camera height, which unintentionally
+      // limited all CesiumProvider-based views. Leaving zoom distances to Cesium defaults avoids
+      // cross-view side effects. If a specific view needs limits, set them locally in that view.
+
       // 7. Final setup
       const renderCtrl = createRenderController(v);
       renderCtrl.bindUserInput();
@@ -618,7 +630,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setRenderController(renderCtrl);
       setReady(true);
 
-    })();
+    })().catch(err => console.error("CesiumProvider: Async IIFE failed", err));
 
     return () => {
       destroyed = true;

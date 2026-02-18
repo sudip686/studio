@@ -23,6 +23,8 @@ interface SceneContextType {
   tooltipState: TooltipState;
   registerTooltipObject: (mesh: THREE.InstancedMesh, getData: (instanceId: number) => string) => void;
   unregisterTooltipObject: (mesh: THREE.InstancedMesh) => void;
+  // Optional helpers for child layers to provide scene constraints/metadata
+  setTerrainMaxY?: (y: number) => void;
 }
 
 const ThreeSceneContext = createContext<SceneContextType | undefined>(undefined);
@@ -36,6 +38,7 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
   const dynamicGroupRef = useRef<THREE.Group | null>(null);
   const rafRef = useRef<number | null>(null);
   const initOnce = useRef(false);
+  const terrainMaxYRef = useRef<number | null>(null);
 
   const [tooltipState, setTooltipState] = useState<TooltipState>({
     visible: false,
@@ -77,6 +80,7 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     tooltipState,
     registerTooltipObject,
     unregisterTooltipObject,
+    setTerrainMaxY: (y: number) => { terrainMaxYRef.current = y; }
   });
 
   useEffect(() => {
@@ -85,12 +89,14 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     initOnce.current = true;
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', logarithmicDepthBuffer: true });
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.15; // Increased exposure for brightness
+    // renderer.physicallyCorrectLights = true; // Deprecated in newer Three.js, use useLegacyLights = false if needed, but standard is fine.
+
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     renderer.domElement.style.position = 'absolute';
@@ -114,7 +120,6 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     // Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x4a6fa5); // Brighter, more vibrant blue background
-    scene.fog = new THREE.Fog(0x4a6fa5, 4000, 25000); // Adjusted fog for brighter scene
     sceneRef.current = scene;
 
     // Static Group (for grid, lights, etc. that don't change per view)
@@ -122,26 +127,19 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     staticGroup.name = 'static-scene-elements';
     scene.add(staticGroup);
 
-    // Enhanced vibrant lighting setup
-    // Main hemisphere light for overall illumination
-    staticGroup.add(new THREE.HemisphereLight(0xffffff, 0x87ceeb, 3.0));
+    // Optimized Lighting for Terrain (prevents washout)
+    // Stronger ambient light to ensure visibility
+    staticGroup.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-    // Primary directional lights with increased intensity
-    const d1 = new THREE.DirectionalLight(0xffffff, 4.0); d1.position.set(-1500, 2000, 1200); staticGroup.add(d1);
-    const d2 = new THREE.DirectionalLight(0xffffff, 3.0); d2.position.set(1500, 600, -1200); staticGroup.add(d2);
-
-    // Additional colored accent lights for vibrancy
-    const accent1 = new THREE.DirectionalLight(0x87ceeb, 1.5); accent1.position.set(2000, 1500, 2000); staticGroup.add(accent1); // Sky blue accent
-    const accent2 = new THREE.DirectionalLight(0xffdab9, 1.2); accent2.position.set(-2000, 1000, -2000); staticGroup.add(accent2); // Warm peach accent
-    const accent3 = new THREE.DirectionalLight(0xe6e6fa, 1.0); accent3.position.set(0, 2500, 0); staticGroup.add(accent3); // Soft lavender from above
-
-    // Point lights for extra vibrancy and depth
-    const point1 = new THREE.PointLight(0xffffff, 2.0, 5000); point1.position.set(0, 1000, 0); staticGroup.add(point1);
-    const point2 = new THREE.PointLight(0x87ceeb, 1.5, 3000); point2.position.set(1000, 500, 1000); staticGroup.add(point2);
-    const point3 = new THREE.PointLight(0xffdab9, 1.2, 3000); point3.position.set(-1000, 500, -1000); staticGroup.add(point3);
-
-    // Ambient light boost
-    const ambient = new THREE.AmbientLight(0xffffff, 0.8); staticGroup.add(ambient);
+    // Directional light (Sun)
+    // Positioned high above to minimize long shadows that might darken the terrain
+    const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+    sun.position.set(100, 2000, 100); 
+    sun.target.position.set(0, 0, 0);
+    sun.castShadow = false; // Disable shadows temporarily to debug darkness
+    // sun.shadow.mapSize.set(2048, 2048);
+    staticGroup.add(sun);
+    staticGroup.add(sun.target);
 
     // Enhanced grid with more vibrant colors
     const grid = new THREE.GridHelper(10000, 100, 0xcccccc, 0x888888); // Brighter grid lines
@@ -156,6 +154,8 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
     // Camera
     const camera = new THREE.PerspectiveCamera(75, mount.clientWidth / mount.clientHeight, 0.5, 1e7);
+    // Start from a safe, above-terrain vantage to avoid spawning under the mesh
+    camera.position.set(1000, 2000, 1000);
     cameraRef.current = camera;
 
     // Controls
@@ -165,8 +165,12 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     controls.enableRotate = true;
     controls.enablePan = true;
     controls.enableZoom = true;
-    controls.minPolarAngle = 0; // Allow full vertical rotation
+    controls.minPolarAngle = 0; // Allow vertical rotation
+    // Allow full 360-degree rotation (user request)
     controls.maxPolarAngle = Math.PI;
+    // Start by looking at world origin; views will refine this on fit
+    controls.target.set(0, 0, 0);
+    controls.update();
     controls.minAzimuthAngle = -Infinity; // Unlimited horizontal rotation
     controls.maxAzimuthAngle = Infinity;
     controlsRef.current = controls;
@@ -220,10 +224,33 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
     renderer.domElement.addEventListener('mousemove', onMouseMove);
 
+    let frameCount = 0;
     const tick = () => {
-      if (controlsRef.current && rendererRef.current && cameraRef.current) {
-        controlsRef.current.update();
-        rendererRef.current.render(sceneRef.current!, cameraRef.current!); // Use sceneRef.current and cameraRef.current
+      const controls = controlsRef.current;
+      const renderer = rendererRef.current;
+      const camera = cameraRef.current;
+      const sceneObj = sceneRef.current;
+      if (controls && renderer && camera && sceneObj) {
+        try {
+            controls.update();
+
+            // FIXED SAFE BOUNDS: Prevent any dynamic clipping
+            camera.near = 0.1;
+            camera.far = 20000000; // 20 million units
+            camera.updateProjectionMatrix();
+
+            // Ensure camera remains above terrain maximum elevation (if known)
+            if (terrainMaxYRef.current != null && Number.isFinite(terrainMaxYRef.current)) {
+              const minY = terrainMaxYRef.current + 2.0; // add a small safety margin
+              if (camera.position.y < minY) {
+                camera.position.y = minY;
+              }
+            }
+
+            renderer.render(sceneObj, camera);
+        } catch (e) {
+            console.warn('[ThreeSceneContext] Tick error:', e);
+        }
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -231,10 +258,19 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
     const onResize = () => {
       if (cameraRef.current && rendererRef.current && mountRef.current) {
-        const cam = cameraRef.current, r = rendererRef.current, m = mountRef.current;
+        const cam = cameraRef.current;
+        const r = rendererRef.current;
+        const m = mountRef.current;
+
+        // Re-apply DPR on resize to avoid blurry output when DPR/zoom/monitor changes
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        r.setPixelRatio(dpr);
+
         cam.aspect = m.clientWidth / m.clientHeight;
         cam.updateProjectionMatrix();
-        r.setSize(m.clientWidth, m.clientHeight);
+
+        // Avoid changing CSS size; only update drawing buffer size
+        r.setSize(m.clientWidth, m.clientHeight, false);
       }
     };
     window.addEventListener('resize', onResize);
@@ -244,6 +280,16 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
       renderer.domElement.removeEventListener('mousemove', onMouseMove);
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       if (controlsRef.current) controlsRef.current.dispose();
+      // Dispose terrain resources if present
+      try {
+        const tg = scene.getObjectByName('terrain-glb');
+        tg?.traverse((o: any) => {
+          o.geometry?.dispose?.();
+          const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+          mats.forEach((m: any) => m?.dispose?.());
+        });
+        tg?.parent?.remove(tg);
+      } catch {}
       if (rendererRef.current && mountRef.current) fullyDispose(rendererRef.current, mountRef.current);
       initOnce.current = false; // Allow re-initialization on remount
     };

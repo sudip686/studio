@@ -14,7 +14,7 @@ if (workbox) {
   navigationPreload.enable();
 
   // __WB_MANIFEST is replaced at build time (InjectManifest)
-  precaching.precacheAndRoute([{"revision":"c97cf2641541d4d5d8bcf10ae302a0a1","url":"A_Logo.png"},{"revision":"c4f7b0a2780d1b6d328c7a90d09f839a","url":"topography.png"},{"revision":"a0dfd68399deef910f885a05df9e39f0","url":"assay_data.geojson"},{"revision":"3917290d47940c59bcdcdd9837ce276a","url":"assay_data.json"},{"revision":"b4b59d6b46198c33fcedd651aaae99af","url":"BlockModel.geojson"},{"revision":"e3924df8c4b5d51befa4b0189488ba2c","url":"boundary.kmz"},{"revision":"f7570b55f5370211de7c3eee2bebf2aa","url":"lithology_data.geojson"},{"revision":"6f5d89c3e77b96551b51e08c054c7153","url":"lithology_data.json"},{"revision":"5cf5bd8fef0972d887c9e24b90a4a8a7","url":"mining_license_boundary.kml"},{"revision":"a8834c491497a2a8852aaf7e95459fc5","url":"tanga_boundary.kmz"},{"revision":"03723d7c829e5e2feeda8a65d4e9e2fd","url":"earth.glb"},{"revision":"30775fb299419e4f756d355c9f0f23b8","url":"geologicalModel.glb"},{"revision":"b158b51bcfa36b3bf47493eb7e7af3bc","url":"geology_map.jpg"},{"revision":"fe10e7c4d4c8d35112be88101f94ef02","url":"resource_model.bin"},{"revision":"419892950068d4c0111c6f433749cb65","url":"Tanga Road Map.tiff"}] || []);
+  precaching.precacheAndRoute([{"revision":"c4f7b0a2780d1b6d328c7a90d09f839a","url":"topography.png"},{"revision":"b8222230e8bcbadc3e7f5db11796cae4","url":"Screenshot 2026-02-18 111036.png"},{"revision":"a4d6a853c53e7ce9f5c194663c583749","url":"icon.png"},{"revision":"c97cf2641541d4d5d8bcf10ae302a0a1","url":"A_Logo.png"},{"revision":"2ef2ebc93a513cfb01c59e439b7dedf1","url":"terrain_runtime.json"},{"revision":"b3a87995aefbaeab5528960ca72bf7da","url":"terrain_meta.json"},{"revision":"a8834c491497a2a8852aaf7e95459fc5","url":"tanga_boundary.kmz"},{"revision":"5a280c1bdb6562780a079442b02331c3","url":"mining_license_boundary.kml"},{"revision":"6f5d89c3e77b96551b51e08c054c7153","url":"lithology_data.json"},{"revision":"5c2b40a32d353866d37bf05cc00fcb2a","url":"lithology_data.geojson"},{"revision":"50f4c135c28eacc7ac4ff64cd9e07287","url":"drillholes_utm.json"},{"revision":"e3924df8c4b5d51befa4b0189488ba2c","url":"boundary.kmz"},{"revision":"d607dac9837aece7b958ccc5f0257228","url":"BlockModel.geojson"},{"revision":"3917290d47940c59bcdcdd9837ce276a","url":"assay_data.json"},{"revision":"0716939f0ccfc85d574c1d68eb0d6aaf","url":"assay_data.geojson"},{"revision":"3d490ead38543b61b9842966ae0aa34d","url":"terrain_texture_8k.jpg"},{"revision":"419892950068d4c0111c6f433749cb65","url":"Tanga Road Map.tiff"},{"revision":"fe10e7c4d4c8d35112be88101f94ef02","url":"resource_model.bin"},{"revision":"b158b51bcfa36b3bf47493eb7e7af3bc","url":"geology_map.jpg"},{"revision":"30775fb299419e4f756d355c9f0f23b8","url":"geologicalModel.glb"},{"revision":"03723d7c829e5e2feeda8a65d4e9e2fd","url":"earth.glb"}] || []);
 
 
 
@@ -22,7 +22,7 @@ if (workbox) {
   routing.registerRoute(
     ({ request }) => request.destination === 'style' || request.destination === 'script' || request.destination === 'worker',
     new strategies.StaleWhileRevalidate({
-      cacheName: 'assets-swr-v1',
+      cacheName: 'assets-swr-v2',
       plugins: [
         new cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] }),
         new expiration.ExpirationPlugin({ maxEntries: 200, purgeOnQuotaError: true })
@@ -50,7 +50,7 @@ if (workbox) {
       (request.destination === 'image' || request.destination === 'document' || request.destination === 'empty') &&
       ionHosts.some((h) => url.hostname.endsWith(h)),
     new strategies.StaleWhileRevalidate({
-      cacheName: 'tiles-swr-v1',
+      cacheName: 'tiles-swr-v2',
       plugins: [
         new cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] }),
         new expiration.ExpirationPlugin({ maxEntries: 1500, maxAgeSeconds: 60 * 60 * 24 * 7, purgeOnQuotaError: true })
@@ -62,7 +62,7 @@ if (workbox) {
   routing.registerRoute(
     ({ request }) => request.destination === 'image',
     new strategies.StaleWhileRevalidate({
-      cacheName: 'img-swr-v1',
+      cacheName: 'img-swr-v2',
       plugins: [new expiration.ExpirationPlugin({ maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 })]
     })
   );
@@ -70,7 +70,7 @@ if (workbox) {
   // --- Default handler ---
   routing.setDefaultHandler(
     new strategies.NetworkFirst({
-      cacheName: 'default-nf-v1',
+      cacheName: 'default-nf-v2',
       networkTimeoutSeconds: 4,
       plugins: [new cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] })]
     })
@@ -80,29 +80,44 @@ if (workbox) {
   console.log(`Boo! Workbox didn't load 😬`);
 }
 
-// --- INSTALL-TIME WARMUP ---
-const WARM_CACHE_NAME = 'tiles-swr-v1';
-const AREA = {
-  bbox: [38.5, -5.3, 38.9, -4.9],
-  zooms: [9, 10]
-};
+// --- INSTALL-TIME WARMUP (disabled to prevent runtime errors) ---
+// Keep lightweight stubs so the SW remains valid JS.
+const WARM_CACHE_NAME = 'tiles-swr-v2';
+function buildWarmUrls() { return []; }
+// self.addEventListener('install', (event) => {
+//   const warmUrls = buildWarmUrls();
+//   event.waitUntil(
+//     (async () => {
+//       const cache = await caches.open(WARM_CACHE_NAME);
+//       try {
+//         await cache.addAll(warmUrls);
+//       } catch {
+//         // Ignore failures
+//       }
+//     })()
+//   );
+// });
 
-function lonLatToTileXY(lon, lat, z) {
-    // ... (same as before)
-}
-function buildWarmUrls({ bbox, zooms }) {
-    // ... (same as before)
-}
-
-self.addEventListener('install', (event) => {
-  const warmUrls = buildWarmUrls(AREA);
+self.addEventListener('activate', (event) => {
+  const CURRENT_CACHES = new Set([
+    'assets-swr-v2',
+    'tiles-swr-v2',
+    'img-swr-v2',
+    'default-nf-v2',
+  ]);
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(WARM_CACHE_NAME);
-      try {
-        await cache.addAll(warmUrls);
-      } catch {
-        // Ignore failures
+      const names = await caches.keys();
+      await Promise.all(
+        names.map((name) => {
+          if (!CURRENT_CACHES.has(name) && !/workbox-precache/i.test(name)) {
+            return caches.delete(name);
+          }
+          return Promise.resolve(false);
+        })
+      );
+      if (self && self.clients && typeof self.clients.claim === 'function') {
+        await self.clients.claim();
       }
     })()
   );

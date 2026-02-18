@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import * as THREE from 'three';
 import { toFixed, orientationFrom } from '@/lib/boreholes/borehole-cylinders';
 import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
+import { ASSET_BASE_URL } from '@/lib/constants';
 
 // ## Data Structures & Constants ##
 export interface DrillholeSegment {
@@ -18,6 +19,7 @@ export interface BlockSegment {
 interface BoreholeInfo {
     segments: DrillholeSegment[];
     orientation: { midpoint: THREE.Vector3; quaternion: THREE.Quaternion; length: number; } | null;
+    length: number;
 }
 
 interface ProcessedLithologyData {
@@ -73,7 +75,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                 const [lithologyResponse, assayResponse, blockModelResponse] = await Promise.all([
                     fetch('/lithology_data.geojson'),
                     fetch('/assay_data.geojson'),
-                    fetch('/BlockModel.geojson')
+                    fetch(`${ASSET_BASE_URL}/BlockModel.geojson`)
                 ]);
 
                 if (!lithologyResponse.ok) throw new Error(`Failed to fetch lithology: ${lithologyResponse.statusText}`);
@@ -147,7 +149,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
 
                 lithologyData.forEach(segment => {
                     if (!lithologyByHoleId[segment.hole_id]) {
-                        lithologyByHoleId[segment.hole_id] = { segments: [], orientation: null };
+                        lithologyByHoleId[segment.hole_id] = { segments: [], orientation: null, length: 0 };
                     }
                     lithologyByHoleId[segment.hole_id].segments.push(segment);
                     allLithologyPoints.push({ lon: segment.lon, lat: segment.lat, elevation: segment.elevation });
@@ -194,7 +196,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
 
                 assayData.forEach(segment => {
                     if (!assayByHoleId[segment.hole_id]) {
-                        assayByHoleId[segment.hole_id] = { segments: [], orientation: null };
+                        assayByHoleId[segment.hole_id] = { segments: [], orientation: null, length: 0 };
                     }
                     assayByHoleId[segment.hole_id].segments.push(segment);
                     allAssayPoints.push({ lon: segment.lon, lat: segment.lat, elevation: segment.elevation });
