@@ -1,3 +1,18 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:46648d22d9840ae9f204eb4fca82eadd18de4f7f5ec7f4e0f5fabe04edcf8717
-size 463
+'use client';
+
+import CommonGeoVision, { GeoVisionDisplayMode } from './common-geo-vision';
+
+interface GeoVisionHostProps {
+    displayMode: GeoVisionDisplayMode;
+    processedDrillholeData: any;
+}
+
+const GeoVisionHost = ({ displayMode, processedDrillholeData }: GeoVisionHostProps) => {
+    return (
+        <CommonGeoVision displayMode={displayMode}>
+            {/* Children content here */}
+        </CommonGeoVision>
+    );
+};
+
+export default GeoVisionHost;

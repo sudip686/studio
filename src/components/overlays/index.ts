@@ -1,3 +1,16 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:bdb1b1eba3269d49125a9709d076daa9f0b554831b46fd6b4e057f0ab4acabd0
-size 565
+/**
+ * UI overlay components
+ * Components that render on top of visualizations including:
+ * - Map overlays (compass, scale indicators)
+ * - Legends and color scales
+ * - Tooltips and interactive overlays
+ * - Quality/quality toggles for data layers
+ */
+
+// Quality and layer controls
+export { default as TilesetQualityToggle } from '../TilesetQualityToggle';
+
+// Navigation and spatial indicators
+export { CompassOverlay } from '../ui/CompassOverlay';
+export { LogoOverlay } from '../ui/LogoOverlay';
+export { MetricScaleOverlay } from '../ui/MetricScaleOverlay';

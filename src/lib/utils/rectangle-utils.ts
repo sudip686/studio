@@ -1,3 +1,15 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:c6c4d931e6ba9d3760e984b762ac35ade4ca42f6c79db3b2f4ef158e4ab9daa6
-size 465
+export function bufferRectangleMeters(Cesium: any, rect: any, bufferMeters = 500) {
+  const R = 6378137.0; // Earth radius (m)
+  const center = Cesium.Rectangle.center(rect);
+  const lat = center.latitude; // radians
+
+  const dLat = bufferMeters / R;                 // radians
+  const dLon = bufferMeters / (R * Math.cos(lat));
+
+  return Cesium.Rectangle.fromRadians(
+    rect.west - dLon,
+    rect.south - dLat,
+    rect.east + dLon,
+    rect.north + dLat
+  );
+}

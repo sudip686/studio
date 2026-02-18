@@ -1,3 +1,19 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ef63b5bb2f55228a519851bd18cbfbea4fd01f54d43f85e0ea4411fc16aa30ca
-size 708
+'use client';
+import { useCesium } from '@/contexts/cesium-context';
+
+export default function TilesetQualityToggle() {
+  const { tileset, applyTilesetProfile } = useCesium();
+  if (!tileset || !applyTilesetProfile) return null;
+
+  const setProfile = (p: 'performance'|'balanced'|'quality') => {
+    applyTilesetProfile(tileset, p);
+  };
+
+  return (
+    <div className="fixed top-4 right-4 z-[9999] bg-black/60 text-white rounded-xl px-3 py-2 pointer-events-auto space-x-2">
+      <button onClick={() => setProfile('performance')}>Performance</button>
+      <button onClick={() => setProfile('balanced')}>Balanced</button>
+      <button onClick={() => setProfile('quality')}>Quality</button>
+    </div>
+  );
+}

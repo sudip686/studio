@@ -1,3 +1,20 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:886c8122875f7f9ef3f85c7795a15887cbfa789d7b5212593d10f8595ee3ad38
-size 641
+// workbox.config.js
+module.exports = {
+  // Use InjectManifest so we control routes & warmup in src/sw.js
+  swSrc: 'src/sw.js',
+  swDest: 'public/service-worker.js',
+  globDirectory: 'public',
+  globPatterns: [
+    // App shell + static assets you want precached:
+    '**/*.{js,css,html,ico,png,svg,webp,woff2}',
+    // Geospatial data files (geojson, kml, kmz) - in public root
+    '*.{geojson,json,kml,kmz}',
+    // Model and other data files
+    '*.{glb,bin,tiff,jpg}'
+  ],
+  globIgnores: [
+    '**/node_modules/**/*',
+    'service-worker.js'
+  ],
+  maximumFileSizeToCacheInBytes: 80 * 1024 * 1024 // increased to support larger files
+};

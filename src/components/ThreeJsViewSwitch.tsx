@@ -1,3 +1,16 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:07fd81621253b7f4c476e34fa749e2e539689b8d94138b1028ebac3f96670e51
-size 1026
+import LithologyViewer from './viewers/LithologyView';
+import AssayViewer from './viewers/AssayView';
+import BlockModelCarbonViewer from './viewers/BlockModelCarbonView';
+import BlockModelRescViewer from './viewers/BlockModelRescView';
+
+export default function ThreeJsViewSwitch({ view, assayCutoff }: { view: string; assayCutoff?: number }) {
+
+    return (
+        <>
+            {view === 'lithology_view' && <LithologyViewer key="lith" />}
+            {view === 'assay_view' && <AssayViewer key="assay" assayCutoff={assayCutoff} />}
+            {view === 'block_model_carbon_view' && <BlockModelCarbonViewer key="bm_c" assayCutoff={assayCutoff} />}
+            {view === 'block_model_resc_view' && <BlockModelRescViewer key="bm_r" assayCutoff={assayCutoff} />}
+        </>
+    );
+}

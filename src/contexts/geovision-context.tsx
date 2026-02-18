@@ -1,3 +1,30 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:bc6ffe1031f6b7b7aa2b6ed4f57aa9739c936dba80a963c5537928930cf77b5d
-size 1039
+'use client';
+import { createContext, useContext } from 'react';
+import type { Scene, PerspectiveCamera } from 'three';
+import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+// Define the context type, it should match what's provided in CommonGeoVision
+export interface GeoVisionContextType {
+    isLoaded: boolean;
+    scene: Scene | null;
+    camera: PerspectiveCamera | null;
+    controls: OrbitControls | null;
+    project: (lon: number, lat: number) => { x: number; z: number };
+    processedDrillholeData: any;
+    filters: {
+        assayFilterValue: number;
+        lithologyFilter: string;
+        blockTransparency: number;
+    };
+    setFilters: React.Dispatch<React.SetStateAction<any>>;
+}
+
+export const GeoVisionContext = createContext<GeoVisionContextType | null>(null);
+
+export const useGeoVision = () => {
+    const context = useContext(GeoVisionContext);
+    if (!context) {
+        throw new Error('useGeoVision must be used within a GeoVisionContext.Provider');
+    }
+    return context;
+};
