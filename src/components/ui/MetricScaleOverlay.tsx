@@ -51,8 +51,8 @@ export function MetricScaleOverlay({ mode, getMetersIn100px, className }: Metric
   const pixelWidth = (scaleLength / metersIn100px) * 100;
 
   return (
-    <div className={`flex flex-col items-center gap-1 ${className || ''}`}>
-      <div className="flex flex-col items-center gap-2 bg-gradient-to-br from-black/60 via-black/50 to-black/40 rounded-xl px-4 py-3 backdrop-blur-md border border-orange-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_12px_48px_rgba(249,115,22,0.2)] transition-all duration-300">
+    <div className={`flex flex-col items-center gap-1 pointer-events-auto ${className || ''}`}>
+      <div className="relative flex flex-col items-center gap-2 bg-gradient-to-br from-black/60 via-black/50 to-black/40 rounded-xl px-4 py-3 backdrop-blur-md border border-orange-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_12px_48px_rgba(249,115,22,0.2)] transition-all duration-300">
         {/* Enhanced scale bar container */}
         <div className="flex items-center gap-2">
           {/* Left tick with glow */}

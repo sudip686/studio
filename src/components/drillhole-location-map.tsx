@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLOR_MAP_CSS } from '@/lib/constants';
 import IonKmlLayer from '@/components/IonKmlLayer';
 
@@ -151,7 +152,8 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
 
     return (
         <>
-            <div className="absolute top-4 right-4 z-20 pointer-events-auto p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
+            <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
+              <div className="pointer-events-auto p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
                 <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Filter by Lithology</label>
                     <select
@@ -164,13 +166,16 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
                         ))}
                     </select>
                 </div>
-            </div>
-            <Legend
-                title={drillholeLocationMapLithologyLegendData.title}
-                type="categorical"
-                items={drillholeLocationMapLithologyLegendData.items}
-                show={true}
-            />
+              </div>
+            </OverlaySlot>
+            <OverlaySlot slot="bottom-left">
+              <Legend
+                  title={drillholeLocationMapLithologyLegendData.title}
+                  type="categorical"
+                  items={drillholeLocationMapLithologyLegendData.items}
+                  show={true}
+              />
+            </OverlaySlot>
         </>
     );
 }
@@ -257,7 +262,8 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
 
     return (
         <>
-            <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-3 p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
+            <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
+              <div className="pointer-events-auto flex flex-col gap-3 p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
                 <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Metric</label>
                     <select
@@ -352,15 +358,18 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                         />
                     </div>
                 )}
-            </div>
-            <Legend
-                title={`${metric === 'average' ? 'Avg.' : 'Max.'} Assay (Graphitic Carbon)`}
-                type="gradient"
-                gradient={`linear-gradient(to right, ${(CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis']).join(', ')})`}
-                minLabel={currentRange.min.toFixed(2)}
-                maxLabel={currentRange.max.toFixed(2)}
-                show={true}
-            />
+              </div>
+            </OverlaySlot>
+            <OverlaySlot slot="bottom-left">
+              <Legend
+                  title={`${metric === 'average' ? 'Avg.' : 'Max.'} Assay (Graphitic Carbon)`}
+                  type="gradient"
+                  gradient={`linear-gradient(to right, ${(CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis']).join(', ')})`}
+                  minLabel={currentRange.min.toFixed(2)}
+                  maxLabel={currentRange.max.toFixed(2)}
+                  show={true}
+              />
+            </OverlaySlot>
         </>
     );
 }
@@ -373,7 +382,7 @@ interface DrillholeLocationMapProps {
     imageryAlpha?: number;
 }
 
-const DrillholeLocationMap = ({ displayMode, imageryAlpha }: DrillholeLocationMapProps) => {
+const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
     const { viewer, ready } = useCesium();
     const { drillholeData } = useDataCache();
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
@@ -78,9 +79,9 @@ export default function LithologyView() {
                 onLoaded={() => setBoreholesReady(true)}
             />
             
-            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
+            <OverlaySlot slot="bottom-left">
                 <Legend title="Lithology" items={lithologyLegendItems} />
-            </div>
+            </OverlaySlot>
         </>
     );
 }

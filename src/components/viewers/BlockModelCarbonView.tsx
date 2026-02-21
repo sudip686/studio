@@ -7,6 +7,7 @@ import { useDataCache, BlockSegment } from '@/lib/data-cache';
 import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
 
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
@@ -167,14 +168,16 @@ export default function BlockModelCarbonViewer({
       <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
       <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
       
-      <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
-          Show traces
-        </label>
-      </div>
+      <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
+        <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
+            Show traces
+          </label>
+        </div>
+      </OverlaySlot>
 
-      <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
+      <OverlaySlot slot="bottom-left">
         <Legend
             title="Carbon Value"
             type="gradient"
@@ -182,7 +185,7 @@ export default function BlockModelCarbonViewer({
             minLabel={carbonRange.min.toFixed(2)}
             maxLabel={carbonRange.max.toFixed(2)}
         />
-      </div>
+      </OverlaySlot>
     </>
   );
 }

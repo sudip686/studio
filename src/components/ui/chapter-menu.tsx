@@ -69,9 +69,10 @@ export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCur
   };
 
   return (
-    <div className="h-full">
+    <div className="h-full pointer-events-auto">
       {/* Burger Icon */}
       <button
+        data-ui-chapter-trigger
         onClick={() => setIsOpen(!isOpen)}
         className="mb-2 p-2 rounded-lg bg-black/60 border border-white/10 backdrop-blur-md text-white hover:bg-white/5 transition-colors"
         title={isOpen ? "Hide Chapters" : "Show Chapters"}
@@ -93,7 +94,7 @@ export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCur
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className="overflow-hidden"
       >
-        <div className="w-80 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md p-4 shadow-[0_18px_45px_rgba(0,0,0,0.7)] h-full overflow-hidden">
+        <div className="w-80 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md p-4 shadow-[0_18px_45px_rgba(0,0,0,0.7)] h-full overflow-hidden" data-ui-chapter-sidebar>
           <h2 className="text-lg font-semibold font-headline mb-4 text-white">Project Chapters</h2>
           <ScrollArea className="h-[calc(100%-3rem)]">
             <div className="space-y-3">

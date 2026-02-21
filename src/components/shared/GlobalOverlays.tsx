@@ -6,6 +6,7 @@
 import { useCesium } from "@/contexts/cesium-context";
 import { useThreeSceneSafe } from "@/contexts/three-scene-context";
 import { CompassOverlay, LogoOverlay, MetricScaleOverlay } from "@/components/overlays";
+import { OverlaySlot, uiTheme } from "@/ui/overlays";
 
 interface GlobalOverlaysProps {
   mode: "cesium" | "three" | "none";
@@ -13,86 +14,6 @@ interface GlobalOverlaysProps {
   measurementMode?: boolean;
   currentView?: string;
   onLogoClick?: () => void;
-}
-
-/**
- * Fixed UI slot container (top-left/right, bottom-left/right, top-center, bottom-center)
- * - slot wrappers are pointer-events-none; children are pointer-events-auto to avoid blocking scene
- * - includes safe-area padding to avoid notches
- * - responsive stacking and gap to avoid collisions
- */
-function Slot({
-  children,
-  position,
-  align = "start",
-  className = "",
-}: {
-  children: React.ReactNode;
-  position:
-    | "top-left"
-    | "top-right"
-    | "bottom-left"
-    | "bottom-right"
-    | "top-center"
-    | "bottom-center";
-  align?: "start" | "center" | "end";
-  className?: string;
-}) {
-  const base =
-    "fixed z-50 pointer-events-none p-3 sm:p-4 md:p-5 flex gap-3 md:gap-4";
-  const alignMap: Record<string, string> = {
-    start: "items-start",
-    center: "items-center",
-    end: "items-end",
-  };
-
-  let posClass = "";
-  let layout = "flex-col"; // stack by default in a column
-  const style: React.CSSProperties = {};
-
-  switch (position) {
-    case "top-left":
-      posClass = "top-0 left-0";
-      style.paddingTop = "calc(env(safe-area-inset-top) + var(--header-height, 0px))";
-      style.paddingLeft = "calc(env(safe-area-inset-left) + var(--chapter-sidebar-width, 0px))";
-      break;
-    case "top-right":
-      posClass = "top-0 right-0";
-      style.paddingTop = "calc(env(safe-area-inset-top) + var(--header-height, 0px))";
-      style.paddingRight = "calc(env(safe-area-inset-right) + var(--chapter-trigger-width, 0px))";
-      break;
-    case "bottom-left":
-      posClass = "bottom-0 left-0";
-      style.paddingBottom = "env(safe-area-inset-bottom)";
-      style.paddingLeft = "calc(env(safe-area-inset-left) + var(--chapter-sidebar-width, 0px))";
-      break;
-    case "bottom-right":
-      posClass = "bottom-0 right-0";
-      style.paddingBottom = "env(safe-area-inset-bottom)";
-      style.paddingRight = "env(safe-area-inset-right)";
-      break;
-    case "top-center":
-      posClass = "top-0 left-1/2 -translate-x-1/2";
-      layout = "flex-row";
-      style.paddingTop = "calc(env(safe-area-inset-top) + var(--header-height, 0px))";
-      break;
-    case "bottom-center":
-      posClass = "bottom-0 left-1/2 -translate-x-1/2";
-      layout = "flex-row";
-      style.paddingBottom = "env(safe-area-inset-bottom)";
-      break;
-  }
-
-  return (
-    <div
-      className={`${base} ${posClass} ${layout} ${alignMap[align]} max-w-full ${className}`}
-      style={style}
-    >
-      <div className="pointer-events-auto flex flex-col gap-3 md:gap-4 max-w-full">
-        {children}
-      </div>
-    </div>
-  );
 }
 
 const GlobalOverlays = ({
@@ -168,74 +89,54 @@ const GlobalOverlays = ({
 
   const isCesium = mode === "cesium";
   const isThree = mode === "three";
+  const panelClass = `${uiTheme.panel.background} ${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow}`;
 
   return (
     <>
       {/* Top-left slot: Logo */}
-      <Slot position="top-left" align="start">
+      <OverlaySlot slot="top-left">
         <LogoOverlay className="will-change-transform transition-transform duration-150" onClick={onLogoClick} />
-      </Slot>
+      </OverlaySlot>
 
-      {/* Top-right slot: Compass (desktop/tablet). Hidden on small screens to avoid header/hamburger. */}
-      <Slot position="top-right" align="end" className="hidden md:flex">
+      {/* Bottom-right slot: Compass */}
+      <OverlaySlot slot="bottom-right" wrapperClassName="flex">
+        <div className={`pointer-events-auto ${panelClass} p-2`}>
         {isCesium && (
           <CompassOverlay
             mode="cesium"
             getHeading={getCesiumHeading}
-            className="will-change-transform transition-transform duration-150"
+            className="will-change-transform transition-transform duration-150 scale-[0.9]"
           />
         )}
         {isThree && (
           <CompassOverlay
             mode="three"
             getHeading={getThreeHeading}
-            className="will-change-transform transition-transform duration-150"
+            className="will-change-transform transition-transform duration-150 scale-[0.9]"
           />
         )}
         {!isCesium && !isThree && (
           <CompassOverlay
             mode="cesium"
             getHeading={() => 0}
-            className="will-change-transform transition-transform duration-150"
+            className="will-change-transform transition-transform duration-150 scale-[0.9]"
           />
         )}
-      </Slot>
-
-      {/* Bottom-right slot: Compass (mobile-first) */}
-      <Slot position="bottom-right" align="end" className="flex md:hidden">
-        {isCesium && (
-          <CompassOverlay
-            mode="cesium"
-            getHeading={getCesiumHeading}
-            className="will-change-transform transition-transform duration-150"
-          />
-        )}
-        {isThree && (
-          <CompassOverlay
-            mode="three"
-            getHeading={getThreeHeading}
-            className="will-change-transform transition-transform duration-150"
-          />
-        )}
-        {!isCesium && !isThree && (
-          <CompassOverlay
-            mode="cesium"
-            getHeading={() => 0}
-            className="will-change-transform transition-transform duration-150"
-          />
-        )}
-      </Slot>
+        </div>
+      </OverlaySlot>
 
       {/* Bottom-left slot: Metric scale */}
-      <Slot position="bottom-left" align="start">
-        <MetricScaleOverlay
-          mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
-          getMetersIn100px={
-            isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
-          }
-          className="will-change-transform transition-transform duration-150"
-        />
-      </Slot>
+      <OverlaySlot slot="bottom-left">
+        <div className={`pointer-events-auto ${panelClass} px-3 py-2`}>
+          <MetricScaleOverlay
+            mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
+            getMetersIn100px={
+              isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
+            }
+            className="will-change-transform transition-transform duration-150"
+          />
+        </div>
+      </OverlaySlot>
 
       {/* Reserve top-center/bottom-center for future unique controls if needed */}
       {/* <Slot position="top-center" align="center"></Slot>
