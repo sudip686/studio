@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';

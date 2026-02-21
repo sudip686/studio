@@ -1,0 +1,219 @@
+[16:51:21.066] [INFO] [36mInitializing Storybook[39m
+[16:51:21.816] [DEBUG] Getting package.json info for C:/Users/SUDIPTA CHANDA/PycharmProjects/presentationCreator/studio/package.json...
+[16:51:21.817] [DEBUG] Getting CLI versions from NPM for storybook...
+[16:51:21.817] [DEBUG] Executing command: npm info storybook version
+[16:51:22.974] [INFO] Adding Storybook version 10.2.10 to your project
+[16:51:22.977] [DEBUG] Project type detected: nextjs
+[16:51:22.977] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:22.983] [INFO] Framework detected: nextjs-vite
+[16:51:22.984] [DEBUG] Getting installed version for vitest...
+[16:51:22.984] [DEBUG] Executing command: npm ls --json --depth=99 2>NUL
+[16:51:24.850] [DEBUG] Executing command: npm ls --json --depth=0 2>NUL
+[16:51:26.582] [DEBUG] Error finding installations for vitest: ExecaError: Command failed with exit code 1: npm.cmd ls --json "--depth=0" "2>NUL"
+
+npm error code EINVALIDTAGNAME
+npm error Invalid tag name "2>NUL" of package "2>NUL": Tags may not have any characters that encodeURIComponent encodes.
+npm error A complete log of this run can be found in: C:\Users\SUDIPTA CHANDA\AppData\Local\npm-cache\_logs\2026-02-18T11_21_25_230Z-debug-0.log
+
+{
+  "error": {
+    "code": "EINVALIDTAGNAME",
+    "summary": "Invalid tag name \"2>NUL\" of package \"2>NUL\": Tags may not have any characters that encodeURIComponent encodes.",
+    "detail": ""
+  }
+}
+[16:51:26.582] [DEBUG] No installations found for vitest
+[16:51:26.582] [DEBUG] Getting installed version for msw...
+[16:51:26.582] [DEBUG] Executing command: npm ls --json --depth=99 2>NUL
+[16:51:28.343] [DEBUG] Executing command: npm ls --json --depth=0 2>NUL
+[16:51:30.107] [DEBUG] Error finding installations for msw: ExecaError: Command failed with exit code 1: npm.cmd ls --json "--depth=0" "2>NUL"
+
+npm error code EINVALIDTAGNAME
+npm error Invalid tag name "2>NUL" of package "2>NUL": Tags may not have any characters that encodeURIComponent encodes.
+npm error A complete log of this run can be found in: C:\Users\SUDIPTA CHANDA\AppData\Local\npm-cache\_logs\2026-02-18T11_21_28_756Z-debug-0.log
+
+{
+  "error": {
+    "code": "EINVALIDTAGNAME",
+    "summary": "Invalid tag name \"2>NUL\" of package \"2>NUL\": Tags may not have any characters that encodeURIComponent encodes.",
+    "detail": ""
+  }
+}
+[16:51:30.107] [DEBUG] No installations found for msw
+[16:51:36.386] [PROMPT] New to Storybook? {"choice":true}
+[16:51:36.387] [INFO] Storybook collects completely anonymous usage telemetry. We use it to shape Storybook's roadmap and prioritize features. You can learn more, including how to opt out, at https://storybook.js.org/telemetry
+[16:51:37.175] [INFO] base-generator-task-start: Generating Storybook configuration
+[16:51:37.176] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:37.176] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:37.176] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:37.177] [INFO] base-generator-task: - Configuring ESLint plugin
+[16:51:37.178] [DEBUG] Detected JSON config at C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\.eslintrc.json
+[16:51:37.184] [DEBUG] Using cached version for storybook...
+[16:51:37.184] [DEBUG] Getting CLI versions from NPM for @storybook/nextjs-vite...
+[16:51:37.184] [DEBUG] Executing command: npm info @storybook/nextjs-vite version
+[16:51:37.225] [DEBUG] Getting CLI versions from NPM for @chromatic-com/storybook...
+[16:51:37.225] [DEBUG] Executing command: npm info @chromatic-com/storybook version
+[16:51:37.260] [DEBUG] Getting CLI versions from NPM for @storybook/addon-vitest...
+[16:51:37.260] [DEBUG] Executing command: npm info @storybook/addon-vitest version
+[16:51:37.311] [DEBUG] Getting CLI versions from NPM for @storybook/addon-a11y...
+[16:51:37.311] [DEBUG] Executing command: npm info @storybook/addon-a11y version
+[16:51:37.371] [DEBUG] Getting CLI versions from NPM for @storybook/addon-docs...
+[16:51:37.371] [DEBUG] Executing command: npm info @storybook/addon-docs version
+[16:51:37.431] [DEBUG] Getting CLI versions from NPM for @storybook/addon-onboarding...
+[16:51:37.431] [DEBUG] Executing command: npm info @storybook/addon-onboarding version
+[16:51:37.475] [DEBUG] Getting CLI versions from NPM for vite...
+[16:51:37.475] [DEBUG] Executing command: npm info vite version
+[16:51:37.544] [DEBUG] Getting CLI versions from NPM for eslint-plugin-storybook...
+[16:51:37.544] [DEBUG] Executing command: npm info eslint-plugin-storybook version
+[16:51:42.755] [INFO] base-generator-task: - Configuring main.ts
+[16:51:42.758] [INFO] base-generator-task: - Configuring preview.ts
+[16:51:42.760] [INFO] base-generator-task: - Adding Storybook command to package.json
+[16:51:42.761] [DEBUG] Getting package.json info for C:/Users/SUDIPTA CHANDA/PycharmProjects/presentationCreator/studio/package.json...
+[16:51:42.761] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:42.761] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:42.762] [INFO] base-generator-task: - Copying framework templates
+[16:51:42.806] [DEBUG] Executing command: npm config get registry -ws=false -iwr
+[16:51:44.506] [INFO] base-generator-task-success: Storybook configuration generated
+[16:51:44.507] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:44.507] [DEBUG] Using cached installed version for vitest...
+[16:51:44.508] [DEBUG] Getting installed version for @vitest/coverage-v8...
+[16:51:44.508] [DEBUG] Executing command: npm ls --json --depth=99 2>NUL
+[16:51:46.365] [DEBUG] Executing command: npm ls --json --depth=0 2>NUL
+[16:51:48.115] [DEBUG] Error finding installations for @vitest/coverage-v8: ExecaError: Command failed with exit code 1: npm.cmd ls --json "--depth=0" "2>NUL"
+
+npm error code EINVALIDTAGNAME
+npm error Invalid tag name "2>NUL" of package "2>NUL": Tags may not have any characters that encodeURIComponent encodes.
+npm error A complete log of this run can be found in: C:\Users\SUDIPTA CHANDA\AppData\Local\npm-cache\_logs\2026-02-18T11_21_46_750Z-debug-0.log
+
+{
+  "error": {
+    "code": "EINVALIDTAGNAME",
+    "summary": "Invalid tag name \"2>NUL\" of package \"2>NUL\": Tags may not have any characters that encodeURIComponent encodes.",
+    "detail": ""
+  }
+}
+[16:51:48.115] [DEBUG] No installations found for @vitest/coverage-v8
+[16:51:48.116] [DEBUG] Getting installed version for @vitest/coverage-istanbul...
+[16:51:48.116] [DEBUG] Executing command: npm ls --json --depth=99 2>NUL
+[16:51:49.849] [DEBUG] Executing command: npm ls --json --depth=0 2>NUL
+[16:51:51.581] [DEBUG] Error finding installations for @vitest/coverage-istanbul: ExecaError: Command failed with exit code 1: npm.cmd ls --json "--depth=0" "2>NUL"
+
+npm error code EINVALIDTAGNAME
+npm error Invalid tag name "2>NUL" of package "2>NUL": Tags may not have any characters that encodeURIComponent encodes.
+npm error A complete log of this run can be found in: C:\Users\SUDIPTA CHANDA\AppData\Local\npm-cache\_logs\2026-02-18T11_21_50_237Z-debug-0.log
+
+{
+  "error": {
+    "code": "EINVALIDTAGNAME",
+    "summary": "Invalid tag name \"2>NUL\" of package \"2>NUL\": Tags may not have any characters that encodeURIComponent encodes.",
+    "detail": ""
+  }
+}
+[16:51:51.581] [DEBUG] No installations found for @vitest/coverage-istanbul
+[16:51:51.582] [INFO] adding-dependencies-task-start: Adding dependencies to package.json
+[16:51:51.583] [INFO] adding-dependencies-task: Adding devDependencies:
+- storybook@^10.2.10
+- @storybook/nextjs-vite@^10.2.10
+- @chromatic-com/storybook@^5.0.1
+- @storybook/addon-vitest@^10.2.10
+- @storybook/addon-a11y@^10.2.10
+- @storybook/addon-docs@^10.2.10
+- @storybook/addon-onboarding@^10.2.10
+- vite@^7.3.1
+- eslint-plugin-storybook@^10.2.10
+- vitest
+- playwright
+- @vitest/browser-playwright
+- @vitest/coverage-v8
+[16:51:51.584] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:51.584] [DEBUG] Using cached version for storybook...
+[16:51:51.584] [DEBUG] Using cached version for @storybook/nextjs-vite...
+[16:51:51.584] [DEBUG] Using cached version for @chromatic-com/storybook...
+[16:51:51.584] [DEBUG] Using cached version for @storybook/addon-vitest...
+[16:51:51.584] [DEBUG] Using cached version for @storybook/addon-a11y...
+[16:51:51.584] [DEBUG] Using cached version for @storybook/addon-docs...
+[16:51:51.584] [DEBUG] Using cached version for @storybook/addon-onboarding...
+[16:51:51.584] [DEBUG] Using cached version for vite...
+[16:51:51.584] [DEBUG] Using cached version for eslint-plugin-storybook...
+[16:51:51.584] [DEBUG] Getting CLI versions from NPM for vitest...
+[16:51:51.585] [DEBUG] Executing command: npm info vitest version
+[16:51:52.665] [DEBUG] Getting CLI versions from NPM for playwright...
+[16:51:52.665] [DEBUG] Executing command: npm info playwright version
+[16:51:53.753] [DEBUG] Getting CLI versions from NPM for @vitest/browser-playwright...
+[16:51:53.753] [DEBUG] Executing command: npm info @vitest/browser-playwright version
+[16:51:54.685] [DEBUG] Getting CLI versions from NPM for @vitest/coverage-v8...
+[16:51:54.685] [DEBUG] Executing command: npm info @vitest/coverage-v8 version
+[16:51:56.566] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:51:56.566] [INFO] adding-dependencies-task-success: Dependencies added to package.json
+[16:51:56.568] [INFO] Installing dependencies...
+[16:51:56.569] [INFO] install-dependencies-spinner-start: Installing dependencies...
+[16:51:56.570] [DEBUG] Executing command: npm install
+[16:52:13.759] [ERROR] Installation of dependencies failed! {"error":"ExecaError: Command failed with exit code 1: npm.cmd install\n\nnpm error code ERESOLVE\nnpm error ERESOLVE could not resolve\nnpm error\nnpm error While resolving: @react-three/drei@10.7.7\nnpm error Found: react@18.3.1\nnpm error node_modules/react\nnpm error   react@\"^18.3.1\" from the root project\nnpm error   peer react@\">=16.8.0\" from @floating-ui/react-dom@2.1.7\nnpm error   node_modules/@floating-ui/react-dom\nnpm error     @floating-ui/react-dom@\"^2.0.0\" from @radix-ui/react-popper@1.2.8\nnpm error     node_modules/@radix-ui/react-popper\nnpm error       @radix-ui/react-popper@\"1.2.8\" from @radix-ui/react-menu@2.1.16\nnpm error       node_modules/@radix-ui/react-menu\nnpm error         @radix-ui/react-menu@\"2.1.16\" from @radix-ui/react-dropdown-menu@2.1.16\nnpm error         node_modules/@radix-ui/react-dropdown-menu\nnpm error         1 more (@radix-ui/react-menubar)\nnpm error       3 more (@radix-ui/react-popover, @radix-ui/react-select, @radix-ui/react-tooltip)\nnpm error   96 more (@fortawesome/react-fontawesome, @iwer/devui, zustand, ...)\nnpm error\nnpm error Could not resolve dependency:\nnpm error peer react@\"^19\" from @react-three/drei@10.7.7\nnpm error node_modules/@react-three/drei\nnpm error   @react-three/drei@\"^10.7.7\" from the root project\nnpm error\nnpm error Conflicting peer dependency: react@19.2.4\nnpm error node_modules/react\nnpm error   peer react@\"^19\" from @react-three/drei@10.7.7\nnpm error   node_modules/@react-three/drei\nnpm error     @react-three/drei@\"^10.7.7\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry\nnpm error this command with --force or --legacy-peer-deps\nnpm error to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error C:\\Users\\SUDIPTA CHANDA\\AppData\\Local\\npm-cache\\_logs\\2026-02-18T11_21_56_967Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: C:\\Users\\SUDIPTA CHANDA\\AppData\\Local\\npm-cache\\_logs\\2026-02-18T11_21_56_967Z-debug-0.log\n    at getFinalError (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:13109:10)\n    at makeError (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:14645:15)\n    at getAsyncResult (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:17291:158)\n    at handlePromise (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:17277:162)\n    at async Object.executeTaskWithSpinner (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-7ZPQ47DO.js:3683:11)\n    at async NPMProxy.installDependencies (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:11258:5)\n    at async DependencyInstallationCommand.execute (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/create-storybook/dist/_node-chunks/chunk-ZWXSN5R5.js:2072:9)\n    at async doInitiate (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/create-storybook/dist/_node-chunks/chunk-ZWXSN5R5.js:2848:38)\n    at async file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/create-storybook/dist/_node-chunks/chunk-ZWXSN5R5.js:2882:20\n    at async withTelemetry (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-S3MWHNYJ.js:218:12)"}
+[16:52:13.759] [ERROR] install-dependencies-spinner-error: [31mInstallation of dependencies failed![39m
+[16:52:13.763] [INFO] configure-addons-task-start: Configuring addons...
+[16:52:13.763] [INFO] configure-addons-task: Configuring @chromatic-com/storybook...
+[16:52:13.766] [INFO] configure-addons-task: @chromatic-com/storybook configured
+
+[16:52:13.766] [INFO] configure-addons-task: Configuring @storybook/addon-vitest...
+[16:52:13.768] [DEBUG] Getting package.json info for C:/Users/SUDIPTA CHANDA/PycharmProjects/presentationCreator/studio/package.json...
+[16:52:13.768] [DEBUG] Using cached package.json for C:\Users\SUDIPTA CHANDA\PycharmProjects\presentationCreator\studio\package.json...
+[16:52:13.768] [DEBUG] Using cached installed version for vitest...
+[16:52:13.768] [DEBUG] Vitest version specifier: 4.0.18
+[16:52:13.925] [DEBUG] Using cached installed version for vitest...
+[16:52:13.925] [DEBUG] Using cached installed version for msw...
+[16:52:13.926] [INFO] Creating a Vitest setup file for Storybook:
+[16:52:13.926] [INFO] C:/Users/SUDIPTA CHANDA/PycharmProjects/presentationCreator/studio/.storybook/vitest.setup.ts
+
+[16:52:13.936] [INFO] Creating a Vitest config file:
+[16:52:13.937] [INFO] C:/Users/SUDIPTA CHANDA/PycharmProjects/presentationCreator/studio/vitest.config.ts
+[16:52:13.947] [INFO] Setting up a11y addon for @storybook/addon-vitest
+[16:52:13.947] [INFO] Setting up a11y addon for @storybook/addon-vitest
+[16:52:13.947] [DEBUG] Executing command: npx storybook@10.2.10 automigrate addon-a11y-addon-test --loglevel silent --yes --skip-doctor --package-manager npm --skip-install
+[16:52:46.763] [INFO] a11y addon setup successfully
+[16:52:46.763] [INFO] [32ma11y addon setup successfully[39m
+[16:52:46.764] [INFO] [32m@storybook/addon-vitest setup completed successfully[39m
+[16:52:46.765] [INFO] @storybook/addon-vitest is now configured and you're ready to run your tests!
+Here are a couple of tips to get you started:
+
+• You can run tests with "[36mnpx vitest[39m"
+• Vitest IDE extension shows all stories as tests in your editor!
+
+Check the documentation for more information about its features and options at:
+https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
+[16:52:46.766] [INFO] configure-addons-task: @storybook/addon-vitest configured
+
+[16:52:46.766] [INFO] configure-addons-task: Configuring @storybook/addon-a11y...
+[16:52:46.767] [DEBUG] Executing command: npx storybook@10.2.10 automigrate addon-a11y-addon-test --loglevel silent --skip-doctor --package-manager npm --config-dir .storybook
+[16:52:54.873] [INFO] configure-addons-task: @storybook/addon-a11y configured
+
+[16:52:54.874] [INFO] configure-addons-task: Configuring @storybook/addon-docs...
+[16:52:54.877] [INFO] configure-addons-task: @storybook/addon-docs configured
+
+[16:52:54.878] [INFO] configure-addons-task: Configuring @storybook/addon-onboarding...
+[16:52:54.881] [INFO] configure-addons-task: @storybook/addon-onboarding configured
+
+[16:52:54.882] [INFO] configure-addons-task-success: Addons configured successfully
+[16:52:54.882] [INFO] [2m✅ @chromatic-com/storybook[22m
+[16:52:54.883] [INFO] [2m✅ @storybook/addon-vitest[22m
+[16:52:54.883] [INFO] [2m✅ @storybook/addon-a11y[22m
+[16:52:54.884] [INFO] [2m✅ @storybook/addon-docs[22m
+[16:52:54.884] [INFO] [2m✅ @storybook/addon-onboarding[22m
+[16:52:54.884] [INFO] Playwright browser binaries are necessary for @storybook/addon-vitest. The download can take some time. If you don't want to wait, you can skip the installation and run the following command manually later:
+[36mnpx playwright install chromium --with-deps[39m
+[16:53:48.047] [PROMPT] Do you want to install Playwright with Chromium now? {"choice":true}
+[16:53:48.047] [INFO] Installing Playwright browser binaries (press "c" to abort)
+[16:53:48.048] [INFO] playwright-installation-spinner-start: Installing Playwright browser binaries (press "c" to abort)
+[16:53:48.048] [DEBUG] Executing command: npx playwright install chromium --with-deps
+[16:53:51.070] [INFO] Installing Playwright browser binaries (press "c" to abort): Need to install the following packages:
+playwright@1.58.2
+Ok to proceed? (y) 
+[16:53:51.070] [INFO] playwright-installation-spinner: Installing Playwright browser binaries (press "c" to abort): Need to install the follo
+[17:06:02.769] [INFO] Installing Playwright browser binaries (press "c" to abort): 
+
+[17:06:02.769] [INFO] playwright-installation-spinner: Installing Playwright browser binaries (press "c" to abort): 
+[17:06:02.801] [ERROR] An error occurred while installing Playwright browser binaries. Please run the following command later: npx playwright install chromium --with-deps {"error":"ExecaError: Command failed with exit code 1: npx.cmd playwright install chromium --with-deps\n\nnpm error canceled\nnpm error A complete log of this run can be found in: C:\\Users\\SUDIPTA CHANDA\\AppData\\Local\\npm-cache\\_logs\\2026-02-18T11_23_48_397Z-debug-0.log\n\nNeed to install the following packages:\nplaywright@1.58.2\nOk to proceed? (y) \n    at getFinalError (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:13109:10)\n    at makeError (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:14645:15)\n    at getAsyncResult (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:17291:158)\n    at handlePromise (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-URMZXQZT.js:17277:162)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Object.executeTaskWithSpinner (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-7ZPQ47DO.js:3683:11)\n    at async AddonVitestService.installPlaywright (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/storybook/dist/_node-chunks/chunk-QQUKUQCR.js:5842:17)\n    at async AddonConfigurationCommand.execute (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/create-storybook/dist/_node-chunks/chunk-ZWXSN5R5.js:1969:26)\n    at async doInitiate (file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/create-storybook/dist/_node-chunks/chunk-ZWXSN5R5.js:2854:38)\n    at async file:///C:/Users/SUDIPTA%20CHANDA/AppData/Local/npm-cache/_npx/05823ecb1a3a987d/node_modules/create-storybook/dist/_node-chunks/chunk-ZWXSN5R5.js:2882:20"}
+[17:06:02.801] [ERROR] playwright-installation-spinner-error: [31mAn error occurred while installing Playwright browser binaries. Please run the following command later: npx playwright install chromium --with-deps[39m
+[17:06:03.961] [WARN] Storybook setup completed, but some non-blocking errors occurred. Please check the log file below for details.
+[17:06:03.963] [INFO] To run Storybook manually, run [36mnpm run storybook[39m. CTRL+C to stop.
+[17:06:03.963] [INFO] Wanna know more about Storybook? Check out [36mhttps://storybook.js.org/[39m
+Having trouble or want to chat? Join us at [36mhttps://discord.gg/storybook/[39m

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import { toFixed, orientationFrom } from '@/lib/boreholes/borehole-cylinders';
 import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
@@ -297,7 +297,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [cache.loadingStatus]);
 
-    const value = React.useMemo(() => ({ ...cache, refetch }), [cache, refetch]);
+    const value = useMemo(() => ({ ...cache, refetch }), [cache, refetch]);
 
     return (
         <DataCacheContext.Provider value={value}>
