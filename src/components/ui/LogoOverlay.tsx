@@ -28,6 +28,7 @@ export function LogoOverlay({ className, onClick }: LogoOverlayProps) {
               height={56}
               className={`w-full h-full object-cover ${isClickable ? 'group-hover:scale-110' : ''} transition-transform duration-500`}
               priority
+              unoptimized
             />
             {/* Logo overlay gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-orange-400/10 via-transparent to-gray-600/10 pointer-events-none" />

@@ -1,25 +1,13 @@
-# Images
-*.png filter=lfs diff=lfs merge=lfs -text
-*.jpg filter=lfs diff=lfs merge=lfs -text
-*.tiff filter=lfs diff=lfs merge=lfs -text
-*.tif filter=lfs diff=lfs merge=lfs -text
-# 3D Models
+# Core LFS types
 *.glb filter=lfs diff=lfs merge=lfs -text
 *.gltf filter=lfs diff=lfs merge=lfs -text
 *.bin filter=lfs diff=lfs merge=lfs -text
-# Geospatial Data
-*.kmz filter=lfs diff=lfs merge=lfs -text
-*.kml filter=lfs diff=lfs merge=lfs -text
-*.geojson filter=lfs diff=lfs merge=lfs -text
-# Backup/Logs
-*.bak filter=lfs diff=lfs merge=lfs -text
-*.log filter=lfs diff=lfs merge=lfs -text
-public/A_Logo.png filter=lfs diff=lfs merge=lfs -text
-public/boundary.kmz filter=lfs diff=lfs merge=lfs -text
-public/tanga_boundary.kmz filter=lfs diff=lfs merge=lfs -text
-public/*.json filter=lfs diff=lfs merge=lfs -text
-# Ignored local large files (hosted on R2)
-public/height.bin
-public/texture_rgb_8192.png
-public/BlockModel.geojson
-public/dem_utm.tif
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.tif filter=lfs diff=lfs merge=lfs -text
+
+# Specific large files
+public/texture_rgb_8192.png filter=lfs diff=lfs merge=lfs -text
+public/height.bin filter=lfs diff=lfs merge=lfs -text
+public/BlockModel.geojson filter=lfs diff=lfs merge=lfs -text
+
+# All other small assets (png, jpg, json, geojson, kmz) are regular files

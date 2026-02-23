@@ -62,6 +62,7 @@ export default function BoreholeLayerFixed({
     const sceneContext = useThreeSceneSafe();
     console.log('[BoreholeLayer] Version 20260211-Fixed - sceneContext:', !!sceneContext);
     const meshRefs = useRef<THREE.InstancedMesh[]>([]);
+    const initializedRef = useRef(false);
     
     // Stable key for modelCenter
     const centerKey = useMemo(() => 
@@ -202,7 +203,10 @@ export default function BoreholeLayerFixed({
                 }
 
                 meshRefs.current = newMeshes;
-                try { onLoaded?.(); } catch {}
+                if (!initializedRef.current) {
+                    initializedRef.current = true;
+                    try { onLoaded?.(); } catch {}
+                }
             })
             .catch(err => console.error('[BoreholeLayer] Error loading drillholes:', err));
 

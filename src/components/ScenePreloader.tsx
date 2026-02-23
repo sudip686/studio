@@ -24,7 +24,7 @@ export default function ScenePreloader() {
       // Warm the terrain texture via Image so it's ready in GPU cache sooner
       const img = new Image();
       img.decoding = 'async';
-      img.src = `${baseUrl}/terrain_texture_8k.jpg`; // Should match what TerrainAscLayer uses
+      img.src = `${baseUrl}/texture_rgb_8192.png`; // Match the high-res texture on R2
       // No need to attach; browser will cache the image
     } catch {}
   }, []);

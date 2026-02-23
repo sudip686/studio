@@ -18,31 +18,27 @@ export default function LithologyView() {
     const [terrainReady, setTerrainReady] = useState(false);
     const [boreholesReady, setBoreholesReady] = useState(false);
 
+    const onTerrainLoaded = useCallback(() => setTerrainReady(true), []);
+    const onBoreholesLoaded = useCallback(() => setBoreholesReady(true), []);
+
     useEffect(() => {
         if (!processedLithologyData || !camera || !controls || !dynamicGroup) return;
         if (mountedRef.current) return;
-        
-        // Fit camera logic - we might need to wait for the BoreholeLayer to load?
-        // BoreholeLayer adds meshes asynchronously.
-        // For now, we rely on standard camera controls or manual positioning.
-        // Or we can try to fit to the terrain bounds if known.
-        
-        // Actually, BoreholeLayer doesn't expose a "ready" callback easily.
-        // We can skip auto-fit for now or implement it later if needed.
-        // The previous code fitted to the drillhole group.
         
     }, [processedLithologyData, camera, controls, dynamicGroup]);
 
     if (loadingStatus === 'loading') return <div>Loading...</div>;
     if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
-    // Only create legend items if LITHOLOGY_COLOR_MAP exists
-    const lithologyLegendItems = (LITHOLOGY_COLOR_MAP && Object.entries(LITHOLOGY_COLOR_MAP).length > 0)
-        ? Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
-            label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            color,
-        }))
-        : [];
+    // Stabilize legend items with useMemo
+    const lithologyLegendItems = React.useMemo(() => {
+        return (LITHOLOGY_COLOR_MAP && Object.entries(LITHOLOGY_COLOR_MAP).length > 0)
+            ? Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+                label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                color,
+            }))
+            : [];
+    }, []);
 
     const tryFit = () => {
         if (!camera || !controls || !dynamicGroup) return;
@@ -71,12 +67,12 @@ export default function LithologyView() {
             <TerrainSurfaceLayer 
                 verticalScale={1} 
                 modelCenter={processedLithologyData?.modelCenter}
-                onLoaded={() => setTerrainReady(true)}
+                onLoaded={onTerrainLoaded}
             />
             <BoreholeLayer 
                 modelCenter={processedLithologyData?.modelCenter} 
                 type="lithology" 
-                onLoaded={() => setBoreholesReady(true)}
+                onLoaded={onBoreholesLoaded}
             />
             
             <OverlaySlot slot="bottom-left">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
@@ -46,6 +46,9 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
     const [terrainReady, setTerrainReady] = useState(false);
     const [boreholesReady, setBoreholesReady] = useState(false);
 
+    const onTerrainLoaded = useCallback(() => setTerrainReady(true), []);
+    const onBoreholesLoaded = useCallback(() => setBoreholesReady(true), []);
+
     const tryFit = () => {
         if (!camera || !controls || !dynamicGroup) return;
         // Fit as soon as either terrain or boreholes are ready (then refit once both are ready)
@@ -74,14 +77,14 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
             <TerrainSurfaceLayer 
                 verticalScale={1} 
                 modelCenter={processedAssayData?.modelCenter}
-                onLoaded={() => setTerrainReady(true)}
+                onLoaded={onTerrainLoaded}
             />
             <BoreholeLayer 
                 modelCenter={processedAssayData?.modelCenter} 
                 type="assay" 
                 assayCutoff={assayCutoff}
                 assayRange={assayRange}
-                onLoaded={() => setBoreholesReady(true)}
+                onLoaded={onBoreholesLoaded}
             />
             
             <OverlaySlot slot="bottom-left">

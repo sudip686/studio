@@ -1,8 +1,3 @@
 {
-  // Ensure Git LFS objects are fetched in Vercel builds so files in public/ aren't left as text pointers
-  // - git lfs install: enables LFS in the build environment
-  // - git lfs fetch --exclude="" --include="public/**": download only what's under public/ to save time
-  // - git lfs checkout public: replace pointers with real files
-  // - then install deps
-  "installCommand": "git lfs install && git lfs fetch --exclude=\"\" --include=\"public/**\" && git lfs checkout public && npm install --legacy-peer-deps"
+  "installCommand": "npm install --legacy-peer-deps"
 }
