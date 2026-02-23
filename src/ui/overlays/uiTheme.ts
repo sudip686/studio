@@ -8,7 +8,9 @@ export const uiTheme = {
   panel: {
     radius: "rounded-[18px]",
     blur: "backdrop-blur-md",
-    background: "bg-black/60",
+    // Keep UI chrome subtle and as small as possible.
+    // Use a lighter background so panels don't feel like large blocks.
+    background: "bg-black/30",
     border: "border border-white/10",
     shadow: "shadow-[0_18px_45px_rgba(0,0,0,0.65)]",
     padding: "px-4 py-3",
@@ -20,8 +22,10 @@ export const uiTheme = {
   },
   legend: {
     width: {
-      categorical: "min-w-[200px]",
-      gradient: "w-96",
+      // Legends should never be wider than their content.
+      // `w-fit` prevents full-width panels while still allowing reasonable wrapping.
+      categorical: "w-fit max-w-[70vw]",
+      gradient: "w-fit max-w-[70vw]",
     },
   },
   zIndex: {
