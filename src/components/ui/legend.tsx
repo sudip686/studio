@@ -1,4 +1,5 @@
 import React from 'react';
+import { uiTheme } from '@/ui/overlays/uiTheme';
 
 interface LegendProps {
   title: string;
@@ -22,7 +23,11 @@ export const Legend: React.FC<LegendProps> = ({
   if (!show) return null;
 
   return (
-    <div className={`absolute bottom-4 left-4 bg-black bg-opacity-70 text-white p-3 rounded-lg shadow-lg z-50 ${type === 'gradient' ? 'w-96' : 'min-w-[200px]'}`}>
+    <div
+      className={`pointer-events-auto text-white ${uiTheme.panel.background} ${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow} ${uiTheme.panel.padding} ${
+        type === 'gradient' ? uiTheme.legend.width.gradient : uiTheme.legend.width.categorical
+      }`}
+    >
       <h4 className="font-bold text-lg mb-2">{title}</h4>
       {type === 'categorical' && items && (
         <div className="space-y-1">

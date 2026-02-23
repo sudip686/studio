@@ -33,7 +33,7 @@ export function CompassOverlay({ mode, getHeading, className }: CompassOverlayPr
   const rotation = (heading * 180) / Math.PI; // Convert radians to degrees
 
   return (
-    <div className={`flex flex-col items-center ${className || ''}`}>
+    <div className={`flex flex-col items-center pointer-events-auto ${className || ''}`}>
       {/* Premium Compass Design */}
       <div className="relative h-32 w-32 rounded-full bg-gradient-to-br from-white/95 via-white/90 to-white/85 border-3 border-orange-500/70 flex items-center justify-center shadow-[0_12px_50px_rgba(0,0,0,0.25)] backdrop-blur-sm">
 

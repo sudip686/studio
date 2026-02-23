@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
 
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
@@ -184,31 +185,33 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
       <>
         <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
         <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
-        <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
+        <OverlaySlot slot="bottom-left">
           <Legend title="Classification" items={RESC_LEGEND} />
-        </div>
-        <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2 pointer-events-auto">
-          <label className="block text-sm">Classification</label>
-          <select
-            value={selectedClassification}
-            onChange={e => setSelectedClassification(e.target.value)}
-            className="w-full p-1 rounded bg-gray-700 text-white border border-gray-600 text-sm"
-          >
-            <option value="All">All</option>
-            <option value="Measured">Measured</option>
-            <option value="Indicated">Indicated</option>
-            <option value="Inferred">Inferred</option>
-            <option value="Unknown">Unknown</option>
-          </select>
-          <label className="block text-sm">Block opacity</label>
-          <input type="range" min="0.05" max="1" step="0.05"
-                 value={blockOpacity}
-                 onChange={(e)=>setBlockOpacity(parseFloat(e.target.value))} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
-            Show traces
-          </label>
-        </div>
+        </OverlaySlot>
+        <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
+          <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-2">
+            <label className="block text-sm">Classification</label>
+            <select
+              value={selectedClassification}
+              onChange={e => setSelectedClassification(e.target.value)}
+              className="w-full p-1 rounded bg-gray-700 text-white border border-gray-600 text-sm"
+            >
+              <option value="All">All</option>
+              <option value="Measured">Measured</option>
+              <option value="Indicated">Indicated</option>
+              <option value="Inferred">Inferred</option>
+              <option value="Unknown">Unknown</option>
+            </select>
+            <label className="block text-sm">Block opacity</label>
+            <input type="range" min="0.05" max="1" step="0.05"
+                   value={blockOpacity}
+                   onChange={(e)=>setBlockOpacity(parseFloat(e.target.value))} />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
+              Show traces
+            </label>
+          </div>
+        </OverlaySlot>
 
       </>
     );

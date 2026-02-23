@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { useThreeScene } from '@/contexts/three-scene-context';
 import { fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
@@ -86,7 +87,7 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
                 onLoaded={onBoreholesLoaded}
             />
             
-            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
+            <OverlaySlot slot="bottom-left">
                 <Legend 
                     title="Assay Value" 
                     type="gradient"
@@ -94,7 +95,7 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
                     minLabel={assayRange.min.toFixed(2)}
                     maxLabel={assayRange.max.toFixed(2)}
                 />
-            </div>
+            </OverlaySlot>
         </>
     );
 }

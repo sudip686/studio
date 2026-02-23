@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import IonKmlLayer from './IonKmlLayer';
 
 import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/constants';
@@ -350,21 +351,23 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     <div className="h-full w-full relative z-20 pointer-events-none">
         <IonKmlLayer assetId={4310565} />
         <TooltipContent data={tooltip} />
-        {type === 'lithology' ? (
-            <Legend
-                title={drillholeLocationMapLithologyLegendData.title}
-                type="categorical"
-                items={drillholeLocationMapLithologyLegendData.items}
-                show={true}
-            />
-        ) : (
-            <Legend
-                title="Assay (Graphitic Carbon)"
-                type="categorical"
-                items={ASSAY_GRAPHITIC_CARBON.bins}
-                show={true}
-            />
-        )}
+        <OverlaySlot slot="bottom-left">
+          {type === 'lithology' ? (
+              <Legend
+                  title={drillholeLocationMapLithologyLegendData.title}
+                  type="categorical"
+                  items={drillholeLocationMapLithologyLegendData.items}
+                  show={true}
+              />
+          ) : (
+              <Legend
+                  title="Assay (Graphitic Carbon)"
+                  type="categorical"
+                  items={ASSAY_GRAPHITIC_CARBON.bins}
+                  show={true}
+              />
+          )}
+        </OverlaySlot>
     </div>
   );
 };

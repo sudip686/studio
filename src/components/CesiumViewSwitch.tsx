@@ -12,8 +12,7 @@ import TerrainClippingPlanes from '@/components/terrain-clipping-planes'; // Cor
 import BlockModelBoxCutter from '@/components/block-model-box-cutter';
 import DrillholeLayer from '@/components/DrillholeLayer';
 import CinematicDrillholeViewer from '@/components/cinematic-drillhole-viewer';
-import TilesetQualityToggle from '@/components/TilesetQualityToggle'; // Import the new component
-import GlobalOverlays from '@/components/shared/GlobalOverlays';
+import { OverlaySlot } from "@/ui/overlays";
 import SubsurfaceViewer from '@/components/viewers/SubsurfaceViewer';
 import BlockModelLayer from '@/components/viewers/BlockModelLayer';
 import BoreholeLayer from '@/components/viewers/BoreholeLayer';
@@ -410,51 +409,48 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         )}
 
       {/* Transparency controls */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 z-20 pointer-events-auto flex flex-col gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-white/80 drop-shadow-sm">
-            Globe opacity {Math.round(globeAlpha * 100)}%
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={globeAlpha}
-            onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
-            className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
-            style={{
-              background: `linear-gradient(to right, #f97316 0%, #f97316 ${globeAlpha * 100}%, rgba(0,0,0,0.3) ${globeAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
-            }}
-          />
-        </div>
-
-        {view === 'drillhole_location_lithology' && (
+      <OverlaySlot slot="top-center">
+        <div className="flex flex-col gap-2 pointer-events-auto">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-white/80 drop-shadow-sm">
-              Map opacity {Math.round(imageryAlpha * 100)}%
+              Globe opacity {Math.round(globeAlpha * 100)}%
             </label>
             <input
               type="range"
               min={0}
               max={1}
               step={0.05}
-              value={imageryAlpha}
-              onChange={(e) => setImageryAlpha(parseFloat(e.target.value))}
+              value={globeAlpha}
+              onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
               className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
               style={{
-                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${imageryAlpha * 100}%, rgba(0,0,0,0.3) ${imageryAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
+                background: `linear-gradient(to right, #f97316 0%, #f97316 ${globeAlpha * 100}%, rgba(0,0,0,0.3) ${globeAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
               }}
             />
           </div>
-        )}
-      </div>
 
-      {/* Tileset Quality Toggle */}
-      <TilesetQualityToggle />
+          {view === 'drillhole_location_lithology' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-white/80 drop-shadow-sm">
+                Map opacity {Math.round(imageryAlpha * 100)}%
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={imageryAlpha}
+                onChange={(e) => setImageryAlpha(parseFloat(e.target.value))}
+                className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
+                style={{
+                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${imageryAlpha * 100}%, rgba(0,0,0,0.3) ${imageryAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </OverlaySlot>
 
-      {/* Global Overlays */}
-      <GlobalOverlays mode="cesium" currentView={view} />
     </>
   );
 }
