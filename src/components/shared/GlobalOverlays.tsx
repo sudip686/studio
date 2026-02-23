@@ -6,6 +6,7 @@
 import { useCesium } from "@/contexts/cesium-context";
 import { useThreeSceneSafe } from "@/contexts/three-scene-context";
 import { CompassOverlay, LogoOverlay, MetricScaleOverlay } from "@/components/overlays";
+import MeasurementTool from "@/components/MeasurementTool";
 import { OverlaySlot, uiTheme } from "@/ui/overlays";
 
 interface GlobalOverlaysProps {
@@ -89,45 +90,66 @@ const GlobalOverlays = ({
 
   const isCesium = mode === "cesium";
   const isThree = mode === "three";
-  const panelClass = `${uiTheme.panel.background} ${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow}`;
+  const panelClass = `${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow}`;
+
+  const renderCompass = () => {
+    if (isCesium) {
+      return (
+        <CompassOverlay
+          mode="cesium"
+          getHeading={getCesiumHeading}
+          className="will-change-transform transition-transform duration-150 scale-[0.9]"
+        />
+      );
+    }
+    if (isThree) {
+      return (
+        <CompassOverlay
+          mode="three"
+          getHeading={getThreeHeading}
+          className="will-change-transform transition-transform duration-150 scale-[0.9]"
+        />
+      );
+    }
+    return (
+      <CompassOverlay
+        mode="cesium"
+        getHeading={() => 0}
+        className="will-change-transform transition-transform duration-150 scale-[0.9]"
+      />
+    );
+  };
+
+  const renderCompassPanel = () => (
+    <div
+      className={`pointer-events-auto ${panelClass} inline-flex w-fit self-end flex-col items-end gap-3 p-2`}
+    >
+      {renderCompass()}
+    </div>
+  );
 
   return (
     <>
-      {/* Top-left slot: Logo */}
+      {/* Keep the logo in the shared overlay slots */}
       <OverlaySlot slot="top-left">
         <LogoOverlay className="will-change-transform transition-transform duration-150" onClick={onLogoClick} />
       </OverlaySlot>
 
-      {/* Bottom-right slot: Compass */}
-      <OverlaySlot slot="bottom-right" wrapperClassName="flex">
-        <div className={`pointer-events-auto ${panelClass} p-2`}>
-        {isCesium && (
-          <CompassOverlay
-            mode="cesium"
-            getHeading={getCesiumHeading}
-            className="will-change-transform transition-transform duration-150 scale-[0.9]"
+      <OverlaySlot slot="top-left" wrapperClassName="w-full">
+        <div className="pointer-events-auto">
+          <MeasurementTool
+            mode={isThree ? "three" : "cesium"}
+            className="ui-dialog-inner"
           />
-        )}
-        {isThree && (
-          <CompassOverlay
-            mode="three"
-            getHeading={getThreeHeading}
-            className="will-change-transform transition-transform duration-150 scale-[0.9]"
-          />
-        )}
-        {!isCesium && !isThree && (
-          <CompassOverlay
-            mode="cesium"
-            getHeading={() => 0}
-            className="will-change-transform transition-transform duration-150 scale-[0.9]"
-          />
-        )}
         </div>
       </OverlaySlot>
 
-      {/* Bottom-left slot: Metric scale */}
-      <OverlaySlot slot="bottom-left">
-        <div className={`pointer-events-auto ${panelClass} px-3 py-2`}>
+      <OverlaySlot slot="bottom-right" wrapperClassName="flex w-full justify-end">
+        {renderCompassPanel()}
+      </OverlaySlot>
+
+      <OverlaySlot slot="bottom-center" wrapperClassName="flex w-full justify-center">
+        <div className="pointer-events-auto">
           <MetricScaleOverlay
             mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
             getMetersIn100px={
@@ -137,10 +159,6 @@ const GlobalOverlays = ({
           />
         </div>
       </OverlaySlot>
-
-      {/* Reserve top-center/bottom-center for future unique controls if needed */}
-      {/* <Slot position="top-center" align="center"></Slot>
-      <Slot position="bottom-center" align="center"></Slot> */}
     </>
   );
 };

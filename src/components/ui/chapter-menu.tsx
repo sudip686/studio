@@ -9,9 +9,16 @@ interface ChapterMenuProps {
   viewTitles: { [key: string]: string };
   currentViewIndex: number;
   setCurrentViewIndex: (index: number) => void;
+  className?: string;
 }
 
-export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCurrentViewIndex }: ChapterMenuProps) {
+export function ChapterMenu({
+  viewSequence,
+  viewTitles,
+  currentViewIndex,
+  setCurrentViewIndex,
+  className,
+}: ChapterMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
   // Define chapter descriptions for storytelling
@@ -29,7 +36,7 @@ export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCur
     'styled_kml': {
       title: 'Mining Licenses',
       description: 'Current mining license boundaries and permit areas.',
-      facts: ['Active exploration licenses', '56 DD holes completed', 'Resource definition drilling']
+      facts: ['Active exploration licenses', '100 DD holes completed', 'Resource definition drilling']
     },
     'tanga_geological_map': {
       title: 'Geological Framework',
@@ -39,7 +46,7 @@ export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCur
     'drillhole_location_assay': {
       title: 'Drilling Program',
       description: 'Location and distribution of drill collars across the project.',
-      facts: ['56 diamond drill holes', 'Average depth 120m', 'High-grade intercepts']
+      facts: ['100 diamond drill holes', 'Average depth 120m', 'High-grade intercepts']
     },
     'lithology_view': {
       title: 'Lithology Model',
@@ -49,7 +56,7 @@ export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCur
     'assay_view': {
       title: 'Assay Results',
       description: 'Graphitic carbon grades and mineralization distribution.',
-      facts: ['Up to 25% Cg', 'High-grade corridors', 'Resource potential']
+      facts: ['Top 10% Avg: 8.41% Cg', 'Peak grade 14.48% Cg', 'Resource potential']
     },
     'block_model_carbon_view': {
       title: 'Carbon Block Model',
@@ -69,7 +76,7 @@ export function ChapterMenu({ viewSequence, viewTitles, currentViewIndex, setCur
   };
 
   return (
-    <div className="h-full pointer-events-auto">
+    <div className={`h-full pointer-events-auto ${className ?? ""}`}>
       {/* Burger Icon */}
       <button
         data-ui-chapter-trigger

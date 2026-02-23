@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { ThreeSceneProvider } from '@/contexts/three-scene-context';
+import { OverlayRoot } from "@/ui/overlays/OverlayRoot";
+import GlobalOverlays from "@/components/shared/GlobalOverlays";
 
 export default function ChaptersLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -17,9 +19,13 @@ export default function ChaptersLayout({ children }: { children: React.ReactNode
         </nav>
       </aside>
       <main className="flex-1 p-4">
-        <ThreeSceneProvider>
-          {children}
-        </ThreeSceneProvider>
+        <OverlayRoot>
+          <ThreeSceneProvider>
+            {children}
+            {/* Always-on overlays for chapter 3D views */}
+            <GlobalOverlays mode="three" hidden={false} />
+          </ThreeSceneProvider>
+        </OverlayRoot>
       </main>
     </div>
   );

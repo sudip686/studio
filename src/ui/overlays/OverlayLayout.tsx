@@ -9,15 +9,15 @@ type OverlayLayoutProps = OverlaySlotContent & {
   bottomOffsetPx?: number | string;
 };
 
-const slotBase = "flex flex-col gap-3 max-w-full";
+const slotBase = "hud-slot flex flex-col gap-3 max-w-full";
 
 const slotAlignment: Record<OverlaySlotKey, string> = {
-  "top-left": "items-start",
-  "top-center": "items-center",
-  "top-right": "items-end",
-  "bottom-left": "items-start justify-end",
-  "bottom-center": "items-center justify-end",
-  "bottom-right": "items-end justify-end",
+  "top-left": "tl",
+  "top-center": "tc",
+  "top-right": "tr",
+  "bottom-left": "bl",
+  "bottom-center": "bc",
+  "bottom-right": "br",
 };
 
 export function OverlayLayout({
@@ -37,32 +37,22 @@ export function OverlayLayout({
     typeof value === "number" ? `${value}px` : value;
   return (
     <div
-      className={`pointer-events-none fixed inset-0 ${className ?? ""}`}
-      style={{ zIndex: uiTheme.zIndex.overlays }}
+      className={`hud ${className ?? ""}`}
+      style={{
+        zIndex: uiTheme.zIndex.overlays,
+        "--hud-offset-top": px(topOffsetPx),
+        "--hud-offset-bottom": px(bottomOffsetPx),
+        "--hud-offset-left": px(leftOffsetPx),
+        "--hud-offset-right": px(rightOffsetPx),
+      } as React.CSSProperties}
     >
-      <div
-        className="absolute inset-0 p-4 md:p-6"
-        style={{
-          paddingTop: `calc(env(safe-area-inset-top) + ${px(topOffsetPx)})`,
-          paddingBottom: `calc(env(safe-area-inset-bottom) + ${px(bottomOffsetPx)})`,
-          paddingLeft: `calc(env(safe-area-inset-left) + ${px(leftOffsetPx)})`,
-          paddingRight: `calc(env(safe-area-inset-right) + ${px(rightOffsetPx)})`,
-        }}
-      >
-        <div className="grid h-full grid-cols-3 grid-rows-3 gap-4">
-          <div className={`${slotBase} ${slotAlignment["top-left"]}`}>{topLeft}</div>
-          <div className={`${slotBase} ${slotAlignment["top-center"]}`}>{topCenter}</div>
-          <div className={`${slotBase} ${slotAlignment["top-right"]}`}>{topRight}</div>
+      <div className={`${slotBase} ${slotAlignment["top-left"]} w-full`}>{topLeft}</div>
+      <div className={`${slotBase} ${slotAlignment["top-center"]} w-full`}>{topCenter}</div>
+      <div className={`${slotBase} ${slotAlignment["top-right"]} w-full`}>{topRight}</div>
 
-          <div />
-          <div />
-          <div />
-
-          <div className={`${slotBase} ${slotAlignment["bottom-left"]}`}>{bottomLeft}</div>
-          <div className={`${slotBase} ${slotAlignment["bottom-center"]}`}>{bottomCenter}</div>
-          <div className={`${slotBase} ${slotAlignment["bottom-right"]}`}>{bottomRight}</div>
-        </div>
-      </div>
+      <div className={`${slotBase} ${slotAlignment["bottom-left"]} w-full`}>{bottomLeft}</div>
+      <div className={`${slotBase} ${slotAlignment["bottom-center"]} w-full`}>{bottomCenter}</div>
+      <div className={`${slotBase} ${slotAlignment["bottom-right"]} w-full`}>{bottomRight}</div>
     </div>
   );
 }

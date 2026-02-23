@@ -5,7 +5,7 @@ export const deckSlides: DeckSlide[] = [
     id: "overview",
     title: "Tanga Graphite",
     subtitle: "Regional setting & access",
-    facts: ["Tanzania, East Africa", "56 DD holes", "120 km² licenses"],
+    facts: ["Tanzania, East Africa", "100 DD holes", "10.56 km² licenses"],
     view: "original",
     camera: {
       type: "flyTo",
@@ -102,7 +102,7 @@ export const deckSlides: DeckSlide[] = [
   {
     id: "drillholes",
     title: "Drillhole Coverage",
-    subtitle: "56 diamond drillholes",
+    subtitle: "100 diamond drillholes",
     facts: ["Collar distribution", "High-grade zones", "Depth trends"],
     view: "drillhole_location_assay",
     camera: {

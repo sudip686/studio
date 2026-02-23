@@ -11,6 +11,7 @@ This document captures **design questions, layout decisions, and easy-to-modify 
 - [ ] **Compass placement**: Top-right on desktop / bottom-right on mobile.
 - [ ] **Metric scale overlay**: Bottom-left. Should it be hidden for certain views?
 - [ ] **Safe-area + sidebar padding**: Confirm header/sidebar offsets.
+- [ ] **Alignment rule**: Left/right slots should anchor to the screen edge (within safe-area padding). Avoid offsetting right-aligned UI based on the chapter trigger width.
 - [ ] **Overlay styling**: Background blur, opacity, border radius, padding.
 - [ ] **Pointer-events**: Overlays are pointer-events-none; inner elements are pointer-events-auto. Confirm if any overlays must be fully clickable/interactive.
 
@@ -69,7 +70,7 @@ This document captures **design questions, layout decisions, and easy-to-modify 
 
 ### Home page overlays (from `src/app/page.tsx`)
 - **Title banner**: top-center, fades between views.
-- **Prev/Next arrows**: left/right mid-screen for navigation.
+- **Prev/Next arrows**: left/right mid-screen for navigation. Next button always renders; disabled state only on the last slide.
 - **Autoplay/Stop Tour button**: top-right, above ChapterMenu.
 
 ---

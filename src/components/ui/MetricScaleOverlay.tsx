@@ -52,7 +52,7 @@ export function MetricScaleOverlay({ mode, getMetersIn100px, className }: Metric
 
   return (
     <div className={`flex flex-col items-center gap-1 pointer-events-auto ${className || ''}`}>
-      <div className="relative flex flex-col items-center gap-2 bg-gradient-to-br from-black/60 via-black/50 to-black/40 rounded-xl px-4 py-3 backdrop-blur-md border border-orange-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_12px_48px_rgba(249,115,22,0.2)] transition-all duration-300">
+      <div className="relative flex flex-col items-center gap-2 bg-white/75 rounded-xl px-4 py-3 backdrop-blur-md border border-orange-400/30 shadow-[0_8px_24px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_32px_rgba(249,115,22,0.2)] transition-all duration-300">
         {/* Enhanced scale bar container */}
         <div className="flex items-center gap-2">
           {/* Left tick with glow */}
@@ -66,10 +66,10 @@ export function MetricScaleOverlay({ mode, getMetersIn100px, className }: Metric
           <div className="w-1 h-4 bg-gradient-to-t from-orange-400 to-orange-300 rounded-sm shadow-lg transition-all duration-300" />
         </div>
         {/* Enhanced label */}
-        <span className="text-sm font-bold text-white tracking-wide drop-shadow-lg transition-all duration-300">{scaleLabel}</span>
+        <span className="text-sm font-bold text-gray-800 tracking-wide drop-shadow-sm transition-all duration-300">{scaleLabel}</span>
 
         {/* Subtle glow effect */}
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-400/5 via-transparent to-gray-400/5 pointer-events-none" />
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-400/10 via-transparent to-orange-200/10 pointer-events-none" />
       </div>
     </div>
   );
