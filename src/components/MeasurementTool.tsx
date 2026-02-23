@@ -2,15 +2,23 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
-import { useThreeScene } from '@/contexts/three-scene-context';
+import { useThreeSceneSafe } from '@/contexts/three-scene-context';
 import * as THREE from 'three';
 import { Ruler, X } from 'lucide-react'; // Assuming lucide-react is available or use standard SVGs
 
 type Point = { x: number; y: number; z: number };
 
-export default function MeasurementTool({ mode }: { mode: 'cesium' | 'three' }) {
+export default function MeasurementTool({
+    mode,
+    className,
+}: {
+    mode: 'cesium' | 'three';
+    className?: string;
+}) {
     const { viewer: cesiumViewer } = useCesium();
-    const { camera: threeCamera, scene: threeScene, renderer: threeRenderer } = useThreeScene();
+    const threeSceneContext = useThreeSceneSafe();
+    const { camera: threeCamera, scene: threeScene, renderer: threeRenderer } =
+        threeSceneContext ?? {};
 
     const [active, setActive] = useState(false);
     const [points, setPoints] = useState<Point[]>([]);
@@ -53,8 +61,10 @@ export default function MeasurementTool({ mode }: { mode: 'cesium' | 'three' }) 
             cesiumEntitiesRef.current = [];
         }
         
-        // Force render
-        threeRenderer?.render(threeScene!, threeCamera!);
+        // Force render (guarded for Three-only mode)
+        if (threeRenderer && threeScene && threeCamera) {
+            threeRenderer.render(threeScene, threeCamera);
+        }
         cesiumViewer?.scene.requestRender();
     };
 
@@ -174,7 +184,7 @@ export default function MeasurementTool({ mode }: { mode: 'cesium' | 'three' }) 
     }, [active, mode, cesiumViewer, threeRenderer, points]); // Re-bind when points change to capture state
 
     return (
-        <div className="absolute top-20 right-4 pointer-events-auto flex flex-col items-end gap-2">
+        <div className={`pointer-events-auto flex flex-col items-start gap-2 ${className ?? ''}`}>
             <button
                 onClick={() => {
                     if (active) clearMeasurement();

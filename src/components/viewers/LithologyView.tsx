@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
 import { OverlaySlot } from '@/ui/overlays';
@@ -31,7 +31,7 @@ export default function LithologyView() {
     if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
     // Stabilize legend items with useMemo
-    const lithologyLegendItems = React.useMemo(() => {
+    const lithologyLegendItems = useMemo(() => {
         return (LITHOLOGY_COLOR_MAP && Object.entries(LITHOLOGY_COLOR_MAP).length > 0)
             ? Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
                 label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),

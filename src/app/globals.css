@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 @layer base {
-  html, body {
+  html, body, #__next {
     @apply h-full w-full m-0 p-0 overflow-hidden;
     /* Enhanced brightness and contrast for presentation feel */
     filter: brightness(1.05) contrast(1.08) saturate(1.1);
@@ -22,6 +22,14 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  canvas {
+    touch-action: none;
+  }
+
+  #__next {
+    height: 100%;
   }
   :root {
     --background: 195 23% 95%;
@@ -100,6 +108,115 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+.app-shell {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.viewer-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  padding: calc(env(safe-area-inset-top) + var(--hud-offset-top, 0px))
+    calc(env(safe-area-inset-right) + var(--hud-offset-right, 0px))
+    calc(env(safe-area-inset-bottom) + var(--hud-offset-bottom, 0px))
+    calc(env(safe-area-inset-left) + var(--hud-offset-left, 0px));
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "tl tc tr"
+    "ml mc mr"
+    "bl bc br";
+  gap: clamp(8px, 1vw, 14px);
+}
+
+.hud > * {
+  pointer-events: auto;
+}
+
+.hud-slot {
+  pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  .hud {
+    padding-top: calc(
+      env(safe-area-inset-top) +
+        var(--hud-offset-top, 0px) +
+        52px
+    );
+  }
+}
+
+.ui-dialog-inner {
+  align-items: flex-start;
+}
+
+.tl {
+  grid-area: tl;
+  justify-self: start;
+  align-self: start;
+}
+
+.tc {
+  grid-area: tc;
+  justify-self: center;
+  align-self: start;
+}
+
+.tr {
+  grid-area: tr;
+  justify-self: end;
+  align-self: start;
+}
+
+.bl {
+  grid-area: bl;
+  justify-self: start;
+  align-self: end;
+}
+
+.bc {
+  grid-area: bc;
+  justify-self: center;
+  align-self: end;
+}
+
+.br {
+  grid-area: br;
+  justify-self: end;
+  align-self: end;
+}
+
+@media (max-width: 768px) {
+  .hud {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      "tc"
+      "tl"
+      "tr"
+      "mc"
+      "bl"
+      "bc"
+      "br";
+  }
+
+  .tl,
+  .tr,
+  .tc {
+    justify-self: stretch;
   }
 }
 

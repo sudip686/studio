@@ -107,6 +107,8 @@ export default function Home() {
   const currentView: ViewType = (deck.current?.view ?? viewSequence[0]) as ViewType;
   const handleNext = () => deck.next();
   const handlePrev = () => deck.prev();
+  const isFirstSlide = deck.index <= 0;
+  const isLastSlide = deck.index >= deck.viewSequence.length - 1;
 
   const isCesiumSwitcherView = cesiumSwitcherViews.has(currentView);
   const isThreeJsSwitcherView = threeJsSwitcherViews.has(currentView);
@@ -115,7 +117,7 @@ export default function Home() {
   console.log(`[page.tsx] Rendering view: ${currentView}`);
 
   return (
-      <div className="h-full w-full relative bg-canvas text-gray-100 transition-all duration-700 ease-in-out">
+      <div className="app-shell bg-canvas text-gray-100 transition-all duration-700 ease-in-out">
         <UiChromeMeasure />
         <OverlayRoot
           baseSlots={{
@@ -130,27 +132,29 @@ export default function Home() {
               </div>
             ),
             "top-right": (
-              <div className="w-[320px] flex flex-col gap-3 items-end max-md:hidden">
-                {deck.isAutoplay && (
-                  <button
-                    onClick={deck.stopAutoplay}
-                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors pointer-events-auto"
-                  >
-                    ⏸️ Stop Tour
-                  </button>
-                )}
-                <ChapterMenu
-                  viewSequence={deck.viewSequence}
-                  viewTitles={deck.viewTitles}
-                  currentViewIndex={deck.index}
-                  setCurrentViewIndex={deck.setIndex}
-                />
-                <TilesetQualityToggle />
+              <div className="flex w-full justify-end">
+                <div className="w-[320px] flex flex-col gap-3 items-end pointer-events-auto max-md:hidden">
+                  {deck.isAutoplay && (
+                    <button
+                      onClick={deck.stopAutoplay}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      ⏸️ Stop Tour
+                    </button>
+                  )}
+                  <ChapterMenu
+                    viewSequence={deck.viewSequence}
+                    viewTitles={deck.viewTitles}
+                    currentViewIndex={deck.index}
+                    setCurrentViewIndex={deck.setIndex}
+                  />
+                  <TilesetQualityToggle />
+                </div>
               </div>
             ),
             "bottom-center": (
               <div className="flex items-center gap-3">
-                {deck.index > 0 && (
+                {!isFirstSlide && (
                   <button
                     onClick={handlePrev}
                     className="text-2xl font-semibold text-white bg-black/40 rounded-lg px-4 py-1 hover:bg-black/60 pointer-events-auto"
@@ -164,29 +168,21 @@ export default function Home() {
                 >
                   {deck.isAutoplay ? "Stop Tour" : "Start Tour"}
                 </button>
-                {deck.index < deck.viewSequence.length - 1 && (
-                  <button
-                    onClick={handleNext}
-                    className="text-2xl font-semibold text-white bg-black/40 rounded-lg px-4 py-1 hover:bg-black/60 pointer-events-auto"
-                  >
-                    Next →
-                  </button>
-                )}
+                <button
+                  onClick={handleNext}
+                  disabled={isLastSlide}
+                  className={`text-2xl font-semibold text-white bg-black/40 rounded-lg px-4 py-1 pointer-events-auto transition-colors ${
+                    isLastSlide ? "opacity-50 cursor-not-allowed" : "hover:bg-black/60"
+                  }`}
+                >
+                  Next →
+                </button>
               </div>
             ),
-            "bottom-right": (
-              <div className="flex flex-col gap-2 items-end md:hidden">
-                <ChapterMenu
-                  viewSequence={deck.viewSequence}
-                  viewTitles={deck.viewTitles}
-                  currentViewIndex={deck.index}
-                  setCurrentViewIndex={deck.setIndex}
-                />
-              </div>
-            ),
+            "bottom-right": null,
           }}
         >
-          <div className="h-full w-full absolute inset-0">
+          <div className="viewer-layer">
             {isCesiumSwitcherView && (
               <CesiumProvider>
                 <DeckCameraController camera={deck.current?.camera} />

@@ -13,8 +13,8 @@ export function OverlayRoot({
   return (
     <OverlayProvider
       baseSlots={baseSlots}
-      leftOffsetPx="var(--chapter-sidebar-width, 0px)"
-      rightOffsetPx="var(--chapter-trigger-width, 0px)"
+      leftOffsetPx={0}
+      rightOffsetPx={0}
       topOffsetPx="var(--header-height, 0px)"
     >
       {children}

@@ -17,15 +17,15 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
 
       <div className="mt-3 grid grid-cols-3 gap-3 text-[11px] text-gray-300">
         <div className="rounded-xl bg-white/5 px-3 py-2 text-center">
-          <p className="text-lg font-semibold text-white">56</p>
+          <p className="text-lg font-semibold text-white">100</p>
           <p className="uppercase tracking-[0.2em] text-[9px] text-gray-400">Holes</p>
         </div>
         <div className="rounded-xl bg-white/5 px-3 py-2 text-center">
-          <p className="text-lg font-semibold text-white">3.71%</p>
-          <p className="uppercase tracking-[0.2em] text-[9px] text-gray-400">Avg Grade</p>
+          <p className="text-lg font-semibold text-white">8.41%</p>
+          <p className="uppercase tracking-[0.2em] text-[9px] text-gray-400">Top 10% Grade</p>
         </div>
         <div className="rounded-xl bg-white/5 px-3 py-2 text-center">
-          <p className="text-lg font-semibold text-white">120 km²</p>
+          <p className="text-lg font-semibold text-white">10.56 km²</p>
           <p className="uppercase tracking-[0.2em] text-[9px] text-gray-400">Area</p>
         </div>
       </div>
