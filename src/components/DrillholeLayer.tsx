@@ -2,9 +2,10 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
 import { OverlaySlot } from '@/ui/overlays';
+import { CompassOverlay, MetricScaleOverlay } from '@/components/overlays';
 import IonKmlLayer from './IonKmlLayer';
 
-import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/constants';
+import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLORS } from '@/lib/constants';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { BoreholeCylinderCache, Interval, Style } from '@/lib/boreholes/borehole-cylinders';
 import { colorFromLegend } from '@/lib/boreholes/legend-color';
@@ -35,7 +36,9 @@ interface DrillholeLayerProps {
 
 const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
   const { viewer, ready } = useCesium();
-  const { drillholeData } = useDataCache();
+  const { drillholeData, processedAssayData, processedLithologyData } = useDataCache();
+  const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
+  const lithologyLegendItems = processedLithologyData?.legendItems ?? drillholeLocationMapLithologyLegendData.items;
   const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
   const [uiTick, setUiTick] = useState(0);
   
@@ -229,7 +232,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
   // Effect for applying styles when type changes
   useEffect(() => {
     applyStyles();
-  }, [type]);
+  }, [type, assayRange.min, assayRange.max]);
 
   const applyStyles = () => {
     if (!cacheRef.current || !intervalsRef.current.length || !viewer) return;
@@ -237,7 +240,8 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
 
     const Cesium = (window as any).Cesium;
     const cache = cacheRef.current;
-    const legend = type === 'assay' ? ASSAY_GRAPHITIC_CARBON : LITHOLOGY_COLORS;
+    const legend = LITHOLOGY_COLORS;
+    const legendMap = processedLithologyData?.legendMap ?? LITHOLOGY_COLORS.map;
 
     const defaultStyle: Style = {
         material: Cesium.Color.GREY,
@@ -256,10 +260,12 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
 
         if (type === 'assay') {
             const value = interval.props.graphitic_carbon;
-            // Only show segments that have assay data
             if (value !== undefined && value !== null) {
-                const color = colorFromLegend(legend, value);
-                styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 2.5 };
+                const t = assayRange.max > assayRange.min
+                    ? (value - assayRange.min) / (assayRange.max - assayRange.min)
+                    : 0.5;
+                const clamped = Math.max(0, Math.min(1, t));
+                styleToApply = { material: new Cesium.Color(clamped, 1 - clamped, 0, 1), opacity: 1.0, outline: false, radiusMeters: 2.5 };
                 visible = true;
             }
         } else { // lithology
@@ -267,8 +273,8 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
             if (value) {
                 const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
                 // Only show segments that have lithology data and map to a color
-                if (LITHOLOGY_COLORS.map[normalizedValue]) {
-                    const color = colorFromLegend(legend, normalizedValue);
+                if (legendMap[normalizedValue]) {
+                    const color = colorFromLegend({ ...legend, map: legendMap }, normalizedValue);
                     styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 2.5 };
                     visible = true;
                 } else if (normalizedValue === 'unknown' || normalizedValue === 'nan') {
@@ -347,27 +353,26 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     return geod.surfaceDistance || 0;
   }, [viewer]);
 
+  const assayGradient = useCallback(() => {
+    const { min, max } = assayRange;
+    const Cesium = (window as any).Cesium;
+    const clamp = (v: number) => Math.max(0, Math.min(1, v));
+    const start = clamp((min - min) / (max - min || 1));
+    const mid = clamp(((min + max) / 2 - min) / (max - min || 1));
+    const end = clamp((max - min) / (max - min || 1));
+
+    const colorFromT = (t: number) => {
+      const color = new Cesium.Color(t, 1 - t, 0, 1);
+      return color.toCssColorString();
+    };
+
+    return `linear-gradient(to right, ${colorFromT(start)}, ${colorFromT(mid)}, ${colorFromT(end)})`;
+  }, [assayRange]);
+
   return (
     <div className="h-full w-full relative z-20 pointer-events-none">
         <IonKmlLayer assetId={4310565} />
         <TooltipContent data={tooltip} />
-        <OverlaySlot slot="bottom-left">
-          {type === 'lithology' ? (
-              <Legend
-                  title={drillholeLocationMapLithologyLegendData.title}
-                  type="categorical"
-                  items={drillholeLocationMapLithologyLegendData.items}
-                  show={true}
-              />
-          ) : (
-              <Legend
-                  title="Assay (Graphitic Carbon)"
-                  type="categorical"
-                  items={ASSAY_GRAPHITIC_CARBON.bins}
-                  show={true}
-              />
-          )}
-        </OverlaySlot>
     </div>
   );
 };

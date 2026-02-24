@@ -3,6 +3,8 @@
  * Centralized fixed slots to prevent overlap and ensure smooth UI across resolutions
  */
 
+import { useCallback } from "react";
+import * as THREE from "three";
 import { useCesium } from "@/contexts/cesium-context";
 import { useThreeSceneSafe } from "@/contexts/three-scene-context";
 import { CompassOverlay, LogoOverlay, MetricScaleOverlay } from "@/components/overlays";
@@ -62,34 +64,58 @@ const GlobalOverlays = ({
     return metersPerPixel * 100;
   };
 
-  const getThreeHeading = () => {
-    if (!threeControls) return 0;
-    // OrbitControls getAzimuthalAngle = horizontal rotation (heading)
-    return threeControls.getAzimuthalAngle();
-  };
+  const getThreeHeading = useCallback(() => {
+    if (threeControls) {
+      try {
+        if (typeof (threeControls as any).getAzimuthalAngle === 'function') {
+          return (threeControls as any).getAzimuthalAngle();
+        }
+      } catch (err) {
+        // Fallback to camera orientation
+      }
+    }
 
-  const getThreeMetersIn100px = () => {
+    if (threeCamera) {
+      // Calculate heading from camera rotation
+      const direction = new THREE.Vector3(0, 0, -1);
+      direction.applyQuaternion(threeCamera.quaternion);
+      // Project to XZ plane and get angle
+      return Math.atan2(direction.x, direction.z);
+    }
+    return 0;
+  }, [threeControls, threeCamera]);
+
+  const getThreeMetersIn100px = useCallback(() => {
     if (!threeCamera || !threeRenderer) return 1000;
 
     try {
       const canvas = threeRenderer.domElement;
       if (!canvas) return 1000;
 
-      const cameraDistance = threeCamera.position.length();
-      const fovRadians = (threeCamera as any).fov
-        ? ((threeCamera as any).fov * Math.PI) / 180
-        : Math.PI / 4;
-      const metersPerPixel =
-        (2 * cameraDistance * Math.tan(fovRadians / 2)) / canvas.clientHeight;
+      // Use camera position relative to its target (or origin)
+      const target = (threeControls as any)?.target as THREE.Vector3;
+      const distance = target
+        ? threeCamera.position.distanceTo(target)
+        : threeCamera.position.length();
+        
+      const fov = (threeCamera as THREE.PerspectiveCamera).fov ?? 75;
+      const fovRadians = (fov * Math.PI) / 180;
+      
+      // Calculate visible height at this distance
+      const visibleHeight = 2 * Math.tan(fovRadians / 2) * distance;
+      const metersPerPixel = visibleHeight / canvas.clientHeight;
 
-      return metersPerPixel * 100;
+      const result = metersPerPixel * 100;
+      if (!Number.isFinite(result) || result <= 0) return 100;
+      return result;
     } catch {
       return 1000;
     }
-  };
+  }, [threeCamera, threeRenderer, threeControls]);
 
   const isCesium = mode === "cesium";
   const isThree = mode === "three";
+  const showCompassScale = true;
   const panelClass = `${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow}`;
 
   const renderCompass = () => {
@@ -98,6 +124,7 @@ const GlobalOverlays = ({
         <CompassOverlay
           mode="cesium"
           getHeading={getCesiumHeading}
+          headingUnit="radians"
           className="will-change-transform transition-transform duration-150 scale-[0.9]"
         />
       );
@@ -144,21 +171,25 @@ const GlobalOverlays = ({
         </div>
       </OverlaySlot>
 
-      <OverlaySlot slot="bottom-right" wrapperClassName="flex w-full justify-end">
-        {renderCompassPanel()}
-      </OverlaySlot>
+      {showCompassScale && (
+        <OverlaySlot slot="bottom-right" wrapperClassName="flex w-full justify-end">
+          {renderCompassPanel()}
+        </OverlaySlot>
+      )}
 
-      <OverlaySlot slot="bottom-center" wrapperClassName="flex w-full justify-center">
-        <div className="pointer-events-auto">
-          <MetricScaleOverlay
-            mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
-            getMetersIn100px={
-              isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
-            }
-            className="will-change-transform transition-transform duration-150"
-          />
-        </div>
-      </OverlaySlot>
+      {showCompassScale && (
+        <OverlaySlot slot="bottom-center" wrapperClassName="flex w-full justify-center">
+          <div className="pointer-events-auto">
+            <MetricScaleOverlay
+              mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
+              getMetersIn100px={
+                isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
+              }
+              className="will-change-transform transition-transform duration-150"
+            />
+          </div>
+        </OverlaySlot>
+      )}
     </>
   );
 };

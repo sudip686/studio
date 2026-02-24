@@ -6,7 +6,7 @@ import { Legend } from '@/components/ui/legend';
 import { OverlaySlot } from '@/ui/overlays';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import { ErrorDisplay } from '@/components/ui/error-display';
-import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
+import { LITHOLOGY_COLORS, drillholeLocationMapLithologyLegendData } from '@/lib/constants';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
 import { fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
@@ -27,18 +27,21 @@ export default function LithologyView() {
         
     }, [processedLithologyData, camera, controls, dynamicGroup]);
 
-    if (loadingStatus === 'loading') return <div>Loading...</div>;
-    if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
-
     // Stabilize legend items with useMemo
     const lithologyLegendItems = useMemo(() => {
-        return (LITHOLOGY_COLOR_MAP && Object.entries(LITHOLOGY_COLOR_MAP).length > 0)
-            ? Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
-                label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                color,
-            }))
-            : [];
-    }, []);
+        if (processedLithologyData?.legendItems?.length) {
+            return processedLithologyData.legendItems;
+        }
+        // Fallback to static legend data if dynamic data isn't available
+        return drillholeLocationMapLithologyLegendData.items;
+    }, [processedLithologyData]);
+
+    useEffect(() => {
+         // console.log('[LithologyView] Legend Items:', lithologyLegendItems);
+    }, [lithologyLegendItems]);
+
+    if (loadingStatus === 'loading') return <div>Loading...</div>;
+    if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
     const tryFit = () => {
         if (!camera || !controls || !dynamicGroup) return;

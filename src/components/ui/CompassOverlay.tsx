@@ -3,10 +3,11 @@ import { useState, useEffect } from 'react';
 interface CompassOverlayProps {
   mode?: 'cesium' | 'three';
   getHeading?: () => number;
+  headingUnit?: 'radians' | 'degrees';
   className?: string;
 }
 
-export function CompassOverlay({ mode, getHeading, className }: CompassOverlayProps) {
+export function CompassOverlay({ mode, getHeading, headingUnit = 'radians', className }: CompassOverlayProps) {
   const [heading, setHeading] = useState(0);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export function CompassOverlay({ mode, getHeading, className }: CompassOverlayPr
     };
   }, [getHeading]);
 
-  const rotation = (heading * 180) / Math.PI; // Convert radians to degrees
+  const rotation = headingUnit === 'degrees' ? heading : (heading * 180) / Math.PI; // Convert radians to degrees
 
   return (
     <div className={`flex flex-col items-center pointer-events-auto ${className || ''}`}>
@@ -60,7 +61,7 @@ export function CompassOverlay({ mode, getHeading, className }: CompassOverlayPr
 
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <div
-            className="relative transition-transform duration-300 ease-out"
+            className="relative"
             style={{ transform: `rotate(${rotation}deg)` }}
           >
             <div className="w-0.5 h-8 bg-gradient-to-t from-red-500 to-red-300 rounded-sm shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
