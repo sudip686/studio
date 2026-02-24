@@ -28,15 +28,15 @@ const GlobalOverlays = ({
 }: GlobalOverlaysProps) => {
   const { viewer: cesiumViewer } = useCesium();
   const threeSceneContext = useThreeSceneSafe();
-  const { camera: threeCamera, controls: threeControls, renderer: threeRenderer } =
-    threeSceneContext || {};
+  const threeCamera = threeSceneContext?.camera;
+  const threeControls = threeSceneContext?.controls;
+  const threeRenderer = threeSceneContext?.renderer;
 
   if (hidden) return null;
 
   const getCesiumHeading = () => {
     if (!cesiumViewer || cesiumViewer.isDestroyed()) return 0;
-    const heading = cesiumViewer.camera.heading;
-    return heading;
+    return cesiumViewer.camera.heading;
   };
 
   const getCesiumMetersIn100px = () => {
@@ -53,7 +53,13 @@ const GlobalOverlays = ({
     const ray = camera.getPickRay(center);
     const intersection = scene.globe.pick(ray, scene);
 
-    if (!Cesium.defined(intersection)) return 1000;
+    if (!Cesium.defined(intersection)) {
+        // Fallback calculation based on height
+        const cartographic = camera.positionCartographic;
+        const height = cartographic.height;
+        const fov = camera.frustum.fovy;
+        return (2 * height * Math.tan(fov / 2)) / canvas.clientHeight * 100;
+    }
 
     const distance = Cesium.Cartesian3.distance(camera.positionWC, intersection);
 
@@ -157,7 +163,27 @@ const GlobalOverlays = ({
 
   return (
     <>
-      {/* Keep the logo in the shared overlay slots */}
+      <div className="fixed inset-0 pointer-events-none z-[2000]">
+        {showCompassScale && (
+          <div className="absolute bottom-4 right-4 pointer-events-auto">
+            {renderCompassPanel()}
+          </div>
+        )}
+
+        {showCompassScale && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+            <MetricScaleOverlay
+              mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
+              getMetersIn100px={
+                isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
+              }
+              className="will-change-transform transition-transform duration-150"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Keep the logo and measurement tool in the shared overlay slots for now to see if they work */}
       <OverlaySlot slot="top-left">
         <LogoOverlay className="will-change-transform transition-transform duration-150" onClick={onLogoClick} />
       </OverlaySlot>
@@ -170,26 +196,6 @@ const GlobalOverlays = ({
           />
         </div>
       </OverlaySlot>
-
-      {showCompassScale && (
-        <OverlaySlot slot="bottom-right" wrapperClassName="flex w-full justify-end">
-          {renderCompassPanel()}
-        </OverlaySlot>
-      )}
-
-      {showCompassScale && (
-        <OverlaySlot slot="bottom-center" wrapperClassName="flex w-full justify-center">
-          <div className="pointer-events-auto">
-            <MetricScaleOverlay
-              mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
-              getMetersIn100px={
-                isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
-              }
-              className="will-change-transform transition-transform duration-150"
-            />
-          </div>
-        </OverlaySlot>
-      )}
     </>
   );
 };

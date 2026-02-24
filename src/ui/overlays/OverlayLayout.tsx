@@ -32,7 +32,19 @@ export function OverlayLayout({
   rightOffsetPx = 0,
   topOffsetPx = 0,
   bottomOffsetPx = 0,
-}: OverlayLayoutProps) {
+}: {
+  topLeft?: React.ReactNode;
+  topCenter?: React.ReactNode;
+  topRight?: React.ReactNode;
+  bottomLeft?: React.ReactNode;
+  bottomCenter?: React.ReactNode;
+  bottomRight?: React.ReactNode;
+  className?: string;
+  leftOffsetPx?: number | string;
+  rightOffsetPx?: number | string;
+  topOffsetPx?: number | string;
+  bottomOffsetPx?: number | string;
+}) {
   const px = (value: number | string) =>
     typeof value === "number" ? `${value}px` : value;
   return (

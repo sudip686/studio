@@ -1,8 +1,5 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
-import { Legend } from '@/components/ui/legend';
-import { OverlaySlot } from '@/ui/overlays';
-import { CompassOverlay, MetricScaleOverlay } from '@/components/overlays';
 import IonKmlLayer from './IonKmlLayer';
 
 import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLORS } from '@/lib/constants';
@@ -40,7 +37,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
   const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
   const lithologyLegendItems = processedLithologyData?.legendItems ?? drillholeLocationMapLithologyLegendData.items;
   const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
-  const [uiTick, setUiTick] = useState(0);
+
   
   const cacheRef = useRef<BoreholeCylinderCache | null>(null);
   const intervalsRef = useRef<any[]>([]);
@@ -312,7 +309,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
     const removePreRender = viewer.scene.preRender.addEventListener(() => {
-        requestAnimationFrame(() => setUiTick(t => (t + 1) % 1_000_000));
+        // Scene updates handled by Cesium natively
     });
 
     return () => {
@@ -320,54 +317,6 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
       removePreRender();
     };
   }, [viewer, ready]);
-
-  const getHeading = useCallback(() => {
-    if (!viewer) return 0;
-    const Cesium = (window as any).Cesium;
-    return Cesium.Math.toDegrees(viewer.camera.heading);
-  }, [viewer]);
-
-  const getMetersIn100px = useCallback(() => {
-    if (!viewer) return 0;
-    const Cesium = (window as any).Cesium;
-    const { scene } = viewer;
-    const canvas = scene.canvas;
-    const p1 = new Cesium.Cartesian2(canvas.clientWidth / 2 - 50, canvas.clientHeight - 10);
-    const p2 = new Cesium.Cartesian2(canvas.clientWidth / 2 + 50, canvas.clientHeight - 10);
-
-    const r1 = scene.camera.getPickRay(p1);
-    const r2 = scene.camera.getPickRay(p2);
-    let c1 = r1 ? scene.globe.pick(r1, scene) : undefined;
-    let c2 = r2 ? scene.globe.pick(r2, scene) : undefined;
-
-    if (c1 && c2) return Cesium.Cartesian3.distance(c1, c2);
-
-    const ellipsoid = scene.globe.ellipsoid;
-    const center = scene.camera.positionCartographic;
-    if (!center) return 0;
-    const metersPerPx = Math.tan(scene.camera.frustum.fovy / 2) * center.height / (canvas.clientHeight / 2);
-    const dLon = (100 * metersPerPx) / ellipsoid.maximumRadius;
-    const gc1 = new Cesium.Cartographic(center.longitude - dLon / 2, center.latitude, 0);
-    const gc2 = new Cesium.Cartographic(center.longitude + dLon / 2, center.latitude, 0);
-    const geod = new Cesium.EllipsoidGeodesic(gc1, gc2, ellipsoid);
-    return geod.surfaceDistance || 0;
-  }, [viewer]);
-
-  const assayGradient = useCallback(() => {
-    const { min, max } = assayRange;
-    const Cesium = (window as any).Cesium;
-    const clamp = (v: number) => Math.max(0, Math.min(1, v));
-    const start = clamp((min - min) / (max - min || 1));
-    const mid = clamp(((min + max) / 2 - min) / (max - min || 1));
-    const end = clamp((max - min) / (max - min || 1));
-
-    const colorFromT = (t: number) => {
-      const color = new Cesium.Color(t, 1 - t, 0, 1);
-      return color.toCssColorString();
-    };
-
-    return `linear-gradient(to right, ${colorFromT(start)}, ${colorFromT(mid)}, ${colorFromT(end)})`;
-  }, [assayRange]);
 
   return (
     <div className="h-full w-full relative z-20 pointer-events-none">
