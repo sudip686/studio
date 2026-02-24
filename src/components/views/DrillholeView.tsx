@@ -4,6 +4,7 @@ import { useState } from 'react';
 import DrillholeLayer from '../DrillholeLayer';
 import { Legend } from '@/components/ui/legend';
 import { cesiumViewerLithologyLegendData } from '@/lib/constants';
+import { OverlaySlot } from '@/ui/overlays';
 
 interface DrillholeViewProps {
     type: 'lithology' | 'assay';
@@ -18,24 +19,28 @@ const DrillholeView = ({ type }: DrillholeViewProps) => {
     return (
         <>
             <DrillholeLayer type={type} />
-            {type === 'lithology' &&
-                <Legend
-                    title={cesiumViewerLithologyLegendData.title}
-                    type="categorical"
-                    items={cesiumViewerLithologyLegendData.items}
-                    show={true}
-                />
-            }
-            {type === 'assay' &&
-                <Legend
-                    title="Assay (Graphitic Carbon)"
-                    type="gradient"
-                    gradient="linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))"
-                    minLabel={assayRange.min.toFixed(2)}
-                    maxLabel={assayRange.max.toFixed(2)}
-                    show={true}
-                />
-            }
+            <OverlaySlot slot="bottom-left">
+                {type === 'lithology' && (
+                    <Legend
+                        title={cesiumViewerLithologyLegendData.title}
+                        type="categorical"
+                        items={cesiumViewerLithologyLegendData.items}
+                        guidance="Colors correspond to lithology classes. Hover a drillhole segment to see the lithology name and interval details."
+                        show={true}
+                    />
+                )}
+                {type === 'assay' && (
+                    <Legend
+                        title="Assay (Graphitic Carbon)"
+                        type="gradient"
+                        gradient="linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))"
+                        minLabel={assayRange.min.toFixed(2)}
+                        maxLabel={assayRange.max.toFixed(2)}
+                        guidance="Higher values trend toward red; lower values trend toward green. Hover a segment to see exact assay values and depth interval."
+                        show={true}
+                    />
+                )}
+            </OverlaySlot>
         </>
     );
 };

@@ -13,6 +13,8 @@ import BlockModelBoxCutter from '@/components/block-model-box-cutter';
 import DrillholeLayer from '@/components/DrillholeLayer';
 import CinematicDrillholeViewer from '@/components/cinematic-drillhole-viewer';
 import { OverlaySlot } from "@/ui/overlays";
+import { Legend } from "@/components/ui/legend";
+import { cesiumViewerLithologyLegendData } from "@/lib/constants";
 import SubsurfaceViewer from '@/components/viewers/SubsurfaceViewer';
 import BlockModelLayer from '@/components/viewers/BlockModelLayer';
 import BoreholeLayer from '@/components/viewers/BoreholeLayer';
@@ -55,6 +57,9 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const [drillholeLocationMode, setDrillholeLocationMode] = useState<'assay' | 'lithology'>('assay');
   const [boxCutterMode, setBoxCutterMode] = useState<'grade' | 'class'>('grade');
   const [cinematicDrillholeMode, setCinematicDrillholeMode] = useState<'assay' | 'lithology'>('assay');
+
+  // Legends should show whenever we are plotting data with color encoding in Cesium.
+  const showCesiumDrillholeLegend = view === 'geojson_drillholes_lithology' || view === 'geojson_drillholes_assay';
 
   const specialViewMap = {
       drillhole_lithology_reveal: 'animatedReveal',
@@ -450,6 +455,31 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
           )}
         </div>
       </OverlaySlot>
+
+      {/* Bottom-left legend for Cesium drillhole views */}
+      {showCesiumDrillholeLegend && (
+        <OverlaySlot slot="bottom-left">
+          {view === 'geojson_drillholes_lithology' ? (
+            <Legend
+              title={cesiumViewerLithologyLegendData.title}
+              type="categorical"
+              items={cesiumViewerLithologyLegendData.items}
+              guidance="Colors correspond to lithology classes. Hover a segment to see lithology and interval details."
+              show
+            />
+          ) : (
+            <Legend
+              title="Assay (Graphitic Carbon)"
+              type="gradient"
+              gradient="linear-gradient(to right, hsl(120, 100%, 50%), hsl(0, 100%, 50%))"
+              minLabel="Low"
+              maxLabel="High"
+              guidance="Higher values trend toward red; lower values trend toward green. Hover a segment to see the exact assay value."
+              show
+            />
+          )}
+        </OverlaySlot>
+      )}
 
     </>
   );

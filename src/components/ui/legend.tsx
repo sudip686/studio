@@ -9,6 +9,7 @@ interface LegendProps {
   minLabel?: string;
   maxLabel?: string;
   show?: boolean;
+  guidance?: string;
 }
 
 export const Legend: React.FC<LegendProps> = ({
@@ -19,6 +20,7 @@ export const Legend: React.FC<LegendProps> = ({
   minLabel,
   maxLabel,
   show = true,
+  guidance,
 }) => {
   if (!show) return null;
 
@@ -29,6 +31,11 @@ export const Legend: React.FC<LegendProps> = ({
       }`}
     >
       <h4 className="font-bold text-lg mb-2">{title}</h4>
+      {guidance && (
+        <p className="text-xs text-gray-200/90 leading-snug mb-2 max-w-[52ch]">
+          {guidance}
+        </p>
+      )}
       {type === 'categorical' && items && (
         <div className="space-y-1">
           {items.map((item, index) => (

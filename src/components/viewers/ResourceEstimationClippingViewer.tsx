@@ -6,6 +6,7 @@ import { useCesium } from '@/contexts/cesium-context';
 import { useDataCache } from '@/lib/data-cache';
 import { Scene, PerspectiveCamera, WebGLRenderer, DirectionalLight, AmbientLight, Plane, Vector3, Object3D, MeshPhongMaterial, Color, BoxGeometry, InstancedMesh } from 'three';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 
 const RESC_LEGEND_ITEMS = [
   { label: 'Measured',  color: '#0000ff' },
@@ -193,21 +194,33 @@ export default function ResourceEstimationClippingViewer() {
   if (error) return <div className="text-white">Error: {error}</div>;
 
   return (
-    <div style={{ position: "absolute", top: "50px", left: "10px", zIndex: 1000, background: "rgba(42, 42, 42, 0.8)", padding: "10px", borderRadius: "5px", color: "white" }}>
-        <Legend title="Resource Classification" items={RESC_LEGEND_ITEMS} />
-        <div style={{ marginTop: "10px" }}>
-            <label>Clipping Height (Elevation)</label>
+    <>
+      <OverlaySlot slot="bottom-left">
+        <Legend
+          title="Resource Classification"
+          items={RESC_LEGEND_ITEMS}
+          guidance="Colors indicate resource classification for block model cells. Use the slider to clip by elevation."
+        />
+      </OverlaySlot>
+
+      <OverlaySlot slot="top-left">
+        <div className="pointer-events-auto text-white bg-black/30 border border-white/10 backdrop-blur-md rounded-[18px] shadow-[0_18px_45px_rgba(0,0,0,0.65)] px-4 py-3 w-fit max-w-[70vw]">
+          <div className="text-xs uppercase tracking-[0.3em] text-accent/80">Clipping</div>
+          <div className="mt-2 flex flex-col gap-2">
+            <label className="text-xs text-gray-200">Clipping Height (Elevation)</label>
             <input
-                type="range"
-                min="-500"
-                max="500"
-                step="10"
-                value={clippingHeight}
-                onChange={(e) => setClippingHeight(parseFloat(e.target.value))}
-                style={{ width: "100%" }}
+              type="range"
+              min="-500"
+              max="500"
+              step="10"
+              value={clippingHeight}
+              onChange={(e) => setClippingHeight(parseFloat(e.target.value))}
+              className="w-64 max-w-[60vw]"
             />
-            <span>{clippingHeight}m</span>
+            <div className="text-xs text-gray-200/90">{clippingHeight} m</div>
+          </div>
         </div>
-    </div>
+      </OverlaySlot>
+    </>
   );
 }
