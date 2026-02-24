@@ -13,6 +13,8 @@ import BlockModelBoxCutter from '@/components/block-model-box-cutter';
 import DrillholeLayer from '@/components/DrillholeLayer';
 import CinematicDrillholeViewer from '@/components/cinematic-drillhole-viewer';
 import { OverlaySlot } from "@/ui/overlays";
+import { Legend } from "@/components/ui/legend";
+import { drillholeLocationMapLithologyLegendData } from "@/lib/constants";
 import SubsurfaceViewer from '@/components/viewers/SubsurfaceViewer';
 import BlockModelLayer from '@/components/viewers/BlockModelLayer';
 import BoreholeLayer from '@/components/viewers/BoreholeLayer';
@@ -42,7 +44,7 @@ const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
 
 export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const { viewer, ready, kmlDataSource, kmlLabel, enableAoiCutaway, disableAoiCutaway } = useCesium();
-  const { drillholeData } = useDataCache();
+  const { drillholeData, processedAssayData } = useDataCache();
   const lastViewRef = useRef<CesiumView | null>(null);
 
   const [globeAlpha, setGlobeAlpha] = useState(1.0);   // 0..1 - Default to 100% opacity
@@ -55,6 +57,11 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const [drillholeLocationMode, setDrillholeLocationMode] = useState<'assay' | 'lithology'>('assay');
   const [boxCutterMode, setBoxCutterMode] = useState<'grade' | 'class'>('grade');
   const [cinematicDrillholeMode, setCinematicDrillholeMode] = useState<'assay' | 'lithology'>('assay');
+
+  // Legends should show whenever we are plotting data with color encoding in Cesium.
+  const showCesiumDrillholeLegend = view === 'geojson_drillholes_lithology' || view === 'geojson_drillholes_assay';
+  const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
+  const assayGradient = `linear-gradient(to right, hsl(120, 100%, 50%), hsl(60, 100%, 50%), hsl(0, 100%, 50%))`;
 
   const specialViewMap = {
       drillhole_lithology_reveal: 'animatedReveal',
@@ -450,6 +457,31 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
           )}
         </div>
       </OverlaySlot>
+
+      {/* Bottom-left legend for Cesium drillhole views */}
+      {showCesiumDrillholeLegend && (
+        <OverlaySlot slot="bottom-left">
+          {view === 'geojson_drillholes_lithology' ? (
+            <Legend
+              title={drillholeLocationMapLithologyLegendData.title}
+              type="categorical"
+              items={drillholeLocationMapLithologyLegendData.items}
+              guidance="Colors correspond to lithology classes. Hover a segment to see lithology and interval details."
+              show
+            />
+          ) : (
+            <Legend
+              title="Assay (Graphitic Carbon)"
+              type="gradient"
+              gradient={assayGradient}
+              minLabel={assayRange.min.toFixed(2)}
+              maxLabel={assayRange.max.toFixed(2)}
+              guidance="Higher values trend toward red; lower values trend toward green. Hover a segment to see the exact assay value."
+              show
+            />
+          )}
+        </OverlaySlot>
+      )}
 
     </>
   );

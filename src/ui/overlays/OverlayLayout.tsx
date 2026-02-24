@@ -32,7 +32,19 @@ export function OverlayLayout({
   rightOffsetPx = 0,
   topOffsetPx = 0,
   bottomOffsetPx = 0,
-}: OverlayLayoutProps) {
+}: {
+  topLeft?: React.ReactNode;
+  topCenter?: React.ReactNode;
+  topRight?: React.ReactNode;
+  bottomLeft?: React.ReactNode;
+  bottomCenter?: React.ReactNode;
+  bottomRight?: React.ReactNode;
+  className?: string;
+  leftOffsetPx?: number | string;
+  rightOffsetPx?: number | string;
+  topOffsetPx?: number | string;
+  bottomOffsetPx?: number | string;
+}) {
   const px = (value: number | string) =>
     typeof value === "number" ? `${value}px` : value;
   return (
@@ -46,13 +58,19 @@ export function OverlayLayout({
         "--hud-offset-right": px(rightOffsetPx),
       } as React.CSSProperties}
     >
-      <div className={`${slotBase} ${slotAlignment["top-left"]} w-full`}>{topLeft}</div>
-      <div className={`${slotBase} ${slotAlignment["top-center"]} w-full`}>{topCenter}</div>
-      <div className={`${slotBase} ${slotAlignment["top-right"]} w-full`}>{topRight}</div>
+      {/*
+        NOTE:
+        These HUD slots should size to their content. Using `w-full` here makes the slot containers span
+        the full width of the viewport which can visually "stretch" backgrounds (e.g. legends/panels)
+        and contribute to unexpected centering.
+      */}
+      <div className={`${slotBase} ${slotAlignment["top-left"]}`}>{topLeft}</div>
+      <div className={`${slotBase} ${slotAlignment["top-center"]}`}>{topCenter}</div>
+      <div className={`${slotBase} ${slotAlignment["top-right"]}`}>{topRight}</div>
 
-      <div className={`${slotBase} ${slotAlignment["bottom-left"]} w-full`}>{bottomLeft}</div>
-      <div className={`${slotBase} ${slotAlignment["bottom-center"]} w-full`}>{bottomCenter}</div>
-      <div className={`${slotBase} ${slotAlignment["bottom-right"]} w-full`}>{bottomRight}</div>
+      <div className={`${slotBase} ${slotAlignment["bottom-left"]}`}>{bottomLeft}</div>
+      <div className={`${slotBase} ${slotAlignment["bottom-center"]}`}>{bottomCenter}</div>
+      <div className={`${slotBase} ${slotAlignment["bottom-right"]}`}>{bottomRight}</div>
     </div>
   );
 }

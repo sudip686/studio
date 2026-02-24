@@ -26,6 +26,8 @@ interface ProcessedLithologyData {
     byHoleId: Record<string, BoreholeInfo>;
     modelCenter: { lon: number; lat: number; };
     grouped?: Record<string, any[]>; // Pre-grouped by color for fast rendering
+    legendItems: { label: string; color: string }[];
+    legendMap: Record<string, string>;
 }
 
 interface ProcessedAssayData {
@@ -178,12 +180,51 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                     }
                 });
 
+                const normalizeLithology = (value: string) =>
+                    value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+                const hashString = (value: string) => {
+                    let hash = 0;
+                    for (let i = 0; i < value.length; i += 1) {
+                        hash = (hash << 5) - hash + value.charCodeAt(i);
+                        hash |= 0; // Keep 32-bit
+                    }
+                    return Math.abs(hash);
+                };
+
+                const fallbackColor = (value: string) => {
+                    const hash = hashString(value);
+                    const hue = hash % 360;
+                    const saturation = 55 + (hash % 20);
+                    const lightness = 40 + (hash % 20);
+                    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                };
+
+                const legendMap: Record<string, string> = {};
+                const legendItems: { label: string; color: string }[] = [];
+                const lithologySet = new Set<string>();
+                lithologyData.forEach(segment => {
+                    const lith = String(segment.lithology ?? 'UNKNOWN');
+                    lithologySet.add(lith);
+                });
+
+                const sortedLithologies = Array.from(lithologySet).sort((a, b) => a.localeCompare(b));
+                sortedLithologies.forEach(lith => {
+                    const normalized = normalizeLithology(lith);
+                    const baseColor = LITHOLOGY_COLOR_MAP[lith];
+                    const isUnknown = normalized === 'unknown' || normalized === 'nan';
+                    const color = baseColor ?? (isUnknown ? (LITHOLOGY_COLOR_MAP.UNKNOWN ?? fallbackColor(lith)) : fallbackColor(lith));
+                    legendMap[normalized] = color;
+                    legendItems.push({ label: lith, color });
+                });
+
                 // Pre-group lithology by color for fast rendering
                 const groupedLithology: Record<string, any[]> = {};
                 Object.values(lithologyByHoleId).forEach(borehole => {
                     borehole.segments.forEach(segment => {
                         const lith = String(segment.lithology ?? 'UNKNOWN');
-                        const css = LITHOLOGY_COLOR_MAP[lith] ?? LITHOLOGY_COLOR_MAP.UNKNOWN;
+                        const normalized = normalizeLithology(lith);
+                        const css = legendMap[normalized] ?? fallbackColor(lith);
                         if (!groupedLithology[css]) {
                             groupedLithology[css] = [];
                         }
@@ -267,6 +308,8 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
                         byHoleId: lithologyByHoleId,
                         modelCenter: modelCenterLithology,
                         grouped: groupedLithology,
+                        legendItems,
+                        legendMap,
                     },
                     processedAssayData: {
                         byHoleId: assayByHoleId,

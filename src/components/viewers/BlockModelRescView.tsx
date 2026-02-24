@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
@@ -9,6 +9,7 @@ import { useDataCache, BlockSegment } from '@/lib/data-cache';
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import { ErrorDisplay } from '@/components/ui/error-display';
+import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
 
@@ -19,6 +20,11 @@ const RESC_LEGEND = [
   { label: 'Inferred',  color: '#00ff00' },
   { label: 'Unknown',   color: '#999999' },
 ];
+
+const lithologyLegendItems = Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+  label: label.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+  color,
+}));
 
 export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: number }) {
     const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
@@ -126,7 +132,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
           const ele = asNumber(b.elevation ?? b.z, 0);
           if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
 
-          // BLOCKS are (lat, lon, elev) in source → swap when projecting: 
+          // BLOCKS are (lat, lon, elev) in source ? swap when projecting: 
           const { x, z } = projectLonLat(lon, lat, modelCenter);  
           const VERTICAL_EXAGGERATION = 1.0;
           P.set(x, ele * VERTICAL_EXAGGERATION, -z);
@@ -186,7 +192,10 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
         <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
         <OverlaySlot slot="bottom-left">
-          <Legend title="Classification" items={RESC_LEGEND} />
+          <div className="flex flex-col gap-3">
+            <Legend title="Lithology" items={lithologyLegendItems} />
+            <Legend title="Classification" items={RESC_LEGEND} />
+          </div>
         </OverlaySlot>
         <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
           <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-2">

@@ -9,6 +9,7 @@ import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-hel
 import { Legend } from '@/components/ui/legend';
 import { OverlaySlot } from '@/ui/overlays';
 import { ErrorDisplay } from '@/components/ui/error-display';
+import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
 
@@ -163,6 +164,13 @@ export default function BlockModelCarbonViewer({
 
   const carbonGradient = "linear-gradient(to right, #00ff00, #ff0000)";
 
+  const lithologyLegendItems = useMemo(() => {
+    return Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+      label: label.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      color,
+    }));
+  }, []);
+
   return (
     <>
       <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
@@ -178,13 +186,16 @@ export default function BlockModelCarbonViewer({
       </OverlaySlot>
 
       <OverlaySlot slot="bottom-left">
-        <Legend
+        <div className="flex flex-col gap-3">
+          <Legend title="Lithology" items={lithologyLegendItems} />
+          <Legend
             title="Carbon Value"
             type="gradient"
             gradient={carbonGradient}
             minLabel={carbonRange.min.toFixed(2)}
             maxLabel={carbonRange.max.toFixed(2)}
-        />
+          />
+        </div>
       </OverlaySlot>
     </>
   );

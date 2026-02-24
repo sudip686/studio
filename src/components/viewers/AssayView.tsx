@@ -94,6 +94,7 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
                     gradient={assayGradient}
                     minLabel={assayRange.min.toFixed(2)}
                     maxLabel={assayRange.max.toFixed(2)}
+                    guidance="Higher values trend toward red; lower values trend toward green. Use the hover tooltip to inspect exact values at a location."
                 />
             </OverlaySlot>
         </>
