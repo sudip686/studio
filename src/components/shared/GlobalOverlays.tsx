@@ -3,7 +3,7 @@
  * Centralized fixed slots to prevent overlap and ensure smooth UI across resolutions
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useCesium } from "@/contexts/cesium-context";
 import { useThreeSceneSafe } from "@/contexts/three-scene-context";
@@ -27,10 +27,15 @@ const GlobalOverlays = ({
   onLogoClick,
 }: GlobalOverlaysProps) => {
   const { viewer: cesiumViewer } = useCesium();
+  const [isMounted, setIsMounted] = useState(false);
   const threeSceneContext = useThreeSceneSafe();
   const threeCamera = threeSceneContext?.camera;
   const threeControls = threeSceneContext?.controls;
   const threeRenderer = threeSceneContext?.renderer;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   if (hidden) return null;
 
@@ -163,7 +168,11 @@ const GlobalOverlays = ({
 
   return (
     <>
-      <div className="fixed inset-0 pointer-events-none z-[2000]">
+      <div
+        className={`fixed inset-0 pointer-events-none z-[2000] transition-opacity duration-300 ${
+          isMounted ? "opacity-100" : "opacity-0"
+        }`}
+      >
         {showCompassScale && (
           <div className="absolute bottom-4 right-4 pointer-events-auto">
             {renderCompassPanel()}
@@ -171,7 +180,7 @@ const GlobalOverlays = ({
         )}
 
         {showCompassScale && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-auto">
             <MetricScaleOverlay
               mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
               getMetersIn100px={

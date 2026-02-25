@@ -6,6 +6,8 @@ import {Scene, PerspectiveCamera, WebGLRenderer, Group, Vector3, Quaternion, Mat
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
+import { Legend } from '@/components/ui/legend';
+import { drillholeLocationMapLithologyLegendData } from '@/lib/constants';
 import { GeoVisionContext, GeoVisionContextType } from '@/contexts/geovision-context';
 import { createThreeBoreholeMeshes } from '@/lib/boreholes/three-borehole-layer';
 import { lithologyColorThree, assayColorThree } from '@/lib/boreholes/colors';
@@ -52,7 +54,14 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
         blockTransparency: 0.8,
     });
 
-    const { drillholeData: processedDrillholeData, blockModelData, loadingStatus, error } = useDataCache();
+    const {
+        drillholeData: processedDrillholeData,
+        blockModelData,
+        processedLithologyData,
+        processedAssayData,
+        loadingStatus,
+        error,
+    } = useDataCache();
 
     useEffect(() => {
         if (!mountRef.current) return;
@@ -251,11 +260,59 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
         setFilters,
     };
 
+    const lithologyLegendItems =
+        processedLithologyData?.legendItems?.length
+            ? processedLithologyData.legendItems
+            : drillholeLocationMapLithologyLegendData.items;
+
+    const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
+    const assayGradient =
+        'linear-gradient(to right, hsl(120, 100%, 50%), hsl(60, 100%, 50%), hsl(0, 100%, 50%))';
+
+    const rescLegendItems = [
+        { label: 'Measured', color: '#0000ff' },
+        { label: 'Indicated', color: '#ff0000' },
+        { label: 'Inferred', color: '#00ff00' },
+        { label: 'Unknown', color: '#999999' },
+    ];
+
+    const carbonGradient = 'linear-gradient(to right, #00ff00, #ff0000)';
+
     return (
         <GeoVisionContext.Provider value={contextValue}>
             <div className="relative h-full w-full pointer-events-auto">
                 <div ref={mountRef} className="h-full w-full" />
                 {contextValue.isLoaded && children}
+
+                {contextValue.isLoaded && (
+                    <div className="absolute bottom-4 left-4 z-[2000]">
+                        {displayMode === 'geovision_lithology' && (
+                            <Legend title="Lithology" items={lithologyLegendItems} />
+                        )}
+                        {displayMode === 'geovision_assay' && (
+                            <Legend
+                                title="Assay (Graphitic Carbon)"
+                                type="gradient"
+                                gradient={assayGradient}
+                                minLabel={assayRange.min.toFixed(2)}
+                                maxLabel={assayRange.max.toFixed(2)}
+                                guidance="Higher values trend toward red; lower values trend toward green."
+                            />
+                        )}
+                        {displayMode === 'geovision_block_resc' && (
+                            <Legend title="Classification" items={rescLegendItems} />
+                        )}
+                        {displayMode === 'geovision_block_carbon' && (
+                            <Legend
+                                title="Carbon Value"
+                                type="gradient"
+                                gradient={carbonGradient}
+                                minLabel={assayRange.min.toFixed(2)}
+                                maxLabel={assayRange.max.toFixed(2)}
+                            />
+                        )}
+                    </div>
+                )}
                 {/* Tooltip and Compass would be here */}
             </div>
         </GeoVisionContext.Provider>
