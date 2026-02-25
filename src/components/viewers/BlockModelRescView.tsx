@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
@@ -21,18 +21,14 @@ const RESC_LEGEND = [
   { label: 'Unknown',   color: '#999999' },
 ];
 
-<<<<<<< HEAD
 type AssayRangeFilter = { min: number; max: number } | null;
 
-export default function BlockModelRescViewer({ assayFilterRange }: { assayFilterRange?: AssayRangeFilter }) {
-=======
 const lithologyLegendItems = Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
   label: label.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
   color,
 }));
 
-export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: number }) {
->>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
+export default function BlockModelRescViewer({ assayFilterRange }: { assayFilterRange?: AssayRangeFilter }) {
     const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
     const mountedRef = useRef(false);
 
@@ -222,96 +218,6 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
       <>
         <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
         <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
-<<<<<<< HEAD
-        <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-          <Legend title="Classification" items={RESC_LEGEND} />
-        </div>
-        <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-3 pointer-events-auto">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-white/80">
-              <span>Assay range filter</span>
-              <button
-                className="text-[11px] text-orange-300 hover:text-orange-200"
-                onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
-              >
-                Reset
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs">
-                Min
-                <input
-                  type="number"
-                  step="0.1"
-                  value={localRange?.min ?? carbonRange.min}
-                  onChange={(e) => setLocalRange(prev => ({
-                    min: Number(e.target.value),
-                    max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
-                  }))}
-                  className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
-                />
-              </label>
-              <label className="text-xs">
-                Max
-                <input
-                  type="number"
-                  step="0.1"
-                  value={localRange?.max ?? carbonRange.max}
-                  onChange={(e) => setLocalRange(prev => ({
-                    min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
-                    max: Number(e.target.value)
-                  }))}
-                  className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
-                />
-              </label>
-            </div>
-            <input
-              type="range"
-              min={carbonRange.min}
-              max={carbonRange.max}
-              step={0.1}
-              value={localRange?.min ?? carbonRange.min}
-              onChange={(e) => setLocalRange(prev => ({
-                min: Number(e.target.value),
-                max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
-              }))}
-              className="w-full"
-            />
-            <input
-              type="range"
-              min={carbonRange.min}
-              max={carbonRange.max}
-              step={0.1}
-              value={localRange?.max ?? carbonRange.max}
-              onChange={(e) => setLocalRange(prev => ({
-                min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
-                max: Number(e.target.value)
-              }))}
-              className="w-full"
-            />
-          </div>
-          <label className="block text-sm">Classification</label>
-          <select
-            value={selectedClassification}
-            onChange={e => setSelectedClassification(e.target.value)}
-            className="w-full p-1 rounded bg-gray-700 text-white border border-gray-600 text-sm"
-          >
-            <option value="All">All</option>
-            <option value="Measured">Measured</option>
-            <option value="Indicated">Indicated</option>
-            <option value="Inferred">Inferred</option>
-            <option value="Unknown">Unknown</option>
-          </select>
-          <label className="block text-sm">Block opacity</label>
-          <input type="range" min="0.05" max="1" step="0.05"
-                 value={blockOpacity}
-                 onChange={(e)=>setBlockOpacity(parseFloat(e.target.value))} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
-            Show traces
-          </label>
-        </div>
-=======
         <OverlaySlot slot="bottom-left">
           <div className="flex flex-col gap-3">
             <Legend title="Lithology" items={lithologyLegendItems} />
@@ -319,7 +225,70 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
           </div>
         </OverlaySlot>
         <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
-          <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-2">
+          <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-white/80">
+                <span>Assay range filter</span>
+                <button
+                  className="text-[11px] text-orange-300 hover:text-orange-200"
+                  onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs">
+                  Min
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={localRange?.min ?? carbonRange.min}
+                    onChange={(e) => setLocalRange(prev => ({
+                      min: Number(e.target.value),
+                      max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+                    }))}
+                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                  />
+                </label>
+                <label className="text-xs">
+                  Max
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={localRange?.max ?? carbonRange.max}
+                    onChange={(e) => setLocalRange(prev => ({
+                      min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+                      max: Number(e.target.value)
+                    }))}
+                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                  />
+                </label>
+              </div>
+              <input
+                type="range"
+                min={carbonRange.min}
+                max={carbonRange.max}
+                step={0.1}
+                value={localRange?.min ?? carbonRange.min}
+                onChange={(e) => setLocalRange(prev => ({
+                  min: Number(e.target.value),
+                  max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+                }))}
+                className="w-full"
+              />
+              <input
+                type="range"
+                min={carbonRange.min}
+                max={carbonRange.max}
+                step={0.1}
+                value={localRange?.max ?? carbonRange.max}
+                onChange={(e) => setLocalRange(prev => ({
+                  min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+                  max: Number(e.target.value)
+                }))}
+                className="w-full"
+              />
+            </div>
             <label className="block text-sm">Classification</label>
             <select
               value={selectedClassification}
@@ -342,7 +311,6 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
             </label>
           </div>
         </OverlaySlot>
->>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
 
       </>
     );

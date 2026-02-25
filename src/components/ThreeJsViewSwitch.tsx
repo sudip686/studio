@@ -3,7 +3,6 @@ import AssayViewer from './viewers/AssayView';
 import BlockModelCarbonViewer from './viewers/BlockModelCarbonView';
 import BlockModelRescViewer from './viewers/BlockModelRescView';
 
-<<<<<<< HEAD
 export type AssayRangeFilter = { min: number; max: number } | null;
 
 export default function ThreeJsViewSwitch({ view, assayFilterRange }: { view: string; assayFilterRange?: AssayRangeFilter }) {
@@ -17,15 +16,3 @@ export default function ThreeJsViewSwitch({ view, assayFilterRange }: { view: st
         </>
     );
 }
-=======
-export default function ThreeJsViewSwitch({ view, assayCutoff }: { view: string; assayCutoff?: number }) {
-  return (
-    <>
-      {view === 'lithology_view' && <LithologyViewer key="lith" />}
-      {view === 'assay_view' && <AssayViewer key="assay" assayCutoff={assayCutoff} />}
-      {view === 'block_model_carbon_view' && <BlockModelCarbonViewer key="bm_c" assayCutoff={assayCutoff} />}
-      {view === 'block_model_resc_view' && <BlockModelRescViewer key="bm_r" assayCutoff={assayCutoff} />}
-    </>
-  );
-}
->>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
