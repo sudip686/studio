@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import * as THREE from 'three';
+import { useDataCache } from '@/lib/data-cache';
 
 export type DrillholeSegment = {
   hole_id: string;
@@ -8,13 +9,8 @@ export type DrillholeSegment = {
   feature: any;
 };
 
-const LITHOLOGY_COLOR_MAP: Record<string,string> = {
-  'quartz-feldspathic':'#FAD7A0','grsc':'#212323','granulite':'#df26c4','khondalite':'#1a3523',
-  'marble':'#fafafa','not recovearble':'#515A5A','soil':'#6efe70','schist':'#46f1b2',
-  'nan':'#ffffff','unknown':'#cccccc'
-};
-const colorForLithology = (raw?: string) =>
-  LITHOLOGY_COLOR_MAP[String(raw ?? 'unknown').trim().toLowerCase()] ?? '#cccccc';
+const colorForLithology = (legendMap: Record<string, string>, raw?: string) =>
+  legendMap[String(raw ?? 'unknown').trim().toLowerCase().replace(/\s+/g, ' ')] ?? '#cccccc';
 
 export default function GeoVisionLithologyView({
   scene,
@@ -27,6 +23,7 @@ export default function GeoVisionLithologyView({
   modelCenter: { lon: number; lat: number };
   getSegmentEndpoints: (seg: any) => { a: number[]; b: number[] } | null;
 }) {
+  const { processedLithologyData } = useDataCache();
   useEffect(() => {
     console.log(`[lithology] input segments:`, drillholeData?.length ?? 0);
     if (!scene || !drillholeData?.length) return;
@@ -43,8 +40,9 @@ export default function GeoVisionLithologyView({
     };
 
     const grouped: Record<string, DrillholeSegment[]> = {};
+    const legendMap = processedLithologyData?.legendMap ?? {};
     for (const seg of drillholeData) {
-      const color = colorForLithology(seg.lithology);
+      const color = colorForLithology(legendMap, seg.lithology);
       (grouped[color] ||= []).push(seg);
     }
 
@@ -101,7 +99,7 @@ export default function GeoVisionLithologyView({
         }
       });
     };
-  }, [scene, drillholeData, modelCenter]);
+  }, [scene, drillholeData, modelCenter, processedLithologyData]);
 
   return null;
 }

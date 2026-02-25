@@ -1,9 +1,8 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
-import { Legend } from '@/components/ui/legend';
 import IonKmlLayer from './IonKmlLayer';
 
-import { drillholeLocationMapLithologyLegendData, ASSAY_GRAPHITIC_CARBON, LITHOLOGY_COLORS } from '@/lib/constants';
+import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLORS } from '@/lib/constants';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { BoreholeCylinderCache, Interval, Style } from '@/lib/boreholes/borehole-cylinders';
 import { colorFromLegend } from '@/lib/boreholes/legend-color';
@@ -34,9 +33,11 @@ interface DrillholeLayerProps {
 
 const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
   const { viewer, ready } = useCesium();
-  const { drillholeData } = useDataCache();
+  const { drillholeData, processedAssayData, processedLithologyData } = useDataCache();
+  const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
+  const lithologyLegendItems = processedLithologyData?.legendItems ?? drillholeLocationMapLithologyLegendData.items;
   const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
-  const [uiTick, setUiTick] = useState(0);
+
   
   const cacheRef = useRef<BoreholeCylinderCache | null>(null);
   const intervalsRef = useRef<any[]>([]);
@@ -228,7 +229,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
   // Effect for applying styles when type changes
   useEffect(() => {
     applyStyles();
-  }, [type]);
+  }, [type, assayRange.min, assayRange.max]);
 
   const applyStyles = () => {
     if (!cacheRef.current || !intervalsRef.current.length || !viewer) return;
@@ -236,7 +237,8 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
 
     const Cesium = (window as any).Cesium;
     const cache = cacheRef.current;
-    const legend = type === 'assay' ? ASSAY_GRAPHITIC_CARBON : LITHOLOGY_COLORS;
+    const legend = LITHOLOGY_COLORS;
+    const legendMap = processedLithologyData?.legendMap ?? LITHOLOGY_COLORS.map;
 
     const defaultStyle: Style = {
         material: Cesium.Color.GREY,
@@ -255,10 +257,12 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
 
         if (type === 'assay') {
             const value = interval.props.graphitic_carbon;
-            // Only show segments that have assay data
             if (value !== undefined && value !== null) {
-                const color = colorFromLegend(legend, value);
-                styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 2.5 };
+                const t = assayRange.max > assayRange.min
+                    ? (value - assayRange.min) / (assayRange.max - assayRange.min)
+                    : 0.5;
+                const clamped = Math.max(0, Math.min(1, t));
+                styleToApply = { material: new Cesium.Color(clamped, 1 - clamped, 0, 1), opacity: 1.0, outline: false, radiusMeters: 2.5 };
                 visible = true;
             }
         } else { // lithology
@@ -266,8 +270,8 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
             if (value) {
                 const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
                 // Only show segments that have lithology data and map to a color
-                if (LITHOLOGY_COLORS.map[normalizedValue]) {
-                    const color = colorFromLegend(legend, normalizedValue);
+                if (legendMap[normalizedValue]) {
+                    const color = colorFromLegend({ ...legend, map: legendMap }, normalizedValue);
                     styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 2.5 };
                     visible = true;
                 } else if (normalizedValue === 'unknown' || normalizedValue === 'nan') {
@@ -305,7 +309,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
     const removePreRender = viewer.scene.preRender.addEventListener(() => {
-        requestAnimationFrame(() => setUiTick(t => (t + 1) % 1_000_000));
+        // Scene updates handled by Cesium natively
     });
 
     return () => {
@@ -314,57 +318,10 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     };
   }, [viewer, ready]);
 
-  const getHeading = useCallback(() => {
-    if (!viewer) return 0;
-    const Cesium = (window as any).Cesium;
-    return Cesium.Math.toDegrees(viewer.camera.heading);
-  }, [viewer]);
-
-  const getMetersIn100px = useCallback(() => {
-    if (!viewer) return 0;
-    const Cesium = (window as any).Cesium;
-    const { scene } = viewer;
-    const canvas = scene.canvas;
-    const p1 = new Cesium.Cartesian2(canvas.clientWidth / 2 - 50, canvas.clientHeight - 10);
-    const p2 = new Cesium.Cartesian2(canvas.clientWidth / 2 + 50, canvas.clientHeight - 10);
-
-    const r1 = scene.camera.getPickRay(p1);
-    const r2 = scene.camera.getPickRay(p2);
-    let c1 = r1 ? scene.globe.pick(r1, scene) : undefined;
-    let c2 = r2 ? scene.globe.pick(r2, scene) : undefined;
-
-    if (c1 && c2) return Cesium.Cartesian3.distance(c1, c2);
-
-    const ellipsoid = scene.globe.ellipsoid;
-    const center = scene.camera.positionCartographic;
-    if (!center) return 0;
-    const metersPerPx = Math.tan(scene.camera.frustum.fovy / 2) * center.height / (canvas.clientHeight / 2);
-    const dLon = (100 * metersPerPx) / ellipsoid.maximumRadius;
-    const gc1 = new Cesium.Cartographic(center.longitude - dLon / 2, center.latitude, 0);
-    const gc2 = new Cesium.Cartographic(center.longitude + dLon / 2, center.latitude, 0);
-    const geod = new Cesium.EllipsoidGeodesic(gc1, gc2, ellipsoid);
-    return geod.surfaceDistance || 0;
-  }, [viewer]);
-
   return (
     <div className="h-full w-full relative z-20 pointer-events-none">
         <IonKmlLayer assetId={4310565} />
         <TooltipContent data={tooltip} />
-        {type === 'lithology' ? (
-            <Legend
-                title={drillholeLocationMapLithologyLegendData.title}
-                type="categorical"
-                items={drillholeLocationMapLithologyLegendData.items}
-                show={true}
-            />
-        ) : (
-            <Legend
-                title="Assay (Graphitic Carbon)"
-                type="categorical"
-                items={ASSAY_GRAPHITIC_CARBON.bins}
-                show={true}
-            />
-        )}
     </div>
   );
 };

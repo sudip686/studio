@@ -25,8 +25,7 @@ This document captures **design questions, layout decisions, and easy-to-modify 
 - [ ] **Responsiveness**: Desired layout changes for tablet and mobile (hide panels, collapse into drawers, etc.).
 
 ### Common interactive elements
-- [ ] **Legend style**: Categorical vs gradient. Position (default bottom-left). Legends should always be visible when a view has color encoding.
-- [ ] **Legend guidance**: Include a 1–2 line hint explaining how to interpret colors (e.g., “higher values trend toward red”) and where to get exact values (hover tooltip).
+- [ ] **Legend style**: Categorical vs gradient. Position (default bottom-left).
 - [ ] **Slider style**: Size, thumb style, gradient fill, label format.
 - [ ] **Dropdowns/selects**: Background, hover states, scrollbar style.
 - [ ] **Buttons**: Primary/secondary style, hover/active states.
@@ -45,7 +44,6 @@ This document captures **design questions, layout decisions, and easy-to-modify 
   - Categorical: color dots + labels.
   - Gradient: bar + min/max labels (width ~ w-96).
   - Easy customizations: position, width, label font size.
-  - Guidance: optional short text displayed under the title to explain how to interpret the legend.
 
 ### Global overlays (top-level)
 - **LogoOverlay** (`src/components/ui/LogoOverlay.tsx`)
@@ -257,12 +255,10 @@ This document captures **design questions, layout decisions, and easy-to-modify 
 ### 2.4 Drillhole View (Cesium Drillhole Layer)
 **File:** `src/components/views/DrillholeView.tsx`
 - UI Elements: **Legend** only (categorical or gradient depending on type).
-- Placement rule: legend must render inside an overlay slot (bottom-left) so it’s anchored above the viewport (not inside the 3D canvas).
 - Easy customizations:
   - [ ] Legend position (default bottom-left).
   - [ ] Legend style (font size, color swatches, spacing).
   - [ ] Assay gradient colors and min/max formatting.
-  - [ ] Legend guidance text for lithology vs assay.
 - **Data required**:
   - `drillholeData` from `DataCache` (see **0B** samples).
   - Requires `hole_id`, `depth_from`, `depth_to`, plus `lithology` or `graphitic_carbon`.
@@ -407,7 +403,6 @@ This document captures **design questions, layout decisions, and easy-to-modify 
 ### 4.3 Assay View
 **File:** `src/components/viewers/AssayView.tsx`
 - UI Elements: **Gradient legend** bottom-left.
-- Guidance: include a short hint (“Higher values trend toward red; lower values trend toward green…”) and encourage hover tooltip usage.
 - Easy customizations:
   - [ ] Gradient colors and labeling.
   - [ ] Add assay cutoff control.
@@ -537,3 +532,137 @@ Use this checklist for any new view or when revisiting an existing one.
 - **Tooltip**: background, max width, data order
 - **Buttons**: primary/secondary color, hover state
 - **Default values**: transparency, filters, selection defaults
+
+---
+
+## 9) VRIFY Deck Design System (Detailed Specification)
+
+Use this section to recreate the VRIFY investor deck experience entirely within Studio. It covers foundations, shared components, interactions, assets, and per-slide requirements.
+
+### 9.1 Design Foundations
+
+#### Color palette
+| Token | Value | Usage |
+| --- | --- | --- |
+| `brand.sunrise-start` | `#FF9D43` | Primary CTA gradient start, stat accents. |
+| `brand.sunrise-mid` | `#F8731F` | CTA gradient mid tone, glow overlays. |
+| `brand.sunset-end` | `#FF4D2D` | CTA gradient end, hover emphasis. |
+| `surface.glass` | `rgba(255,255,255,0.05)` | Base fill for glass panels (hero container, legends). |
+| `surface.glass-strong` | `rgba(255,255,255,0.10)` | Elevated tiles (stats, outlined buttons). |
+| `surface.dark` | `rgba(0,0,0,0.40)` | Background for media frames, Cesium overlays. |
+| `text.primary` | `#FFFFFF` | Headline text, CTA labels. |
+| `text.secondary` | `rgba(255,255,255,0.70)` | Body copy, legends. |
+| `text.muted` | `rgba(255,255,255,0.50)` | Helper text (“Drag to rotate”). |
+| `border.glass` | `rgba(255,255,255,0.10)` | Panel outlines. |
+| `shadow.primary` | `rgba(0,0,0,0.55)` | Default drop shadow for glass panels. |
+
+#### Typography
+| Token | Stack | Weight | Size / Leading | Description |
+| --- | --- | --- | --- | --- |
+| `type.display` | `"Space Grotesk", "Inter", sans-serif` | 600 | 40–48px / 1.25 | Hero headline, slide titles. |
+| `type.title` | `"Inter", sans-serif` | 600 | 24–32px / 1.3 | Section headings, CTA prompts. |
+| `type.body` | `"Inter", sans-serif` | 400 | 16px / 1.5 | Narrative copy. |
+| `type.label` | `"Inter", sans-serif` | 500 | 11–12px / 1.4 | Uppercase pills and stat labels (tracking 0.3em). |
+
+#### Spacing, radius, depth
+- Base spacing unit: 4px. Default paddings: 24px (hero card), 16px (tiles, legends).
+- Glass panels: radius 24–28px, `backdrop-blur-md`, shadow `0 25px 70px rgba(0,0,0,0.55)`.
+- Buttons: pill radius with gradient fill; outline button uses 20% white border.
+- Maintain safe areas (desktop 32px, tablet 20px, mobile 16px).
+
+### 9.2 Shared Components & Patterns
+
+| Component | File / Source | Layout Notes | Interaction |
+| --- | --- | --- | --- |
+| Hero overlay | `src/components/HeroOverlay.tsx` | Two-column glass card. Text column includes CTA pill, headline, body copy, stats grid (2×2 mobile → 1×3 desktop). Media column shows hero screenshot with gradient overlay. | Primary CTA triggers autoplay, secondary CTA opens VRIFY deck. Hero image scales to 105% on hover. |
+| Stat tiles | — (inline) | Glass tile with border (10% white), value 24px, uppercase label tracking 0.3em. | Static; ensure contrast remains ≥4.5:1. |
+| CTA buttons | Shared style | Gradient `sunrise-start → sunset-end`, black text, drop shadow `0 18px 45px rgba(255,120,58,0.45)`. Outline variant uses transparent fill + white/20% border. | Hover brightens gradient and scales 1.02×. Focus adds white outline (2px offset). |
+| Title banner | `src/app/page.tsx` top-center | Glass pill for current slide title; fades on slide change. | 300ms opacity transition. |
+| Chapter menu | `src/components/ui/chapter-menu.tsx` | Collapsible panel 320px wide. Burger trigger visible on mobile. Active item gets accent border + tinted background. | Clicking row updates slide index; include keyboard focus. |
+| Legends & tooltips | `Legend`, `MetricScaleOverlay`, etc. | Glass background, secondary text color, border 10% white. | Hover raises border to 20%, tooltips remain 12px body text. |
+| Autoplay controls | `src/app/page.tsx` bottom-center | Buttons follow CTA styling. Disabled `Next` sets 50% opacity and disables pointer. | Scroll throttle (1s) prevents accidental navigation. |
+
+### 9.3 Interaction & Responsiveness
+- Navigation: Scroll (throttled), Prev/Next buttons, Chapter menu selection.
+- Autoplay: Each slide respects `durationMs`; stops at final slide and reverts CTA.
+- Transitions: Title banner fade, hero hover zoom, CTA brightness.
+- Responsive adjustments:
+  - <1024px: hero becomes single column; stats tiles wrap to two columns; CTAs stack with 16px gap.
+  - <768px: hide chapter list, rely on burger trigger; reduce hero padding to 16px.
+- Accessibility: Maintain ≥4.5:1 contrast, provide focus outlines, ensure buttons reachable via keyboard.
+
+### 9.4 Assets & Data
+| Resource | Location | Notes |
+| --- | --- | --- |
+| Hero preview image | `public/Screenshot 2026-02-18 111036.png` | 1152×652 asset used in hero media. Load with `priority`. |
+| Company logo | `public/A_Logo.png` | 415×416 emblem for LogoOverlay and optional hero pill. |
+| Deck slides | `src/data/deck.ts` | Titles, subtitles, facts, camera presets, durations. |
+| Chapter summaries | `src/data/chapters.ts` | Sidebar copy for storytelling. |
+| Drillhole datasets | `public/assay_data.geojson`, `public/lithology_data.geojson` | Used across Cesium and Three.js drillhole views. |
+| Block model data | `public/resource_model.bin`, `BlockModel.geojson` | Carbon probability and classification volumes. |
+| Terrain assets | `public/terrain_meta.json`, `terrain_texture_8k.jpg` | Heightmap + texture for 3D terrain contexts. |
+
+### 9.5 Slide Blueprint
+
+| Slide ID | Story beat | Layout & Content | Data / Assets | Camera & Interaction |
+| --- | --- | --- | --- | --- |
+| `overview` | Introduce region | Hero context: show Tanzania location, overlay project title. | Base terrain + KML boundary. | FlyTo lon 39.05, lat -4.85, height 180k; autopan. |
+| `licenses` | Exploration tenure | Emphasise permit polygon with label and quick stats. | `styled_kml`, annotation. | Height 42k, heading 10°. |
+| `accessibility` | Logistics | Roads/villages overlay, highlight access corridors. | Ion imagery 3733958. | Height 48k, heading 20°. |
+| `geology_map` | Regional geology | Geological raster + legend. | Ion imagery 3678736. | Height 42k, heading 18°. |
+| `topography` | Terrain relief | Exaggerated terrain with KML overlay, optional callouts. | Terrain + KML. | Vertical exaggeration 1.5→1.0 transition. |
+| `drillholes` | Drilling density | Gradient legend with annotation “High-grade corridor”. | `/assay_data.geojson`. | Height 22k; highlight callout. |
+| `drillholes_lithology` | Lithology intervals | Categorical legend, optional filter panel top-right. | `/lithology_data.geojson`. | Height 26k, heading 12°. |
+| `drillholes_assay` | Assay intervals | Gradient legend emphasising carbon percentage bins. | `/assay_data.geojson`. | Crossfade from lithology view. |
+| `lithology` | 3D geology volumes | Three.js scene with categorical legend and helper text. | Lithology volume (GLB). | Auto rotate 10°; allow user interaction. |
+| `assay` | 3D assay volumes | Gradient legend, opacity slider top-right. | Assay volume data. | Animate opacity from 0.3 to 0.8 over 1.5s. |
+| `carbon_model` | Carbon probability | Block model view with trace toggle panel. | BlockModel GeoJSON. | Default cutoff 5%; allow toggling traces. |
+| `classification` | Resource classification | RESC legend and closing CTA. | BlockModel `RescCalc`. | Provide follow-up CTAs (contact/demo). |
+
+### 9.6 CTA Footer Template
+- Headline: “Want to create your own VRIFY 3D Presentation?”
+- Buttons: Primary gradient (“Get VRIFIED”), secondary outline (“Contact Us”).
+- Layout: Glass panel centred, spacing 24px, CTA pill alignment matches hero pattern.
+
+### 9.7 Maintenance Notes
+- Source references: `~/vrify_assets` bundles and hero screenshot in `public/`.
+- Review cadence: Audit quarterly or when VRIFY updates deck styling.
+- Adding slides: Duplicate template in §7, append to blueprint table with data/camera notes.
+- Cross-team workflow: Designers confirm gradients/blur; engineers ensure performance on mid hardware.
+
+### 9.8 Diagram & Mockup References
+Below are annotated diagrams that accompany the written specification. All assets live in `docs/assets/vrify/` so designers and developers can review them offline.
+
+#### Global elements
+
+![Hero overlay diagram](./assets/vrify/hero-layout-diagram.png)
+*Hero overlay layout: callouts for CTA pill, headline, stat tiles, and media frame.*
+
+![CTA footer layout](./assets/vrify/cta-footer-diagram.png)
+*Closing CTA glass panel with gradient/outline button hierarchy.*
+
+#### Slide reference gallery
+
+- `overview`: ![Overview slide](./assets/vrify/slide-overview.png)
+- `licenses`: ![License slide](./assets/vrify/slide-licenses.png)
+- `accessibility`: ![Accessibility slide](./assets/vrify/slide-accessibility.png)
+- `geology_map`: ![Geology map slide](./assets/vrify/slide-geology_map.png)
+- `topography`: ![Topography slide](./assets/vrify/slide-topography.png)
+- `drillholes`: ![Drillholes slide](./assets/vrify/slide-drillholes.png)
+- `drillholes_lithology`: ![Drillholes lithology slide](./assets/vrify/slide-drillholes_lithology.png)
+- `drillholes_assay`: ![Drillholes assay slide](./assets/vrify/slide-drillholes_assay.png)
+- `lithology`: ![3D lithology slide](./assets/vrify/slide-lithology.png)
+- `assay`: ![3D assay slide](./assets/vrify/slide-assay.png)
+- `carbon_model`: ![Carbon model slide](./assets/vrify/slide-carbon_model.png)
+- `classification`: ![Resource classification slide](./assets/vrify/slide-classification.png)
+
+All diagrams were exported at 1.5× scale to keep annotations legible while keeping file sizes below 1 MB. If you update any slide, regenerate its companion image to maintain consistency.
+
+### 9.9 Extending the Deck
+Follow this checklist whenever a new slide or variant is added:
+1. **Capture reference** – Export the corresponding VRIFY screen and add to `docs/assets/vrify/`.
+2. **Update data** – Add a new entry in `src/data/deck.ts` with camera, subtitles, and duration.
+3. **Document layout** – Append a new row to the Slide Blueprint table with layout, assets, and interaction notes.
+4. **Specify controls** – Note any new UI panels, toggles, or legends required.
+5. **Review interactions** – Confirm autoplay timing, transitions, and accessibility impact.
+6. **Cross-check assets** – Ensure required datasets or Ion assets exist, updating §9.4 if necessary.

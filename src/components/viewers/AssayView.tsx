@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { useThreeScene } from '@/contexts/three-scene-context';
 import { fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
@@ -97,6 +98,7 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                 onLoaded={onBoreholesLoaded}
             />
             
+<<<<<<< HEAD
             <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-3 pointer-events-auto">
                 <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs text-white/80">
@@ -164,14 +166,23 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
             </div>
 
             <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
+=======
+            <OverlaySlot slot="bottom-left">
+>>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
                 <Legend 
                     title="Assay Value" 
                     type="gradient"
                     gradient={assayGradient}
+<<<<<<< HEAD
                     minLabel={(localRange?.min ?? assayRange.min).toFixed(2)}
                     maxLabel={(localRange?.max ?? assayRange.max).toFixed(2)}
+=======
+                    minLabel={assayRange.min.toFixed(2)}
+                    maxLabel={assayRange.max.toFixed(2)}
+                    guidance="Higher values trend toward red; lower values trend toward green. Use the hover tooltip to inspect exact values at a location."
+>>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
                 />
-            </div>
+            </OverlaySlot>
         </>
     );
 }

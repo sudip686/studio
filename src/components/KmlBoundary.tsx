@@ -40,13 +40,19 @@ const KmlBoundary = ({ styled = false }: KmlBoundaryProps) => {
                             entity.polygon.outlineWidth = 5;
                             entity.polygon.fill = styled;
                             entity.polygon.material = styled ? Cesium.Color.WHITE.withAlpha(0.5) : undefined;
-                            entity.polygon.heightReference = Cesium.HeightReference.RELATIVE_TO_GROUND;
+                            // Ensure boundary is drawn on the surface only (avoid "double" outlines from altitude data)
+                            entity.polygon.height = 0;
+                            (entity.polygon as any).extrudedHeight = undefined;
+                            entity.polygon.perPositionHeight = false;
+                            entity.polygon.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
                         }
                         if (entity.polyline) {
                             entity.polyline.show = true;
                             entity.polyline.material = Cesium.Color.RED;
                             entity.polyline.width = 5;
-                            entity.polyline.heightReference = Cesium.HeightReference.RELATIVE_TO_GROUND;
+                            // Clamp boundary polylines to ground so only one line renders
+                            entity.polyline.clampToGround = true;
+                            entity.polyline.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
                         }
                     });
 

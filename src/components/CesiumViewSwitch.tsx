@@ -12,8 +12,9 @@ import TerrainClippingPlanes from '@/components/terrain-clipping-planes'; // Cor
 import BlockModelBoxCutter from '@/components/block-model-box-cutter';
 import DrillholeLayer from '@/components/DrillholeLayer';
 import CinematicDrillholeViewer from '@/components/cinematic-drillhole-viewer';
-import TilesetQualityToggle from '@/components/TilesetQualityToggle'; // Import the new component
-import GlobalOverlays from '@/components/shared/GlobalOverlays';
+import { OverlaySlot } from "@/ui/overlays";
+import { Legend } from "@/components/ui/legend";
+import { drillholeLocationMapLithologyLegendData } from "@/lib/constants";
 import SubsurfaceViewer from '@/components/viewers/SubsurfaceViewer';
 import BlockModelLayer from '@/components/viewers/BlockModelLayer';
 import BoreholeLayer from '@/components/viewers/BoreholeLayer';
@@ -43,7 +44,7 @@ const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
 
 export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const { viewer, ready, kmlDataSource, kmlLabel, enableAoiCutaway, disableAoiCutaway } = useCesium();
-  const { drillholeData } = useDataCache();
+  const { drillholeData, processedAssayData } = useDataCache();
   const lastViewRef = useRef<CesiumView | null>(null);
 
   const [globeAlpha, setGlobeAlpha] = useState(1.0);   // 0..1 - Default to 100% opacity
@@ -56,6 +57,11 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const [drillholeLocationMode, setDrillholeLocationMode] = useState<'assay' | 'lithology'>('assay');
   const [boxCutterMode, setBoxCutterMode] = useState<'grade' | 'class'>('grade');
   const [cinematicDrillholeMode, setCinematicDrillholeMode] = useState<'assay' | 'lithology'>('assay');
+
+  // Legends should show whenever we are plotting data with color encoding in Cesium.
+  const showCesiumDrillholeLegend = view === 'geojson_drillholes_lithology' || view === 'geojson_drillholes_assay';
+  const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
+  const assayGradient = `linear-gradient(to right, hsl(120, 100%, 50%), hsl(60, 100%, 50%), hsl(0, 100%, 50%))`;
 
   const specialViewMap = {
       drillhole_lithology_reveal: 'animatedReveal',
@@ -410,51 +416,73 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         )}
 
       {/* Transparency controls */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 z-20 pointer-events-auto flex flex-col gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-white/80 drop-shadow-sm">
-            Globe opacity {Math.round(globeAlpha * 100)}%
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={globeAlpha}
-            onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
-            className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
-            style={{
-              background: `linear-gradient(to right, #f97316 0%, #f97316 ${globeAlpha * 100}%, rgba(0,0,0,0.3) ${globeAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
-            }}
-          />
-        </div>
-
-        {view === 'drillhole_location_lithology' && (
+      <OverlaySlot slot="top-center">
+        <div className="flex flex-col gap-2 pointer-events-auto">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-white/80 drop-shadow-sm">
-              Map opacity {Math.round(imageryAlpha * 100)}%
+              Globe opacity {Math.round(globeAlpha * 100)}%
             </label>
             <input
               type="range"
               min={0}
               max={1}
               step={0.05}
-              value={imageryAlpha}
-              onChange={(e) => setImageryAlpha(parseFloat(e.target.value))}
+              value={globeAlpha}
+              onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
               className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
               style={{
-                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${imageryAlpha * 100}%, rgba(0,0,0,0.3) ${imageryAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
+                background: `linear-gradient(to right, #f97316 0%, #f97316 ${globeAlpha * 100}%, rgba(0,0,0,0.3) ${globeAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
               }}
             />
           </div>
-        )}
-      </div>
 
-      {/* Tileset Quality Toggle */}
-      <TilesetQualityToggle />
+          {view === 'drillhole_location_lithology' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-white/80 drop-shadow-sm">
+                Map opacity {Math.round(imageryAlpha * 100)}%
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={imageryAlpha}
+                onChange={(e) => setImageryAlpha(parseFloat(e.target.value))}
+                className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
+                style={{
+                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${imageryAlpha * 100}%, rgba(0,0,0,0.3) ${imageryAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </OverlaySlot>
 
-      {/* Global Overlays */}
-      <GlobalOverlays mode="cesium" currentView={view} />
+      {/* Bottom-left legend for Cesium drillhole views */}
+      {showCesiumDrillholeLegend && (
+        <OverlaySlot slot="bottom-left">
+          {view === 'geojson_drillholes_lithology' ? (
+            <Legend
+              title={drillholeLocationMapLithologyLegendData.title}
+              type="categorical"
+              items={drillholeLocationMapLithologyLegendData.items}
+              guidance="Colors correspond to lithology classes. Hover a segment to see lithology and interval details."
+              show
+            />
+          ) : (
+            <Legend
+              title="Assay (Graphitic Carbon)"
+              type="gradient"
+              gradient={assayGradient}
+              minLabel={assayRange.min.toFixed(2)}
+              maxLabel={assayRange.max.toFixed(2)}
+              guidance="Higher values trend toward red; lower values trend toward green. Hover a segment to see the exact assay value."
+              show
+            />
+          )}
+        </OverlaySlot>
+      )}
+
     </>
   );
 }

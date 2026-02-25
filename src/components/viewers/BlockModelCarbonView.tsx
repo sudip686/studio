@@ -7,7 +7,9 @@ import { useDataCache, BlockSegment } from '@/lib/data-cache';
 import { projectLonLat, fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
 
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { ErrorDisplay } from '@/components/ui/error-display';
+import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
 
@@ -176,11 +178,19 @@ export default function BlockModelCarbonViewer({
 
   const carbonGradient = "linear-gradient(to right, #00ff00, #ff0000)";
 
+  const lithologyLegendItems = useMemo(() => {
+    return Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+      label: label.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      color,
+    }));
+  }, []);
+
   return (
     <>
       <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
       <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
       
+<<<<<<< HEAD
       <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-3 pointer-events-auto">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-white/80">
@@ -250,16 +260,29 @@ export default function BlockModelCarbonViewer({
           Show traces
         </label>
       </div>
+=======
+      <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
+        <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
+            Show traces
+          </label>
+        </div>
+      </OverlaySlot>
+>>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
 
-      <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
-        <Legend
+      <OverlaySlot slot="bottom-left">
+        <div className="flex flex-col gap-3">
+          <Legend title="Lithology" items={lithologyLegendItems} />
+          <Legend
             title="Carbon Value"
             type="gradient"
             gradient={carbonGradient}
             minLabel={carbonRange.min.toFixed(2)}
             maxLabel={carbonRange.max.toFixed(2)}
-        />
-      </div>
+          />
+        </div>
+      </OverlaySlot>
     </>
   );
 }

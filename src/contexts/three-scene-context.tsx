@@ -25,6 +25,7 @@ interface SceneContextType {
   unregisterTooltipObject: (mesh: THREE.InstancedMesh) => void;
   // Optional helpers for child layers to provide scene constraints/metadata
   setTerrainMaxY?: (y: number) => void;
+  setTerrainMinY?: (y: number) => void;
 }
 
 const ThreeSceneContext = createContext<SceneContextType | undefined>(undefined);
@@ -39,6 +40,7 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
   const rafRef = useRef<number | null>(null);
   const initOnce = useRef(false);
   const terrainMaxYRef = useRef<number | null>(null);
+  const terrainMinYRef = useRef<number | null>(null);
 
   const [tooltipState, setTooltipState] = useState<TooltipState>({
     visible: false,
@@ -70,6 +72,10 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
   const setTerrainMaxY = useCallback((y: number) => { 
     terrainMaxYRef.current = y; 
+  }, []);
+
+  const setTerrainMinY = useCallback((y: number) => {
+    terrainMinYRef.current = y;
   }, []);
 
   const [sceneReady, setSceneReady] = useState(false);
@@ -129,11 +135,11 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     controls.enableRotate = true;
     controls.enablePan = true;
     controls.enableZoom = true;
-    controls.minPolarAngle = 0; 
+    controls.minPolarAngle = 0;
     controls.maxPolarAngle = Math.PI;
     controls.target.set(0, 0, 0);
     controls.update();
-    controls.minAzimuthAngle = -Infinity; 
+    controls.minAzimuthAngle = -Infinity;
     controls.maxAzimuthAngle = Infinity;
     controlsRef.current = controls;
 
@@ -188,12 +194,9 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
             camera.far = 20000000; 
             camera.updateProjectionMatrix();
 
-            if (terrainMaxYRef.current != null && Number.isFinite(terrainMaxYRef.current)) {
-              const minY = terrainMaxYRef.current + 2.0; 
-              if (camera.position.y < minY) {
-                camera.position.y = minY;
-              }
-            }
+            // NOTE: We intentionally do NOT clamp camera.position.y to terrain height.
+            // OrbitControls allows full 360° rotation (including going "under" the terrain)
+            // by adjusting polar angle; clamping Y breaks that behavior once terrain loads.
 
             renderer.render(sceneObj, camera);
         } catch (e) {
@@ -238,8 +241,9 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     tooltipState,
     registerTooltipObject,
     unregisterTooltipObject,
-    setTerrainMaxY
-  }), [sceneReady, tooltipState, registerTooltipObject, unregisterTooltipObject, setTerrainMaxY]);
+    setTerrainMaxY,
+    setTerrainMinY
+  }), [sceneReady, tooltipState, registerTooltipObject, unregisterTooltipObject, setTerrainMaxY, setTerrainMinY]);
 
   return (
     <ThreeSceneContext.Provider value={contextValue}>

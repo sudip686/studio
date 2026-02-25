@@ -1,13 +1,15 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { Legend } from '@/components/ui/legend';
+import { OverlaySlot } from '@/ui/overlays';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
 
 import { projectLonLat, fitCameraToGroupWorldAware } from '../../lib/utils/three-helpers';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import { ErrorDisplay } from '@/components/ui/error-display';
+import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
 
@@ -19,9 +21,18 @@ const RESC_LEGEND = [
   { label: 'Unknown',   color: '#999999' },
 ];
 
+<<<<<<< HEAD
 type AssayRangeFilter = { min: number; max: number } | null;
 
 export default function BlockModelRescViewer({ assayFilterRange }: { assayFilterRange?: AssayRangeFilter }) {
+=======
+const lithologyLegendItems = Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+  label: label.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+  color,
+}));
+
+export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: number }) {
+>>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
     const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
     const mountedRef = useRef(false);
 
@@ -139,7 +150,7 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
           const ele = asNumber(b.elevation ?? b.z, 0);
           if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
 
-          // BLOCKS are (lat, lon, elev) in source → swap when projecting: 
+          // BLOCKS are (lat, lon, elev) in source ? swap when projecting: 
           const { x, z } = projectLonLat(lon, lat, modelCenter);  
           const VERTICAL_EXAGGERATION = 1.0;
           P.set(x, ele * VERTICAL_EXAGGERATION, -z);
@@ -211,6 +222,7 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
       <>
         <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
         <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
+<<<<<<< HEAD
         <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
           <Legend title="Classification" items={RESC_LEGEND} />
         </div>
@@ -299,6 +311,38 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
             Show traces
           </label>
         </div>
+=======
+        <OverlaySlot slot="bottom-left">
+          <div className="flex flex-col gap-3">
+            <Legend title="Lithology" items={lithologyLegendItems} />
+            <Legend title="Classification" items={RESC_LEGEND} />
+          </div>
+        </OverlaySlot>
+        <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
+          <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-2">
+            <label className="block text-sm">Classification</label>
+            <select
+              value={selectedClassification}
+              onChange={e => setSelectedClassification(e.target.value)}
+              className="w-full p-1 rounded bg-gray-700 text-white border border-gray-600 text-sm"
+            >
+              <option value="All">All</option>
+              <option value="Measured">Measured</option>
+              <option value="Indicated">Indicated</option>
+              <option value="Inferred">Inferred</option>
+              <option value="Unknown">Unknown</option>
+            </select>
+            <label className="block text-sm">Block opacity</label>
+            <input type="range" min="0.05" max="1" step="0.05"
+                   value={blockOpacity}
+                   onChange={(e)=>setBlockOpacity(parseFloat(e.target.value))} />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
+              Show traces
+            </label>
+          </div>
+        </OverlaySlot>
+>>>>>>> 7a2b9f91fb44e873326a1069779a434d9e7effad
 
       </>
     );
