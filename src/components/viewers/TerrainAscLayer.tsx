@@ -17,10 +17,151 @@ function utmToLatLon(easting: number, northing: number) {
 
 const DEFAULT_CLIPPING_RADIUS = 3000;
 
+const HIGH_RES_SEGMENTS = 1024;
+const LOW_RES_SEGMENTS = 128;
+
+const terrainCache = {
+    meta: null as any,
+    heightData: null as Float32Array | null,
+    heightPromise: null as Promise<[any, Float32Array]> | null,
+    texture: null as THREE.Texture | null,
+    texturePromise: null as Promise<THREE.Texture> | null,
+};
+
+const loadTerrainMetaAndHeight = async () => {
+    if (terrainCache.meta && terrainCache.heightData) {
+        return [terrainCache.meta, terrainCache.heightData] as [any, Float32Array];
+    }
+    if (!terrainCache.heightPromise) {
+        terrainCache.heightPromise = Promise.all([
+            fetch('/terrain_meta.json').then(res => res.json()),
+            fetch(`${ASSET_BASE_URL}/height.bin`).then(res => res.arrayBuffer())
+        ]).then(([meta, heightBuffer]) => {
+            const heightData = new Float32Array(heightBuffer);
+            terrainCache.meta = meta;
+            terrainCache.heightData = heightData;
+            return [meta, heightData] as [any, Float32Array];
+        }).catch(err => {
+            terrainCache.heightPromise = null;
+            throw err;
+        });
+    }
+    return terrainCache.heightPromise;
+};
+
+const loadTerrainTexture = async (renderer?: THREE.WebGLRenderer | null, texturePath?: string) => {
+    if (terrainCache.texture) return terrainCache.texture;
+    if (!terrainCache.texturePromise) {
+        terrainCache.texturePromise = new Promise((resolve, reject) => {
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(
+                texturePath ?? `${ASSET_BASE_URL}/terrain_texture_8k.jpg`,
+                (texture) => {
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+                    const maxAniso = (renderer?.capabilities.getMaxAnisotropy?.() ?? 16) || 16;
+                    texture.anisotropy = maxAniso;
+                    texture.generateMipmaps = true;
+                    texture.minFilter = THREE.LinearMipmapLinearFilter;
+                    texture.magFilter = THREE.LinearFilter;
+                    texture.needsUpdate = true;
+                    terrainCache.texture = texture;
+                    resolve(texture);
+                },
+                undefined,
+                (err) => {
+                    terrainCache.texturePromise = null;
+                    reject(err);
+                }
+            );
+        });
+    }
+    return terrainCache.texturePromise;
+};
+
+const buildTerrainGeometry = (
+    heightData: Float32Array,
+    meta: any,
+    modelCenter: { lon: number; lat: number },
+    verticalScale: number,
+    segmentsW: number,
+    segmentsH: number
+) => {
+    const { bounds_utm, width: dataW, height: dataH } = meta;
+    const { minX, maxX, minY, maxY } = bounds_utm;
+    const globalWidth = maxX - minX;
+    const globalHeight = maxY - minY;
+
+    const sampleHeight = (easting: number, northing: number) => {
+        const u = (easting - minX) / globalWidth;
+        const v = (maxY - northing) / globalHeight;
+        if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
+        const x = u * (dataW - 1);
+        const y = v * (dataH - 1);
+        const x0 = Math.floor(x);
+        const y0 = Math.floor(y);
+        const x1 = Math.min(x0 + 1, dataW - 1);
+        const y1 = Math.min(y0 + 1, dataH - 1);
+        const dx = x - x0;
+        const dy = y - y0;
+        const h00 = heightData[y0 * dataW + x0];
+        const h10 = heightData[y0 * dataW + x1];
+        const h01 = heightData[y1 * dataW + x0];
+        const h11 = heightData[y1 * dataW + x1];
+        const top = h00 * (1 - dx) + h10 * dx;
+        const bottom = h01 * (1 - dx) + h11 * dx;
+        return top * (1 - dy) + bottom * dy;
+    };
+
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array(segmentsW * segmentsH * 3);
+    const uvs = new Float32Array(segmentsW * segmentsH * 2);
+    const indices: number[] = [];
+
+    for (let iy = 0; iy < segmentsH; iy++) {
+        const rowV = iy / (segmentsH - 1);
+        const northing = maxY - rowV * globalHeight;
+
+        for (let ix = 0; ix < segmentsW; ix++) {
+            const colU = ix / (segmentsW - 1);
+            const easting = minX + colU * globalWidth;
+            const height = sampleHeight(easting, northing);
+            const idx = (iy * segmentsW + ix);
+            const { lat, lon } = utmToLatLon(easting, northing);
+            const { x, z } = projectLonLat(lon, lat, modelCenter);
+
+            vertices[idx * 3] = x;
+            vertices[idx * 3 + 1] = height * verticalScale;
+            vertices[idx * 3 + 2] = -z;
+
+            uvs[idx * 2] = colU;
+            uvs[idx * 2 + 1] = 1 - rowV;
+        }
+    }
+
+    for (let iy = 0; iy < segmentsH - 1; iy++) {
+        for (let ix = 0; ix < segmentsW - 1; ix++) {
+            const a = iy * segmentsW + ix;
+            const b = iy * segmentsW + (ix + 1);
+            const c = (iy + 1) * segmentsW + ix;
+            const d = (iy + 1) * segmentsW + (ix + 1);
+            indices.push(a, c, b);
+            indices.push(b, c, d);
+        }
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+};
+
 export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = DEFAULT_CLIPPING_RADIUS, onLoaded }: { verticalScale?: number, modelCenter?: { lon: number, lat: number }, clipRadiusM?: number | null, onLoaded?: (info: { box: THREE.Box3; center: THREE.Vector3; size: THREE.Vector3; maxY: number }) => void }) {
     const { dynamicGroup, renderer, setTerrainMaxY } = useThreeScene();
     const terrainGroupRef = useRef<THREE.Group | null>(null);
     const initializedRef = useRef(false);
+    const meshRef = useRef<THREE.Mesh | null>(null);
 
     const centerKey = useMemo(() => 
         modelCenter ? `${modelCenter.lon.toFixed(6)}_${modelCenter.lat.toFixed(6)}` : 'none', 
@@ -47,157 +188,78 @@ export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = 
             new THREE.Plane(new THREE.Vector3(0, 0, -1), radius)
         ];
 
-        Promise.all([
-            fetch('/terrain_meta.json').then(res => res.json()),
-            fetch(`${ASSET_BASE_URL}/height.bin`).then(res => res.arrayBuffer())
-        ]).then(([meta, heightBuffer]) => {
-            const { bounds_utm, width: dataW, height: dataH } = meta;
-            const { minX, maxX, minY, maxY } = bounds_utm;
-            
-            const heightData = new Float32Array(heightBuffer);
-            
-            // Validate data size
-            if (heightData.length !== dataW * dataH) {
-                console.warn(`[TerrainAscLayer] Height data size mismatch. Expected ${dataW*dataH}, got ${heightData.length}`);
+        loadTerrainMetaAndHeight().then(([meta, heightData]) => {
+            if (!meta || !heightData || !modelCenter) return;
+            if (heightData.length !== meta.width * meta.height) {
+                console.warn(`[TerrainAscLayer] Height data size mismatch. Expected ${meta.width * meta.height}, got ${heightData.length}`);
             }
 
-            const globalWidth = maxX - minX;
-            const globalHeight = maxY - minY;
-
-            // Bilinear interpolation for smoother terrain
-            const sampleHeight = (easting: number, northing: number) => {
-                // Map coords to pixel space 0..W-1, 0..H-1
-                const u = (easting - minX) / globalWidth;
-                const v = (maxY - northing) / globalHeight; // Y is flipped in image coords usually (Top-Left origin)
-
-                // Clamp
-                if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
-
-                const x = u * (dataW - 1);
-                const y = v * (dataH - 1);
-
-                const x0 = Math.floor(x);
-                const y0 = Math.floor(y);
-                const x1 = Math.min(x0 + 1, dataW - 1);
-                const y1 = Math.min(y0 + 1, dataH - 1);
-
-                const dx = x - x0;
-                const dy = y - y0;
-
-                // Index: y * width + x
-                const h00 = heightData[y0 * dataW + x0];
-                const h10 = heightData[y0 * dataW + x1];
-                const h01 = heightData[y1 * dataW + x0];
-                const h11 = heightData[y1 * dataW + x1];
-
-                // Bilinear
-                const top = h00 * (1 - dx) + h10 * dx;
-                const bottom = h01 * (1 - dx) + h11 * dx;
-                return top * (1 - dy) + bottom * dy;
-            };
-
-            const SEGMENTS_W = 1024; // Increased resolution
-            const SEGMENTS_H = 1024; 
-            
-            const geometry = new THREE.BufferGeometry();
-            const vertices = new Float32Array(SEGMENTS_W * SEGMENTS_H * 3);
-            const uvs = new Float32Array(SEGMENTS_W * SEGMENTS_H * 2);
-            const indices: number[] = [];
-            
-            for (let iy = 0; iy < SEGMENTS_H; iy++) {
-                const rowV = iy / (SEGMENTS_H - 1);
-                const northing = maxY - rowV * globalHeight;
-
-                for (let ix = 0; ix < SEGMENTS_W; ix++) {
-                    const colU = ix / (SEGMENTS_W - 1);
-                    const easting = minX + colU * globalWidth;
-
-                    const height = sampleHeight(easting, northing);
-                    const idx = (iy * SEGMENTS_W + ix);
-                    const { lat, lon } = utmToLatLon(easting, northing);
-                    const { x, z } = projectLonLat(lon, lat, modelCenter);
-                    
-                    vertices[idx * 3] = x;
-                    vertices[idx * 3 + 1] = height * verticalScale;
-                    vertices[idx * 3 + 2] = -z; // Z is -Z in this projection logic
-                    
-                    uvs[idx * 2] = colU;
-                    uvs[idx * 2 + 1] = 1 - rowV; // Texture V is usually 0 at bottom, 1 at top? 
-                    // If image is top-down (dem), rowV=0 is Top (MaxY). 
-                    // Standard UV: (0,0) is bottom-left. 
-                    // If texture matches DEM (Top-Left origin in file), then:
-                    // When rowV=0 (Top), V should be 1.
-                    // When rowV=1 (Bottom), V should be 0.
-                    // So 1 - rowV is correct.
-                }
-            }
-            
-            for (let iy = 0; iy < SEGMENTS_H - 1; iy++) {
-                for (let ix = 0; ix < SEGMENTS_W - 1; ix++) {
-                    const a = iy * SEGMENTS_W + ix;
-                    const b = iy * SEGMENTS_W + (ix + 1);
-                    const c = (iy + 1) * SEGMENTS_W + ix;
-                    const d = (iy + 1) * SEGMENTS_W + (ix + 1);
-                    indices.push(a, c, b);
-                    indices.push(b, c, d);
-                }
-            }
-            
-            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-            geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-            geometry.setIndex(indices);
-            geometry.computeVertexNormals();
-
-            // Load Baked Texture
-            const textureLoader = new THREE.TextureLoader();
             const texPath = `${ASSET_BASE_URL}/${meta.rgb_texture || 'terrain_texture_8k.jpg'}`;
-            
-            textureLoader.load(texPath, (texture) => {
-                texture.colorSpace = THREE.SRGBColorSpace;
-                texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-                
-                const maxAniso = (renderer?.capabilities.getMaxAnisotropy?.() ?? 16) || 16;
-                texture.anisotropy = maxAniso;
-                texture.generateMipmaps = true;
-                texture.minFilter = THREE.LinearMipmapLinearFilter;
-                texture.magFilter = THREE.LinearFilter;
-                texture.needsUpdate = true;
 
-                const mat = new THREE.MeshStandardMaterial({
-                    map: texture,
-                    color: 0xffffff,
-                    side: THREE.DoubleSide,
-                    roughness: 1.0, // Fully rough for terrain
-                    metalness: 0.0,
-                    emissive: 0x222222, // Low ambient emission to prevent blackness
-                    emissiveIntensity: 0.5,
-                    clippingPlanes: clippingPlanes,
-                    polygonOffset: true,
-                    polygonOffsetFactor: 1
-                });
-                
-                const mesh = new THREE.Mesh(geometry, mat);
-                mesh.frustumCulled = false;
-                mesh.receiveShadow = true;
-                mesh.castShadow = true;
-                group.add(mesh);
-
-                // Compute bounds and notify listeners so camera/controls can fit safely
-                try {
-                    group.updateMatrixWorld(true);
-                    const box = new THREE.Box3().setFromObject(group);
-                    const center = new THREE.Vector3();
-                    const size = new THREE.Vector3();
-                    box.getCenter(center);
-                    box.getSize(size);
-                    const maxY = box.max.y;
-                    setTerrainMaxY?.(maxY);
-                    onLoaded?.({ box, center, size, maxY });
-                } catch (e) {
-                    console.warn('[TerrainAscLayer] Failed to compute bounds:', e);
-                }
+            const makeMaterial = (texture: THREE.Texture | null) => new THREE.MeshStandardMaterial({
+                map: texture ?? undefined,
+                color: 0xffffff,
+                side: THREE.DoubleSide,
+                roughness: 1.0,
+                metalness: 0.0,
+                emissive: 0x222222,
+                emissiveIntensity: 0.5,
+                clippingPlanes: clippingPlanes,
+                polygonOffset: true,
+                polygonOffsetFactor: 1
             });
 
+            const lowGeometry = buildTerrainGeometry(heightData, meta, modelCenter, verticalScale, LOW_RES_SEGMENTS, LOW_RES_SEGMENTS);
+            const lowMaterial = makeMaterial(null);
+            const lowMesh = new THREE.Mesh(lowGeometry, lowMaterial);
+            lowMesh.frustumCulled = false;
+            lowMesh.receiveShadow = true;
+            lowMesh.castShadow = true;
+            group.add(lowMesh);
+            meshRef.current = lowMesh;
+
+            try {
+                group.updateMatrixWorld(true);
+                const box = new THREE.Box3().setFromObject(group);
+                const center = new THREE.Vector3();
+                const size = new THREE.Vector3();
+                box.getCenter(center);
+                box.getSize(size);
+                const maxY = box.max.y;
+                setTerrainMaxY?.(maxY);
+                onLoaded?.({ box, center, size, maxY });
+            } catch (e) {
+                console.warn('[TerrainAscLayer] Failed to compute bounds:', e);
+            }
+
+            const upgradeToHighRes = async () => {
+                try {
+                    const texture = await loadTerrainTexture(renderer, texPath);
+                    const highGeometry = buildTerrainGeometry(heightData, meta, modelCenter, verticalScale, HIGH_RES_SEGMENTS, HIGH_RES_SEGMENTS);
+                    const highMaterial = makeMaterial(texture);
+                    const highMesh = new THREE.Mesh(highGeometry, highMaterial);
+                    highMesh.frustumCulled = false;
+                    highMesh.receiveShadow = true;
+                    highMesh.castShadow = true;
+                    group.add(highMesh);
+
+                    if (meshRef.current) {
+                        group.remove(meshRef.current);
+                        meshRef.current.geometry.dispose();
+                        const mat = meshRef.current.material as THREE.Material;
+                        mat.dispose();
+                    }
+                    meshRef.current = highMesh;
+                } catch (e) {
+                    console.error('[TerrainAscLayer] Failed to build high-res terrain:', e);
+                }
+            };
+
+            if ('requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(upgradeToHighRes);
+            } else {
+                setTimeout(upgradeToHighRes, 0);
+            }
         }).catch(err => {
             console.error('[TerrainAscLayer] Failed to load terrain data:', err);
             initializedRef.current = false;
@@ -218,6 +280,7 @@ export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = 
                 });
                 terrainGroupRef.current = null;
                 initializedRef.current = false;
+                meshRef.current = null;
             }
         };
     }, [dynamicGroup, renderer]);
