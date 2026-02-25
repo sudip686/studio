@@ -32,6 +32,8 @@ const ResourceModelViewer = () => {
     const [selectedProperty, setSelectedProperty] = useState<string>("");
     const [blockTransparency, setBlockTransparency] = useState(0.5);
     const [assayTransparency, setAssayTransparency] = useState(0.8);
+    const [assayRangeFilter, setAssayRangeFilter] = useState<{ min: number; max: number } | null>(null);
+    const [assayRangeBounds, setAssayRangeBounds] = useState<{ min: number; max: number } | null>(null);
     const [blockModelData, setBlockModelData] = useState<any>(null);
     const [assayData, setAssayData] = useState<any>(null);
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
@@ -59,6 +61,22 @@ const ResourceModelViewer = () => {
             setAssayData(assay);
         })();
     }, [ready, viewer]);
+
+    useEffect(() => {
+        if (!blockModelData) return;
+        let min = Infinity, max = -Infinity;
+        blockModelData.features?.forEach((f: any) => {
+            const v = Number(f.properties?.["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+            if (Number.isFinite(v)) {
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+        });
+        if (min !== Infinity && max !== -Infinity) {
+            setAssayRangeBounds({ min, max });
+            setAssayRangeFilter(prev => prev ?? { min, max });
+        }
+    }, [blockModelData]);
 
     // Effect for tooltip picking
     useEffect(() => {
@@ -120,6 +138,15 @@ const ResourceModelViewer = () => {
                 }
             }
 
+            if (shouldPlot && assayRangeFilter && selectedProperty === "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC") {
+                const value = parseFloat(properties[selectedProperty]);
+                if (Number.isFinite(value)) {
+                    if (value < assayRangeFilter.min || value > assayRangeFilter.max) {
+                        shouldPlot = false;
+                    }
+                }
+            }
+
             if (shouldPlot) {
                 const { dX, dY, dZ } = properties;
                 const entity = viewer.entities.add({
@@ -150,7 +177,7 @@ const ResourceModelViewer = () => {
             }
         };
 
-    }, [viewer, blockModelData, assayData, selectedProperty, blockTransparency, assayTransparency]);
+    }, [viewer, blockModelData, assayData, selectedProperty, blockTransparency, assayTransparency, assayRangeFilter]);
 
 
     return (
@@ -158,6 +185,68 @@ const ResourceModelViewer = () => {
             {tooltip.display && <TooltipContent data={tooltip} />}
             <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', borderRadius: '8px' }}>
                 <h4>Resource Model Controls</h4>
+                {assayRangeFilter && assayRangeBounds && selectedProperty === "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC" && (
+                    <div>
+                        <div className="flex items-center justify-between">
+                            <label className="block text-xs font-semibold">Assay range filter</label>
+                            <button
+                                onClick={() => {
+                                    if (assayRangeBounds) {
+                                        setAssayRangeFilter({ ...assayRangeBounds });
+                                    }
+                                }}
+                                className="text-[11px] text-orange-600"
+                                type="button"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={assayRangeFilter.min}
+                                onChange={(e) => setAssayRangeFilter(prev => prev ? ({
+                                    min: Number(e.target.value),
+                                    max: Math.max(Number(e.target.value), prev.max)
+                                }) : prev)}
+                                style={{ width: '100%' }}
+                            />
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={assayRangeFilter.max}
+                                onChange={(e) => setAssayRangeFilter(prev => prev ? ({
+                                    min: Math.min(prev.min, Number(e.target.value)),
+                                    max: Number(e.target.value)
+                                }) : prev)}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <input
+                            type="range"
+                            min={assayRangeBounds.min}
+                            max={assayRangeBounds.max}
+                            step="0.1"
+                            value={assayRangeFilter.min}
+                            onChange={(e) => setAssayRangeFilter(prev => prev ? ({
+                                min: Number(e.target.value),
+                                max: Math.max(Number(e.target.value), prev.max)
+                            }) : prev)}
+                        />
+                        <input
+                            type="range"
+                            min={assayRangeBounds.min}
+                            max={assayRangeBounds.max}
+                            step="0.1"
+                            value={assayRangeFilter.max}
+                            onChange={(e) => setAssayRangeFilter(prev => prev ? ({
+                                min: Math.min(prev.min, Number(e.target.value)),
+                                max: Number(e.target.value)
+                            }) : prev)}
+                        />
+                    </div>
+                )}
                 <div>
                     <label>Visualize Property: </label>
                     <select value={selectedProperty} onChange={(e) => setSelectedProperty(e.target.value)} style={{width: "100%"}}>

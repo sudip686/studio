@@ -43,7 +43,7 @@ function colorForAssay(vRaw: any, min: number, max: number): string {
 interface BoreholeLayerProps {
     modelCenter?: { lon: number, lat: number };
     type?: 'lithology' | 'assay';
-    assayCutoff?: number;
+    assayFilterRange?: { min: number; max: number };
     assayRange?: { min: number, max: number };
     visible?: boolean;
     transparency?: number;
@@ -53,7 +53,7 @@ interface BoreholeLayerProps {
 export default function BoreholeLayerFixed({ 
     modelCenter, 
     type = 'lithology', 
-    assayCutoff, 
+    assayFilterRange, 
     assayRange = { min: 0, max: 1 },
     visible = true,
     transparency = 1.0,
@@ -96,7 +96,11 @@ export default function BoreholeLayerFixed({
                         color = getLithologyColor(lith);
                     } else {
                         const val = feature.properties?.graphitic_carbon;
-                        if (assayCutoff !== undefined && (val ?? 0) < assayCutoff) return; // Skip below cutoff
+                        if (assayFilterRange) {
+                            const numericVal = Number(val ?? NaN);
+                            if (!Number.isFinite(numericVal)) return;
+                            if (numericVal < assayFilterRange.min || numericVal > assayFilterRange.max) return;
+                        }
                         color = colorForAssay(val, assayRange.min, assayRange.max);
                     }
 
@@ -221,7 +225,7 @@ export default function BoreholeLayerFixed({
             meshRefs.current = [];
         };
 
-    }, [sceneContext?.scene, sceneContext?.dynamicGroup, visible, transparency, centerKey, type, assayCutoff, assayRange.min, assayRange.max]);
+    }, [sceneContext?.scene, sceneContext?.dynamicGroup, visible, transparency, centerKey, type, assayFilterRange?.min, assayFilterRange?.max, assayRange.min, assayRange.max]);
 
     return null;
 }

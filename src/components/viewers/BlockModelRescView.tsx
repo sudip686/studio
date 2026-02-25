@@ -19,7 +19,9 @@ const RESC_LEGEND = [
   { label: 'Unknown',   color: '#999999' },
 ];
 
-export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: number }) {
+type AssayRangeFilter = { min: number; max: number } | null;
+
+export default function BlockModelRescViewer({ assayFilterRange }: { assayFilterRange?: AssayRangeFilter }) {
     const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
     const mountedRef = useRef(false);
 
@@ -27,6 +29,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
     const [blockOpacity, setBlockOpacity] = useState(0.8);
     const [showTraces, setShowTraces] = useState(true);
     const [selectedClassification, setSelectedClassification] = useState('All');
+    const [localRange, setLocalRange] = useState<AssayRangeFilter>(assayFilterRange ?? null);
 
     const pick = (o: any, keys: string[]) => {
       for (const k of keys) if (o?.[k] !== undefined) return o[k];
@@ -36,6 +39,16 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
       const n = Number(v);
       return Number.isFinite(n) ? n : d;
     };
+
+    useEffect(() => {
+      if (assayFilterRange) {
+        setLocalRange({ ...assayFilterRange });
+        return;
+      }
+      if (!localRange && Number.isFinite(carbonRange.min) && Number.isFinite(carbonRange.max)) {
+        setLocalRange({ min: carbonRange.min, max: carbonRange.max });
+      }
+    }, [assayFilterRange, carbonRange.min, carbonRange.max, localRange]);
 
     const modelCenter = useMemo(() => {
       if (!blockModelData || !Array.isArray(blockModelData) || blockModelData.length === 0) {
@@ -67,9 +80,10 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
              if (val !== selectedClassification) return false;
         }
 
-        if (assayCutoff !== undefined) {
+        if (localRange) {
           const carbonValue = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
-          return Number.isFinite(carbonValue) && carbonValue > assayCutoff;
+          if (!Number.isFinite(carbonValue)) return false;
+          return carbonValue >= localRange.min && carbonValue <= localRange.max;
         }
         return true;
       });
@@ -161,7 +175,7 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         materials.forEach(m => m.dispose());
         mountedRef.current = false;
       };
-    }, [blockModelData, loadingStatus, blockOpacity, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff, selectedClassification]);
+    }, [blockModelData, loadingStatus, blockOpacity, scene, camera, controls, dynamicGroup, modelCenter, localRange, selectedClassification]);
 
     useEffect(() => {
       if (!camera || !controls || !dynamicGroup) return;
@@ -180,6 +194,19 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
     if (loadingStatus === 'loading') return <div>Loading...</div>;
     if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
+    const carbonRange = useMemo(() => {
+      if (!blockModelData) return { min: 0, max: 10 };
+      let min = Infinity, max = -Infinity;
+      blockModelData.forEach(b => {
+        const v = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+        if (Number.isFinite(v)) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      });
+      return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 10 : max };
+    }, [blockModelData]);
+
     return (
       <>
         <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
@@ -187,7 +214,70 @@ export default function BlockModelRescViewer({ assayCutoff }: { assayCutoff?: nu
         <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
           <Legend title="Classification" items={RESC_LEGEND} />
         </div>
-        <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2 pointer-events-auto">
+        <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-3 pointer-events-auto">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-white/80">
+              <span>Assay range filter</span>
+              <button
+                className="text-[11px] text-orange-300 hover:text-orange-200"
+                onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
+              >
+                Reset
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs">
+                Min
+                <input
+                  type="number"
+                  step="0.1"
+                  value={localRange?.min ?? carbonRange.min}
+                  onChange={(e) => setLocalRange(prev => ({
+                    min: Number(e.target.value),
+                    max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+                  }))}
+                  className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                />
+              </label>
+              <label className="text-xs">
+                Max
+                <input
+                  type="number"
+                  step="0.1"
+                  value={localRange?.max ?? carbonRange.max}
+                  onChange={(e) => setLocalRange(prev => ({
+                    min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+                    max: Number(e.target.value)
+                  }))}
+                  className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                />
+              </label>
+            </div>
+            <input
+              type="range"
+              min={carbonRange.min}
+              max={carbonRange.max}
+              step={0.1}
+              value={localRange?.min ?? carbonRange.min}
+              onChange={(e) => setLocalRange(prev => ({
+                min: Number(e.target.value),
+                max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+              }))}
+              className="w-full"
+            />
+            <input
+              type="range"
+              min={carbonRange.min}
+              max={carbonRange.max}
+              step={0.1}
+              value={localRange?.max ?? carbonRange.max}
+              onChange={(e) => setLocalRange(prev => ({
+                min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+                max: Number(e.target.value)
+              }))}
+              className="w-full"
+            />
+          </div>
           <label className="block text-sm">Classification</label>
           <select
             value={selectedClassification}

@@ -25,7 +25,9 @@ function colorForAssay(vRaw: any, min: number, max: number): string {
     return hexString;
 }
 
-export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
+type AssayRangeFilter = { min: number; max: number } | null;
+
+export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: AssayRangeFilter }) {
     console.log('[AssayViewer] Mounting version with fixed imports');
     const { processedAssayData, loadingStatus, error, refetch } = useDataCache();
 
@@ -44,9 +46,18 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
     const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
     const [terrainReady, setTerrainReady] = useState(false);
     const [boreholesReady, setBoreholesReady] = useState(false);
+    const [localRange, setLocalRange] = useState<AssayRangeFilter>(assayFilterRange ?? null);
 
     const onTerrainLoaded = useCallback(() => setTerrainReady(true), []);
     const onBoreholesLoaded = useCallback(() => setBoreholesReady(true), []);
+
+    useEffect(() => {
+        if (assayFilterRange) {
+            setLocalRange({ ...assayFilterRange });
+        } else {
+            setLocalRange({ min: assayRange.min, max: assayRange.max });
+        }
+    }, [assayFilterRange, assayRange.min, assayRange.max]);
 
     const tryFit = () => {
         if (!camera || !controls || !dynamicGroup) return;
@@ -81,18 +92,84 @@ export default function AssayViewer({ assayCutoff }: { assayCutoff?: number }) {
             <BoreholeLayer 
                 modelCenter={processedAssayData?.modelCenter} 
                 type="assay" 
-                assayCutoff={assayCutoff}
+                assayFilterRange={localRange ?? undefined}
                 assayRange={assayRange}
                 onLoaded={onBoreholesLoaded}
             />
             
+            <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-3 pointer-events-auto">
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-white/80">
+                        <span>Assay range filter</span>
+                        <button
+                            className="text-[11px] text-orange-300 hover:text-orange-200"
+                            onClick={() => setLocalRange({ min: assayRange.min, max: assayRange.max })}
+                        >
+                            Reset
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <label className="text-xs">
+                            Min
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={localRange?.min ?? assayRange.min}
+                                onChange={(e) => setLocalRange(prev => ({
+                                    min: Number(e.target.value),
+                                    max: Math.max(Number(e.target.value), prev?.max ?? assayRange.max)
+                                }))}
+                                className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                            />
+                        </label>
+                        <label className="text-xs">
+                            Max
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={localRange?.max ?? assayRange.max}
+                                onChange={(e) => setLocalRange(prev => ({
+                                    min: Math.min(prev?.min ?? assayRange.min, Number(e.target.value)),
+                                    max: Number(e.target.value)
+                                }))}
+                                className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                            />
+                        </label>
+                    </div>
+                    <input
+                        type="range"
+                        min={assayRange.min}
+                        max={assayRange.max}
+                        step={0.1}
+                        value={localRange?.min ?? assayRange.min}
+                        onChange={(e) => setLocalRange(prev => ({
+                            min: Number(e.target.value),
+                            max: Math.max(Number(e.target.value), prev?.max ?? assayRange.max)
+                        }))}
+                        className="w-full"
+                    />
+                    <input
+                        type="range"
+                        min={assayRange.min}
+                        max={assayRange.max}
+                        step={0.1}
+                        value={localRange?.max ?? assayRange.max}
+                        onChange={(e) => setLocalRange(prev => ({
+                            min: Math.min(prev?.min ?? assayRange.min, Number(e.target.value)),
+                            max: Number(e.target.value)
+                        }))}
+                        className="w-full"
+                    />
+                </div>
+            </div>
+
             <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', pointerEvents: 'auto' }}>
                 <Legend 
                     title="Assay Value" 
                     type="gradient"
                     gradient={assayGradient}
-                    minLabel={assayRange.min.toFixed(2)}
-                    maxLabel={assayRange.max.toFixed(2)}
+                    minLabel={(localRange?.min ?? assayRange.min).toFixed(2)}
+                    maxLabel={(localRange?.max ?? assayRange.max).toFixed(2)}
                 />
             </div>
         </>

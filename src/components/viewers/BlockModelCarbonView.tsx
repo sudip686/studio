@@ -26,14 +26,17 @@ function colorForCarbon(vRaw: any): number {
     return color.getHex();
 }
 
+type AssayRangeFilter = { min: number; max: number } | null;
+
 export default function BlockModelCarbonViewer({
-  opacity = 0.8, assayCutoff
-}: { opacity?: number; assayCutoff?: number }) {
+  opacity = 0.8, assayFilterRange
+}: { opacity?: number; assayFilterRange?: AssayRangeFilter }) {
 
   const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
   const mountedRef = useRef(false);
   const { blockModelData, loadingStatus, error, refetch } = useDataCache();
   const [showTraces, setShowTraces] = useState(true);
+  const [localRange, setLocalRange] = useState<AssayRangeFilter>(assayFilterRange ?? null);
 
   const modelCenter = useMemo(() => {
     if (!blockModelData || !Array.isArray(blockModelData) || blockModelData.length === 0) {
@@ -44,6 +47,16 @@ export default function BlockModelCarbonViewer({
     const centerLat = allPoints.reduce((acc, p) => acc + p.lat, 0) / allPoints.length;
     return { lon: centerLon, lat: centerLat };
   }, [blockModelData]);
+
+  useEffect(() => {
+    if (assayFilterRange) {
+      setLocalRange({ ...assayFilterRange });
+      return;
+    }
+    if (!localRange && Number.isFinite(carbonRange.min) && Number.isFinite(carbonRange.max)) {
+      setLocalRange({ min: carbonRange.min, max: carbonRange.max });
+    }
+  }, [assayFilterRange, carbonRange.min, carbonRange.max, localRange]);
 
   useEffect(() => {
     if (!scene || !camera || !controls || !dynamicGroup || !renderer) return;
@@ -59,9 +72,10 @@ export default function BlockModelCarbonViewer({
       const idVal = Number(b.Id);
       if (idVal === 0) return false;
 
-      if (assayCutoff !== undefined) {
+      if (localRange) {
         const carbonValue = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
-        return Number.isFinite(carbonValue) && carbonValue > assayCutoff;
+        if (!Number.isFinite(carbonValue)) return false;
+        return carbonValue >= localRange.min && carbonValue <= localRange.max;
       }
       return true;
     });
@@ -142,7 +156,7 @@ export default function BlockModelCarbonViewer({
       materials.forEach(m => m.dispose());
       mountedRef.current = false;
     };
-  }, [blockModelData, opacity, scene, camera, controls, dynamicGroup, modelCenter, assayCutoff, registerTooltipObject, unregisterTooltipObject]);
+  }, [blockModelData, opacity, scene, camera, controls, dynamicGroup, modelCenter, localRange, registerTooltipObject, unregisterTooltipObject]);
 
   if (loadingStatus === 'loading') return <div>Loading...</div>;
   if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
@@ -167,7 +181,70 @@ export default function BlockModelCarbonViewer({
       <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
       <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
       
-      <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-2">
+      <div className="absolute top-4 right-4 z-50 bg-black/60 text-white rounded p-3 space-y-3 pointer-events-auto">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-white/80">
+            <span>Assay range filter</span>
+            <button
+              className="text-[11px] text-orange-300 hover:text-orange-200"
+              onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
+            >
+              Reset
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs">
+              Min
+              <input
+                type="number"
+                step="0.1"
+                value={localRange?.min ?? carbonRange.min}
+                onChange={(e) => setLocalRange(prev => ({
+                  min: Number(e.target.value),
+                  max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+                }))}
+                className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+              />
+            </label>
+            <label className="text-xs">
+              Max
+              <input
+                type="number"
+                step="0.1"
+                value={localRange?.max ?? carbonRange.max}
+                onChange={(e) => setLocalRange(prev => ({
+                  min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+                  max: Number(e.target.value)
+                }))}
+                className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+              />
+            </label>
+          </div>
+          <input
+            type="range"
+            min={carbonRange.min}
+            max={carbonRange.max}
+            step={0.1}
+            value={localRange?.min ?? carbonRange.min}
+            onChange={(e) => setLocalRange(prev => ({
+              min: Number(e.target.value),
+              max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+            }))}
+            className="w-full"
+          />
+          <input
+            type="range"
+            min={carbonRange.min}
+            max={carbonRange.max}
+            step={0.1}
+            value={localRange?.max ?? carbonRange.max}
+            onChange={(e) => setLocalRange(prev => ({
+              min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+              max: Number(e.target.value)
+            }))}
+            className="w-full"
+          />
+        </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
           Show traces
