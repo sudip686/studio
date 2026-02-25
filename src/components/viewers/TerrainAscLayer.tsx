@@ -196,9 +196,9 @@ export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = 
 
             const texPath = `${ASSET_BASE_URL}/${meta.rgb_texture || 'terrain_texture_8k.jpg'}`;
 
-            const makeMaterial = (texture: THREE.Texture | null) => new THREE.MeshStandardMaterial({
+            const makeMaterial = (texture: THREE.Texture | null, color?: number) => new THREE.MeshStandardMaterial({
                 map: texture ?? undefined,
-                color: 0xffffff,
+                color: color ?? 0xffffff,
                 side: THREE.DoubleSide,
                 roughness: 1.0,
                 metalness: 0.0,
@@ -210,8 +210,9 @@ export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = 
             });
 
             const lowGeometry = buildTerrainGeometry(heightData, meta, modelCenter, verticalScale, LOW_RES_SEGMENTS, LOW_RES_SEGMENTS);
-            const lowMaterial = makeMaterial(null);
+            const lowMaterial = makeMaterial(null, 0x777777);
             const lowMesh = new THREE.Mesh(lowGeometry, lowMaterial);
+            lowMesh.renderOrder = 0;
             lowMesh.frustumCulled = false;
             lowMesh.receiveShadow = true;
             lowMesh.castShadow = true;
@@ -236,8 +237,9 @@ export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = 
                 try {
                     const texture = await loadTerrainTexture(renderer, texPath);
                     const highGeometry = buildTerrainGeometry(heightData, meta, modelCenter, verticalScale, HIGH_RES_SEGMENTS, HIGH_RES_SEGMENTS);
-                    const highMaterial = makeMaterial(texture);
+                    const highMaterial = makeMaterial(texture, 0xffffff);
                     const highMesh = new THREE.Mesh(highGeometry, highMaterial);
+                    highMesh.renderOrder = 1;
                     highMesh.frustumCulled = false;
                     highMesh.receiveShadow = true;
                     highMesh.castShadow = true;

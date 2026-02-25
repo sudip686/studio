@@ -40,6 +40,19 @@ export default function BlockModelCarbonViewer({
   const [showTraces, setShowTraces] = useState(true);
   const [localRange, setLocalRange] = useState<AssayRangeFilter>(assayFilterRange ?? null);
 
+  const carbonRange = useMemo(() => {
+    if (!blockModelData) return { min: 0, max: 10 };
+    let min = Infinity, max = -Infinity;
+    blockModelData.forEach(b => {
+      const v = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+      if (Number.isFinite(v)) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    });
+    return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 10 : max };
+  }, [blockModelData]);
+
   const modelCenter = useMemo(() => {
     if (!blockModelData || !Array.isArray(blockModelData) || blockModelData.length === 0) {
       return { lon: 0, lat: 0 }; 
@@ -162,19 +175,6 @@ export default function BlockModelCarbonViewer({
 
   if (loadingStatus === 'loading') return <div>Loading...</div>;
   if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
-
-  const carbonRange = useMemo(() => {
-    if (!blockModelData) return { min: 0, max: 10 };
-    let min = Infinity, max = -Infinity;
-    blockModelData.forEach(b => {
-      const v = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
-      if (Number.isFinite(v)) {
-        if (v < min) min = v;
-        if (v > max) max = v;
-      }
-    });
-    return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 10 : max };
-  }, [blockModelData]);
 
   const carbonGradient = "linear-gradient(to right, #00ff00, #ff0000)";
 

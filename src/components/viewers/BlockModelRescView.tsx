@@ -47,6 +47,19 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
       return Number.isFinite(n) ? n : d;
     };
 
+    const carbonRange = useMemo(() => {
+      if (!blockModelData) return { min: 0, max: 10 };
+      let min = Infinity, max = -Infinity;
+      blockModelData.forEach(b => {
+        const v = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+        if (Number.isFinite(v)) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      });
+      return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 10 : max };
+    }, [blockModelData]);
+
     useEffect(() => {
       if (assayFilterRange) {
         setLocalRange({ ...assayFilterRange });
@@ -200,19 +213,6 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
 
     if (loadingStatus === 'loading') return <div>Loading...</div>;
     if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
-
-    const carbonRange = useMemo(() => {
-      if (!blockModelData) return { min: 0, max: 10 };
-      let min = Infinity, max = -Infinity;
-      blockModelData.forEach(b => {
-        const v = Number(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
-        if (Number.isFinite(v)) {
-          if (v < min) min = v;
-          if (v > max) max = v;
-        }
-      });
-      return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 10 : max };
-    }, [blockModelData]);
 
     return (
       <>
