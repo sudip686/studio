@@ -30,7 +30,7 @@ export const Legend: React.FC<LegendProps> = ({
         type === 'gradient' ? uiTheme.legend.width.gradient : uiTheme.legend.width.categorical
       }`}
     >
-      <h4 className="font-bold text-lg mb-2">{title}</h4>
+      <h4 className="font-semibold text-base md:text-lg tracking-wide mb-2">{title}</h4>
       {guidance && (
         <p className="text-xs text-gray-200/90 leading-snug mb-2 max-w-[52ch]">
           {guidance}
@@ -39,12 +39,12 @@ export const Legend: React.FC<LegendProps> = ({
       {type === 'categorical' && items && (
         <div className="space-y-1">
           {items.map((item, index) => (
-            <div key={index} className="flex items-center">
+            <div key={index} className="flex items-center gap-2 text-sm md:text-base">
               <span
-                className="w-4 h-4 rounded-full mr-2"
+                className="w-3.5 h-3.5 rounded-full border border-white/20"
                 style={{ backgroundColor: item.color }}
               ></span>
-              <span>{item.label}</span>
+              <span className="leading-tight">{item.label}</span>
             </div>
           ))}
         </div>
@@ -52,10 +52,10 @@ export const Legend: React.FC<LegendProps> = ({
       {type === 'gradient' && gradient && (
         <div className="flex flex-col items-stretch mt-2">
           <div
-            className="h-6 w-full rounded-md border border-white/20"
+            className="h-5 w-full rounded-md border border-white/20"
             style={{ background: gradient }}
           ></div>
-          <div className="flex justify-between text-sm mt-1 font-medium">
+          <div className="flex justify-between text-xs md:text-sm mt-1 font-medium">
             <span>{minLabel}</span>
             <span>{maxLabel}</span>
           </div>
