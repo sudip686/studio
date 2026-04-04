@@ -1,33 +1,109 @@
 'use client';
 
-import { useEffect } from 'react';
-import { ASSET_BASE_URL } from '@/lib/constants';
+import { useEffect, useRef } from 'react';
+import { useDataCache } from '@/lib/data-cache';
+import { buildBlockModelCenter, prewarmTerrainSurface } from '@/lib/terrain/shared-terrain-cache';
 
 // Preload heavy scene assets (terrain, texture, boreholes) early to reduce wait times
 export default function ScenePreloader() {
+  const { processedLithologyData, processedAssayData, blockModelData } = useDataCache();
+  const warmedTerrainKeysRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     try {
-      // Kick off requests in parallel. Browser cache will serve subsequent fetches.
-      // Note: If using R2, 'terrain_meta.json' might still be local, but height.bin definitely R2.
-      // We assume everything large is on R2 if configured.
-      const baseUrl = ASSET_BASE_URL;
-      const urls: Array<{ url: string; opts?: RequestInit }> = [
-        { url: '/terrain_meta.json', opts: { cache: 'force-cache' } }, // Usually kept local
-        { url: `${baseUrl}/height.bin`, opts: { cache: 'force-cache' } },
-        { url: '/drillholes_utm.json', opts: { cache: 'force-cache' } }, // Kept local (5MB)
+      const warmFirstAvailable = (candidates: string[], opts?: RequestInit) => {
+        const tryNext = (index: number) => {
+          if (index >= candidates.length) return;
+          fetch(candidates[index], opts)
+            .then((response) => {
+              if (!response.ok) {
+                tryNext(index + 1);
+              }
+            })
+            .catch(() => tryNext(index + 1));
+        };
+        tryNext(0);
+      };
+
+      const criticalUrls: Array<{ candidates: string[]; opts?: RequestInit }> = [
+        {
+          candidates: ['/terrain_meta.json'],
+          opts: { cache: 'force-cache' },
+        },
+        {
+          candidates: ['/terrain_runtime.json'],
+          opts: { cache: 'force-cache' },
+        },
       ];
 
-      urls.forEach(({ url, opts }) => {
-        fetch(url, opts).catch(() => {});
+      criticalUrls.forEach(({ candidates, opts }) => {
+        warmFirstAvailable(candidates, opts);
       });
 
-      // Warm the terrain texture via Image so it's ready in GPU cache sooner
-      const img = new Image();
-      img.decoding = 'async';
-      img.src = `${baseUrl}/texture_rgb_8192.png`; // Match the high-res texture on R2
-      // No need to attach; browser will cache the image
+      const idleWarm = () => {
+        const deferredUrls: Array<{ candidates: string[]; opts?: RequestInit }> = [
+          {
+            candidates: ['/lithology_data.geojson'],
+            opts: { cache: 'force-cache' },
+          },
+          {
+            candidates: ['/assay_data.geojson'],
+            opts: { cache: 'force-cache' },
+          },
+        ];
+
+        deferredUrls.forEach(({ candidates, opts }) => {
+          warmFirstAvailable(candidates, opts);
+        });
+
+        const textureCandidates = [
+          '/texture_rgb_8192.png',
+          '/terrain_texture_8k.jpg',
+        ];
+
+        textureCandidates.forEach((src) => {
+          const img = new Image();
+          img.decoding = 'async';
+          img.src = src;
+        });
+      };
+
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(idleWarm);
+      } else {
+        setTimeout(idleWarm, 1200);
+      }
     } catch {}
   }, []);
+
+  useEffect(() => {
+    const centers = [
+      processedLithologyData?.modelCenter ?? processedAssayData?.modelCenter ?? null,
+      buildBlockModelCenter(blockModelData),
+    ].filter((value): value is { lon: number; lat: number } => Boolean(value));
+
+    if (centers.length === 0) return;
+
+    const scheduleWarm = (callback: () => void) => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(callback);
+      } else {
+        setTimeout(callback, 300);
+      }
+    };
+
+    centers.forEach((center) => {
+      const key = `${center.lon.toFixed(6)}_${center.lat.toFixed(6)}`;
+      if (warmedTerrainKeysRef.current.has(key)) return;
+      warmedTerrainKeysRef.current.add(key);
+
+      scheduleWarm(() => {
+        prewarmTerrainSurface(center).catch((error) => {
+          console.warn('[ScenePreloader] Terrain prewarm failed:', error);
+        });
+      });
+    });
+  }, [blockModelData, processedAssayData?.modelCenter, processedLithologyData?.modelCenter]);
 
   return null;
 }

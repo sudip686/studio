@@ -15,10 +15,10 @@ import BoreholeLayer from './BoreholeLayer';
 
 
 const RESC_LEGEND = [
-  { label: 'Measured',  color: '#0000ff' },
-  { label: 'Indicated', color: '#ff0000' },
-  { label: 'Inferred',  color: '#00ff00' },
-  { label: 'Unknown',   color: '#999999' },
+  { label: 'Measured',  color: '#1d4ed8' },
+  { label: 'Indicated', color: '#f59e0b' },
+  { label: 'Inferred',  color: '#10b981' },
+  { label: 'Unknown',   color: '#94a3b8' },
 ];
 
 type AssayRangeFilter = { min: number; max: number } | null;
@@ -125,10 +125,10 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
       // COLOR BY RescCalc
       const colorForResc = (v: any) => {
         const s = String(v ?? "Unknown").trim();
-        if (s === "Measured") return "#0000ff";
-        if (s === "Indicated") return "#ff0000";
-        if (s === "Inferred") return "#00ff00";
-        return "#999999";
+        if (s === "Measured") return "#1d4ed8";
+        if (s === "Indicated") return "#f59e0b";
+        if (s === "Inferred") return "#10b981";
+        return "#94a3b8";
       };
 
       // BATCH BLOCKS BY COLOR
@@ -144,7 +144,15 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
       for (const [hex, list] of Object.entries(grouped)) {
         if (!list.length) continue;
 
-        const mat = new THREE.MeshStandardMaterial({ color: hex, transparent: false, opacity: 1.0 });
+        const mat = new THREE.MeshStandardMaterial({
+          color: hex,
+          transparent: blockOpacity < 0.999,
+          opacity: blockOpacity,
+          roughness: 0.4,
+          metalness: 0.05,
+          emissive: new THREE.Color(hex).multiplyScalar(0.045),
+          emissiveIntensity: 0.14,
+        });
         const geo = new THREE.BoxGeometry(1,1,1);
         materials.push(mat); geometries.push(geo);
 
@@ -179,7 +187,15 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
       // >>> NEW: Fit camera once content is there
       viewGroup.updateMatrixWorld(true);
       controls.update();
-      fitCameraToGroupWorldAware(camera, controls, viewGroup, 1.35);
+      fitCameraToGroupWorldAware(camera, controls, viewGroup, {
+        padding: 1.16,
+        targetScreenFraction: 0.82,
+        minDistance: 360,
+        maxDistance: 24000,
+        screenBiasX: 0.14,
+        screenBiasY: 0.03,
+        viewDir: new THREE.Vector3(0.84, 0.66, 0.98).normalize(),
+      });
 
       return () => {
         dynamicGroup.remove(viewGroup);
@@ -203,7 +219,15 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
         if (e.key.toLowerCase() === 'f') {
           requestAnimationFrame(() => {
             dynamicGroup.updateMatrixWorld(true); // Use dynamicGroup for fitting
-            fitCameraToGroupWorldAware(camera, controls, dynamicGroup, 1.35);
+            fitCameraToGroupWorldAware(camera, controls, dynamicGroup, {
+              padding: 1.16,
+              targetScreenFraction: 0.82,
+              minDistance: 360,
+              maxDistance: 24000,
+              screenBiasX: 0.14,
+              screenBiasY: 0.03,
+              viewDir: new THREE.Vector3(0.84, 0.66, 0.98).normalize(),
+            });
           });
         }
       };
@@ -216,19 +240,23 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
 
     return (
       <>
-        <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
+        <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} quality="presentation" />
         <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
         <OverlaySlot slot="bottom-left">
           <div className="flex flex-col gap-3">
             <Legend title="Lithology" items={lithologyLegendItems} />
-            <Legend title="Classification" items={RESC_LEGEND} />
+            <Legend
+              title="Classification"
+              items={RESC_LEGEND}
+              guidance="Measured, Indicated, and Inferred blocks use a softer presentation palette for cleaner visual separation."
+            />
           </div>
         </OverlaySlot>
-        <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
-          <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-3">
+        <OverlaySlot slot="top-left" wrapperClassName="w-[272px] max-w-[calc(100vw-2rem)] flex flex-col items-start">
+          <div className="pointer-events-auto overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(10,15,24,0.92),rgba(5,9,16,0.72))] p-3 text-white shadow-[0_22px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl">
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-white/80">
-                <span>Assay range filter</span>
+              <div className="flex items-center justify-between text-[11px] text-white/74">
+                <span className="uppercase tracking-[0.18em] text-white/48">Model filter</span>
                 <button
                   className="text-[11px] text-orange-300 hover:text-orange-200"
                   onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
@@ -237,7 +265,7 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs">
+                <label className="text-[11px] text-white/72">
                   Min
                   <input
                     type="number"
@@ -247,10 +275,10 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
                       min: Number(e.target.value),
                       max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
                     }))}
-                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
                   />
                 </label>
-                <label className="text-xs">
+                <label className="text-[11px] text-white/72">
                   Max
                   <input
                     type="number"
@@ -260,7 +288,7 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
                       min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
                       max: Number(e.target.value)
                     }))}
-                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
                   />
                 </label>
               </div>
@@ -274,7 +302,7 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
                   min: Number(e.target.value),
                   max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
                 }))}
-                className="w-full"
+                className="range-slider w-full"
               />
               <input
                 type="range"
@@ -286,14 +314,14 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
                   min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
                   max: Number(e.target.value)
                 }))}
-                className="w-full"
+                className="range-slider w-full"
               />
             </div>
-            <label className="block text-sm">Classification</label>
+            <label className="block pt-1 text-[11px] uppercase tracking-[0.18em] text-white/48">Classification</label>
             <select
               value={selectedClassification}
               onChange={e => setSelectedClassification(e.target.value)}
-              className="w-full p-1 rounded bg-gray-700 text-white border border-gray-600 text-sm"
+              className="w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1.5 text-[12px] text-white"
             >
               <option value="All">All</option>
               <option value="Measured">Measured</option>
@@ -301,11 +329,12 @@ export default function BlockModelRescViewer({ assayFilterRange }: { assayFilter
               <option value="Inferred">Inferred</option>
               <option value="Unknown">Unknown</option>
             </select>
-            <label className="block text-sm">Block opacity</label>
+            <label className="block pt-1 text-[11px] uppercase tracking-[0.18em] text-white/48">Block opacity</label>
             <input type="range" min="0.05" max="1" step="0.05"
                    value={blockOpacity}
-                   onChange={(e)=>setBlockOpacity(parseFloat(e.target.value))} />
-            <label className="flex items-center gap-2 text-sm">
+                   onChange={(e)=>setBlockOpacity(parseFloat(e.target.value))}
+                   className="range-slider w-full" />
+            <label className="flex items-center gap-2 pt-1 text-[12px] text-white/80">
               <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
               Show traces
             </label>

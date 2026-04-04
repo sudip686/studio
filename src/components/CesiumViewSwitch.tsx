@@ -42,8 +42,22 @@ const LITHOLOGY_COLOR_MAP: { [key: string]: string } = {
     "UNKNOWN": "#cccccc",
 };
 
-export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
-  const { viewer, ready, kmlDataSource, kmlLabel, enableAoiCutaway, disableAoiCutaway } = useCesium();
+const TRANSLUCENT_DRILLHOLE_VIEWS = new Set<CesiumView>([
+  'drillhole_location_lithology',
+  'geojson_drillholes_lithology',
+  'geojson_drillholes_assay',
+]);
+
+const DECK_AOI_FLIGHT_VIEWS = new Set<CesiumView>([
+  'original',
+  'styled_kml',
+  'exaggerated_kml',
+  'tanaga_accessibility',
+  'tanga_geological_map',
+]);
+
+export default function CesiumViewSwitch({ view, deckControlled = false }: { view: CesiumView; deckControlled?: boolean }) {
+  const { viewer, ready, kmlDataSource, kmlLabel, kmlOutline, boundaryLayers = [], enableAoiCutaway, disableAoiCutaway } = useCesium();
   const { drillholeData, processedAssayData } = useDataCache();
   const lastViewRef = useRef<CesiumView | null>(null);
 
@@ -59,39 +73,30 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   const [cinematicDrillholeMode, setCinematicDrillholeMode] = useState<'assay' | 'lithology'>('assay');
 
   // Legends should show whenever we are plotting data with color encoding in Cesium.
-  const showCesiumDrillholeLegend = view === 'geojson_drillholes_lithology' || view === 'geojson_drillholes_assay';
+  const showCesiumDrillholeLegend =
+    view === 'geojson_drillholes_lithology' ||
+    view === 'geojson_drillholes_assay' ||
+    view === 'drillhole_location_lithology' ||
+    view === 'drillhole_location_assay';
+  const showBoundaryLegend =
+    view === 'original' ||
+    view === 'styled_kml' ||
+    view === 'exaggerated_kml';
+  const showTransparencyControls = TRANSLUCENT_DRILLHOLE_VIEWS.has(view);
   const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
   const assayGradient = `linear-gradient(to right, hsl(120, 100%, 50%), hsl(60, 100%, 50%), hsl(0, 100%, 50%))`;
-
-  const specialViewMap = {
-      drillhole_lithology_reveal: 'animatedReveal',
-      subsurface_cutaway: 'subsurfaceCutaway',
-      kml_focused_view: 'kmlFocused',
-      resource_model_viewer: 'resourceModel',
-      cesium_three_block_model: 'cesiumThreeBlockModel',
-      grand_canyon_assay: 'grandCanyon',
-      grand_canyon_lithology: 'grandCanyon',
-      drillhole_location_assay: 'drillholeLocation',
-      drillhole_location_lithology: 'drillholeLocation',
-      terrain_clipping: 'terrainClipping',
-      block_model_box_cutter_grade: 'boxCutter',
-      block_model_box_cutter_class: 'boxCutter',
-      block_model_clip_view: 'blockModelClip',
-      cinematic_drillhole_assay: 'cinematicDrillhole',
-      cinematic_drillhole_lithology: 'cinematicDrillhole',
-      modular_subsurface: 'modularSubsurface',
-  };
+  const allowDeckFlight = !deckControlled || DECK_AOI_FLIGHT_VIEWS.has(view);
 
   // Apply transparency whenever sliders change (and when viewer is ready)
   useEffect(() => {
     if (!viewer || !ready || viewer.isDestroyed()) return;
-    const Cesium = (window as any).Cesium;
 
     // Globe translucency (terrain/globe)
     // Enable Cesium’s built-in translucency pipeline
-    if (viewer.scene.globe) { // Add this check
+    if (viewer.scene.globe) {
       viewer.scene.globe.translucency.enabled = globeAlpha < 1.0;
-      viewer.scene.globe.translucency.frontFaceAlpha = globeAlpha;   // 0..1
+      viewer.scene.globe.translucency.frontFaceAlpha = globeAlpha;
+      viewer.scene.globe.translucency.backFaceAlpha = Math.min(1, globeAlpha + 0.12);
     }
 
     // Imagery layer transparency
@@ -102,10 +107,21 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     viewer.scene.requestRender();
   }, [viewer, ready, globeAlpha, imageryAlpha]);
 
+  useEffect(() => {
+    if (TRANSLUCENT_DRILLHOLE_VIEWS.has(view)) {
+      setGlobeAlpha(0.34);
+      setImageryAlpha(0.62);
+      return;
+    }
+
+    setGlobeAlpha(1.0);
+    setImageryAlpha(1.0);
+  }, [view]);
+
   // Refs for persistent data
   const kmlDataSourceRef = useRef<any>(null);
   const kmlLabelRef = useRef<any>(null);
-  const styledKmlHandlerRef = useRef<any>(null);
+  const kmlOutlineRef = useRef<any>(null);
   const ionImageryLayerRef = useRef<any>(null);
   const geospatialDsRef = useRef<any>(null);
   const tiffOverlayLayerRef = useRef<any>(null);
@@ -123,6 +139,10 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
     kmlLabelRef.current = kmlLabel;
   }, [kmlLabel]);
 
+  useEffect(() => {
+    kmlOutlineRef.current = kmlOutline;
+  }, [kmlOutline]);
+
   // View Transition Logic
   useEffect(() => {
     let cancelled = false;
@@ -139,12 +159,6 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       // Dispose of any existing special views
       setSpecialView(null);
 
-      // Clear any existing event handlers
-      if (styledKmlHandlerRef.current && !styledKmlHandlerRef.current.isDestroyed()) {
-        styledKmlHandlerRef.current.destroy();
-        styledKmlHandlerRef.current = null;
-      }
-
       // Clear temporary entities and data sources
       if (projectLocationLayerRef.current) {
         v.entities.remove(projectLocationLayerRef.current);
@@ -160,7 +174,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       terrainTracesEntitiesRef.current = [];
 
       // Clear imagery layers if not needed for new view
-      if (ionImageryLayerRef.current && !['tanaga_accessibility', 'tanga_geological_map', 'drillhole_location_lithology'].includes(view)) {
+      if (ionImageryLayerRef.current && !['tanaga_accessibility', 'tanga_geological_map'].includes(view)) {
         v.imageryLayers.remove(ionImageryLayerRef.current, true);
         ionImageryLayerRef.current = null;
       }
@@ -179,20 +193,18 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       }
       
       if (prev === 'styled_kml') {
-        if (styledKmlHandlerRef.current && !styledKmlHandlerRef.current.isDestroyed()) {
-          styledKmlHandlerRef.current.destroy();
-          styledKmlHandlerRef.current = null;
-        }
         const kmlDataSource = kmlDataSourceRef.current;
         if (kmlDataSource) {
-            const entity = kmlDataSource.entities.values.find((e:any) => e.polygon);
-            if (entity && entity.polygon) {
-                entity.polygon.fill = false;
+          kmlDataSource.entities.values.forEach((entity: any) => {
+            if (entity?.polygon) {
+              entity.polygon.fill = false;
+              entity.polygon.material = Cesium.Color.WHITE.withAlpha(0.01);
             }
+          });
         }
       }
 
-      if (prev === 'tanaga_accessibility' || prev === 'tanga_geological_map' || prev === 'drillhole_location_lithology') {
+      if (prev === 'tanaga_accessibility' || prev === 'tanga_geological_map' || prev === 'drillhole_location_lithology' || prev === 'drillhole_location_assay') {
         if (ionImageryLayerRef.current) {
           v.imageryLayers.remove(ionImageryLayerRef.current, true);
           ionImageryLayerRef.current = null;
@@ -228,7 +240,38 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       await waitOneFrame(v);
       if (cancelled || v.isDestroyed()) return;
 
-      if (next === 'original' || next === 'block_model_clip_view' || next === 'tanaga_accessibility') { // Explicitly disable AOI cutaway for tanaga_accessibility
+      const flyToProjectBounds = async ({
+        duration = 2.2,
+        headingDeg = 18,
+        pitchDeg = -58,
+      }: {
+        duration?: number;
+        headingDeg?: number;
+        pitchDeg?: number;
+      } = {}) => {
+        const rect = Cesium.Rectangle.fromDegrees(
+          TERRAIN_BOUNDS.west,
+          TERRAIN_BOUNDS.south,
+          TERRAIN_BOUNDS.east,
+          TERRAIN_BOUNDS.north
+        );
+
+        await v.camera.flyTo({
+          destination: rect,
+          orientation: {
+            heading: Cesium.Math.toRadians(headingDeg),
+            pitch: Cesium.Math.toRadians(pitchDeg),
+            roll: 0,
+          },
+          duration,
+        });
+      };
+
+      if (kmlDataSourceRef.current) kmlDataSourceRef.current.show = false;
+      if (kmlLabelRef.current) kmlLabelRef.current.show = false;
+      if (kmlOutlineRef.current) kmlOutlineRef.current.show = false;
+
+      if (next === 'original' || next === 'styled_kml' || next === 'block_model_clip_view' || next === 'tanaga_accessibility') {
         disableAoiCutaway?.();
       } else {
         enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
@@ -238,44 +281,61 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         if (kmlDataSourceRef.current) {
           kmlDataSourceRef.current.show = true;
           if (kmlLabelRef.current) kmlLabelRef.current.show = true;
-          await v.flyTo(kmlDataSourceRef.current);
+          if (kmlOutlineRef.current) kmlOutlineRef.current.show = true;
+          kmlDataSourceRef.current.entities.values.forEach((entity: any) => {
+            if (entity?.polygon) {
+              entity.polygon.fill = false;
+              entity.polygon.outline = true;
+              entity.polygon.outlineColor = Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.96);
+            }
+          });
+          if (allowDeckFlight) {
+            await v.flyTo(kmlDataSourceRef.current);
+          }
         }
       }
       else if (next === 'exaggerated_kml') {
         const kmlDataSource = kmlDataSourceRef.current;
         if (!kmlDataSource) return;
-        const kmlEntity = kmlDataSource.entities.values.find((e:any) => e.polygon);
-        if (!kmlEntity) return;
-        if (kmlLabelRef.current) kmlLabelRef.current.show = false;
-        await v.flyTo(kmlEntity, { duration: 3.0, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(30.0), Cesium.Math.toRadians(-45.0), 80000) });
+        kmlDataSource.show = true;
+        if (kmlOutlineRef.current) kmlOutlineRef.current.show = true;
+        kmlDataSource.entities.values.forEach((entity: any) => {
+          if (entity?.polygon) {
+            entity.polygon.fill = false;
+            entity.polygon.outline = true;
+            entity.polygon.outlineColor = Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.96);
+          }
+        });
         v.scene.verticalExaggeration = 3.0;
+        if (allowDeckFlight) {
+          await v.flyTo(kmlDataSource, {
+            duration: 3.0,
+            offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(30.0), Cesium.Math.toRadians(-45.0), 80000),
+          });
+        }
       }
       else if (next === 'styled_kml') {
         const kmlDataSource = kmlDataSourceRef.current;
         if (!kmlDataSource) return;
-        const kmlEntity = kmlDataSource.entities.values.find((e:any) => e.polygon);
-        if (!kmlEntity) return;
-        if (kmlLabelRef.current) kmlLabelRef.current.show = false;
-        const originalMaterial = Cesium.Color.WHITE.withAlpha(0.5);
-        kmlEntity.polygon.fill = true;
-        kmlEntity.polygon.material = originalMaterial;
-        await v.flyTo(kmlEntity, { duration: 3.0, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0.0), Cesium.Math.toRadians(-50.0), 15000) });
-        const handler = new Cesium.ScreenSpaceEventHandler(v.scene.canvas);
-        let highlightedEntity: any = undefined;
-        handler.setInputAction(function onMouseMove(movement: any) {
-            const pickedObject = v.scene.pick(movement.endPosition);
-            if (Cesium.defined(highlightedEntity)) {
-                highlightedEntity.polygon.material = originalMaterial;
-                highlightedEntity = undefined;
-            }
-            if (Cesium.defined(pickedObject) && (pickedObject as any).id === kmlEntity) {
-                highlightedEntity = (pickedObject as any).id;
-                (pickedObject as any).id.polygon.material = Cesium.Color.YELLOW.withAlpha(0.5);
-            }
-        }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-        styledKmlHandlerRef.current = handler;
+        kmlDataSource.show = true;
+        if (kmlLabelRef.current) kmlLabelRef.current.show = true;
+        if (kmlOutlineRef.current) kmlOutlineRef.current.show = true;
+        kmlDataSource.entities.values.forEach((entity: any) => {
+          if (entity?.polygon) {
+            entity.polygon.fill = true;
+            entity.polygon.outline = true;
+            entity.polygon.outlineColor = Cesium.Color.fromCssColorString('#fde68a').withAlpha(0.98);
+            entity.polygon.material = Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.18);
+          }
+        });
+        if (allowDeckFlight) {
+          await v.flyTo(kmlDataSource, {
+            duration: 3.0,
+            offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(0.0), Cesium.Math.toRadians(-50.0), 18000),
+          });
+        }
       }
-      else if (next === 'tanaga_accessibility' || next === 'tanga_geological_map' || next === 'drillhole_location_lithology') {
+      else if (next === 'tanaga_accessibility' || next === 'tanga_geological_map') {
         if (kmlDataSourceRef.current) kmlDataSourceRef.current.show = false;
         
         // Clear clipping planes for full visibility
@@ -285,23 +345,98 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
         }
 
         try {
+            if (ionImageryLayerRef.current) {
+              v.imageryLayers.remove(ionImageryLayerRef.current, true);
+              ionImageryLayerRef.current = null;
+            }
             const assetId = next === 'tanaga_accessibility' ? 3733958 : 3678736;
             const layer = await v.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(assetId));
             ionImageryLayerRef.current = layer;
-            
-            // Fly to the specific terrain bounds
-            const rect = Cesium.Rectangle.fromDegrees(
-                TERRAIN_BOUNDS.west, 
-                TERRAIN_BOUNDS.south, 
-                TERRAIN_BOUNDS.east, 
-                TERRAIN_BOUNDS.north
-            );
-            await v.flyTo(layer, { 
-                destination: rect,
-                duration: 2.0 
-            });
+
+            if (allowDeckFlight) {
+              if (kmlDataSourceRef.current) {
+                await v.flyTo(kmlDataSourceRef.current, {
+                  duration: 2.2,
+                  offset: new Cesium.HeadingPitchRange(
+                    Cesium.Math.toRadians(next === 'tanaga_accessibility' ? 26 : 10),
+                    Cesium.Math.toRadians(next === 'tanaga_accessibility' ? -64 : -67),
+                    next === 'tanaga_accessibility' ? 25500 : 23500,
+                  ),
+                });
+              } else {
+                await flyToProjectBounds(
+                  next === 'tanaga_accessibility'
+                    ? { duration: 2.1, headingDeg: 24, pitchDeg: -66 }
+                    : { duration: 2.1, headingDeg: 8, pitchDeg: -68 }
+                );
+              }
+            }
         } catch (error) {
             console.error("Error loading ION imagery:", error);
+        }
+      }
+      else if (next === 'drillhole_location_assay') {
+        if (kmlDataSourceRef.current) {
+          kmlDataSourceRef.current.show = true;
+        }
+        if (kmlLabelRef.current) {
+          kmlLabelRef.current.show = false;
+        }
+        if (kmlOutlineRef.current) {
+          kmlOutlineRef.current.show = true;
+        }
+
+        if (v.scene.globe.clippingPlanes) {
+             v.scene.globe.clippingPlanes.enabled = false;
+             v.scene.globe.clippingPlanes = undefined;
+        }
+
+        setDrillholeLocationMode(next.endsWith('assay') ? 'assay' : 'lithology');
+        setSpecialView('drillholeLocation');
+
+        const rect = Cesium.Rectangle.fromDegrees(
+            TERRAIN_BOUNDS.west,
+            TERRAIN_BOUNDS.south,
+            TERRAIN_BOUNDS.east,
+            TERRAIN_BOUNDS.north
+        );
+        if (!deckControlled) {
+          await v.camera.flyTo({
+              destination: rect,
+              duration: 2.0
+          });
+        }
+      }
+      else if (next === 'drillhole_location_lithology') {
+        if (kmlDataSourceRef.current) {
+          kmlDataSourceRef.current.show = true;
+        }
+        if (kmlLabelRef.current) {
+          kmlLabelRef.current.show = false;
+        }
+        if (kmlOutlineRef.current) {
+          kmlOutlineRef.current.show = true;
+        }
+
+        if (v.scene.globe.clippingPlanes) {
+             v.scene.globe.clippingPlanes.enabled = false;
+             v.scene.globe.clippingPlanes = undefined;
+        }
+
+        setDrillholeLocationMode('lithology');
+        setSpecialView('drillholeLocation');
+
+        const rect = Cesium.Rectangle.fromDegrees(
+            TERRAIN_BOUNDS.west,
+            TERRAIN_BOUNDS.south,
+            TERRAIN_BOUNDS.east,
+            TERRAIN_BOUNDS.north
+        );
+        if (!deckControlled) {
+          await v.camera.flyTo({
+              destination: rect,
+              duration: 2.0
+          });
         }
       }
       else if (
@@ -316,6 +451,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
       else if (next === 'project_location') {
         if (kmlDataSourceRef.current) kmlDataSourceRef.current.show = false;
         if (kmlLabelRef.current) kmlLabelRef.current.show = false;
+        if (kmlOutlineRef.current) kmlOutlineRef.current.show = false;
         const centerPoint = Cesium.Cartesian3.fromDegrees(38.78, -4.8);
         const marker = v.entities.add({ position: centerPoint, point: { pixelSize: 12, color: Cesium.Color.RED, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 } });
         projectLocationLayerRef.current = marker;
@@ -372,7 +508,7 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
   useEffect(() => {
     if (!viewer || !ready || viewer.isDestroyed()) return;
     if (!kmlDataSource) return;
-    if (view !== 'original' && view !== 'block_model_clip_view' && view !== 'tanaga_accessibility') { // Explicitly exclude tanaga_accessibility
+    if (view !== 'original' && view !== 'styled_kml' && view !== 'block_model_clip_view' && view !== 'tanaga_accessibility') {
       enableAoiCutaway?.({ keepInside: true, edgeStyling: true });
     }
   }, [viewer, ready, kmlDataSource, view, enableAoiCutaway]);
@@ -415,53 +551,34 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
             </SubsurfaceViewer>
         )}
 
-      {/* Transparency controls */}
-      <OverlaySlot slot="top-center">
-        <div className="flex flex-col gap-2 pointer-events-auto">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-white/80 drop-shadow-sm">
-              Globe opacity {Math.round(globeAlpha * 100)}%
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={globeAlpha}
-              onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
-              className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
-              style={{
-                background: `linear-gradient(to right, #f97316 0%, #f97316 ${globeAlpha * 100}%, rgba(0,0,0,0.3) ${globeAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
-              }}
-            />
-          </div>
-
-          {view === 'drillhole_location_lithology' && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-white/80 drop-shadow-sm">
-                Map opacity {Math.round(imageryAlpha * 100)}%
+      {showTransparencyControls ? (
+        <OverlaySlot slot="top-center">
+          <div className="flex flex-col gap-2 pointer-events-auto" data-no-deck-wheel>
+            <div className="flex flex-col gap-1 rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(10,16,25,0.92),rgba(7,11,18,0.76))] px-4 py-3 shadow-[0_18px_42px_rgba(0,0,0,0.26)] backdrop-blur-xl">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/72">
+                Globe opacity {Math.round(globeAlpha * 100)}%
               </label>
               <input
                 type="range"
                 min={0}
                 max={1}
                 step={0.05}
-                value={imageryAlpha}
-                onChange={(e) => setImageryAlpha(parseFloat(e.target.value))}
-                className="w-32 h-1 bg-black/30 rounded-lg appearance-none cursor-pointer slider-thumb"
+                value={globeAlpha}
+                onChange={(e) => setGlobeAlpha(parseFloat(e.target.value))}
+                className="slider-thumb h-1 w-40 cursor-pointer appearance-none rounded-lg bg-black/30"
                 style={{
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${imageryAlpha * 100}%, rgba(0,0,0,0.3) ${imageryAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
+                  background: `linear-gradient(to right, #f97316 0%, #f97316 ${globeAlpha * 100}%, rgba(0,0,0,0.3) ${globeAlpha * 100}%, rgba(0,0,0,0.3) 100%)`
                 }}
               />
             </div>
-          )}
-        </div>
-      </OverlaySlot>
+          </div>
+        </OverlaySlot>
+      ) : null}
 
       {/* Bottom-left legend for Cesium drillhole views */}
       {showCesiumDrillholeLegend && (
-        <OverlaySlot slot="bottom-left">
-          {view === 'geojson_drillholes_lithology' ? (
+        <OverlaySlot slot="bottom-center">
+          {view === 'geojson_drillholes_lithology' || view === 'drillhole_location_lithology' ? (
             <Legend
               title={drillholeLocationMapLithologyLegendData.title}
               type="categorical"
@@ -480,6 +597,18 @@ export default function CesiumViewSwitch({ view }: { view: CesiumView }) {
               show
             />
           )}
+        </OverlaySlot>
+      )}
+
+      {showBoundaryLegend && boundaryLayers.length > 0 && (
+        <OverlaySlot slot="top-center" wrapperClassName="max-w-[18rem] pt-1">
+          <Legend
+            title="License Areas"
+            type="categorical"
+            items={boundaryLayers.map((layer) => ({ label: layer.label, color: layer.color }))}
+            guidance="All licence polygons in the merged project boundary."
+            show
+          />
         </OverlaySlot>
       )}
 

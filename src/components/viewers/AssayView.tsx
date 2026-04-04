@@ -67,9 +67,14 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
         requestAnimationFrame(() => {
             dynamicGroup.updateMatrixWorld(true);
             fitCameraToGroupWorldAware(camera, controls, dynamicGroup, {
-                padding: 1.3,
-                minDistance: 200,
-                maxDistance: 20000,
+                padding: 1.14,
+                targetScreenFraction: 0.82,
+                minDistance: 260,
+                maxDistance: 22000,
+                screenBiasX: 0.18,
+                screenBiasY: 0.04,
+                containMode: 'best-fit',
+                viewDir: new THREE.Vector3(0.84, 0.64, 1.04).normalize(),
                 filter: (o) => !!o.userData.isBorehole,
             });
             console.log('[AssayView] Camera fitted to terrain + boreholes.');
@@ -88,6 +93,7 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
             <TerrainSurfaceLayer 
                 verticalScale={1} 
                 modelCenter={processedAssayData?.modelCenter}
+                quality="presentation"
                 onLoaded={onTerrainLoaded}
             />
             <BoreholeLayer 
@@ -97,11 +103,11 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                 assayRange={assayRange}
                 onLoaded={onBoreholesLoaded}
             />
-            <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
-                <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-3">
-                    <div className="space-y-1">
-                        <div className="flex items-center justify-between text-xs text-white/80">
-                            <span>Assay range filter</span>
+            <OverlaySlot slot="top-left" wrapperClassName="w-[272px] max-w-[calc(100vw-2rem)] flex flex-col items-start">
+                <div className="pointer-events-auto overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(10,15,24,0.92),rgba(5,9,16,0.72))] p-3 text-white shadow-[0_22px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-white/74">
+                            <span className="uppercase tracking-[0.18em] text-white/48">Assay filter</span>
                             <button
                                 className="text-[11px] text-orange-300 hover:text-orange-200"
                                 onClick={() => setLocalRange({ min: assayRange.min, max: assayRange.max })}
@@ -110,7 +116,7 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                             </button>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                            <label className="text-xs">
+                            <label className="text-[11px] text-white/72">
                                 Min
                                 <input
                                     type="number"
@@ -120,10 +126,10 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                                         min: Number(e.target.value),
                                         max: Math.max(Number(e.target.value), prev?.max ?? assayRange.max)
                                     }))}
-                                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
                                 />
                             </label>
-                            <label className="text-xs">
+                            <label className="text-[11px] text-white/72">
                                 Max
                                 <input
                                     type="number"
@@ -133,7 +139,7 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                                         min: Math.min(prev?.min ?? assayRange.min, Number(e.target.value)),
                                         max: Number(e.target.value)
                                     }))}
-                                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
                                 />
                             </label>
                         </div>
@@ -147,7 +153,7 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                                 min: Number(e.target.value),
                                 max: Math.max(Number(e.target.value), prev?.max ?? assayRange.max)
                             }))}
-                            className="w-full"
+                            className="range-slider w-full"
                         />
                         <input
                             type="range"
@@ -159,7 +165,7 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                                 min: Math.min(prev?.min ?? assayRange.min, Number(e.target.value)),
                                 max: Number(e.target.value)
                             }))}
-                            className="w-full"
+                            className="range-slider w-full"
                         />
                     </div>
                 </div>
@@ -172,7 +178,7 @@ export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: A
                     gradient={assayGradient}
                     minLabel={(localRange?.min ?? assayRange.min).toFixed(2)}
                     maxLabel={(localRange?.max ?? assayRange.max).toFixed(2)}
-                    guidance="Higher values trend toward red; lower values trend toward green. Use the hover tooltip to inspect exact values at a location."
+                    guidance="Higher values transition toward warm yellow-orange; lower values stay cooler for faster grade scanning."
                 />
             </OverlaySlot>
         </>

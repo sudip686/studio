@@ -1,5 +1,6 @@
 'use client';
 
+import * as THREE from 'three';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDataCache } from '@/lib/data-cache';
 import { Legend } from '@/components/ui/legend';
@@ -51,9 +52,14 @@ export default function LithologyView() {
             dynamicGroup.updateMatrixWorld(true);
             // Clamp the fitting area so the massive terrain mesh doesn't force an extreme zoom-out
             fitCameraToGroupWorldAware(camera, controls, dynamicGroup, {
-                padding: 1.3,
-                minDistance: 200,
-                maxDistance: 20000,
+                padding: 1.14,
+                targetScreenFraction: 0.84,
+                minDistance: 260,
+                maxDistance: 22000,
+                screenBiasX: 0.16,
+                screenBiasY: 0.04,
+                containMode: 'best-fit',
+                viewDir: new THREE.Vector3(0.82, 0.62, 1.02).normalize(),
                 filter: (o) => !!o.userData.isBorehole, // Only fit to boreholes
             });
             console.log('[LithologyView] Camera fitted to terrain + boreholes.');
@@ -70,6 +76,7 @@ export default function LithologyView() {
             <TerrainSurfaceLayer 
                 verticalScale={1} 
                 modelCenter={processedLithologyData?.modelCenter}
+                quality="presentation"
                 onLoaded={onTerrainLoaded}
             />
             <BoreholeLayer 
@@ -79,7 +86,11 @@ export default function LithologyView() {
             />
             
             <OverlaySlot slot="bottom-left">
-                <Legend title="Lithology" items={lithologyLegendItems} />
+                <Legend
+                    title="Lithology"
+                    items={lithologyLegendItems}
+                    guidance="Dominant host units and logged lithology domains visible in the 3D interpretation."
+                />
             </OverlaySlot>
         </>
     );

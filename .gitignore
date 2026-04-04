@@ -22,6 +22,46 @@ public/dem_utm.tif
 # production
 /build
 
+# local workspace artifacts
+/.claude/
+/.playwright-cli/
+/.playwright-mcp/
+/memory/
+/output/
+/temp_docx/
+/tmp/
+/.idx/
+/.storybook/
+/.modified
+/.aider.tags.cache.v4
+.aider.chat.history.md
+.aider.input.history
+compile_errors.txt
+debug-storybook.log
+dev-server.log
+dev-server.err.log
+dev-server.verify.log
+dev-server.verify.err.log
+error.log
+*.log
+*.tmp
+current-app-state.png
+slide1-after-fix.png
+slide1-fixed-layout.png
+slide2-fixed-layout.png
+slide2-kmz-visible.png
+slide2-licenses.png
+vrify-ui-homepage.png
+cmd
+powershell
+json-parse-failed
+CONTENT_INTEGRATION_PLAN.md
+DEPLOYMENT_FIXES.md
+MODULARIZATION_SUMMARY.md
+IMPLEMENTATION_PROGRESS.md
+TEXT_VIEW_INTEGRATION_PLAN.md
+VRIFY_STYLE_IMPLEMENTATION_PLAN.md
+
 # misc
 .DS_Store
 *.pem

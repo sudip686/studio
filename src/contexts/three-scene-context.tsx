@@ -91,7 +91,9 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15; 
+    renderer.toneMappingExposure = 1.34;
+    renderer.sortObjects = true;
+    renderer.setClearColor(0xf6e0cf, 1);
 
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
@@ -103,23 +105,30 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x4a6fa5); 
+    scene.background = new THREE.Color(0xf6e0cf);
+    scene.fog = new THREE.Fog(0xf5e7dc, 72000, 235000);
     sceneRef.current = scene;
 
     const staticGroup = new THREE.Group();
     staticGroup.name = 'static-scene-elements';
     scene.add(staticGroup);
 
-    staticGroup.add(new THREE.AmbientLight(0xffffff, 0.8));
-    const sun = new THREE.DirectionalLight(0xffffff, 2.0);
-    sun.position.set(100, 2000, 100); 
+    staticGroup.add(new THREE.HemisphereLight(0xfff8ef, 0xa46d42, 1.62));
+    staticGroup.add(new THREE.AmbientLight(0xfffaf3, 0.42));
+
+    const sun = new THREE.DirectionalLight(0xfff4e6, 4.1);
+    sun.position.set(2400, 4200, 2200);
     sun.target.position.set(0, 0, 0);
     staticGroup.add(sun);
     staticGroup.add(sun.target);
 
-    const grid = new THREE.GridHelper(10000, 100, 0xcccccc, 0x888888); 
-    grid.frustumCulled = false;
-    staticGroup.add(grid);
+    const rimLight = new THREE.DirectionalLight(0xffd8b8, 1.8);
+    rimLight.position.set(-2400, 1700, -2800);
+    staticGroup.add(rimLight);
+
+    const fillLight = new THREE.PointLight(0xffead4, 1.18, 0, 2);
+    fillLight.position.set(0, 1800, 2200);
+    staticGroup.add(fillLight);
 
     const dynamicGroup = new THREE.Group();
     dynamicGroup.name = 'dynamic-view-content';
@@ -247,7 +256,9 @@ export const ThreeSceneProvider = ({ children, active = true }: { children: Reac
 
   return (
     <ThreeSceneContext.Provider value={contextValue}>
-      <div ref={mountRef} className="h-full w-full relative">
+      <div ref={mountRef} className="relative h-full w-full overflow-hidden bg-[#e6c7b2]">
+        <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_top,rgba(255,244,233,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(204,90,40,0.16),transparent_32%),linear-gradient(180deg,rgba(235,214,198,0.14),rgba(90,49,29,0.22))]" />
+        <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_center,transparent_52%,rgba(24,17,14,0.08)_100%)]" />
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           {children}
         </div>

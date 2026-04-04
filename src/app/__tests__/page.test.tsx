@@ -2,12 +2,44 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import Home from '../page';
 
+jest.mock('framer-motion', () => ({
+  motion: {
+    section: ({ children, ...props }: React.HTMLAttributes<HTMLElement>) => (
+      <section {...props}>{children}</section>
+    ),
+  },
+  AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 // Mock components that might cause issues with heavy dependencies
 jest.mock('@/components/CesiumViewSwitch', () => () => <div data-testid="cesium-view" />);
 jest.mock('@/components/ThreeJsViewSwitch', () => () => <div data-testid="three-view" />);
+jest.mock('@/components/ThreeJsDataOverlay', () => ({ slideId }: { slideId: string }) => (
+  <div data-testid="three-data-panel">{slideId}</div>
+));
 jest.mock('@/components/shared/GlobalOverlays', () => () => <div data-testid="global-overlays" />);
-jest.mock('@/components/ui/chapter-menu', () => ({
-  ChapterMenu: () => <div data-testid="chapter-menu" />
+jest.mock('@/components/deck/AnnotationsOverlay', () => ({
+  AnnotationsOverlay: () => <div data-testid="annotations-overlay" />,
+}));
+jest.mock('@/components/deck/DeckCameraController', () => ({
+  DeckCameraController: () => <div data-testid="deck-camera-controller" />,
+}));
+jest.mock('@/components/SharedThreeTerrain', () => () => <div data-testid="shared-three-terrain" />);
+jest.mock('@/ui/overlays/OverlayRoot', () => ({
+  OverlayRoot: ({
+    baseSlots,
+    children,
+  }: {
+    baseSlots?: Record<string, React.ReactNode>;
+    children: React.ReactNode;
+  }) => (
+    <div>
+      {Object.values(baseSlots ?? {}).map((node, index) => (
+        <div key={index}>{node}</div>
+      ))}
+      {children}
+    </div>
+  ),
 }));
 
 // Mock contexts
@@ -19,41 +51,95 @@ jest.mock('@/contexts/three-scene-context', () => ({
 }));
 
 describe('Home Page Navigation', () => {
-  it('should not have the Immersive Experience button', () => {
-    render(<Home />);
-    const immersiveButton = screen.queryByText(/Immersive Experience/i);
-    expect(immersiveButton).toBeNull();
+  beforeEach(() => {
+    jest.useFakeTimers();
   });
 
-  it('should not show the Previous button on the first slide', () => {
-    render(<Home />);
-    const prevButton = screen.queryByText('<');
-    expect(prevButton).toBeNull();
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
-  it('should show the Next button on the first slide', () => {
+  const advanceTransition = () => {
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
+  };
+
+  it('mounts the Cesium switcher on the first deck view', () => {
     render(<Home />);
-    const nextButton = screen.queryByText('>');
-    expect(nextButton).not.toBeNull();
+    expect(screen.getByTestId('cesium-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('three-view')).toBeNull();
+    expect(screen.getByLabelText(/presentation chapters/i)).toBeInTheDocument();
   });
 
-  it('should not show the Next button on the last slide', async () => {
+  it('disables the previous button on the first slide', () => {
     render(<Home />);
-    
-    // Click "Next" until it's gone
-    let nextButton = screen.queryByText('>');
-    let clicks = 0;
-    while (nextButton && clicks < 20) {
-      const btn = nextButton;
+    expect(screen.getByRole('button', { name: /prev/i })).toBeDisabled();
+  });
+
+  it('shows the next button on the first slide', () => {
+    render(<Home />);
+    expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument();
+    expect(screen.getByTestId('story-panel')).toBeInTheDocument();
+  });
+
+  it('switches to the Three.js renderer on the lithology slide', async () => {
+    render(<Home />);
+
+    for (let i = 0; i < 8; i += 1) {
       await act(async () => {
-        fireEvent.click(btn);
+        fireEvent.click(screen.getByRole('button', { name: /next/i }));
       });
-      nextButton = screen.queryByText('>');
-      clicks++;
+      advanceTransition();
     }
-    
-    console.log(`Reached end in ${clicks} clicks`);
-    expect(screen.queryByText('>')).toBeNull();
-    expect(screen.queryByText('<')).not.toBeNull();
+
+    expect(screen.getByTestId('three-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('cesium-view')).toBeNull();
+    expect(screen.getByTestId('global-nav-dock')).toBeInTheDocument();
+  });
+
+  it('keeps drillholes lithology in the Cesium renderer with the story shell intact', async () => {
+    render(<Home />);
+
+    for (let i = 0; i < 6; i += 1) {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /next/i }));
+      });
+      advanceTransition();
+    }
+
+    expect(screen.getByTestId('cesium-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('three-view')).toBeNull();
+    expect(screen.getByTestId('story-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('global-nav-dock')).toBeInTheDocument();
+  });
+
+  it('disables the next button on the last slide', async () => {
+    render(<Home />);
+
+    const nextButton = screen.getByRole('button', { name: /next/i });
+    for (let i = 0; i < 14; i += 1) {
+      await act(async () => {
+        fireEvent.click(nextButton);
+      });
+      advanceTransition();
+    }
+
+    expect(nextButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: /prev/i })).toBeInTheDocument();
+  });
+
+  it('shows the data evidence panel on supported slides', async () => {
+    render(<Home />);
+
+    for (let i = 0; i < 10; i += 1) {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /next/i }));
+      });
+      advanceTransition();
+    }
+
+    expect(screen.getByTestId('three-data-panel')).toHaveTextContent('classification');
   });
 });

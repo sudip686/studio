@@ -13,19 +13,17 @@ import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
 
-const CARBON_COLOR_STEPS = 20;
-const carbonColorCache: { [step: number]: string } = {};
-function colorForCarbon(vRaw: any): number {
-    const v = Number(vRaw);
-    let t = Number.isFinite(v) ? v / 10 : 0.5; // Assuming a scale of 0-10 for carbon
+const CARBON_PALETTE = ['#17304a', '#205375', '#2b7a78', '#78c07f', '#f6d860', '#f08a5d'];
+
+function colorForCarbon(vRaw: any, min: number, max: number): string {
+    const value = Number(vRaw);
+    let t = Number.isFinite(value) && max > min ? (value - min) / (max - min) : 0.5;
     t = Math.max(0, Math.min(1, t));
-    const step = Math.floor(t * (CARBON_COLOR_STEPS - 1));
-    if (carbonColorCache[step]) return parseInt(carbonColorCache[step].substring(1), 16);
-    const r = t, g = 1 - t, b = 0;
-    const color = new THREE.Color(r, g, b);
-    const hexString = '#' + color.getHexString();
-    carbonColorCache[step] = hexString;
-    return color.getHex();
+    const scaled = t * (CARBON_PALETTE.length - 1);
+    const lowerIndex = Math.floor(scaled);
+    const upperIndex = Math.min(CARBON_PALETTE.length - 1, lowerIndex + 1);
+    const mix = scaled - lowerIndex;
+    return `#${new THREE.Color(CARBON_PALETTE[lowerIndex]).lerp(new THREE.Color(CARBON_PALETTE[upperIndex]), mix).getHexString()}`;
 }
 
 type AssayRangeFilter = { min: number; max: number } | null;
@@ -111,16 +109,28 @@ export default function BlockModelCarbonViewer({
     const blockMeshes: THREE.InstancedMesh[] = [];
 
     // group blocks by color
-    const buckets = new Map<number, BlockSegment[]>();
+    const buckets = new Map<string, BlockSegment[]>();
     for (const b of blocks) {
-      const color = colorForCarbon(b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"]);
+      const color = colorForCarbon(
+        b["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"],
+        carbonRange.min,
+        carbonRange.max,
+      );
       if (!buckets.has(color)) buckets.set(color, []);
       buckets.get(color)!.push(b);
     }
 
     // build instances per color
     buckets.forEach((items, color) => {
-      const mat = new THREE.MeshStandardMaterial({ color, transparent: false, opacity: 1.0 });
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        transparent: opacity < 0.999,
+        opacity,
+        roughness: 0.38,
+        metalness: 0.06,
+        emissive: new THREE.Color(color).multiplyScalar(0.06),
+        emissiveIntensity: 0.16,
+      });
       const geom = new THREE.BoxGeometry(1, 1, 1);
       materials.push(mat);
       geometries.push(geom);
@@ -154,7 +164,15 @@ export default function BlockModelCarbonViewer({
     });
 
     requestAnimationFrame(() => {
-      fitCameraToGroupWorldAware(camera, controls, viewGroup, 1.35);
+      fitCameraToGroupWorldAware(camera, controls, viewGroup, {
+        padding: 1.16,
+        targetScreenFraction: 0.82,
+        minDistance: 360,
+        maxDistance: 24000,
+        screenBiasX: 0.14,
+        screenBiasY: 0.03,
+        viewDir: new THREE.Vector3(0.86, 0.66, 1.0).normalize(),
+      });
     });
 
     return () => {
@@ -171,12 +189,25 @@ export default function BlockModelCarbonViewer({
       materials.forEach(m => m.dispose());
       mountedRef.current = false;
     };
-  }, [blockModelData, opacity, scene, camera, controls, dynamicGroup, modelCenter, localRange, registerTooltipObject, unregisterTooltipObject]);
+  }, [
+    blockModelData,
+    opacity,
+    scene,
+    camera,
+    controls,
+    dynamicGroup,
+    modelCenter,
+    localRange,
+    carbonRange.min,
+    carbonRange.max,
+    registerTooltipObject,
+    unregisterTooltipObject,
+  ]);
 
   if (loadingStatus === 'loading') return <div>Loading...</div>;
   if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
 
-  const carbonGradient = "linear-gradient(to right, #00ff00, #ff0000)";
+  const carbonGradient = `linear-gradient(to right, ${CARBON_PALETTE.join(', ')})`;
 
   const lithologyLegendItems = useMemo(() => {
     return Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
@@ -187,13 +218,13 @@ export default function BlockModelCarbonViewer({
 
   return (
     <>
-      <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} />
+      <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} quality="presentation" />
       <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
-      <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
-        <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-3">
+      <OverlaySlot slot="top-left" wrapperClassName="w-[272px] max-w-[calc(100vw-2rem)] flex flex-col items-start">
+        <div className="pointer-events-auto overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(10,15,24,0.92),rgba(5,9,16,0.72))] p-3 text-white shadow-[0_22px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl">
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-white/80">
-              <span>Assay range filter</span>
+            <div className="flex items-center justify-between text-[11px] text-white/74">
+              <span className="uppercase tracking-[0.18em] text-white/48">Carbon filter</span>
               <button
                 className="text-[11px] text-orange-300 hover:text-orange-200"
                 onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
@@ -202,7 +233,7 @@ export default function BlockModelCarbonViewer({
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs">
+              <label className="text-[11px] text-white/72">
                 Min
                 <input
                   type="number"
@@ -212,10 +243,10 @@ export default function BlockModelCarbonViewer({
                     min: Number(e.target.value),
                     max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
                   }))}
-                  className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
                 />
               </label>
-              <label className="text-xs">
+              <label className="text-[11px] text-white/72">
                 Max
                 <input
                   type="number"
@@ -225,7 +256,7 @@ export default function BlockModelCarbonViewer({
                     min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
                     max: Number(e.target.value)
                   }))}
-                  className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
                 />
               </label>
             </div>
@@ -239,7 +270,7 @@ export default function BlockModelCarbonViewer({
                 min: Number(e.target.value),
                 max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
               }))}
-              className="w-full"
+              className="range-slider w-full"
             />
             <input
               type="range"
@@ -251,10 +282,10 @@ export default function BlockModelCarbonViewer({
                 min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
                 max: Number(e.target.value)
               }))}
-              className="w-full"
+              className="range-slider w-full"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 pt-2 text-[12px] text-white/80">
             <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
             Show traces
           </label>
@@ -268,8 +299,9 @@ export default function BlockModelCarbonViewer({
             title="Carbon Value"
             type="gradient"
             gradient={carbonGradient}
-            minLabel={carbonRange.min.toFixed(2)}
-            maxLabel={carbonRange.max.toFixed(2)}
+            minLabel={(localRange?.min ?? carbonRange.min).toFixed(2)}
+            maxLabel={(localRange?.max ?? carbonRange.max).toFixed(2)}
+            guidance="Viridis-inspired grade ramp tuned for stronger contrast, with warmer tones marking stronger graphitic carbon concentrations."
           />
         </div>
       </OverlaySlot>

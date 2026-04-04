@@ -1,10 +1,17 @@
 'use client';
 import React, { createContext, useContext, useRef, useState, useEffect } from 'react';
 import { createRenderController, RenderController } from '@/lib/cesium-render-controller';
-import { clipTilesetToRectangle } from '@/lib/utils/aoi-clip';
 import { bufferRectangleMeters } from '@/lib/utils/rectangle-utils';
 
 type PerfProfile = 'performance' | 'balanced' | 'quality';
+type InteractionMode = 'presentation' | 'explore';
+type BoundaryLayerMeta = {
+  id: string;
+  kind: 'primary' | 'license';
+  dataSource: any | null;
+  color: string;
+  label: string;
+};
 
 type CesiumCtx = {
   viewer: any | null;
@@ -13,6 +20,8 @@ type CesiumCtx = {
   tileset: any | null; // OSM Buildings
   kmlDataSource: any | null;
   kmlLabel: any | null;
+  kmlOutline: any | null;
+  boundaryLayers: BoundaryLayerMeta[];
   applyTilesetProfile: ((tileset: any, p: PerfProfile) => void) | null;
   enableAoiCutaway: ((opts?: { keepInside?: boolean; edgeStyling?: boolean }) => void) | null;
   disableAoiCutaway: (() => void) | null;
@@ -30,6 +39,8 @@ const Ctx = createContext<CesiumCtx>({
   tileset: null, 
   kmlDataSource: null,
   kmlLabel: null,
+  kmlOutline: null,
+  boundaryLayers: [],
   applyTilesetProfile: null,
   enableAoiCutaway: null,
   disableAoiCutaway: null,
@@ -42,7 +53,10 @@ const Ctx = createContext<CesiumCtx>({
 
 export const useCesium = () => useContext(Ctx);
 
-export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMode?: InteractionMode }> = ({
+  children,
+  interactionMode = 'explore',
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const initializedRef = useRef(false);
   const [viewer, setViewer] = useState<any | null>(null);
@@ -51,9 +65,27 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [tileset, setTileset] = useState<any | null>(null);
   const [kmlDataSource, setKmlDataSource] = useState<any | null>(null);
   const [kmlLabel, setKmlLabel] = useState<any | null>(null);
+  const [kmlOutline, setKmlOutline] = useState<any | null>(null);
+  const [boundaryLayers, setBoundaryLayers] = useState<BoundaryLayerMeta[]>([]);
 
   const applyTilesetProfileRef = useRef<((tileset: any, p: PerfProfile) => void) | null>(null);
   const controllerRef = useRef<RenderController | null>(null);
+  const boundaryDataSourcesRef = useRef<any[]>([]);
+  const boundaryEntitiesRef = useRef<any[]>([]);
+
+  const safeRemoveDataSource = React.useCallback((targetViewer: any, dataSource: any) => {
+    try {
+      if (!targetViewer || targetViewer.isDestroyed?.() || !targetViewer.dataSources || !dataSource) return;
+      targetViewer.dataSources.remove(dataSource, true);
+    } catch {}
+  }, []);
+
+  const safeRemoveEntity = React.useCallback((targetViewer: any, entity: any) => {
+    try {
+      if (!targetViewer || targetViewer.isDestroyed?.() || !targetViewer.entities || !entity) return;
+      targetViewer.entities.remove(entity);
+    } catch {}
+  }, []);
 
   // AOI cutaway state
   const cutawayActiveRef = useRef(false);
@@ -220,12 +252,13 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ctrl.inertiaZoom = 0.0;
       ctrl.inertiaSpin = 0.0;
       ctrl.lookDamping = 0.0;
-      ctrl.zoomFactor = 20.0; // faster zoom speed
-      ctrl.minimumZoomDistance = 1.0; // allow close to/under surface
-      viewer.resolutionScale = 0.85; // lighter rendering
+      ctrl.zoomFactor = 16.0;
+      ctrl.minimumZoomDistance = interactionMode === 'presentation' ? 8000.0 : 1.0;
+      ctrl.maximumZoomDistance = interactionMode === 'presentation' ? 220000.0 : 40000000.0;
+      viewer.resolutionScale = interactionMode === 'presentation' ? 0.98 : 0.82;
       (viewer as any).scene?.requestRender?.();
     } catch {}
-  }, [viewer]);
+  }, [interactionMode, viewer]);
 
   const undergroundRef = useRef(false);
   const enterUndergroundMode = React.useCallback(() => {
@@ -336,9 +369,9 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Performance scaling during active input
     if (performance.now() < inputActiveUntilRef.current) {
-      (viewer as any).resolutionScale = 0.75;
+      (viewer as any).resolutionScale = 0.82;
     } else {
-      (viewer as any).resolutionScale = 0.85;
+      (viewer as any).resolutionScale = 0.96;
     }
 
     // Movement inputs
@@ -416,7 +449,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (freeFlyRafRef.current) cancelAnimationFrame(freeFlyRafRef.current);
       freeFlyRafRef.current = null;
       // Restore resolution
-      if (viewer && !(viewer as any)?.isDestroyed?.()) (viewer as any).resolutionScale = 0.85;
+      if (viewer && !(viewer as any)?.isDestroyed?.()) (viewer as any).resolutionScale = 0.78;
       throttleRef.current = { forward: 0, strafe: 0, vertical: 0 };
       rightDragRef.current = { active: false, last: undefined };
     } catch {}
@@ -454,6 +487,49 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       );
     }
 
+    const registerBoundaryDataSource = (dataSource: any) => {
+      if (dataSource) boundaryDataSourcesRef.current.push(dataSource);
+    };
+
+    const registerBoundaryEntity = (entity: any) => {
+      if (entity) boundaryEntitiesRef.current.push(entity);
+    };
+
+    const styleBoundaryDataSource = (
+      Cesium: any,
+      dataSource: any,
+      style: { outlineColor: string; fillColor?: string; lineColor?: string; lineWidth?: number; fill?: boolean }
+    ) => {
+      if (!dataSource?.entities?.values) return;
+      const time = Cesium.JulianDate.now();
+      const polygonSets: any[][] = [];
+      dataSource.entities.values.forEach((entity: any) => {
+        if (entity.polygon) {
+          entity.polygon.outline = true;
+          entity.polygon.outlineColor = Cesium.Color.fromCssColorString(style.outlineColor).withAlpha(0.95);
+          entity.polygon.outlineWidth = style.lineWidth ?? 4;
+          entity.polygon.fill = style.fill ?? false;
+          if (style.fillColor) {
+            entity.polygon.material = Cesium.Color.fromCssColorString(style.fillColor);
+          }
+          const hierarchy = entity.polygon.hierarchy?.getValue?.(time);
+          const positions = hierarchy?.positions;
+          if (Array.isArray(positions) && positions.length > 2) {
+            polygonSets.push(positions);
+          }
+        }
+        if (entity.polyline) {
+          entity.polyline.width = style.lineWidth ?? 4;
+          entity.polyline.material = Cesium.Color.fromCssColorString(style.lineColor ?? style.outlineColor).withAlpha(0.92);
+          entity.polyline.clampToGround = true;
+        }
+        if (entity.label) {
+          entity.label.show = false;
+        }
+      });
+      return polygonSets;
+    };
+
     (async () => {
       if (destroyed || !containerRef.current) return;
       const Cesium = (window as any).Cesium;
@@ -466,7 +542,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         terrainProvider = await Cesium.createWorldTerrainAsync({
             requestVertexNormals: true,
-            requestWaterMask: true,
+            requestWaterMask: false,
         });
       } catch (e) {
         console.warn("Failed to load World Terrain (likely missing/invalid Ion token). Falling back to Ellipsoid.", e);
@@ -485,51 +561,95 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (destroyed) { v.destroy(); return; }
       setViewer(v);
 
-      // 2. Load KMZ to determine AOI first
+      // 2. Load boundary layers and determine AOI from the merged project KMZ
       let aoi: any;
       try {
-        const kmlDs = await Cesium.KmlDataSource.load('/tanga_boundary.kmz', {
+        const kmlDs = await Cesium.KmlDataSource.load('/boundary.kmz', {
           camera: v.scene.camera,
           canvas: v.scene.canvas
         });
-        if (destroyed) { v.dataSources.remove(kmlDs); return; }
+        if (destroyed) {
+          safeRemoveDataSource(v, kmlDs);
+          return;
+        }
         await v.dataSources.add(kmlDs);
+        registerBoundaryDataSource(kmlDs);
         setKmlDataSource(kmlDs);
 
-        const entity = kmlDs.entities.values.find((e: any) => e.polygon);
-        if (entity && entity.polygon) {
-          entity.polygon.outline = true;
-          entity.polygon.outlineColor = Cesium.Color.RED;
-          entity.polygon.outlineWidth = 5;
-          entity.polygon.fill = false;
+        const polygonSets = styleBoundaryDataSource(Cesium, kmlDs, {
+          outlineColor: '#f59e0b',
+          lineColor: '#fbbf24',
+          lineWidth: 6,
+          fill: false,
+        }) ?? [];
+        const allPositions = polygonSets.flat();
 
-          const polyPositions = entity.polygon.hierarchy.getValue(v.clock.currentTime).positions;
-          aoi = Cesium.Rectangle.fromCartesianArray(polyPositions, Cesium.Ellipsoid.WGS84);
+        if (allPositions.length > 2) {
+          aoi = Cesium.Rectangle.fromCartesianArray(allPositions, Cesium.Ellipsoid.WGS84);
 
-          const polyCenter = Cesium.BoundingSphere.fromPoints(polyPositions).center;
+          polygonSets.forEach((polyPositions, index) => {
+            const outline = v.entities.add({
+              id: `boundary-outline-${index}`,
+              polyline: {
+                positions: [...polyPositions, polyPositions[0]],
+                clampToGround: true,
+                width: 7,
+                material: new Cesium.PolylineGlowMaterialProperty({
+                  glowPower: 0.18,
+                  taperPower: 0.75,
+                  color: Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.98),
+                }),
+              },
+            });
+            registerBoundaryEntity(outline);
+            if (destroyed) {
+              safeRemoveEntity(v, outline);
+            }
+          });
+          if (destroyed) {
+            return;
+          }
+          setKmlOutline(boundaryEntitiesRef.current[0] ?? null);
+
+          const polyCenter = Cesium.BoundingSphere.fromPoints(allPositions).center;
           const label = v.entities.add({
             position: polyCenter,
             label: {
               text: 'Tanga Graphite',
               font: 'bold 20px sans-serif',
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              fillColor: Cesium.Color.YELLOW,
+              fillColor: Cesium.Color.fromCssColorString('#fde68a'),
               outlineColor: Cesium.Color.BLACK,
               outlineWidth: 3,
               showBackground: true,
-              backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
+              backgroundColor: new Cesium.Color(5 / 255, 16 / 255, 26 / 255, 0.72),
               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
               pixelOffset: new Cesium.Cartesian2(0, -20),
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
               eyeOffset: new Cesium.Cartesian3(0, 0, -100)
             }
           });
-          if (destroyed) { v.entities.remove(label); return; }
+          registerBoundaryEntity(label);
+          if (destroyed) {
+            safeRemoveEntity(v, label);
+            return;
+          }
           setKmlLabel(label);
         }
+
+        setBoundaryLayers([
+          {
+            id: 'tanga-primary',
+            kind: 'primary',
+            dataSource: kmlDs,
+            color: '#fbbf24',
+            label: polygonSets.length > 1 ? 'Merged licence footprint' : 'Project AOI',
+          },
+        ]);
       } catch (err) {
         console.error("KMZ loading failed:", err);
         aoi = Cesium.Rectangle.fromDegrees(38.6, -5.2, 39.1, -4.5);
+        setBoundaryLayers([]);
       }
       if (destroyed) return;
 
@@ -549,76 +669,66 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (destroyed) return;
       v.imageryLayers.add(aerialLayer);
 
-      // 4. Add OSM Buildings and clip to AOI
-      try {
-        const buildings = await Cesium.createOsmBuildingsAsync();
-        if (destroyed) { v.scene.primitives.remove(buildings); return; }
-        v.scene.primitives.add(buildings);
-        setTileset(buildings);
-        if (aoiBuffered) {
-          clipTilesetToRectangle(v, buildings, aoiBuffered);
-        }
-        buildings.cullRequestsWhileMoving = true;
-        buildings.cullRequestsWhileMovingMultiplier = 10.0;
-        buildings.dynamicScreenSpaceError = true;
-        buildings.maximumScreenSpaceError = 8;
-      } catch (err) {
-        console.error("OSM Buildings failed:", err);
-      }
-      if (destroyed) return;
-
-      // 5. Apply 3D cues
+      // 4. Apply 3D cues
       v.scene.globe.show = true;
       v.scene.globe.translucency.enabled = false;
       v.scene.globe.depthTestAgainstTerrain = true;
       v.scene.globe.enableLighting = true;
-      // Increase brightness for more vibrancy
-      v.scene.light.intensity = 2.4; // Boost lighting intensity (+20%)
-      v.scene.globe.baseColor = Cesium.Color.WHITE.withAlpha(0.12); // Slightly brighter base color
-      v.scene.atmosphere.brightnessShift = 0.24; // Brighten atmosphere (+20%)
-      v.scene.skyBox.brightnessShift = 0.12; // Brighten skybox (+20%)
-      try { v.scene.terrainExaggeration = 1.3; } catch {}
+      v.scene.light.intensity = 2.7;
+      v.scene.globe.baseColor = Cesium.Color.WHITE.withAlpha(0.18);
+      v.scene.atmosphere.brightnessShift = 0.34;
+      v.scene.skyAtmosphere.brightnessShift = 0.22;
+      v.scene.globe.maximumScreenSpaceError = interactionMode === 'presentation' ? 1.9 : 1.8;
+      v.scene.globe.tileCacheSize = interactionMode === 'presentation' ? 160 : 220;
+      v.targetFrameRate = interactionMode === 'presentation' ? 30 : 45;
+      try { v.scene.skyBox.brightnessShift = 0.18; } catch {}
+      try { v.scene.terrainExaggeration = 1.18; } catch {}
 
-      // 6. Enable smooth VR-like navigation for cinematic experience
+      // 5. Configure navigation to match the active interaction mode.
       const controller = v.scene.screenSpaceCameraController;
       controller.enableInputs = true;
-      controller.enableRotate = false; // Disable orbit rotation
-      controller.enableTranslate = true; // Keep translate for panning
+      controller.enableRotate = false;
       controller.enableZoom = true;
-      controller.enableTilt = false; // Disable tilt, use look instead
-      controller.enableLook = true; // Enable look for VR-style viewing
+      controller.enableLook = true;
+      controller.rotateEventTypes = [];
+      controller.lookEventTypes = [Cesium.CameraEventType.LEFT_DRAG];
 
-      // Assign left-drag to look (VR-style camera rotation without moving position)
-      controller.rotateEventTypes = []; // Clear rotate events
-      controller.lookEventTypes = [Cesium.CameraEventType.LEFT_DRAG]; // Left drag for looking around
-      controller.translateEventTypes = [Cesium.CameraEventType.MIDDLE_DRAG]; // Middle drag for panning
+      if (interactionMode === 'presentation') {
+        controller.enableTranslate = false;
+        controller.enableTilt = false;
+        controller.translateEventTypes = [];
+        controller.tiltEventTypes = [Cesium.CameraEventType.PINCH];
+        controller.zoomEventTypes = [Cesium.CameraEventType.WHEEL];
+        controller.zoomFactor = 2.8;
+        controller.minimumZoomDistance = 12000.0;
+        controller.maximumZoomDistance = 180000.0;
+      } else {
+        controller.enableTranslate = true;
+        controller.enableTilt = true;
+        controller.translateEventTypes = [Cesium.CameraEventType.MIDDLE_DRAG];
+        controller.tiltEventTypes = [
+          { eventType: Cesium.CameraEventType.LEFT_DRAG, modifier: Cesium.KeyboardEventModifier.SHIFT },
+          Cesium.CameraEventType.PINCH,
+        ];
+        controller.zoomEventTypes = [Cesium.CameraEventType.RIGHT_DRAG, Cesium.CameraEventType.WHEEL];
+      }
 
-      // Configure zoom with right drag and wheel for convenience
-      controller.zoomEventTypes = [Cesium.CameraEventType.RIGHT_DRAG, Cesium.CameraEventType.WHEEL];
-
-      // Minimize inertia for immediate, responsive feel
       controller.inertiaSpin = 0;
-      controller.inertiaTranslate = 0.05; // Reduced for smoother feel
-      controller.inertiaZoom = 0.05; // Reduced for smoother feel
+      controller.inertiaTranslate = interactionMode === 'presentation' ? 0.0 : 0.03;
+      controller.inertiaZoom = interactionMode === 'presentation' ? 0.02 : 0.03;
+      controller.lookDamping = interactionMode === 'presentation' ? 0.008 : 0.015;
+      controller.bounceAnimationTime = 0;
+      controller.maximumMovementRatio = interactionMode === 'presentation' ? 0.7 : 0.85;
+      v.resolutionScale = interactionMode === 'presentation' ? 1.0 : 0.82;
 
-      // Set damping for ultra-smooth look movement
-      controller.lookDamping = 0.02; // Very low for cinematic feel
-
-      // Enable smooth camera movements with minimal bounce
-      controller.bounceAnimationTime = 0; // Disable bounce for immediate response
-      controller.maximumMovementRatio = 1.0; // Allow full movement range
-
-      // Apply faster, lighter navigation defaults
-      applyFastNavProfile?.();
-
-      // 7. Fly camera to AOI
+      // 6. Fly camera to AOI
       if (aoiBuffered) {
         await flyToRectangleFill(v, aoiBuffered);
       }
       if (destroyed) return;
       v.scene.requestRender();
 
-      // 7.1 Removed global zoom clamp.
+      // 6.1 Removed global zoom clamp.
       // Previously we clamped zoom relative to the initial camera height, which unintentionally
       // limited all CesiumProvider-based views. Leaving zoom distances to Cesium defaults avoids
       // cross-view side effects. If a specific view needs limits, set them locally in that view.
@@ -634,17 +744,26 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     return () => {
       destroyed = true;
+      disableFreeFly();
       if (controllerRef.current) controllerRef.current.stop();
+      if (v && !v.isDestroyed?.()) {
+        boundaryEntitiesRef.current.forEach((entity) => safeRemoveEntity(v, entity));
+        boundaryEntitiesRef.current = [];
+        boundaryDataSourcesRef.current.forEach((dataSource) => safeRemoveDataSource(v, dataSource));
+        boundaryDataSourcesRef.current = [];
+      }
       try { if (v && !v.isDestroyed()) v.destroy(); } catch {}
       setViewer(null);
       setRenderController(null);
       setTileset(null);
       setKmlDataSource(null);
       setKmlLabel(null);
+      setKmlOutline(null);
+      setBoundaryLayers([]);
       setReady(false);
       initializedRef.current = false;
     };
-  }, []);
+  }, [interactionMode, safeRemoveDataSource, safeRemoveEntity]);
 
   // InteractionQualityScaler: lighten rendering during active interaction (pointer/touch/wheel),
   // then restore crisp quality shortly after idle. Cesium-only; fully guarded.
@@ -689,7 +808,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       lastInputAt = performance.now();
       try {
         const base = baseline.res ?? 1.0;
-        v.resolutionScale = Math.max(0.7, Math.min(0.85, base * 0.85));
+        v.resolutionScale = Math.max(0.82, Math.min(0.9, base * 0.88));
       } catch {}
       try { if (tileset) tileset.maximumScreenSpaceError = 16; } catch {}
       try { if (fxaaStage) fxaaStage.enabled = false; } catch {}
@@ -744,7 +863,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [viewer, ready, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile, enableFreeFly, disableFreeFly]);
 
   return (
-    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, applyTilesetProfile: applyTilesetProfileRef.current, enableAoiCutaway, disableAoiCutaway, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile, enableFreeFly, disableFreeFly }}>
+    <Ctx.Provider value={{ viewer, ready, renderController, tileset, kmlDataSource, kmlLabel, kmlOutline, boundaryLayers, applyTilesetProfile: applyTilesetProfileRef.current, enableAoiCutaway, disableAoiCutaway, enterUndergroundMode, exitUndergroundMode, applyFastNavProfile, enableFreeFly, disableFreeFly }}>
       <div className="absolute inset-0 pointer-events-auto" ref={containerRef} />
       {children}
     </Ctx.Provider>

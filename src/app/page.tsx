@@ -1,223 +1,381 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ChapterMenu } from "@/components/ui/chapter-menu";
+import Image from 'next/image';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { deckSlides } from "@/data/deck";
 import { useDeckController } from "@/hooks/useDeckController";
 import { AnnotationsOverlay } from "@/components/deck/AnnotationsOverlay";
 import { DeckCameraController } from "@/components/deck/DeckCameraController";
-import { OverlayRoot } from "@/ui/overlays/OverlayRoot";
-import { uiTheme } from "@/ui/overlays";
-import { HeroOverlay } from "@/components/HeroOverlay";
-import TilesetQualityToggle from "@/components/TilesetQualityToggle";
 import { CesiumProvider } from '@/contexts/cesium-context';
 import CesiumViewSwitch from '@/components/CesiumViewSwitch';
 import ThreeJsViewSwitch from '@/components/ThreeJsViewSwitch';
 import { ThreeSceneProvider } from '@/contexts/three-scene-context';
+import { DeckRail } from '@/components/presentation/DeckRail';
+import { StoryStageCard } from '@/components/presentation/StoryStageCard';
+import { StageNav } from '@/components/presentation/StageNav';
+import ThreeJsDataOverlay from '@/components/ThreeJsDataOverlay';
 import GlobalOverlays from '@/components/shared/GlobalOverlays';
-import UiChromeMeasure from '@/components/shared/UiChromeMeasure';
+import { OverlayRoot } from '@/ui/overlays/OverlayRoot';
+import { MetallurgyShowcase } from '@/components/presentation/MetallurgyShowcase';
+import type {
+  DeckSlide,
+  PresentationMediaLayout,
+  PresentationPanelVariant,
+  PresentationStageMode,
+  PresentationThemeTone,
+} from '@/lib/deck';
 
-// Simplified view sequence
-const viewSequence = [
-  'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map',
-  'drillhole_location_assay',
+type HomeView =
+  | 'original'
+  | 'exaggerated_kml'
+  | 'styled_kml'
+  | 'tanaga_accessibility'
+  | 'tanga_geological_map'
+  | 'geojson_drillholes_lithology'
+  | 'geojson_drillholes_assay'
+  | 'drillhole_location_assay'
+  | 'drillhole_location_lithology'
+  | 'lithology_view'
+  | 'assay_view'
+  | 'block_model_carbon_view'
+  | 'block_model_resc_view';
+
+const cesiumSwitcherViews = new Set<HomeView>([
+  'original',
+  'exaggerated_kml',
+  'styled_kml',
+  'tanaga_accessibility',
+  'tanga_geological_map',
   'geojson_drillholes_lithology',
   'geojson_drillholes_assay',
-  // 'drillhole_lithology_reveal',
-  'lithology_view', 'assay_view', 'block_model_carbon_view', 'block_model_resc_view'
-] as const;
-
-type ViewType = typeof viewSequence[number];
-
-const cesiumSwitcherViews = new Set<string>([
-    'original', 'exaggerated_kml', 'styled_kml', 'tanaga_accessibility', 'tanga_geological_map',
-    'geojson_drillholes_lithology', 'geojson_drillholes_assay', 'tiff_overlay', 'project_location',
-    'geospatial_lithology', 'geospatial_assay', 'drillhole_lithology_reveal', 'subsurface_cutaway', 'kml_focused_view', 'resource_model_viewer',
-    'block_model_box_cutter_class', 'block_model_clip_view', 'drillhole_location_assay', 'modular_subsurface'
+  'drillhole_location_assay',
+  'drillhole_location_lithology',
 ]);
 
-const threeJsSwitcherViews = new Set<string>([
-    'lithology_view',
-    'assay_view',
-    'block_model_carbon_view',
-    'block_model_resc_view'
+const threeJsSwitcherViews = new Set<HomeView>([
+  'lithology_view',
+  'assay_view',
+  'block_model_carbon_view',
+  'block_model_resc_view',
 ]);
+
+const technicalSlides = new Set([
+  'drillholes',
+  'drillholes_lithology',
+  'drillholes_assay',
+  'lithology',
+  'assay',
+  'carbon_model',
+  'classification',
+]);
+
+const rightDataOverlaySlides = new Set([
+  'drillholes',
+  'drillholes_lithology',
+  'drillholes_assay',
+  'lithology',
+  'assay',
+  'carbon_model',
+  'classification',
+  'metallurgy',
+  'product_quality',
+]);
+
+const mediaLayoutById: Partial<Record<string, PresentationMediaLayout>> = {
+  drillholes: 'split-right',
+  drillholes_lithology: 'split-right',
+  drillholes_assay: 'split-right',
+  lithology: 'split-right',
+  assay: 'split-right',
+  carbon_model: 'split-right',
+  classification: 'split-right',
+  metallurgy: 'split-right',
+  product_quality: 'split-right',
+};
+
+const variantById: Partial<Record<string, PresentationPanelVariant>> = {
+  overview: 'cover',
+  drillholes: 'evidence',
+  drillholes_assay: 'evidence',
+  assay: 'evidence',
+  carbon_model: 'evidence',
+  classification: 'evidence',
+  metallurgy: 'evidence',
+  product_quality: 'evidence',
+  investment_thesis: 'closing',
+};
+
+const actToneMap: Record<string, PresentationThemeTone> = {
+  setup: 'sky',
+  journey: 'emerald',
+  resolution: 'amber',
+};
+
+const evidenceLabels = ['Location', 'Dataset', 'Advantage', 'Validation'];
+
+const presentationSlides: DeckSlide[] = deckSlides.map((slide, index, slides) => {
+  const stageMode: PresentationStageMode =
+    slide.id === 'overview'
+      ? 'hero'
+      : slide.id === 'investment_thesis'
+        ? 'closing'
+        : technicalSlides.has(slide.id)
+          ? 'technical'
+          : 'narrative';
+
+  return {
+    ...slide,
+    chapter: slide.chapter ?? slide.narrative?.chapterTitle ?? `Chapter ${index + 1}`,
+    railTitle: slide.railTitle ?? slide.title,
+    panelVariant:
+      slide.panelVariant ??
+      variantById[slide.id] ??
+      (index === 0 ? 'cover' : index === slides.length - 1 ? 'closing' : 'focus'),
+    themeTone: slide.themeTone ?? actToneMap[slide.narrative?.act ?? 'journey'] ?? 'sky',
+    stageMode,
+    mediaLayout: slide.mediaLayout ?? mediaLayoutById[slide.id] ?? 'full-bleed',
+    hideSceneUtilities: slide.hideSceneUtilities ?? true,
+    evidenceItems:
+      slide.evidenceItems ??
+      slide.facts?.slice(0, 3).map((fact, factIndex) => ({
+        label: evidenceLabels[factIndex] ?? `Point ${factIndex + 1}`,
+        value: fact,
+      })),
+  };
+});
 
 export default function Home() {
-  const deck = useDeckController(deckSlides);
-  const [title, setTitle] = useState(deckSlides[0]?.title ?? "");
-  const [titleVisible, setTitleVisible] = useState(true);
+  const deck = useDeckController(presentationSlides);
+  const lockRef = useRef(false);
+  const transitionTimerRef = useRef<number | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  useEffect(() => {
-    setTitleVisible(false);
-    setTimeout(() => {
-      setTitle(deck.current?.title ?? "");
-      setTitleVisible(true);
-    }, 500); // Increased delay for smoother transition
-  }, [deck.index, deck.current]);
-
-  // Autoplay effect
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (deck.isAutoplay && deck.index < deck.viewSequence.length - 1) {
-      interval = setTimeout(() => {
-        deck.next();
-      }, deck.current?.durationMs ?? 10000);
-    } else if (deck.isAutoplay && deck.index === deck.viewSequence.length - 1) {
-      deck.stopAutoplay();
-    }
-    return () => {
-      if (interval) clearTimeout(interval);
-    };
-  }, [deck.index, deck.isAutoplay, deck.current, deck.viewSequence.length, deck.next, deck.stopAutoplay]);
-
-  // Scrolling functionality
-  useEffect(() => {
-    let lastScrollTime = 0;
-    const handleWheel = (e: WheelEvent) => {
-      // Ignore scroll if interacting with a canvas (3D Viewer zoom)
-      if ((e.target as HTMLElement).tagName === 'CANVAS') return;
-
-      const now = Date.now();
-      if (now - lastScrollTime < 1000) return; // 1 second throttle
-
-      if (e.deltaY > 50) {
-        deck.next();
-        lastScrollTime = now;
-      } else if (e.deltaY < -50) {
-        deck.prev();
-        lastScrollTime = now;
-      }
-    };
-    window.addEventListener('wheel', handleWheel);
-    return () => window.removeEventListener('wheel', handleWheel);
-  }, []);
-
-  const startGuidedTour = () => {
-    deck.setIndex(0);
-    deck.startAutoplay();
-  };
-
-  const resetToHomeView = () => {
-    console.log('Reset to home view triggered');
-    deck.setIndex(0);
-    deck.stopAutoplay();
-  };
-
-  const currentView: ViewType = (deck.current?.view ?? viewSequence[0]) as ViewType;
-  const handleNext = () => deck.next();
-  const handlePrev = () => deck.prev();
+  const slideCount = deck.viewSequence.length;
+  const currentSlide = deck.current;
+  const currentView = (currentSlide?.view ?? 'original') as HomeView;
+  const currentSlideNumber = deck.index + 1;
   const isFirstSlide = deck.index <= 0;
-  const isLastSlide = deck.index >= deck.viewSequence.length - 1;
-
+  const isLastSlide = deck.index >= slideCount - 1;
   const isCesiumSwitcherView = cesiumSwitcherViews.has(currentView);
   const isThreeJsSwitcherView = threeJsSwitcherViews.has(currentView);
-  const isStandalone2D = ['downhole_plot'].includes(currentView);
+  const isMetallurgySlide = currentSlide?.id === 'metallurgy';
+  const showThreeDataOverlay = !!currentSlide && rightDataOverlaySlides.has(currentSlide.id);
+  const showStorySidePanel = !showThreeDataOverlay;
 
-  console.log(`[page.tsx] Rendering view: ${currentView}`);
+  const releaseLock = useCallback(() => {
+    lockRef.current = false;
+    setIsTransitioning(false);
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+  }, []);
+
+  const navigateToIndex = useCallback((nextIndex: number, preserveAutoplay = false) => {
+    if (nextIndex < 0 || nextIndex >= presentationSlides.length || nextIndex === deck.index || lockRef.current) {
+      return;
+    }
+
+    lockRef.current = true;
+    setIsTransitioning(true);
+    deck.setIndex(nextIndex);
+
+    if (!preserveAutoplay) {
+      deck.stopAutoplay();
+    }
+
+    const transitionMs = Math.max(
+      900,
+      Math.round((presentationSlides[nextIndex]?.camera?.duration ?? 1.3) * 1000) + 420
+    );
+
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+    }
+
+    transitionTimerRef.current = window.setTimeout(() => {
+      lockRef.current = false;
+      setIsTransitioning(false);
+      transitionTimerRef.current = null;
+    }, transitionMs);
+  }, [deck.index, deck.setIndex, deck.stopAutoplay]);
+
+  const goNext = useCallback((preserveAutoplay = false) => {
+    if (deck.index >= slideCount - 1) {
+      if (!preserveAutoplay) {
+        deck.stopAutoplay();
+      }
+      return;
+    }
+
+    navigateToIndex(deck.index + 1, preserveAutoplay);
+  }, [deck.index, deck.stopAutoplay, navigateToIndex, slideCount]);
+
+  const goPrev = useCallback(() => {
+    navigateToIndex(deck.index - 1);
+  }, [deck.index, navigateToIndex]);
+
+  const startGuidedTour = useCallback(() => {
+    releaseLock();
+    deck.setIndex(0);
+    deck.startAutoplay();
+  }, [deck.setIndex, deck.startAutoplay, releaseLock]);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let interval: number | undefined;
+
+    if (deck.isAutoplay && !isTransitioning && deck.index < slideCount - 1) {
+      interval = window.setTimeout(() => {
+        goNext(true);
+      }, currentSlide?.durationMs ?? 9000);
+    } else if (deck.isAutoplay && deck.index === slideCount - 1) {
+      deck.stopAutoplay();
+    }
+
+    return () => {
+      if (interval) {
+        clearTimeout(interval);
+      }
+    };
+  }, [currentSlide?.durationMs, deck.index, deck.isAutoplay, deck.stopAutoplay, goNext, isTransitioning, slideCount]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (lockRef.current) return;
+
+      if (event.key === 'ArrowRight' || event.key === 'PageDown') {
+        event.preventDefault();
+        goNext();
+      } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+        event.preventDefault();
+        goPrev();
+      } else if (event.key === ' ' && !(event.target instanceof HTMLInputElement)) {
+        event.preventDefault();
+        deck.toggleAutoplay();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [deck.toggleAutoplay, goNext, goPrev]);
 
   return (
-      <div className="app-shell bg-canvas text-gray-100 transition-all duration-700 ease-in-out">
-        <UiChromeMeasure />
-        <OverlayRoot
-          baseSlots={{
-            "top-left": (
-              <div className="flex flex-col gap-3">
-                <HeroOverlay onStart={startGuidedTour} />
-              </div>
-            ),
-            "top-center": (
-              <div className={`text-2xl md:text-3xl font-bold text-white ${uiTheme.panel.background} ${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow} ${uiTheme.panel.padding} transition-opacity duration-300 ${titleVisible ? "opacity-100" : "opacity-0"}`}>
-                {deck.current?.title ?? title}
-              </div>
-            ),
-            "top-right": (
-              <div className="flex w-full justify-end">
-                <div className="w-[320px] flex flex-col gap-3 items-end pointer-events-auto max-md:hidden">
-                  {deck.isAutoplay && (
-                    <button
-                      onClick={deck.stopAutoplay}
-                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      ⏸️ Stop Tour
-                    </button>
-                  )}
-                  <ChapterMenu
-                    viewSequence={deck.viewSequence}
-                    viewTitles={deck.viewTitles}
-                    currentViewIndex={deck.index}
-                    setCurrentViewIndex={deck.setIndex}
-                  />
-                  <TilesetQualityToggle />
-                </div>
-              </div>
-            ),
-            "bottom-center": (
-              <div className="flex items-center gap-3">
-                {!isFirstSlide && (
-                  <button
-                    onClick={handlePrev}
-                    className="text-2xl font-semibold text-white bg-black/40 rounded-lg px-4 py-1 hover:bg-black/60 pointer-events-auto"
-                  >
-                    ← Prev
-                  </button>
-                )}
-                <button
-                  onClick={deck.toggleAutoplay}
-                  className="text-sm font-medium text-white bg-black/50 rounded-full px-4 py-2 pointer-events-auto"
-                >
-                  {deck.isAutoplay ? "Stop Tour" : "Start Tour"}
-                </button>
-                <button
-                  onClick={handleNext}
-                  disabled={isLastSlide}
-                  className={`text-2xl font-semibold text-white bg-black/40 rounded-lg px-4 py-1 pointer-events-auto transition-colors ${
-                    isLastSlide ? "opacity-50 cursor-not-allowed" : "hover:bg-black/60"
-                  }`}
-                >
-                  Next →
-                </button>
-              </div>
-            ),
-            "bottom-right": null,
-          }}
+    <div className="vrify-frame">
+      <OverlayRoot
+        leftOffsetPx="var(--vrify-overlay-left, 0px)"
+        rightOffsetPx="var(--vrify-overlay-right, 0px)"
+        topOffsetPx="var(--vrify-overlay-top, 0px)"
+        bottomOffsetPx="var(--vrify-overlay-bottom, 0px)"
+      >
+        <div
+          className="vrify-shell"
+          data-scene-mode={isThreeJsSwitcherView ? 'three' : isCesiumSwitcherView ? 'cesium' : 'none'}
+          data-story-tone={currentSlide?.themeTone ?? 'sky'}
         >
-          <div className="viewer-layer">
-            {isCesiumSwitcherView && (
-              <CesiumProvider>
-                <DeckCameraController camera={deck.current?.camera} />
-                <AnnotationsOverlay annotations={deck.current?.annotations} />
-                <CesiumViewSwitch view={currentView as any} />
-                <GlobalOverlays
-                  mode="cesium"
-                  hidden={false}
-                  currentView={currentView}
-                  onLogoClick={resetToHomeView}
-                />
+      <div className="vrify-shell__backdrop" />
+
+      <DeckRail
+        slides={presentationSlides}
+        currentIndex={deck.index}
+        isAutoplay={deck.isAutoplay}
+        isLocked={isTransitioning}
+        onJump={(index) => navigateToIndex(index)}
+        onToggleAutoplay={deck.toggleAutoplay}
+      />
+
+      <main className="vrify-main">
+        <div className="vrify-main__header">
+          <div className="vrify-main__project-pill">
+            <div className="vrify-main__project-brand">
+              <Image src="/A_Logo.png" alt="Sakariya logo" width={28} height={28} className="vrify-main__project-mark" priority />
+              <div className="vrify-main__project-copy">
+                <span className="vrify-main__project-label">Tanga Graphite</span>
+                <span className="vrify-main__project-subtitle">Investor story deck</span>
+              </div>
+            </div>
+          </div>
+          <div className="vrify-main__chapter-tag" data-no-deck-wheel>
+            {currentSlide?.chapter ?? currentSlide?.narrative?.chapterTitle ?? "Project Story"}
+          </div>
+        </div>
+
+        <section className="vrify-stage" data-no-deck-wheel>
+          <div className="vrify-stage__media" data-no-deck-wheel>
+            {isMetallurgySlide ? (
+              <MetallurgyShowcase />
+            ) : null}
+
+            {isCesiumSwitcherView && !isMetallurgySlide && (
+              <CesiumProvider interactionMode="presentation">
+                {currentSlide?.cameraMode !== 'view' ? (
+                  <DeckCameraController camera={currentSlide?.camera} />
+                ) : null}
+                <AnnotationsOverlay annotations={currentSlide?.annotations} />
+                <CesiumViewSwitch view={currentView as any} deckControlled />
+                <GlobalOverlays mode="cesium" hidden={false} currentView={currentSlide?.id} />
               </CesiumProvider>
             )}
 
-            {isThreeJsSwitcherView && (
+            {isThreeJsSwitcherView && !isMetallurgySlide && (
               <ThreeSceneProvider active={isThreeJsSwitcherView}>
-                <AnnotationsOverlay annotations={deck.current?.annotations} />
+                <AnnotationsOverlay annotations={currentSlide?.annotations} />
                 <ThreeJsViewSwitch view={currentView as any} />
-                <GlobalOverlays
-                  mode="three"
-                  hidden={false}
-                  currentView={currentView}
-                  onLogoClick={resetToHomeView}
-                />
+                <GlobalOverlays mode="three" hidden={false} currentView={currentSlide?.id} />
               </ThreeSceneProvider>
             )}
-
-            {isStandalone2D && (
-              <div className="h-full w-full bg-transparent">
-                {/* Standalone 2D content */}
-              </div>
-            )}
           </div>
-          <div id="cesium-toolbar" className="absolute top-12 left-4 z-10 hidden bg-zinc-800/80 text-white p-2 rounded"></div>
-        </OverlayRoot>
-      </div>
+
+          <div className="vrify-stage__scrim" />
+          <div className="vrify-stage__highlight" />
+
+          <div className="vrify-stage__content">
+            {currentSlide ? (
+              <StoryStageCard
+                slide={currentSlide}
+                slideNumber={currentSlideNumber}
+                slideCount={slideCount}
+                isAutoplay={deck.isAutoplay}
+                onStartTour={startGuidedTour}
+                showSidePanel={showStorySidePanel}
+              />
+            ) : null}
+          </div>
+
+          {showThreeDataOverlay && currentSlide ? <ThreeJsDataOverlay slideId={currentSlide.id} /> : null}
+        </section>
+
+        <footer className="vrify-main__footer">
+          <div className="vrify-main__footer-copy">
+            <span>Investor Deck</span>
+            <strong>
+              {currentSlide?.chapter ?? currentSlide?.narrative?.chapterTitle ?? 'Project Story'}
+            </strong>
+          </div>
+          <StageNav
+            currentSlideNumber={currentSlideNumber}
+            slideCount={slideCount}
+            isAutoplay={deck.isAutoplay}
+            isFirstSlide={isFirstSlide}
+            isLastSlide={isLastSlide}
+            isLocked={isTransitioning}
+            onPrev={goPrev}
+            onNext={() => goNext()}
+            onToggleAutoplay={deck.toggleAutoplay}
+          />
+        </footer>
+      </main>
+        </div>
+      </OverlayRoot>
+    </div>
   );
 }

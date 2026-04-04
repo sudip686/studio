@@ -6,26 +6,23 @@ export const uiTheme = {
     lg: "1.5rem",
   },
   panel: {
-    radius: "rounded-[18px]",
-    blur: "backdrop-blur-md",
-    // Keep UI chrome subtle and as small as possible.
-    // Use a lighter background so panels don't feel like large blocks.
-    background: "bg-black/30",
-    border: "border border-white/10",
-    shadow: "shadow-[0_18px_45px_rgba(0,0,0,0.65)]",
-    padding: "px-4 py-3",
+    radius: "rounded-[24px]",
+    blur: "backdrop-blur-sm",
+    background:
+      "bg-[linear-gradient(180deg,rgba(26,18,13,0.98),rgba(13,10,8,0.94))]",
+    border: "border border-[#f1d2bf]/24",
+    shadow: "shadow-[0_18px_42px_rgba(0,0,0,0.34)]",
+    padding: "px-4 py-4",
   },
   text: {
-    label: "text-xs uppercase tracking-[0.3em] text-accent/80",
-    body: "text-xs md:text-sm text-gray-300",
-    title: "text-lg md:text-xl font-semibold font-headline",
+    label: "text-[10px] uppercase tracking-[0.28em] text-[#f1d2bf]/82",
+    body: "text-xs md:text-sm leading-relaxed text-white/86",
+    title: "text-lg md:text-xl font-semibold tracking-[-0.02em] text-white",
   },
   legend: {
     width: {
-      // Legends should never be wider than their content.
-      // `w-fit` prevents full-width panels while still allowing reasonable wrapping.
-      categorical: "w-fit max-w-[70vw]",
-      gradient: "w-fit max-w-[70vw]",
+      categorical: "w-fit max-w-[min(22rem,78vw)]",
+      gradient: "w-fit min-w-[12.5rem] max-w-[min(22rem,78vw)]",
     },
   },
   zIndex: {
