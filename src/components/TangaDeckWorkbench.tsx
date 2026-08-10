@@ -867,12 +867,35 @@ function deckHeightAt(lon: number, lat: number) {
   return reliefHeightAt(lon, lat);
 }
 
+const TERRAIN_HYPSO_STOPS: Array<[number, [number, number, number]]> = [
+  [32, [38, 86, 116]],    // valleys — cool slate
+  [200, [44, 128, 118]],  // teal lowland
+  [340, [92, 150, 92]],   // green foothills
+  [500, [168, 148, 92]],  // tan slopes
+  [680, [204, 168, 112]], // warm ridges
+  [900, [234, 216, 188]], // high peaks — pale
+];
+
 function terrainColor(elevation: number): [number, number, number, number] {
-  if (elevation >= 620) return [228, 169, 92, 158];
-  if (elevation >= 460) return [180, 139, 84, 148];
-  if (elevation >= 310) return [84, 143, 92, 138];
-  if (elevation >= 180) return [34, 134, 139, 132];
-  return [26, 86, 128, 124];
+  // Smooth continuous hypsometric tint (interpolated, not banded) so the DEM
+  // reads as a real elevation surface rather than 5 flat colour steps.
+  const first = TERRAIN_HYPSO_STOPS[0];
+  const last = TERRAIN_HYPSO_STOPS[TERRAIN_HYPSO_STOPS.length - 1];
+  const e = clamp(elevation, first[0], last[0]);
+  for (let i = 0; i < TERRAIN_HYPSO_STOPS.length - 1; i += 1) {
+    const [e0, c0] = TERRAIN_HYPSO_STOPS[i];
+    const [e1, c1] = TERRAIN_HYPSO_STOPS[i + 1];
+    if (e <= e1) {
+      const t = (e - e0) / (e1 - e0);
+      return [
+        Math.round(c0[0] + (c1[0] - c0[0]) * t),
+        Math.round(c0[1] + (c1[1] - c0[1]) * t),
+        Math.round(c0[2] + (c1[2] - c0[2]) * t),
+        150,
+      ];
+    }
+  }
+  return [last[1][0], last[1][1], last[1][2], 150];
 }
 
 function terrainPresentationElevation(
@@ -886,8 +909,9 @@ function terrainPresentationElevation(
 
 function localTerrainCells(heightAt: (lon: number, lat: number) => number, mode: WorkbenchMode): TerrainCell[] {
   const [minLon, minLat, maxLon, maxLat] = TOPO_BOUNDS;
-  const columns = mode === 'topography' ? 24 : 18;
-  const rows = mode === 'topography' ? 18 : 13;
+  // Higher cell density on the topography scene → smoother, less-blocky relief.
+  const columns = mode === 'topography' ? 44 : 22;
+  const rows = mode === 'topography' ? 34 : 16;
   const dx = (maxLon - minLon) / columns;
   const dy = (maxLat - minLat) / rows;
   const cells: TerrainCell[] = [];
