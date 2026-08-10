@@ -214,14 +214,36 @@ const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, -60, 0);
 // the 192 MB high-res texture and other heavy files out of the git repo and
 // the Vercel deployment bundle.
 const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_ASSET_BASE_URL || '').replace(/\/$/, '');
-const assetUrl = (path: string) => (ASSET_BASE_URL ? `${ASSET_BASE_URL}${path}` : path);
 
-const TERRAIN_META_PATH = assetUrl('/terrain_preview_meta.json');
-const TERRAIN_HEIGHT_PATH = assetUrl('/height_preview_1024.bin');
+// Resilient asset loading: prefer Cloudflare R2 (when NEXT_PUBLIC_ASSET_BASE_URL
+// is set), but transparently fall back to the local /public copy if R2 is
+// missing the object or unreachable. This means the app works whether or not
+// every asset has been uploaded to R2 yet — no hard dependency on the bucket.
+async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
+  if (ASSET_BASE_URL) {
+    try {
+      const remote = await fetch(`${ASSET_BASE_URL}${path}`, init);
+      if (remote.ok) return remote;
+    } catch { /* fall through to local */ }
+  }
+  return fetch(path, init);
+}
+async function loadTextureWithFallback(path: string): Promise<THREE.Texture> {
+  const loader = new THREE.TextureLoader();
+  if (ASSET_BASE_URL) {
+    try {
+      return await loader.loadAsync(`${ASSET_BASE_URL}${path}`);
+    } catch { /* fall through to local */ }
+  }
+  return loader.loadAsync(path);
+}
+
+const TERRAIN_META_PATH = '/terrain_preview_meta.json';
+const TERRAIN_HEIGHT_PATH = '/height_preview_1024.bin';
 const TERRAIN_TEXTURE_PATHS: Record<AssetQuality, string> = {
-  preview: assetUrl('/topography.png'),
-  standard: assetUrl('/terrain_texture_8k.jpg'),
-  high: assetUrl('/texture_rgb_8192.png'),
+  preview: '/topography.png',
+  standard: '/terrain_texture_8k.jpg',
+  high: '/texture_rgb_8192.png',
 };
 const TERRAIN_PATCH_WIDTH = 7200;
 const TERRAIN_PATCH_DEPTH = 6800;
@@ -362,15 +384,15 @@ function loadTangaTerrainResources(renderer: THREE.WebGLRenderer, quality: Asset
   if (existingPromise) return existingPromise;
 
   const terrainPromise = Promise.all([
-      fetch(TERRAIN_META_PATH, {cache: 'force-cache'}).then(async (response) => {
+      fetchAsset(TERRAIN_META_PATH, {cache: 'force-cache'}).then(async (response) => {
         if (!response.ok) throw new Error(`Terrain meta failed with ${response.status}`);
         return response.json() as Promise<TerrainMeta>;
       }),
-      fetch(TERRAIN_HEIGHT_PATH, {cache: 'force-cache'}).then(async (response) => {
+      fetchAsset(TERRAIN_HEIGHT_PATH, {cache: 'force-cache'}).then(async (response) => {
         if (!response.ok) throw new Error(`Height grid failed with ${response.status}`);
         return response.arrayBuffer();
       }),
-      new THREE.TextureLoader().loadAsync(TERRAIN_TEXTURE_PATHS[quality]),
+      loadTextureWithFallback(TERRAIN_TEXTURE_PATHS[quality]),
     ]).then(([meta, heightBuffer, texture]) => {
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.wrapS = THREE.ClampToEdgeWrapping;
@@ -757,7 +779,7 @@ function parseBlockGeoJson(payload: any) {
 
 function loadBlocks() {
   if (!blockPromise) {
-    blockPromise = fetch(assetUrl('/resource_model.bin'), {cache: 'force-cache'})
+    blockPromise = fetchAsset('/resource_model.bin', {cache: 'force-cache'})
       .then((response) => {
         if (!response.ok) throw new Error(`Resource binary failed with ${response.status}`);
         return response.arrayBuffer();
@@ -776,12 +798,12 @@ function loadBlocks() {
 function loadDrillholes() {
   if (!drillPromise) {
     drillPromise = Promise.all([
-      fetch(assetUrl('/assay_data.geojson'), {cache: 'force-cache'})
+      fetchAsset('/assay_data.geojson', {cache: 'force-cache'})
         .then((response) => {
           if (!response.ok) throw new Error(`Drillholes failed with ${response.status}`);
           return response.json();
         }),
-      fetch(assetUrl('/lithology_data.geojson'), {cache: 'force-cache'})
+      fetchAsset('/lithology_data.geojson', {cache: 'force-cache'})
         .then((response) => response.ok ? response.json() : null)
         .catch(() => null),
     ]).then(([assayPayload, lithologyPayload]) => {
