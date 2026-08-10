@@ -1156,12 +1156,12 @@ function drillTooltip(segment: DrillSegment, title: string, tone: string, extraR
 function blockTooltip(block: ResourceBlock): DrillPickInfo {
   const bin = tgcGradeBin(block.carbon);
   return {
-    title: `${bin.label} block`,
+    title: `${block.carbon.toFixed(2)}% TGC`,
     tone: bin.color,
     rows: [
-      `${block.carbon.toFixed(2)}% TGC proxy`,
-      `${block.classification} resource class`,
-      `${Math.round(block.dx)} x ${Math.round(block.dy)} x ${Math.round(block.dz)} m cell`,
+      `${bin.label} grade`,
+      `${block.classification} resource`,
+      `${Math.round(block.dx)} × ${Math.round(block.dy)} × ${Math.round(block.dz)} m block`,
     ],
   };
 }
@@ -1433,9 +1433,10 @@ export default function TangaThreeGeologyScene({
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Slightly lower exposure lets colors resolve richer instead of washed;
-    // a CSS saturation/contrast filter on the host adds the "vivid" pop.
-    renderer.toneMappingExposure = 1.02;
+    // Lower exposure so the bright satellite terrain doesn't wash out; a CSS
+    // contrast/saturation grade then adds punch. Tuned by measuring canvas
+    // luminance (~220 was washed; target ~185 with more tonal range).
+    renderer.toneMappingExposure = 0.92;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
@@ -1632,6 +1633,20 @@ export default function TangaThreeGeologyScene({
     const stage = new THREE.Group();
     groupRef.current = stage;
     scene.add(stage);
+
+    // Ground reference grid — anchors the block model / pit in space so the
+    // subsurface reads as a real 3D model rather than floating voxels.
+    if (mode === 'resource' || mode === 'mine_planning' || mode === 'subsurface') {
+      const grid = new THREE.GridHelper(3800, 19, 0x4a5a6e, 0x2a3644);
+      grid.position.set(0, -440, -60);
+      const gm = grid.material as THREE.Material;
+      gm.transparent = true;
+      gm.opacity = 0.28;
+      gm.depthWrite = false;
+      grid.renderOrder = 1;
+      stage.add(grid);
+    }
+
     cameraCommandHandlerRef.current = consumeCameraCommand;
     const pendingCameraCommand = cameraCommandRef.current;
     if (pendingCameraCommand) consumeCameraCommand(pendingCameraCommand);
@@ -1936,6 +1951,8 @@ export default function TangaThreeGeologyScene({
         opacity: mode === 'resource' ? 0.62 : 0.96,
       });
       const collars = new THREE.InstancedMesh(collarGeometry, collarMaterial, collarSegments.length);
+      collars.castShadow = true;
+      collars.receiveShadow = true;
       const collarMatrix = new THREE.Matrix4();
       collarSegments.forEach((segment, index) => {
         const point = collarSurfacePoint(segment, terrainResources, mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT);
