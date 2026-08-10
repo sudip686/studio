@@ -13266,3 +13266,69 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
   bottom: 26px !important;
   width: min(300px, 40vw) !important;
 }
+
+/* ═════ Investor disclaimer (Competent Person / forward-looking / not advice) ═════ */
+.tanga-deck__disclaimer-link {
+  display: inline;
+  margin-left: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--pro-brand, #d96a2a);
+  font: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.tanga-deck__disclaimer-link:hover { color: #ffce8a; }
+.tanga-deck__disclaimer-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 5, 10, 0.7);
+  backdrop-filter: blur(6px);
+  animation: proFadeRise 220ms cubic-bezier(0.2,0.8,0.2,1);
+}
+.tanga-deck__disclaimer {
+  width: min(680px, 92vw);
+  max-height: 82vh;
+  overflow-y: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: linear-gradient(180deg, rgba(12,18,26,0.98), rgba(7,12,19,0.98));
+  box-shadow: var(--pro-elev-3, 0 32px 84px rgba(0,0,0,0.6));
+}
+.tanga-deck__disclaimer-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10,16,24,0.96);
+  border-radius: 18px 18px 0 0;
+}
+.tanga-deck__disclaimer-head strong { font-size: 15px; color: #fff; }
+.tanga-deck__disclaimer-body { padding: 18px 20px 22px; }
+.tanga-deck__disclaimer-body p {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(226, 232, 240, 0.82);
+}
+.tanga-deck__disclaimer-body p strong { color: #ffce8a; font-weight: 600; }
+.tanga-deck__disclaimer-body small {
+  display: block;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 11px;
+  color: rgba(196, 205, 219, 0.6);
+}
+@media (prefers-reduced-motion: reduce) { .tanga-deck__disclaimer-overlay { animation: none; } }
