@@ -2786,19 +2786,8 @@ export default function TangaDeckWorkbench() {
         getBorderWidth: 1,
         parameters: {depthTest: false} as any,
       }),
-      showFastLocalSurface && new ScatterplotLayer({
-        id: 'project-focus-halo',
-        data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 76]}],
-        getPosition: (item: any) => item.position,
-        getRadius: activeMode === 'accessibility' ? 8200 : 5600,
-        radiusUnits: 'meters',
-        getFillColor: [45, 212, 191, activeMode === 'topography' ? 34 : 25],
-        getLineColor: [250, 204, 21, activeMode === 'topography' ? 210 : 170],
-        lineWidthMinPixels: 2,
-        stroked: true,
-        filled: true,
-        parameters: {depthTest: false} as any,
-      }),
+      // Removed the teal/gold "project-focus-halo" circle — the glowing license
+      // boundary already marks the project area; the circle read as clutter.
       showFastLocalSurface && new PathLayer({
         id: 'fast-relief-ridges',
         data: localReliefPaths,
@@ -2982,29 +2971,32 @@ export default function TangaDeckWorkbench() {
         backgroundPadding: [8, 5],
         parameters: {depthTest: false} as any,
       }),
-      new ScatterplotLayer({
+      // Location markers only on the country/regional views where a point is
+      // needed to find Tanga. On the local project scenes the glowing licence
+      // boundary + text label mark it — no circle (per design request).
+      (activeMode === 'tanzania' || activeMode === 'accessibility') && new ScatterplotLayer({
         id: 'project-marker-halo',
         data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 86], label: 'Tanga project'}],
         getPosition: (item: any) => item.position,
-        getRadius: activeMode === 'tanzania' ? 42000 : activeMode === 'accessibility' ? 2500 : activeMode === 'project' ? 1450 : 900,
+        getRadius: activeMode === 'tanzania' ? 34000 : 2200,
         radiusUnits: 'meters',
-        getFillColor: activeMode === 'tanzania' ? [199, 85, 27, 58] : [199, 85, 27, 36],
-        getLineColor: [255, 236, 204, 224],
-        lineWidthMinPixels: 2,
+        getFillColor: [217, 106, 42, 42],
+        getLineColor: [255, 206, 138, 210],
+        lineWidthMinPixels: 1.5,
         stroked: true,
         filled: true,
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      new ScatterplotLayer({
+      (activeMode === 'tanzania' || activeMode === 'accessibility') && new ScatterplotLayer({
         id: 'project-marker-core',
         data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 96], label: 'Tanga project'}],
         getPosition: (item: any) => item.position,
-        getRadius: activeMode === 'tanzania' ? 12000 : activeMode === 'accessibility' ? 520 : 260,
+        getRadius: activeMode === 'tanzania' ? 9000 : 420,
         radiusUnits: 'meters',
         getFillColor: [255, 255, 255, 245],
-        getLineColor: [199, 85, 27, 250],
-        lineWidthMinPixels: 3,
+        getLineColor: [217, 106, 42, 250],
+        lineWidthMinPixels: 2.5,
         stroked: true,
         filled: true,
         pickable: true,
