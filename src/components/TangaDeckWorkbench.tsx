@@ -3485,6 +3485,8 @@ export default function TangaDeckWorkbench() {
   useEffect(() => { writeHashScene(activeMode); }, [activeMode]);
 
   const goToStoryIndex = useCallback((index: number) => {
+    setShowCoach(false);
+    try { window.localStorage?.setItem('tanga:coachSeen', '1'); } catch { /* ignore */ }
     const clamped = clamp(index, 0, STORY_STEPS.length - 1);
     const targetStep = STORY_STEPS[clamped];
     const defaults = storyStepDefaults(targetStep.mode);
@@ -3511,6 +3513,21 @@ export default function TangaDeckWorkbench() {
   // Investor inspector — plain-English "why this matters" overlay (Ctrl+I).
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const toggleInspector = useCallback(() => setIsInspectorOpen((prev) => !prev), []);
+  // First-run coach marks — a one-time hint so a cold viewer knows the deck is
+  // interactive. Dismisses on first navigation and never returns.
+  const [showCoach, setShowCoach] = useState(false);
+  useEffect(() => {
+    try {
+      if (!window.localStorage?.getItem('tanga:coachSeen')) {
+        const t = window.setTimeout(() => setShowCoach(true), 1400);
+        return () => window.clearTimeout(t);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  const dismissCoach = useCallback(() => {
+    setShowCoach(false);
+    try { window.localStorage?.setItem('tanga:coachSeen', '1'); } catch { /* ignore */ }
+  }, []);
 
   const handlePrevStory = useCallback(() => {
     goToStoryIndex(activeStoryIndex - 1);
@@ -3928,6 +3945,20 @@ export default function TangaDeckWorkbench() {
           </div>
         ))}
       </div>
+
+      {/* First-run coach marks — one-time interactive hint. */}
+      {showCoach && (
+        <button type="button" className="tanga-deck__coach" onClick={dismissCoach} aria-label="Dismiss navigation hint">
+          <span className="tanga-deck__coach-keys">
+            <kbd>&larr;</kbd><kbd>&rarr;</kbd>
+          </span>
+          <span className="tanga-deck__coach-copy">
+            <strong>This deck is interactive</strong>
+            <small>Use the arrow keys or the bar below to move through the story. Press <kbd>?</kbd> for all shortcuts.</small>
+          </span>
+          <span className="tanga-deck__coach-dismiss">Got it</span>
+        </button>
+      )}
 
       {/* Guided narration caption — during autoplay the deck reads itself
           like a self-running pitch (great for a lobby / booth screen). */}

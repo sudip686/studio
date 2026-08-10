@@ -12895,3 +12895,68 @@ body:has(.tanga-deck__notes) .tanga-deck__insight-panel {
   transition: opacity 300ms ease;
   pointer-events: none;
 }
+
+/* ═════ First-run coach marks — one-time interactive hint ═════ */
+.tanga-deck__coach {
+  position: absolute;
+  bottom: 210px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(217, 106, 42, 0.3);
+  background: linear-gradient(180deg, rgba(14, 20, 28, 0.94), rgba(8, 13, 20, 0.9));
+  box-shadow: var(--pro-elev-3), 0 0 40px rgba(217, 106, 42, 0.25);
+  backdrop-filter: blur(22px) saturate(1.2);
+  cursor: pointer;
+  text-align: left;
+  animation: proCoachIn 500ms var(--pro-ease, ease), proCoachPulse 2.6s ease-in-out 0.6s infinite;
+}
+.tanga-deck__coach-keys {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.tanga-deck__coach-keys kbd,
+.tanga-deck__coach-copy kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.tanga-deck__coach-copy kbd { min-width: 20px; height: 20px; font-size: 11px; margin: 0 1px; }
+.tanga-deck__coach-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 340px;
+}
+.tanga-deck__coach-copy strong { font-size: 14px; font-weight: 600; color: #fff; }
+.tanga-deck__coach-copy small { font-size: 12px; line-height: 1.4; color: rgba(226, 232, 240, 0.72); }
+.tanga-deck__coach-dismiss {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--pro-brand, #d96a2a);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+@keyframes proCoachIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes proCoachPulse { 0%,100% { box-shadow: var(--pro-elev-3), 0 0 40px rgba(217,106,42,0.22); } 50% { box-shadow: var(--pro-elev-3), 0 0 56px rgba(217,106,42,0.42); } }
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__coach { animation: proCoachIn 400ms ease; }
+}
