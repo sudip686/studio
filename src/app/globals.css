@@ -13169,3 +13169,91 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
 .tanga-deck__rank-vs li b:last-of-type { color: rgba(226,232,240,0.78); font-weight: 500; text-align: right; }
 .tanga-deck__rank-vs p { margin: 8px 0 0; font-size: 11px; line-height: 1.4; color: rgba(226,232,240,0.82); }
 @media (prefers-reduced-motion: reduce) { .tanga-deck__rank-vs { animation: none; } }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   POLISH: consistent focus rings + hover states across all deck chrome.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* One focus ring everywhere (keyboard nav only, not mouse clicks). */
+.tanga-deck button:focus-visible,
+.tanga-deck [role="button"]:focus-visible,
+.tanga-deck a:focus-visible,
+.tanga-deck input:focus-visible,
+.tanga-deck [tabindex]:focus-visible {
+  outline: 2px solid rgba(255, 206, 138, 0.9) !important;
+  outline-offset: 2px !important;
+  border-radius: 6px;
+}
+
+/* Interactive cursor + subtle transition on anything clickable. */
+.tanga-deck button:not(:disabled),
+.tanga-deck [role="button"] {
+  cursor: pointer;
+  transition: transform 150ms cubic-bezier(0.2,0.8,0.2,1),
+              background 150ms ease, border-color 150ms ease,
+              box-shadow 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+/* Gentle hover lift for panel/list buttons that don't already define one. */
+.tanga-deck__ranking-list li:hover:not(.is-tanga),
+.tanga-deck__speed-menu button:hover,
+.tanga-deck__recent-prompts button:hover,
+.tanga-deck__tool-row button:hover:not(.is-active),
+.tanga-deck__command-suggestions button:hover {
+  transform: translateY(-1px);
+}
+
+/* Disabled controls read clearly. */
+.tanga-deck button:disabled { cursor: not-allowed; opacity: 0.4; }
+
+/* Active/pressed feedback — quick scale-down so clicks feel responsive. */
+.tanga-deck button:not(:disabled):active,
+.tanga-deck [role="button"]:active { transform: translateY(0) scale(0.97); }
+
+/* ═════ Loading shimmer / skeleton polish ═════ */
+@keyframes proShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+/* Reusable skeleton class for any placeholder block. */
+.pro-skeleton {
+  border-radius: 8px;
+  background: linear-gradient(100deg,
+    rgba(255,255,255,0.04) 20%,
+    rgba(255,255,255,0.10) 40%,
+    rgba(255,255,255,0.04) 60%);
+  background-size: 200% 100%;
+  animation: proShimmer 1.4s ease-in-out infinite;
+}
+/* The 3D "rendering the deposit" state gets a soft shimmering backdrop so the
+   stage reads as actively building, not blank/broken. */
+.tanga-three--loading {
+  background:
+    radial-gradient(ellipse at center, rgba(217,106,42,0.05), transparent 60%),
+    linear-gradient(100deg, rgba(10,16,24,0.0) 20%, rgba(255,255,255,0.03) 40%, rgba(10,16,24,0.0) 60%),
+    #070d15;
+  background-size: auto, 200% 100%, auto;
+  animation: proShimmer 2.2s ease-in-out infinite;
+}
+.tanga-three__loader--branded {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pro-skeleton, .tanga-three--loading { animation: none; }
+}
+
+/* ═════ Tabular numerals for all figures — clean column alignment ═════ */
+.tanga-deck__data-table,
+.tanga-deck__pager-count,
+.tanga-deck__rank-number,
+.tanga-deck__rank-figure,
+.tanga-deck__closing-metrics strong,
+.tanga-deck__insight-value,
+.tanga-deck__notes-timer,
+.tanga-deck__rank-vs b,
+.tanga-deck__compass small,
+.tanga-deck__scale em {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
