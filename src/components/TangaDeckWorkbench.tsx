@@ -314,6 +314,30 @@ type ModeDataTable = {
 // Sourced from the AMC "Tanga Graphite Mineral Resource Estimate" (19 Dec 2025):
 // Table I (Mineral Resource >3% TGC) and Table II (flake size / TC grade).
 const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
+  topography: {
+    title: 'Terrain & Setting',
+    source: 'AMC MRE §2.1.1 · local DEM · Mkinga District, Tanga Region',
+    columns: ['Metric', 'Value', ''],
+    rows: [
+      {cells: ['Max elevation', '≈940 m', '']},
+      {cells: ['Min elevation', '≈300 m', '']},
+      {cells: ['Relief range', '≈640 m', ''], emphasis: true},
+      {cells: ['Setting', 'Maramba village', '']},
+      {cells: ['Terrain', 'Low-relief foothills', '']},
+    ],
+  },
+  accessibility: {
+    title: 'Infrastructure Access',
+    source: 'Coastal NE Tanzania · real OSM locations',
+    columns: ['Destination', 'Distance', ''],
+    rows: [
+      {cells: ['Tanga Port', '≈80 km', ''], emphasis: true},
+      {cells: ['Hale hydro station', '57 km', '']},
+      {cells: ['New Pangani Falls', '61 km', '']},
+      {cells: ['Tanga rail terminal', 'coastal link', '']},
+      {cells: ['Grid power', 'hydro nodes < 62 km', '']},
+    ],
+  },
   resource: {
     title: 'Mineral Resource Estimate',
     source: 'JORC 2012 · >3% TGC cut-off · AMC · Nov 2025',
@@ -1470,19 +1494,6 @@ function powerGridCorridors(heightAt: (lon: number, lat: number) => number) {
       ],
     },
   ];
-}
-
-function quickReliefPaths(heightAt: (lon: number, lat: number) => number) {
-  const ridges = [
-    [[38.725, -4.89], [38.77, -4.85], [38.825, -4.815], [38.89, -4.79], [38.955, -4.775]],
-    [[38.735, -4.98], [38.79, -4.93], [38.86, -4.895], [38.94, -4.86], [39.04, -4.835]],
-    [[38.75, -5.065], [38.82, -5.015], [38.895, -4.965], [38.985, -4.925], [39.085, -4.885]],
-  ];
-
-  return ridges.map((path, index) => ({
-    name: `Tanga relief trace ${index + 1}`,
-    path: path.map(([lon, lat]) => [lon, lat, heightAt(lon, lat) + 96 + index * 12] as [number, number, number]),
-  }));
 }
 
 function isProjectLayer(feature: any) {
@@ -2665,7 +2676,6 @@ export default function TangaDeckWorkbench() {
     const showDetailedLocalContext = activeMode === 'topography';
     const showPowerGrid = activeMode === 'accessibility' || activeMode === 'project';
     const showVillageLabels = activeMode === 'project';
-    const localReliefPaths = showFastLocalSurface ? quickReliefPaths(heightAt) : [];
     const terrainCells = showFastLocalSurface ? localTerrainCells(heightAt, activeMode) : [];
     const mineFacilities = showMineInfrastructure ? locatedMineFacilities() : [];
     const minePoints = showMineInfrastructure ? locatedMinePoints() : [];
@@ -2788,18 +2798,9 @@ export default function TangaDeckWorkbench() {
       }),
       // Removed the teal/gold "project-focus-halo" circle — the glowing license
       // boundary already marks the project area; the circle read as clutter.
-      showFastLocalSurface && new PathLayer({
-        id: 'fast-relief-ridges',
-        data: localReliefPaths,
-        getPath: (item: any) => item.path,
-        getColor: (_item: any, {index}: any) => index === 1 ? [250, 204, 21, 175] : [125, 211, 252, 165],
-        getWidth: activeMode === 'topography' ? 82 : 48,
-        widthUnits: 'meters',
-        widthMinPixels: 1.5,
-        jointRounded: true,
-        capRounded: true,
-        parameters: {depthTest: false} as any,
-      }),
+      // Removed the synthetic "fast-relief-ridges" — 3 hardcoded floating
+      // lines (blue/yellow/blue) that represented no real feature and read as
+      // random cross-lines over the terrain.
       showDetailedLocalContext && new GeoJsonLayer<any>({
         id: 'local-buildings',
         data: '/generated/buildings.geojson',
