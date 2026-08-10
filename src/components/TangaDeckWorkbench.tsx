@@ -3529,6 +3529,7 @@ export default function TangaDeckWorkbench() {
   const [isBlackout, setIsBlackout] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
   // VRIFY-style autoplay pacing — 5s / 10s / 15s options. 10s default (mid).
   const [autoplaySec, setAutoplaySec] = useState<5 | 10 | 15>(10);
@@ -3658,6 +3659,7 @@ export default function TangaDeckWorkbench() {
       if (key === '?' || key === '/') { event.preventDefault(); toggleShortcuts(); return; }
 
       if (key === 'Escape') {
+        if (isDisclaimerOpen) { setIsDisclaimerOpen(false); return; }
         if (isShortcutsOpen) { setIsShortcutsOpen(false); return; }
         if (isNotesOpen)     { setIsNotesOpen(false); return; }
         if (isBlackout)      { setIsBlackout(false); return; }
@@ -3666,7 +3668,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, toggleAnnotations, toggleInspector, isShortcutsOpen, isNotesOpen, isBlackout, activeStoryIndex, coverDismissed]);
+  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, toggleAnnotations, toggleInspector, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -4049,7 +4051,12 @@ export default function TangaDeckWorkbench() {
             <div><strong>US$<CountUp value="0.58" /> Bn</strong><span>Optimum pit NPV</span></div>
             <div><strong>#<CountUp value="5" /></strong><span>By M&amp;I contained graphite</span></div>
           </div>
-          <p className="tanga-deck__closing-contact">Sakariya Mines &amp; Minerals · investor relations</p>
+          <p className="tanga-deck__closing-contact">
+            Sakariya Mines &amp; Minerals · investor relations
+            <button type="button" className="tanga-deck__disclaimer-link" onClick={() => setIsDisclaimerOpen(true)}>
+              Important notice &amp; disclaimer
+            </button>
+          </p>
         </aside>
       )}
 
@@ -4237,6 +4244,26 @@ export default function TangaDeckWorkbench() {
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBlackout(); } }}
           aria-label="Blackout is active. Press B or Esc to exit."
         />
+      )}
+
+      {isDisclaimerOpen && (
+        <div className="tanga-deck__disclaimer-overlay" role="dialog" aria-modal="true" aria-label="Important notice and disclaimer" onClick={() => setIsDisclaimerOpen(false)}>
+          <div className="tanga-deck__disclaimer" onClick={(e) => e.stopPropagation()}>
+            <div className="tanga-deck__disclaimer-head">
+              <strong>Important Notice &amp; Disclaimer</strong>
+              <button type="button" onClick={() => setIsDisclaimerOpen(false)} aria-label="Close disclaimer" className="tanga-deck__shortcuts-close">
+                <X size={16} strokeWidth={2.2} />
+              </button>
+            </div>
+            <div className="tanga-deck__disclaimer-body">
+              <p><strong>Competent Person statement.</strong> The Mineral Resource estimate in this presentation was prepared by AMC Consultants Pty Ltd and is reported in accordance with the JORC Code (2012 Edition). The information is based on, and fairly represents, work compiled by the Competent Person, who consents to its inclusion in the form and context in which it appears.</p>
+              <p><strong>Forward-looking statements.</strong> This presentation contains forward-looking statements — including the mine-plan, pit-optimisation and economic figures — that are based on assumptions and estimates subject to significant business, economic and technical uncertainties. Actual results may differ materially. Pit shells, NPV and mine-planning figures are conceptual, preliminary and for illustration only; they do not constitute an Ore Reserve or a feasibility-level study.</p>
+              <p><strong>Not investment advice.</strong> This material is provided for information purposes only and does not constitute an offer, invitation or recommendation to subscribe for or purchase any security, nor investment, financial, legal or tax advice. Recipients should conduct their own due diligence and seek independent professional advice.</p>
+              <p><strong>Sources.</strong> AMC Tanga Graphite Mineral Resource Estimate (19 Dec 2025); Sakariya / Grapeak exploration and metallurgical testwork; internal pit-optimisation modelling. Concept mine infrastructure shown in the accessibility scene is hypothetical.</p>
+              <small>© Sakariya Mines &amp; Minerals. All figures subject to the qualifications above.</small>
+            </div>
+          </div>
+        </div>
       )}
 
       {isShortcutsOpen && (
