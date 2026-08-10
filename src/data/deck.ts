@@ -211,18 +211,18 @@ export const deckSlides: DeckSlide[] = [
       "Core orientation verified (Reflex ACT)",
       "JORC-ready QAQC dataset"
     ],
-    view: "drillhole_location_assay",
+    view: "geojson_drillholes_assay",
     cameraMode: "view",
     camera: {
       type: "flyTo",
       lon: 39.06,
       lat: -4.86,
-      height: 22000,
-      heading: 5,
-      pitch: -50,
+      height: 18000,
+      heading: 8,
+      pitch: -72,
       duration: 1.8,
     },
-    layers: { drillholes: "assay", imagery: true, kml: true },
+    layers: { drillholes: "assay", imagery: true, kml: false },
     annotations: [
       {
         type: "callout",
@@ -260,18 +260,18 @@ export const deckSlides: DeckSlide[] = [
       "Clear lithology contacts defined",
       "Consistent stratigraphy across tenement"
     ],
-    view: "drillhole_location_lithology",
+    view: "geojson_drillholes_lithology",
     cameraMode: "view",
     camera: {
       type: "flyTo",
       lon: 39.06,
       lat: -4.85,
-      height: 26000,
+      height: 21000,
       heading: 12,
-      pitch: -45,
+      pitch: -74,
       duration: 1.8,
     },
-    layers: { drillholes: "lithology", kml: true, imagery: false },
+    layers: { drillholes: "lithology", kml: false, imagery: false },
     annotations: [
       {
         type: "callout",
@@ -315,12 +315,12 @@ export const deckSlides: DeckSlide[] = [
       type: "flyTo",
       lon: 39.06,
       lat: -4.85,
-      height: 26000,
+      height: 21000,
       heading: 12,
-      pitch: -45,
+      pitch: -74,
       duration: 1.8,
     },
-    layers: { drillholes: "assay", kml: true, imagery: false },
+    layers: { drillholes: "assay", kml: false, imagery: false },
     annotations: [
       {
         type: "callout",
@@ -352,6 +352,7 @@ export const deckSlides: DeckSlide[] = [
     id: "lithology",
     title: "3D Lithology Model",
     subtitle: "Subsurface geology interpretation",
+    themeTone: "violet",
     facts: [
       "Micromine 2025 3D model (Build 25.0.5164)",
       "24 cross-section interpretation",
@@ -363,12 +364,12 @@ export const deckSlides: DeckSlide[] = [
       type: "flyTo",
       lon: 39.06,
       lat: -4.86,
-      height: 18000,
+      height: 8000,
       heading: 15,
-      pitch: -40,
+      pitch: 40,
       duration: 2.0,
     },
-    layers: { drillholes: "lithology", imagery: false, kml: false },
+    layers: { drillholes: "lithology", imagery: false, kml: false, terrain: false },
     annotations: [
       {
         type: "callout",
@@ -400,6 +401,7 @@ export const deckSlides: DeckSlide[] = [
     id: "assay",
     title: "3D Assay Model",
     subtitle: "Grade distribution in 3D",
+    themeTone: "sky",
     facts: [
       "Ordinary Kriging estimation",
       "Lithology-domained interpolation",
@@ -411,12 +413,12 @@ export const deckSlides: DeckSlide[] = [
       type: "flyTo",
       lon: 39.06,
       lat: -4.86,
-      height: 16000,
+      height: 7000,
       heading: 20,
-      pitch: -45,
+      pitch: 45,
       duration: 2.0,
     },
-    layers: { drillholes: "assay", imagery: false, kml: false },
+    layers: { drillholes: "assay", imagery: false, kml: false, terrain: false },
     annotations: [
       {
         type: "callout",
@@ -448,6 +450,7 @@ export const deckSlides: DeckSlide[] = [
     id: "carbon_model",
     title: "Carbon Block Model",
     subtitle: ">5% TGC probability distribution",
+    themeTone: "amber",
     facts: [
       "Ordinary Kriging block model derived",
       "3% TGC cut-off (5% shown for visualization)",
@@ -459,11 +462,12 @@ export const deckSlides: DeckSlide[] = [
       type: "flyTo",
       lon: 39.06,
       lat: -4.86,
-      height: 14000,
+      height: 6500,
       heading: 25,
-      pitch: -50,
+      pitch: 50,
       duration: 2.0,
     },
+    layers: { terrain: false },
     style: { cutoff: 5, opacity: 0.65, colormap: "viridis" },
     annotations: [
       {
@@ -496,6 +500,7 @@ export const deckSlides: DeckSlide[] = [
     id: "classification",
     title: "Resource Classification",
     subtitle: "JORC Code compliant resource",
+    themeTone: "emerald",
     facts: [
       "JORC Code compliant (2012 Edition)",
       "Indicated + Inferred categories reported",
@@ -507,12 +512,12 @@ export const deckSlides: DeckSlide[] = [
       type: "flyTo",
       lon: 39.06,
       lat: -4.86,
-      height: 14000,
+      height: 6500,
       heading: 25,
-      pitch: -50,
+      pitch: 50,
       duration: 2.0,
     },
-    layers: { drillholes: false, blockModel: "resc", imagery: false, kml: false },
+    layers: { drillholes: false, blockModel: "resc", imagery: false, kml: false, terrain: false },
     annotations: [
       {
         type: "callout",
@@ -685,3 +690,5 @@ export const deckSlides: DeckSlide[] = [
     }
   }
 ];
+
+

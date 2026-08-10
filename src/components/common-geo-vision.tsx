@@ -285,7 +285,7 @@ const CommonGeoVision = ({ children, displayMode }: CommonGeoVisionProps) => {
                 {contextValue.isLoaded && children}
 
                 {contextValue.isLoaded && (
-                    <div className="absolute bottom-4 left-4 z-[2000]">
+                    <div className="absolute bottom-8 left-8 z-[9999] pointer-events-auto">
                         {displayMode === 'geovision_lithology' && (
                             <Legend title="Lithology" items={lithologyLegendItems} />
                         )}

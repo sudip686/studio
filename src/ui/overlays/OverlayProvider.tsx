@@ -35,6 +35,7 @@ type OverlayProviderProps = {
   rightOffsetPx?: number | string;
   topOffsetPx?: number | string;
   bottomOffsetPx?: number | string;
+  dataPresentationMode?: boolean;
 };
 
 const isSameNode = (a: React.ReactNode, b: React.ReactNode): boolean => {

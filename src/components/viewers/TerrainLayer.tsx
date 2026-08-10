@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import { projectLonLat } from '@/lib/utils/three-helpers';
 
@@ -45,34 +46,125 @@ export function TerrainLayer({ verticalScale = 1, modelCenter }: { verticalScale
 
         const loader = new GLTFLoader();
 
-        // Function to handle model setup
+        // Function to handle model setup with realistic terrain material
         const setupModel = (gltf: any) => {
             const model = gltf.scene;
-            
+
             // Apply vertical scale (compensating for baked-in exaggeration)
             model.scale.set(1, verticalScale / TERRAIN_BAKED_SCALE, 1);
-            
+
+            // Create a more realistic earth material with noise variation
+            const createRealisticEarthMaterial = (): THREE.MeshStandardMaterial => {
+                // Base earthy color palette - natural soil/rock tones
+                const baseColor = new THREE.Color(0x5d6757); // Primary earthy green-brown
+                const variationColors = [
+                    new THREE.Color(0x4a5245), // Darker earth
+                    new THREE.Color(0x6b7563), // Lighter soil
+                    new THREE.Color(0x3d4438), // Shadow areas
+                    new THREE.Color(0x7a846f), // Highlight areas
+                ];
+
+                return {
+                    color: baseColor,
+                    roughness: 0.85,
+                    metalness: 0.1,
+                    envMapIntensity: 1.2,
+                    side: THREE.DoubleSide,
+                    polygonOffset: true,
+                    polygonOffsetFactor: 1,
+                    polygonOffsetUnits: 1,
+                    clipShadows: true,
+                    // Add noise-based color variation for natural look
+                    vertexColors: false,
+                } as any;
+            };
+
             // Ensure materials handle lighting correctly
             model.traverse((child: any) => {
                 if (child.isMesh) {
                     child.castShadow = false;
                     child.receiveShadow = true;
-                    // Ensure the material is not too dark or invisible
+
                     if (child.material) {
                         child.material.side = THREE.DoubleSide;
-                        
+
                         // Fix "pixels breaking" (Z-fighting/shimmering)
                         child.material.polygonOffset = true;
                         child.material.polygonOffsetFactor = 1;
                         child.material.polygonOffsetUnits = 1;
-                        
-                        // Adjust appearance
-                        child.material.roughness = 1.0;
-                        child.material.metalness = 0.0;
+
+                        // Natural earth terrain material - realistic like Google Earth
+                        const earthColor = new THREE.Color(0x5d6757); // Natural earthy green-brown
+                        child.material.color = earthColor;
+                        child.material.roughness = 0.85; // Slightly rough for natural soil/rock
+                        child.material.metalness = 0.1; // Very slight metallic for wet rock areas
+                        child.material.envMapIntensity = 1.2; // Enhanced environmental reflection
 
                         // Apply clipping planes
                         child.material.clippingPlanes = planes;
                         child.material.clipShadows = true;
+
+                        // Add subtle noise variation for realism using SimplexNoise
+                        const simplex = new SimplexNoise();
+                        const originalPositionAttribute = (child as THREE.Mesh).geometry.attributes.position;
+                        const count = originalPositionAttribute.count;
+                        const positionAttribute = originalPositionAttribute;
+                        const normalAttribute = (child as THREE.Mesh).geometry.attributes.normal;
+
+                        // Create a new geometry with noise-displaced surface
+                        const newGeometry = new THREE.BufferGeometry();
+                        const newPositions = new Float32Array(count * 3);
+                        const newNormals = new Float32Array(count * 3);
+
+                        for (let i = 0; i < count; i++) {
+                            const x = positionAttribute.getX(i);
+                            const y = positionAttribute.getY(i);
+                            const z = positionAttribute.getZ(i);
+
+                            // Use noise based on X and Z coordinates for natural variation
+                            const noiseScale = 500; // Scale of variation
+                            const noiseValue = simplex.noise((x / noiseScale), (z / noiseScale));
+
+                            // Subtly displace the surface (very subtle, ~2-3% max)
+                            newPositions[i * 3] = x;
+                            newPositions[i * 3 + 1] = y + noiseValue * 0.025; // Very subtle displacement
+                            newPositions[i * 3 + 2] = z;
+
+                            // Recalculate normals for better lighting
+                            if (i > 0 && i < count - 1) {
+                                const p0 = [x, y, z];
+                                const p1 = [
+                                    positionAttribute.getX(Math.min(i + 1, count - 1)),
+                                    positionAttribute.getY(Math.min(i + 1, count - 1)),
+                                    positionAttribute.getZ(Math.min(i + 1, count - 1))
+                                ];
+                                const p2 = [
+                                    positionAttribute.getX(Math.max(i - 1, 0)),
+                                    positionAttribute.getY(Math.max(i - 1, 0)),
+                                    positionAttribute.getZ(Math.max(i - 1, 0))
+                                ];
+
+                                const v1 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
+                                const v2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+
+                                const normalX = v1[1] * v2[2] - v1[2] * v2[1];
+                                const normalY = v1[2] * v2[0] - v1[0] * v2[2];
+                                const normalZ = v1[0] * v2[1] - v1[1] * v2[0];
+
+                                const length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+                                newNormals[i * 3] = normalX / length;
+                                newNormals[i * 3 + 1] = normalY / length;
+                                newNormals[i * 3 + 2] = normalZ / length;
+                            } else {
+                                newNormals[i * 3] = normalAttribute.getX(i);
+                                newNormals[i * 3 + 1] = normalAttribute.getY(i);
+                                newNormals[i * 3 + 2] = normalAttribute.getZ(i);
+                            }
+                        }
+
+                        newGeometry.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));
+                        newGeometry.setAttribute('normal', new THREE.BufferAttribute(newNormals, 3));
+                        (child as THREE.Mesh).geometry = newGeometry;
                     }
                 }
             });

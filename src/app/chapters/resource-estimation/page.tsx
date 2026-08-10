@@ -9,10 +9,16 @@ import ClippingControls from '@/components/viewers/ClippingControls';
 export default function ResourceEstimationPage() {
   return (
     <GeospatialLayout showCesium={true}>
-      <SubsurfaceViewer initialState={{ clippingMode: 'elevation', transparency: 0.8 }}>
+      <SubsurfaceViewer
+        initialState={{ clippingMode: 'none', transparency: 0.68 }}
+        showSceneHud
+        hudTitle="Resource estimation"
+        hudSubtitle="Terrain, classification blocks, and optional clipping controls."
+      >
         <BlockModelLayer colorMode="classification" />
         <ClippingControls />
       </SubsurfaceViewer>
     </GeospatialLayout>
   );
 }
+

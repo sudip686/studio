@@ -1,3 +1,4 @@
+import { uiTheme } from '@/ui/overlays/uiTheme';
 import { cn } from '@/lib/utils';
 
 interface PanelProps {
@@ -9,7 +10,14 @@ export function Panel({ children, className }: PanelProps) {
   return (
     <div
       className={cn(
-        'rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md px-4 py-3 shadow-[0_18px_45px_rgba(0,0,0,0.7)] pointer-events-auto',
+        uiTheme.panel.base,
+        uiTheme.panel.background,
+        uiTheme.panel.border,
+        uiTheme.panel.blur,
+        uiTheme.panel.radius,
+        uiTheme.panel.padding,
+        uiTheme.panel.shadow,
+        'pointer-events-auto text-white',
         className
       )}
     >

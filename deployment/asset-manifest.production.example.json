@@ -1,0 +1,24 @@
+{
+  "version": "v2026-06-06",
+  "baseUrl": "https://assets.example.com/tanga/v2026-06-06",
+  "critical": [
+    "terrain_preview_meta.json",
+    "height_preview_1024.bin",
+    "resource_model.bin"
+  ],
+  "onDemand": [
+    "height.bin",
+    "texture_rgb_8192.png",
+    "terrain_texture_8k.jpg",
+    "drillholes_utm.json",
+    "assay_data.geojson",
+    "lithology_data.geojson",
+    "earth.glb",
+    "geologicalModel.glb"
+  ],
+  "cachePolicy": {
+    "versionedAssets": "public, max-age=31536000, immutable",
+    "manifest": "public, max-age=300"
+  }
+}
+

@@ -39,6 +39,7 @@ interface BoreholeLayerProps {
     assayRange?: { min: number, max: number };
     visible?: boolean;
     transparency?: number;
+    visualMode?: 'default' | 'presentation';
     onLoaded?: () => void;
 }
 
@@ -49,6 +50,7 @@ export default function BoreholeLayerFixed({
     assayRange = { min: 0, max: 1 },
     visible = true,
     transparency = 1.0,
+    visualMode = 'default',
     onLoaded
 }: BoreholeLayerProps) {
     const sceneContext = useThreeSceneSafe();
@@ -61,10 +63,12 @@ export default function BoreholeLayerFixed({
         modelCenter ? `${modelCenter.lon.toFixed(6)}_${modelCenter.lat.toFixed(6)}` : 'none', 
     [modelCenter]);
     const cylinderGeometry = useMemo(() => {
-        const geometry = new THREE.CylinderGeometry(2.15, 2.15, 1, 14, 1, false);
+        const radius = visualMode === 'presentation' ? 2.85 : 2.15;
+        const radialSegments = visualMode === 'presentation' ? 18 : 14;
+        const geometry = new THREE.CylinderGeometry(radius, radius, 1, radialSegments, 1, false);
         geometry.center();
         return geometry;
-    }, []);
+    }, [visualMode]);
 
     useEffect(() => {
         if (!sceneContext || !sceneContext.dynamicGroup || !visible || !modelCenter || !drillholeData) return;
@@ -125,10 +129,10 @@ export default function BoreholeLayerFixed({
                 color: new THREE.Color(hex),
                 transparent: transparency < 1.0,
                 opacity: transparency,
-                roughness: type === 'lithology' ? 0.44 : 0.34,
-                metalness: type === 'lithology' ? 0.08 : 0.1,
-                emissive: type === 'lithology' ? new THREE.Color(hex).multiplyScalar(0.08) : new THREE.Color(hex).multiplyScalar(0.06),
-                emissiveIntensity: type === 'lithology' ? 0.22 : 0.16,
+                roughness: visualMode === 'presentation' ? 0.24 : type === 'lithology' ? 0.44 : 0.34,
+                metalness: visualMode === 'presentation' ? 0.16 : type === 'lithology' ? 0.08 : 0.1,
+                emissive: type === 'lithology' ? new THREE.Color(hex).multiplyScalar(0.1) : new THREE.Color(hex).multiplyScalar(0.08),
+                emissiveIntensity: visualMode === 'presentation' ? (type === 'lithology' ? 0.34 : 0.3) : type === 'lithology' ? 0.22 : 0.16,
                 depthWrite: transparency >= 1.0,
             });
 
@@ -212,7 +216,7 @@ export default function BoreholeLayerFixed({
         return () => {
             disposeMeshes();
         };
-    }, [sceneContext?.dynamicGroup, visible, transparency, centerKey, type, assayFilterRange?.min, assayFilterRange?.max, assayRange.min, assayRange.max, drillholeData, processedLithologyData, cylinderGeometry]);
+    }, [sceneContext?.dynamicGroup, visible, transparency, centerKey, type, assayFilterRange?.min, assayFilterRange?.max, assayRange.min, assayRange.max, drillholeData, processedLithologyData, cylinderGeometry, visualMode]);
 
     useEffect(() => {
         return () => {

@@ -1,0 +1,48 @@
+/* Hallmark · tokens: Sakariya premium geology deck · tone: institutional mining · anchor hue: alloy orange
+ * pre-emit critique: Philosophy 5 · Hierarchy 4 · Execution 4 · Specificity 5 · Restraint 4 · Variety 4
+ */
+:root {
+  --hm-color-alloy: var(--color-primary, #c7551b);
+  --hm-color-brown: var(--color-dark-brown, #41200e);
+  --hm-color-coal: var(--color-coal-black, #020100);
+  --hm-color-grey: var(--color-warm-grey, #a89c94);
+  --hm-color-beige: var(--color-light-beige, #f5f3f0);
+  --hm-color-white: var(--color-light, #ffffff);
+  --hm-color-panel: color-mix(in srgb, var(--hm-color-coal) 82%, transparent);
+  --hm-color-panel-soft: color-mix(in srgb, var(--hm-color-coal) 64%, transparent);
+  --hm-color-line: color-mix(in srgb, var(--hm-color-grey) 24%, transparent);
+  --hm-color-line-hot: color-mix(in srgb, var(--hm-color-alloy) 50%, transparent);
+  --hm-color-text: color-mix(in srgb, var(--hm-color-beige) 92%, var(--hm-color-white));
+  --hm-color-muted: color-mix(in srgb, var(--hm-color-beige) 58%, transparent);
+  --hm-color-shadow: color-mix(in srgb, var(--hm-color-coal) 76%, transparent);
+  --hm-font-display: "Poppins", "Montserrat", "Inter", Arial, sans-serif;
+  --hm-font-body: "Poppins", "Montserrat", "Inter", Arial, sans-serif;
+  --hm-space-1: 4px;
+  --hm-space-2: 8px;
+  --hm-space-3: 12px;
+  --hm-space-4: 16px;
+  --hm-space-5: 20px;
+  --hm-space-6: 24px;
+  --hm-space-8: 32px;
+  --hm-space-10: 40px;
+  --hm-space-12: 48px;
+  --hm-text-xs: 10px;
+  --hm-text-sm: 12px;
+  --hm-text-md: 14px;
+  --hm-text-lg: 18px;
+  --hm-text-xl: 24px;
+  --hm-text-2xl: 34px;
+  --hm-text-display: clamp(58px, 3.9vw, 96px);
+  --hm-ease-out: cubic-bezier(0.18, 0.9, 0.2, 1);
+  --hm-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --hm-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --hm-dur-fast: 160ms;
+  --hm-dur-med: 280ms;
+  --hm-dur-slow: 760ms;
+  --hm-rule-hairline: 1px solid var(--hm-color-line);
+  --hm-rule-hot: 1px solid var(--hm-color-line-hot);
+  --hm-radius-sm: 6px;
+  --hm-radius-md: 8px;
+  --hm-radius-lg: 12px;
+  --hm-radius-pill: 999px;
+}

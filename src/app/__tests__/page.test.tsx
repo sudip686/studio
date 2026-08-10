@@ -84,6 +84,13 @@ describe('Home Page Navigation', () => {
     expect(screen.getByTestId('story-panel')).toBeInTheDocument();
   });
 
+  it('renders the runtime toggle without forcing the monitor open by default', () => {
+    render(<Home />);
+
+    expect(screen.queryByTestId('runtime-monitor')).toBeNull();
+    expect(screen.getByRole('button', { name: /show runtime panel/i })).toBeInTheDocument();
+  });
+
   it('switches to the Three.js renderer on the lithology slide', async () => {
     render(<Home />);
 

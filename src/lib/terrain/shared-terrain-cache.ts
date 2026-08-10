@@ -24,8 +24,8 @@ type SharedTerrainResources = {
   heightData: Float32Array;
   texture: THREE.Texture;
   normalMap: THREE.DataTexture;
-  lowGeometry: THREE.BufferGeometry;
-  highGeometry: THREE.BufferGeometry | null;
+  lowGeometry: THREE.BufferGeometry & { visible?: boolean };
+  highGeometry: (THREE.BufferGeometry & { visible?: boolean }) | null;
 };
 
 const HIGH_RES_SEGMENTS = 1024;
@@ -127,7 +127,7 @@ async function loadTerrainMetaAndHeight() {
         }
         return response.json() as Promise<TerrainMeta>;
       }),
-      fetch(`${ASSET_BASE_URL}/height.bin`).then(async (response) => {
+      fetch('/height.bin', { cache: 'force-cache' }).then(async (response) => {
         if (!response.ok) {
           throw new Error(`Failed to load terrain heights: ${response.statusText}`);
         }
@@ -147,6 +147,24 @@ async function loadTerrainMetaAndHeight() {
   }
 
   return terrainCache.heightPromise;
+}
+
+function resolveTerrainTexturePath(meta: TerrainMeta) {
+  const textureName = meta.rgb_texture?.trim();
+
+  if (textureName) {
+    if (/^https?:\/\//i.test(textureName)) {
+      return textureName;
+    }
+
+    return textureName.startsWith('/') ? textureName : `/${textureName}`;
+  }
+
+  if (ASSET_BASE_URL) {
+    return `${ASSET_BASE_URL}/terrain_texture_8k.jpg`;
+  }
+
+  return '/terrain_texture_8k.jpg';
 }
 
 function applyTextureTuning(texture: THREE.Texture, renderer?: THREE.WebGLRenderer | null) {
@@ -169,7 +187,7 @@ function applyTextureTuning(texture: THREE.Texture, renderer?: THREE.WebGLRender
 }
 
 async function loadTerrainTexture(texturePath: string, renderer?: THREE.WebGLRenderer | null) {
-  const cacheKey = texturePath || `${ASSET_BASE_URL}/terrain_texture_8k.jpg`;
+  const cacheKey = texturePath || '/terrain_texture_8k.jpg';
 
   const existing = terrainCache.textures.get(cacheKey);
   if (existing) {
@@ -402,11 +420,12 @@ export async function prepareTerrainSurface(
   modelCenter: TerrainModelCenter,
   verticalScale = 1,
   renderer?: THREE.WebGLRenderer | null,
-  options?: { includeHigh?: boolean },
+  options?: { includeHigh?: boolean; meshVisible?: boolean },
 ): Promise<SharedTerrainResources> {
   const includeHigh = options?.includeHigh ?? true;
+  const meshVisible = options?.meshVisible ?? false;
   const [meta, heightData] = await loadTerrainMetaAndHeight();
-  const texturePath = `${ASSET_BASE_URL}/${meta.rgb_texture || 'terrain_texture_8k.jpg'}`;
+  const texturePath = resolveTerrainTexturePath(meta);
   const [texture, normalMap, lowGeometry, highGeometry] = await Promise.all([
     loadTerrainTexture(texturePath, renderer),
     loadTerrainNormalMap(verticalScale),
@@ -437,32 +456,41 @@ export function createTerrainMaterial({
   clippingPlanes,
   highQuality,
   renderer,
+  presentationMode = false,
 }: {
   texture?: THREE.Texture | null;
   normalMap?: THREE.Texture | null;
   clippingPlanes?: THREE.Plane[];
   highQuality: boolean;
   renderer?: THREE.WebGLRenderer | null;
+  presentationMode?: boolean;
 }) {
   if (texture) {
     applyTextureTuning(texture, renderer);
   }
 
-  return new THREE.MeshPhysicalMaterial({
+  // Presentation mode enhancements for slides 9-12
+  const isPresentation = presentationMode || highQuality;
+  const visibilityBoost = 1.3;
+  const normalScaleX = (isPresentation ? 2.2 : (highQuality ? 1.85 : 1.1)) * 1.08;
+  const normalScaleY = (isPresentation ? 2.2 : (highQuality ? 1.85 : 1.1)) * 1.08;
+  const roughness = isPresentation ? 0.84 : (highQuality ? 0.9 : 0.94);
+  const metalness = isPresentation ? 0.05 : 0.02;
+
+  return new THREE.MeshStandardMaterial({
     map: texture ?? undefined,
     normalMap: normalMap ?? undefined,
-    normalScale: highQuality ? new THREE.Vector2(3.1, 3.1) : new THREE.Vector2(1.85, 1.85),
-    color: highQuality ? new THREE.Color('#fff7f0') : new THREE.Color('#f2dac6'),
-    side: THREE.DoubleSide,
-    roughness: highQuality ? 0.68 : 0.82,
-    metalness: 0.04,
-    clearcoat: highQuality ? 0.2 : 0.1,
-    clearcoatRoughness: 0.4,
-    reflectivity: 0.42,
-    emissive: new THREE.Color(highQuality ? '#5b3b24' : '#4c311f'),
-    emissiveIntensity: highQuality ? 0.08 : 0.05,
+    normalScale: new THREE.Vector2(normalScaleX, normalScaleY),
+    color: new THREE.Color('#f4f8fb'),
+    side: THREE.FrontSide,
+    roughness: roughness,
+    metalness: metalness,
+    emissive: new THREE.Color('#6b7f91'),
+    emissiveIntensity: (isPresentation ? 0.08 : (highQuality ? 0.065 : 0.05)) * visibilityBoost,
     clippingPlanes: clippingPlanes ?? [],
     polygonOffset: true,
     polygonOffsetFactor: 1,
   });
 }
+
+

@@ -4,30 +4,39 @@ import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLORS } from '@/lib
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { BoreholeCylinderCache, Interval, Style } from '@/lib/boreholes/borehole-cylinders';
 import { colorFromLegend } from '@/lib/boreholes/legend-color';
-
-const TooltipContent = ({ data }: { data: any }) => {
-  if (!data || !data.content) return null;
-  return (
-    <div
-      className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none"
-      style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-    >
-      <p className="font-bold text-base mb-1">Hole ID: {data.content.hole_id}</p>
-      <ul className="list-none space-y-1">
-        <li><strong>Lat:</strong> {data.content.latitude?.toFixed(5)}</li>
-        <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
-        {data.content.lithology && <li><strong>Lithologies:</strong> {data.content.lithology}</li>}
-        {data.content.graphitic_carbon !== undefined && (
-          <li><strong>Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
-        )}
-      </ul>
-    </div>
-  );
-};
+import { DrillholeTooltip } from './ui/tooltip';
 
 interface DrillholeLayerProps {
   type: 'lithology' | 'assay';
+  presentationMode?: boolean;
+  showContextBoundary?: boolean;
+  visualProfile?: 'default' | 'presentationClarity';
 }
+
+const VISUAL_PROFILES = {
+  default: {
+    assayRadius: 2.5,
+    lithologyRadius: 2.5,
+    outline: false,
+    outlineColorCss: '#ffffff',
+    creationSlices: 32,
+    lightenLithology: 0,
+    seatBelowTerrain: true,
+    terrainSeatSamples: 2,
+    terrainSeatNudgeMeters: 1.5,
+  },
+  presentationClarity: {
+    assayRadius: 3.2,
+    lithologyRadius: 3.15,
+    outline: false,
+    outlineColorCss: '#082f49',
+    creationSlices: 16,
+    lightenLithology: 0,
+    seatBelowTerrain: true,
+    terrainSeatSamples: 2,
+    terrainSeatNudgeMeters: 1.5,
+  },
+} as const;
 
 function collectKmlPositions(kmlDataSource: any, time: any) {
   if (!kmlDataSource) return [] as any[];
@@ -53,7 +62,12 @@ function collectKmlPositions(kmlDataSource: any, time: any) {
   return positions;
 }
 
-const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
+const DrillholeLayer = ({
+  type,
+  presentationMode = false,
+  showContextBoundary = true,
+  visualProfile = 'default',
+}: DrillholeLayerProps) => {
   const { viewer, ready, kmlDataSource, kmlLabel } = useCesium();
   const { drillholeData, processedAssayData, processedLithologyData } = useDataCache();
   const assayRange = processedAssayData?.assayRange ?? { min: 0, max: 1 };
@@ -67,6 +81,7 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
   const cacheRef = useRef<BoreholeCylinderCache | null>(null);
   const intervalsRef = useRef<Interval[]>([]);
   const entitiesRef = useRef<any[]>([]);
+  const profile = VISUAL_PROFILES[visualProfile];
 
   const fitCameraToVisibleData = (entities: any[]) => {
     if (!viewer || entities.length === 0) return;
@@ -78,7 +93,9 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
       .map((entity) => entity.position?.getValue?.(time))
       .filter(Boolean);
 
-    positions.push(...collectKmlPositions(kmlDataSource, time));
+    if (showContextBoundary) {
+      positions.push(...collectKmlPositions(kmlDataSource, time));
+    }
 
     if (positions.length === 0) return;
 
@@ -103,12 +120,14 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
     const legend = LITHOLOGY_COLORS;
     const legendMap = processedLithologyData?.legendMap ?? LITHOLOGY_COLORS.map;
 
+    const outlineColor = Cesium.Color.fromCssColorString(profile.outlineColorCss);
     const defaultStyle: Style = {
       material: Cesium.Color.GREY,
-      opacity: 0.5,
-      outline: true,
-      outlineColor: Cesium.Color.WHITE,
-      radiusMeters: 2.5,
+      opacity: 1.0,
+      outline: profile.outline,
+      outlineColor,
+      radiusMeters: type === 'assay' ? profile.assayRadius : profile.lithologyRadius,
+      slices: profile.creationSlices,
     };
 
     const visibleEntities: any[] = [];
@@ -130,8 +149,10 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
           styleToApply = {
             material: new Cesium.Color(clamped, 1 - clamped, 0, 1),
             opacity: 1.0,
-            outline: false,
-            radiusMeters: 2.5,
+            outline: profile.outline,
+            outlineColor,
+            radiusMeters: profile.assayRadius,
+            slices: profile.creationSlices,
           };
           visible = true;
         }
@@ -140,8 +161,19 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
         if (value) {
           const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
           if (legendMap[normalizedValue]) {
-            const color = colorFromLegend({ ...legend, map: legendMap }, normalizedValue);
-            styleToApply = { material: color, opacity: 1.0, outline: false, radiusMeters: 2.5 };
+            const baseColor = colorFromLegend({ ...legend, map: legendMap }, normalizedValue);
+            const color =
+              profile.lightenLithology > 0
+                ? Cesium.Color.lerp(baseColor, Cesium.Color.WHITE, profile.lightenLithology, new Cesium.Color())
+                : baseColor;
+            styleToApply = {
+              material: color,
+              opacity: 1.0,
+              outline: profile.outline,
+              outlineColor,
+              radiusMeters: profile.lithologyRadius,
+              slices: profile.creationSlices,
+            };
             visible = true;
           } else if (normalizedValue === 'unknown' || normalizedValue === 'nan') {
             styleToApply = defaultStyle;
@@ -157,7 +189,9 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
       }
     }
 
-    fitCameraToVisibleData(visibleEntities.length > 0 ? visibleEntities : entities);
+    if (!presentationMode) {
+      fitCameraToVisibleData(visibleEntities.length > 0 ? visibleEntities : entities);
+    }
     viewer.scene.requestRender();
   };
 
@@ -276,10 +310,26 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
         if (isCancelled) break;
 
         const batch = intervalsRef.current.slice(i, i + BATCH_SIZE);
-        const newEntities = await Promise.all(batch.map((interval) => cache.getOrCreate(interval)));
+        const creationStyle: Style = {
+          material: Cesium.Color.GREY,
+          opacity: 0.0,
+          outline: false,
+          radiusMeters: type === 'assay' ? profile.assayRadius : profile.lithologyRadius,
+          slices: profile.creationSlices,
+          seatBelowTerrain: profile.seatBelowTerrain,
+          terrainSeatSamples: profile.terrainSeatSamples,
+          terrainSeatNudgeMeters: profile.terrainSeatNudgeMeters,
+        };
+
+        const newEntities = await Promise.all(
+          batch.map((interval) => cache.getOrCreate(interval, creationStyle))
+        );
 
         newEntities.forEach((entity) => {
-          if (entity) entitiesCreated.push(entity);
+          if (entity) {
+            entity.show = false;
+            entitiesCreated.push(entity);
+          }
         });
 
         viewer.entities.resumeEvents();
@@ -303,20 +353,37 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
       cacheRef.current = null;
       entitiesRef.current = [];
     };
-  }, [viewer, ready, drillholeData]);
+  }, [
+    viewer,
+    ready,
+    drillholeData,
+    profile.assayRadius,
+    profile.creationSlices,
+    profile.lithologyRadius,
+    profile.seatBelowTerrain,
+    profile.terrainSeatNudgeMeters,
+    profile.terrainSeatSamples,
+    type,
+  ]);
 
   useEffect(() => {
     applyStyles();
-  }, [type, assayRange.min, assayRange.max, processedLithologyData?.legendMap, kmlDataSource]);
+  }, [type, assayRange.min, assayRange.max, processedLithologyData?.legendMap, kmlDataSource, presentationMode, profile, showContextBoundary]);
 
   useEffect(() => {
     if (!kmlDataSource) return;
+    if (!showContextBoundary) {
+      kmlDataSource.show = false;
+      if (kmlLabel) kmlLabel.show = false;
+      viewer?.scene?.requestRender?.();
+      return;
+    }
     kmlDataSource.show = true;
     if (kmlLabel) {
       kmlLabel.show = false;
     }
     viewer?.scene?.requestRender?.();
-  }, [kmlDataSource, kmlLabel, viewer]);
+  }, [kmlDataSource, kmlLabel, showContextBoundary, viewer]);
 
   useEffect(() => {
     if (!viewer || !ready) return;
@@ -350,9 +417,12 @@ const DrillholeLayer = ({ type }: DrillholeLayerProps) => {
 
   return (
     <div className="h-full w-full relative z-20 pointer-events-none">
-      <TooltipContent data={tooltip} />
+      <DrillholeTooltip data={tooltip} />
     </div>
   );
 };
 
 export default DrillholeLayer;
+
+
+

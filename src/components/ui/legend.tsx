@@ -10,6 +10,8 @@ interface LegendProps {
   maxLabel?: string;
   show?: boolean;
   guidance?: string;
+  fullWidth?: boolean;
+  className?: string;
 }
 
 export const Legend: React.FC<LegendProps> = ({
@@ -21,6 +23,8 @@ export const Legend: React.FC<LegendProps> = ({
   maxLabel,
   show = true,
   guidance,
+  fullWidth = false,
+  className,
 }) => {
   if (!show) return null;
 
@@ -29,8 +33,8 @@ export const Legend: React.FC<LegendProps> = ({
       data-testid={`legend-${title.toLowerCase().replace(/\s+/g, '-')}`}
       data-no-deck-wheel
       className={`pointer-events-auto relative overflow-hidden text-white ${uiTheme.panel.background} ${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow} ${uiTheme.panel.padding} ${
-        type === 'gradient' ? uiTheme.legend.width.gradient : uiTheme.legend.width.categorical
-      }`}
+        fullWidth ? 'w-full min-w-0' : type === 'gradient' ? uiTheme.legend.width.gradient : uiTheme.legend.width.categorical
+      } ${className ?? ''}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.12),transparent_34%)]" />
       <div className="relative">

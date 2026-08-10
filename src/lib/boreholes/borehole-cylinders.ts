@@ -17,6 +17,9 @@ export type Style = {
   opacity?: number;
   radiusMeters?: number;
   slices?: number;
+  seatBelowTerrain?: boolean;
+  terrainSeatSamples?: number;
+  terrainSeatNudgeMeters?: number;
 };
 
 const DEFAULT_RADIUS = 2.5;
@@ -84,8 +87,8 @@ async function seatBelowTerrain(
   viewer: any,
   startLLZ: LatLonZ,
   endLLZ: LatLonZ,
-  nudge = -0.05,
-  samples = 5
+  nudgeMeters = 3,
+  samples = 3
 ) {
   const Cesium = getCesium();
   if (!Cesium) throw new Error('Cesium not loaded');
@@ -106,7 +109,7 @@ async function seatBelowTerrain(
     const above = z - h;
     if (above > dzNeeded) dzNeeded = above;
   }
-  const dz = Math.max(0, dzNeeded) - nudge;
+  const dz = Math.max(0, dzNeeded) + Math.max(0, nudgeMeters);
   const s = [startLLZ[0], startLLZ[1], startLLZ[2] - dz] as LatLonZ;
   const e = [endLLZ[0], endLLZ[1], endLLZ[2] - dz] as LatLonZ;
   return { s, e };
@@ -140,8 +143,27 @@ export class BoreholeCylinderCache {
       return existingEntity;
     }
 
-    const p0 = toFixed(interval.start);
-    const p1 = toFixed(interval.end ?? interval.start);
+    let intervalStart = interval.start;
+    let intervalEnd = interval.end ?? interval.start;
+
+    if (style?.seatBelowTerrain) {
+      try {
+        const seated = await seatBelowTerrain(
+          viewer,
+          intervalStart,
+          intervalEnd,
+          style.terrainSeatNudgeMeters,
+          style.terrainSeatSamples
+        );
+        intervalStart = seated.s;
+        intervalEnd = seated.e;
+      } catch {
+        // Fall back to the source interval if terrain heights are unavailable.
+      }
+    }
+
+    const p0 = toFixed(intervalStart);
+    const p1 = toFixed(intervalEnd);
     const length0 = Cesium.Cartesian3.distance(p0, p1) || 0.01;
     const { midpoint: mid0, quaternion: q0 } = orientationFrom(p0, p1);
 
@@ -154,8 +176,8 @@ export class BoreholeCylinderCache {
         topRadius: style?.radiusMeters ?? DEFAULT_RADIUS,
         bottomRadius: style?.radiusMeters ?? DEFAULT_RADIUS,
         slices: style?.slices ?? 32,
-        material: (style?.material ?? Cesium.Color.GREY).withAlpha(style?.opacity ?? 0.15),
-        outline: style?.outline ?? true,
+        material: (style?.material ?? Cesium.Color.GREY).withAlpha(style?.opacity ?? 0),
+        outline: style?.outline ?? false,
       },
       properties: interval.props ?? {},
     });
@@ -195,6 +217,9 @@ export class BoreholeCylinderCache {
     cyl.outlineColor = style.outlineColor ?? Cesium.Color.BLACK;
     cyl.topRadius = style.radiusMeters ?? DEFAULT_RADIUS;
     cyl.bottomRadius = style.radiusMeters ?? DEFAULT_RADIUS;
+    if (style.slices !== undefined) {
+      cyl.slices = style.slices;
+    }
   }
 
   destroy() {
@@ -212,3 +237,4 @@ export class BoreholeCylinderCache {
     this.map.clear();
   }
 }
+

@@ -1,0 +1,13 @@
+{
+  "center": {
+    "lon": 38.78497638702834,
+    "lat": -4.81724026576475
+  },
+  "radius_m": 3500,
+  "counts": {
+    "roads": 8,
+    "buildings": 67,
+    "trees": 41,
+    "labels": 11
+  }
+}

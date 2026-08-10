@@ -1,14 +1,23 @@
-# Large files hosted on Cloudflare R2
+# Large files hosted on Cloudflare R2 (served via NEXT_PUBLIC_ASSET_BASE_URL)
 public/height.bin
 public/BlockModel.geojson
 public/texture_rgb_8192.png
 public/dem_utm.tif
+# Heavy assets — MUST live on R2, never in git / the Vercel bundle.
+# Videos (2.6 GB total) and multi-MB test meshes. Small geojsons in
+# public/generated (boundaries, roads, buildings, labels) stay committed
+# because the map layers fetch them locally.
+public/media/
+public/generated/*.obj
+public/generated/forge3d_test_terrain_meta.json
+public/*.kmz
 .env.local
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
 /node_modules
+/.venv-whisper
 /.pnp
 .pnp.js
 
@@ -24,6 +33,7 @@ public/dem_utm.tif
 
 # local workspace artifacts
 /.claude/
+models/vosk-*
 /.playwright-cli/
 /.playwright-mcp/
 /memory/

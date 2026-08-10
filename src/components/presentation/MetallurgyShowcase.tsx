@@ -1,175 +1,227 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
+import Image from 'next/image';
+import { motion } from 'framer-motion';
+import { ShowcaseDepositHero } from './ShowcaseDepositHero';
 
-const flowSteps = [
+const metallurgySampleRows = [
   {
-    label: "Composite selection",
-    value: "Oxide and fresh domains",
-    note: "Representative samples capture weathering and lithology variability before flotation optimisation.",
+    sample: 'TDM003',
+    domain: 'Fresh',
+    interval: '51.8-57.8 m',
+    tgc: '5.0',
+    totalCarbon: '5.93',
+    carbonate: '0.12',
+    note: 'Balanced fresh composite',
   },
   {
-    label: "Flotation optimisation",
-    value: "Cleaner circuit tuning",
-    note: "Reagent suite and grind conditions lifted concentrate quality while maintaining strong recovery.",
+    sample: 'TDM004',
+    domain: 'Fresh',
+    interval: '46.3-52.9 m',
+    tgc: '6.0',
+    totalCarbon: '8.11',
+    carbonate: '1.17',
+    note: 'Carbonate-rich outlier',
   },
   {
-    label: "Saleable product",
-    value: ">97% TC concentrate",
-    note: "Premium concentrate quality is consistently above typical commercial saleable thresholds.",
+    sample: 'TDM006',
+    domain: 'Oxidised',
+    interval: '2.2-12.2 m',
+    tgc: '7.0',
+    totalCarbon: '8.83',
+    carbonate: '0.77',
+    note: 'Oxide optimisation feed',
+  },
+  {
+    sample: 'TDM007',
+    domain: 'Oxidised',
+    interval: '10.2-22.2 m',
+    tgc: '7.6',
+    totalCarbon: '8.13',
+    carbonate: '0.11',
+    note: 'Cleaner oxide composite',
+  },
+  {
+    sample: 'TDM008',
+    domain: 'Kaolinised',
+    interval: '68.3-81.8 m',
+    tgc: '9.7',
+    totalCarbon: '8.13',
+    carbonate: '0.41',
+    note: 'High-grade altered feed',
   },
 ];
 
-const headlineMetrics = [
-  { label: "Oxide optimisation", value: "98.4% TC", subvalue: "93.0% recovery" },
-  { label: "Fresh optimisation", value: "98.6% TC", subvalue: "94.4% recovery" },
-  { label: "Recovery envelope", value: "89.1-95.2%", subvalue: "Across composite programme" },
+const metallurgyMetrics = [
+  { label: 'Fresh optimisation', value: '98.6% TC' },
+  { label: 'Oxide optimisation', value: '98.4% TC' },
+  { label: 'Recovery band', value: '89.1-95.2%' },
 ];
 
-const performanceBands = [
-  { name: "Oxide composites", value: "97.6-98.4% TC", width: "78%" },
-  { name: "Fresh composites", value: "97.18-98.64% TC", width: "84%" },
-  { name: "Outlier case", value: "75.8% recovery", width: "42%" },
+const metallurgyNotes = [
+  'All composites finished above 97% total carbon.',
+  'The weaker response is tied to carbonate-rich TDM004, while the broader programme still supports bulk concentrate and battery-market follow-on work.',
 ];
 
 export function MetallurgyShowcase() {
   return (
     <div
-      className="metallurgy-showcase absolute inset-0 overflow-hidden"
+      className="absolute inset-0 overflow-hidden"
       data-no-deck-wheel
       data-testid="metallurgy-showcase"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(56,189,248,0.24),transparent_28%),radial-gradient(circle_at_80%_12%,rgba(251,191,36,0.26),transparent_22%),linear-gradient(180deg,rgba(8,20,34,0.22),rgba(5,12,21,0.16)_40%,rgba(4,10,18,0.78)_100%)]" />
-      <div className="absolute inset-x-0 top-0 h-[38%] bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.04),transparent)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(245,158,11,0.18),transparent_24%),radial-gradient(circle_at_86%_12%,rgba(56,189,248,0.16),transparent_26%),linear-gradient(180deg,rgba(8,9,12,0.34),rgba(8,9,12,0.68)_48%,rgba(4,5,7,0.94)_100%)]" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: "easeOut" }}
-        className="relative flex h-full flex-col justify-between px-6 py-6 md:px-8 md:py-7"
-      >
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.92fr)]">
-          <div className="rounded-[30px] border border-white/18 bg-[linear-gradient(180deg,rgba(11,19,30,0.96),rgba(8,13,22,0.92))] p-5 shadow-[0_18px_44px_rgba(2,8,23,0.3)] backdrop-blur-sm">
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="absolute inset-y-0 right-0 flex w-[36%] min-w-[22rem] flex-col gap-4 border-l border-white/10 bg-[linear-gradient(180deg,rgba(13,15,20,0.5),rgba(7,8,10,0.88))] p-5">
+        <div className="grid min-h-0 flex-[1.15] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-[30px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,16,20,0.94),rgba(7,8,10,0.96))] shadow-[0_30px_80px_rgba(0,0,0,0.38)]">
+          <div className="min-h-0 overflow-hidden px-4 pb-3 pt-4">
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-sky-100/58">
-                  Process confidence
-                </p>
-                <h3 className="mt-3 text-[1.7rem] font-semibold tracking-[-0.04em] text-white">
-                  Metallurgical path to premium graphite product
-                </h3>
-                <p className="mt-3 max-w-[40rem] text-sm leading-6 text-white/88">
-                  The slide now explains metallurgical relevance directly: representative composite selection,
-                  flotation optimisation, and premium concentrate quality with clear recovery context.
+                <p className="text-[10px] uppercase tracking-[0.28em] text-white/52">Project 0424046 draft</p>
+                <h4 className="mt-2 text-[1.05rem] font-semibold tracking-[-0.03em] text-white">
+                  Metallurgy sample matrix
+                </h4>
+                <p className="mt-2 max-w-[24rem] text-[12px] leading-5 text-white/74">
+                  Composite chemistry and interval context rebuilt from the draft report so the metallurgy evidence reads cleanly.
                 </p>
               </div>
-              <div className="rounded-full border border-amber-300/18 bg-amber-300/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-100">
-                IMO Report 6798
+              <div className="rounded-full border border-amber-300/22 bg-amber-400/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-100/82">
+                Rebuilt table
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {headlineMetrics.map((metric, index) => (
-                <motion.div
-                  key={metric.label}
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: 0.1 + index * 0.08 }}
-                  className="rounded-[24px] border border-white/16 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.08))] px-4 py-4"
-                >
-                  <p className="text-[10px] uppercase tracking-[0.26em] text-white/68">{metric.label}</p>
-                  <p className="mt-3 text-[1.5rem] font-semibold tracking-[-0.04em] text-white">{metric.value}</p>
-                  <p className="mt-2 text-sm text-white/84">{metric.subvalue}</p>
-                </motion.div>
-              ))}
+            <div className="mt-3 min-h-0 overflow-auto rounded-[24px] border border-white/10 bg-black/24">
+              <table className="w-full border-collapse text-left">
+                <thead className="sticky top-0 bg-[rgba(13,16,20,0.98)] backdrop-blur-md">
+                  <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.2em] text-white/54">
+                    <th className="px-3 py-2.5 font-medium">Sample</th>
+                    <th className="px-3 py-2.5 font-medium">Domain</th>
+                    <th className="px-3 py-2.5 font-medium">Interval</th>
+                    <th className="px-3 py-2.5 font-medium text-right">TGC %</th>
+                    <th className="px-3 py-2.5 font-medium text-right">TC %</th>
+                    <th className="px-3 py-2.5 font-medium text-right">CO3 %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metallurgySampleRows.map((row) => (
+                    <tr
+                      key={row.sample}
+                      className={`border-t border-white/8 align-top ${
+                        row.sample === 'TDM004' ? 'bg-amber-400/8' : 'bg-transparent'
+                      }`}
+                    >
+                      <td className="px-3 py-2.5">
+                        <p className="text-[12px] font-semibold tracking-[-0.02em] text-white">{row.sample}</p>
+                        <p className="mt-1 text-[10px] leading-4 text-white/58">{row.note}</p>
+                      </td>
+                      <td className="px-3 py-2.5 text-[12px] text-white/86">{row.domain}</td>
+                      <td className="px-3 py-2.5 text-[12px] text-white/78">{row.interval}</td>
+                      <td className="px-3 py-2.5 text-right text-[12px] font-semibold text-white/94">{row.tgc}</td>
+                      <td className="px-3 py-2.5 text-right text-[12px] font-semibold text-white/94">{row.totalCarbon}</td>
+                      <td className="px-3 py-2.5 text-right text-[12px] font-semibold text-white/94">{row.carbonate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {flowSteps.map((step, index) => (
-                <motion.div
-                  key={step.label}
-                  initial={{ opacity: 0, x: -16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.38, delay: 0.18 + index * 0.08 }}
-                  className="relative rounded-[26px] border border-white/16 bg-[linear-gradient(180deg,rgba(12,21,33,0.94),rgba(9,15,24,0.88))] px-4 py-4"
-                >
-                  <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/48">
-                    0{index + 1}
-                  </div>
-                  <p className="text-[10px] uppercase tracking-[0.26em] text-white/64">{step.label}</p>
-                  <p className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">{step.value}</p>
-                  <p className="mt-3 text-sm leading-6 text-white/84">{step.note}</p>
-                </motion.div>
-              ))}
+            <div className="mt-3 grid gap-2 xl:grid-cols-2">
+              <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-[0.24em] text-white/52">Feed selection</p>
+                <p className="mt-1.5 text-[12px] leading-5 text-white/82">
+                  Oxidised, fresh, and kaolinised material are all represented so the metallurgy story is not built on a single ore type.
+                </p>
+              </div>
+              <div className="rounded-[20px] border border-amber-300/12 bg-amber-300/8 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-[0.24em] text-white/52">Key exception</p>
+                <p className="mt-1.5 text-[12px] leading-5 text-white/82">
+                  TDM004 stands out because the carbonate-rich chemistry is materially higher than the other composites.
+                </p>
+              </div>
             </div>
           </div>
-
-          <div className="rounded-[30px] border border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] p-5 shadow-[0_18px_44px_rgba(2,8,23,0.26)] backdrop-blur-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-amber-100/56">
-              Performance detail
+          <div className="border-t border-white/10 bg-black/58 px-4 py-3.5 backdrop-blur-md">
+            <p className="text-[10px] uppercase tracking-[0.28em] text-white/56">Source anchor</p>
+            <p className="mt-2 text-sm leading-6 text-white/86">
+              Values align with the sample chemistry tables and the flotation performance summary in the Tanga Graphite MRE draft.
             </p>
-            <div className="mt-4 space-y-4">
-              {performanceBands.map((band, index) => (
-                <motion.div
-                  key={band.name}
-                  initial={{ opacity: 0, x: 18 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.38, delay: 0.22 + index * 0.08 }}
-                  className="rounded-[24px] border border-white/16 bg-black/28 px-4 py-4"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <p className="text-sm font-semibold tracking-[-0.02em] text-white">{band.name}</p>
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-white/72">Observed</span>
-                  </div>
-                  <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,rgba(56,189,248,0.92),rgba(251,191,36,0.94))] shadow-[0_0_18px_rgba(56,189,248,0.32)]"
-                      style={{ width: band.width }}
-                    />
-                  </div>
-                  <p className="mt-3 text-sm text-white/88">{band.value}</p>
-                </motion.div>
-              ))}
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.42, delay: 0.36 }}
-              className="mt-5 rounded-[26px] border border-white/16 bg-[linear-gradient(180deg,rgba(251,191,36,0.22),rgba(255,255,255,0.08))] px-4 py-4"
-            >
-              <p className="text-[10px] uppercase tracking-[0.28em] text-amber-100/62">Key interpretation</p>
-              <h4 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
-                TDM004 is the exception, not the rule
-              </h4>
-              <p className="mt-3 text-sm leading-6 text-white/88">
-                The weakest recovery is explained by elevated carbonate content around 1.8%, which depressed
-                flotation response. That isolates the issue to mineralogical variability rather than a broader
-                process limitation across the deposit.
-              </p>
-            </motion.div>
           </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, delay: 0.32 }}
-          className="mt-4 grid gap-3 md:grid-cols-3"
-        >
-          <div className="rounded-[24px] border border-white/16 bg-[linear-gradient(180deg,rgba(5,15,26,0.92),rgba(5,12,20,0.84))] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-white/62">Cleaner 6 quality</p>
-            <p className="mt-3 text-base font-semibold text-white">Premium concentrate threshold comfortably exceeded</p>
+        <div className="grid min-h-0 flex-[0.78] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-[26px] border border-white/12 bg-[linear-gradient(180deg,rgba(12,14,18,0.96),rgba(7,8,10,0.94))] shadow-[0_22px_64px_rgba(0,0,0,0.34)]">
+          <div className="relative min-h-0 overflow-hidden">
+            <Image
+              src="/presentation-assets/metallurgy-samples.jpg"
+              alt="Metallurgy sample imagery extracted from the Tanga graphite mineral resource report"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,6,8,0.05),rgba(4,6,8,0.12)_45%,rgba(4,6,8,0.24)_100%)]" />
           </div>
-          <div className="rounded-[24px] border border-white/16 bg-[linear-gradient(180deg,rgba(5,15,26,0.92),rgba(5,12,20,0.84))] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-white/62">Investor meaning</p>
-            <p className="mt-3 text-base font-semibold text-white">Resource confidence now extends to product conversion confidence</p>
+          <div className="border-t border-white/10 bg-black/62 px-4 py-3.5">
+            <p className="text-[10px] uppercase tracking-[0.28em] text-white/56">Representative composite samples</p>
+            <p className="mt-2 text-sm leading-6 text-white/88">
+              Fresh, oxidised, and altered composites show how conversion quality holds across multiple domains of the deposit.
+            </p>
           </div>
-          <div className="rounded-[24px] border border-white/16 bg-[linear-gradient(180deg,rgba(5,15,26,0.92),rgba(5,12,20,0.84))] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-white/62">Recommended next step</p>
-            <p className="mt-3 text-base font-semibold text-white">Bulk concentrate generation and battery-spec follow-up work</p>
+        </div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 22 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.42, ease: 'easeOut' }}
+        className="relative grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-4 px-6 py-6 pr-[39%] pb-[8rem] xl:pl-8 xl:pr-[39%] xl:pt-7 xl:pb-[8rem]"
+      >
+        <div className="max-w-[35rem]">
+          <div className="inline-flex items-center gap-3 rounded-full border border-amber-300/16 bg-amber-400/8 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-50/74">
+            Conversion confidence
           </div>
-        </motion.div>
+          <h3 className="mt-5 max-w-[12ch] text-[2.7rem] font-semibold leading-[0.95] tracking-[-0.06em] text-white">
+            Premium concentrate performance is supported across the deposit.
+          </h3>
+          <p className="mt-4 max-w-[31rem] text-[14px] leading-6 text-white/76">
+            The deposit view now works with the metallurgy evidence: strong fresh and oxide recoveries, saleable concentrate quality,
+            and one clearly isolated carbonate-rich exception rather than a broader process problem.
+          </p>
+        </div>
+
+        <div className="min-h-0 py-1">
+          <ShowcaseDepositHero
+            eyebrow="Deposit view"
+            title="Tanga deposit metallurgy context"
+            note="Composite testwork is tied back to the deposit geometry so recovery and concentrate quality read in geological context."
+            variant="geology"
+            accent="amber"
+            metrics={metallurgyMetrics}
+            className="h-full min-h-[23rem]"
+          />
+        </div>
+
+        <div className="grid gap-2 xl:grid-cols-[minmax(0,1.14fr)_minmax(15rem,0.86fr)]">
+          <div className="rounded-[26px] border border-white/12 bg-[linear-gradient(180deg,rgba(10,12,15,0.84),rgba(6,7,9,0.94))] px-4 py-3">
+            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2.5">
+              <p className="text-[10px] uppercase tracking-[0.28em] text-white/52">Metallurgical read-through</p>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-white/36">Report-backed</p>
+            </div>
+            <div className="mt-3 space-y-2">
+              {metallurgyNotes.map((note) => (
+                <div key={note} className="flex gap-3">
+                  <span className="mt-[0.45rem] h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_0_6px_rgba(245,158,11,0.08)]" />
+                  <p className="text-[12.5px] leading-[1.4] text-white/82">{note}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[26px] border border-white/12 bg-[linear-gradient(180deg,rgba(245,158,11,0.14),rgba(255,255,255,0.04))] px-4 py-3">
+            <p className="text-[10px] uppercase tracking-[0.28em] text-white/54">Critical interpretation</p>
+            <p className="mt-2.5 text-[1.05rem] font-semibold tracking-[-0.03em] text-white">TDM004 is the isolated exception.</p>
+            <p className="mt-2 text-[12.5px] leading-[1.4] text-white/82">
+              Elevated carbonate content explains the weaker recovery without changing the broader flotation route indicated by the rest of the programme.
+            </p>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

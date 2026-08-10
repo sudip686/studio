@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useDataCache, type DrillholeSegment } from '@/lib/data-cache';
-import { OverlaySlot } from '@/ui/overlays';
 
 type SlideKey =
   | 'drillholes'
@@ -390,73 +389,72 @@ export default function ThreeJsDataOverlay({ slideId }: { slideId: string }) {
   const spec = highlightSpecs[slideId as SlideKey];
 
   return (
-    <OverlaySlot slot="top-right" wrapperClassName="w-[min(24rem,calc(100vw-3rem))] flex flex-col items-end">
-      <motion.aside
-        key={slideId}
-        initial={{ opacity: 0, y: 20, x: 12 }}
-        animate={{ opacity: 1, y: 0, x: 0 }}
-        transition={{ duration: 0.42, ease: 'easeOut' }}
-        className="pointer-events-none relative w-full overflow-hidden rounded-[28px] border border-white/18 bg-[linear-gradient(180deg,rgba(14,17,24,0.98),rgba(8,10,15,0.95))] p-4 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur-sm"
-        data-testid="three-data-panel"
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.18),transparent_30%)]" />
-        <div className="relative">
-          <div className="flex items-start justify-between gap-3 border-b border-white/8 pb-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.32em] text-white/68">{spec.eyebrow}</p>
-              <h3 className="mt-2 text-[1.15rem] font-semibold tracking-[-0.03em] text-white">{spec.title}</h3>
-              <p className="mt-2 max-w-[19rem] text-[12px] leading-5 text-white/86">{spec.summary}</p>
-            </div>
-            <div className="hidden h-12 w-px bg-gradient-to-b from-white/40 via-white/10 to-transparent md:block" />
+    <motion.aside
+      key={slideId}
+      initial={{ opacity: 0, y: 20, x: 12 }}
+      animate={{ opacity: 1, y: 0, x: 0 }}
+      transition={{ duration: 0.42, ease: 'easeOut' }}
+      className="three-data-panel three-data-panel--stage pointer-events-auto absolute right-4 top-4 z-[3] flex max-h-[calc(100%-2rem)] w-[min(24rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-[28px] border border-white/18 bg-[linear-gradient(180deg,rgba(14,17,24,0.98),rgba(8,10,15,0.95))] p-4 text-white shadow-[0_18px_46px_rgba(0,0,0,0.32)] backdrop-blur-sm"
+      data-testid="three-data-panel"
+      data-no-deck-wheel
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.18),transparent_30%)]" />
+      <div className="relative min-h-0 overflow-y-auto pr-1">
+        <div className="flex items-start justify-between gap-3 border-b border-white/8 pb-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.32em] text-white/68">{spec.eyebrow}</p>
+            <h3 className="mt-2 text-[1.15rem] font-semibold tracking-[-0.03em] text-white">{spec.title}</h3>
+            <p className="mt-2 max-w-[19rem] text-[12px] leading-5 text-white/86">{spec.summary}</p>
           </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {spec.metrics.map((metric) => (
-              <div
-                key={metric.label}
-                className={`rounded-[20px] border border-white/16 bg-gradient-to-br px-3 py-3 ${
-                  toneClasses[metric.tone ?? 'cool']
-                }`}
-              >
-                <p className="text-[9px] uppercase tracking-[0.22em] text-white/70">{metric.label}</p>
-                <p
-                  className="mt-1.5 text-[0.95rem] font-semibold tracking-[-0.04em] text-white"
-                  data-testid={`metric-${metric.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
-                >
-                  {metric.value}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 overflow-hidden rounded-[20px] border border-white/14 bg-black/34">
-            <div className="flex items-center justify-between border-b border-white/12 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-white/58">Key data</p>
-              <p className="text-[10px] uppercase tracking-[0.24em] text-white/48">Source backed</p>
-            </div>
-            <table className="w-full border-collapse text-left">
-              <tbody>
-                {spec.rows.map((row) => (
-                  <tr key={`${row.metric}-${row.value}`} className="border-t border-white/10 first:border-t-0">
-                    <td className="px-3 py-2.5 align-top">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">{row.metric}</p>
-                      {row.note ? <p className="mt-1 text-[11px] leading-4.5 text-white/72">{row.note}</p> : null}
-                    </td>
-                    <td className="px-3 py-2.5 text-right align-top">
-                      <p className="text-[12px] font-semibold tracking-[-0.02em] text-white/94">{row.value}</p>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-3 rounded-[18px] border border-white/12 bg-white/[0.06] px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-[0.26em] text-white/58">Source</p>
-            <p className="mt-1.5 text-[11px] leading-4.5 text-white/84">{spec.source}</p>
-          </div>
+          <div className="hidden h-12 w-px bg-gradient-to-b from-white/40 via-white/10 to-transparent md:block" />
         </div>
-      </motion.aside>
-    </OverlaySlot>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {spec.metrics.map((metric) => (
+            <div
+              key={metric.label}
+              className={`rounded-[20px] border border-white/16 bg-gradient-to-br px-3 py-3 ${
+                toneClasses[metric.tone ?? 'cool']
+              }`}
+            >
+              <p className="text-[9px] uppercase tracking-[0.22em] text-white/70">{metric.label}</p>
+              <p
+                className="mt-1.5 text-[0.95rem] font-semibold tracking-[-0.04em] text-white"
+                data-testid={`metric-${metric.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+              >
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-[20px] border border-white/14 bg-black/34">
+          <div className="flex items-center justify-between border-b border-white/12 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-white/58">Key data</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-white/48">Source backed</p>
+          </div>
+          <table className="w-full border-collapse text-left">
+            <tbody>
+              {spec.rows.map((row) => (
+                <tr key={`${row.metric}-${row.value}`} className="border-t border-white/10 first:border-t-0">
+                  <td className="px-3 py-2.5 align-top">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">{row.metric}</p>
+                    {row.note ? <p className="mt-1 text-[11px] leading-4.5 text-white/72">{row.note}</p> : null}
+                  </td>
+                  <td className="px-3 py-2.5 text-right align-top">
+                    <p className="text-[12px] font-semibold tracking-[-0.02em] text-white/94">{row.value}</p>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-3 rounded-[18px] border border-white/12 bg-white/[0.06] px-3 py-2.5">
+          <p className="text-[10px] uppercase tracking-[0.26em] text-white/58">Source</p>
+          <p className="mt-1.5 text-[11px] leading-4.5 text-white/84">{spec.source}</p>
+        </div>
+      </div>
+    </motion.aside>
   );
 }

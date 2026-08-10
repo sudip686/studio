@@ -26,6 +26,8 @@ export function DeckRail({
   onJump,
   onToggleAutoplay,
 }: DeckRailProps) {
+  const progress = `${Math.max(8, ((currentIndex + 1) / slides.length) * 100)}%`;
+
   return (
     <aside className="deck-rail" aria-label="Presentation chapters">
       <div className="deck-rail__brand">
@@ -48,11 +50,22 @@ export function DeckRail({
               priority
             />
           </div>
-          <span className="deck-rail__brand-badge">2026 Investor Materials</span>
+          <span className="deck-rail__brand-badge">Investor Deck 2026</span>
         </div>
         <p className="deck-rail__company">Sakariya Mines & Minerals</p>
         <h2 className="deck-rail__project">Tanga Graphite</h2>
-        <p className="deck-rail__subtitle">Investor presentation story</p>
+        <p className="deck-rail__subtitle">Presentation workspace for the live project narrative.</p>
+        <div className="deck-rail__progress" aria-hidden="true">
+          <div className="deck-rail__progress-copy">
+            <span>Deck progress</span>
+            <strong>
+              {String(currentIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
+            </strong>
+          </div>
+          <div className="deck-rail__progress-track">
+            <span className="deck-rail__progress-fill" style={{ width: progress }} />
+          </div>
+        </div>
       </div>
 
       <div className="deck-rail__items" data-no-deck-wheel data-scrollable="chapters">
@@ -80,6 +93,7 @@ export function DeckRail({
                   </p>
                   <p className="deck-rail__thumb-title">{slide.railTitle ?? slide.title}</p>
                 </div>
+                <span className="deck-rail__thumb-indicator" />
               </div>
               <p className="deck-rail__caption">
                 {slide.narrative?.storyBeat ?? slide.subtitle ?? "Project chapter"}
@@ -91,9 +105,9 @@ export function DeckRail({
 
       <div className="deck-rail__footer">
         <button type="button" onClick={onToggleAutoplay} className="deck-rail__autoplay">
-          {isAutoplay ? "Pause Autoplay" : "Start Autoplay"}
+          {isAutoplay ? "Autoplay On" : "Autoplay Off"}
         </button>
-        <p className="deck-rail__hint">Use the chapter rail, keyboard arrows, or the pager to move through the story.</p>
+        <p className="deck-rail__hint">Use chapters, arrow keys, or the pager to move through the deck.</p>
       </div>
     </aside>
   );

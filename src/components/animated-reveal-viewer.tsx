@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
 import { graphiticCarbonLegendData } from '@/lib/constants';
+import { Play } from 'lucide-react';
+import { OverlaySlot } from '@/ui/overlays';
+import { DrillholeViewerHud, SceneModePill } from '@/components/viewers/ProfessionalViewerHud';
 
 declare global {
     interface Window {
@@ -11,7 +14,6 @@ declare global {
     }
 }
 
-// --- Helper Functions ---
 const getAssayColor = (value: number, Cesium: any, alpha = 1.0) => {
     const v = Number(value);
     let color;
@@ -33,36 +35,19 @@ const getAssayColor = (value: number, Cesium: any, alpha = 1.0) => {
     return color.withAlpha(alpha);
 };
 
-// --- UI Components ---
-const DrillholeControls = ({ onAnimate, onToggle, show }: { onAnimate: () => void, onToggle: (filter: string) => void, show: boolean }) => {
-    if (!show) return null;
-    return (
-        <div className={`absolute top-4 right-4 bg-white bg-opacity-80 p-4 rounded-lg shadow-md w-72 text-sm pointer-events-auto transition-opacity duration-500 ${show ? 'opacity-100' : 'opacity-0'}`}>
-            <h3 className="font-bold text-lg mb-3">Drillhole Controls</h3>
-            <div className="space-y-3">
-                <div>
-                    <button onClick={onAnimate} className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                        Animate Discovery
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- Main Component ---
 type AnimationPhase = 'initial' | 'loading' | 'ready' | 'surface' | 'slice' | 'final';
 
 const AnimatedRevealViewer = () => {
     const { viewer } = useCesium();
     const [controlsVisible, setControlsVisible] = useState(false);
     const [animationPhase, setAnimationPhase] = useState<AnimationPhase>('initial');
-    
+    const [showCollars, setShowCollars] = useState(true);
+    const [showTraces, setShowTraces] = useState(true);
+
     const sceneData = useRef<any>({});
     const dataSources = useRef<any[]>([]);
-    const cleanupFuncs = useRef<(()=>void)[]>([]);
+    const cleanupFuncs = useRef<(() => void)[]>([]);
 
-    // Phase 1: Data Loading
     useEffect(() => {
         if (!viewer || animationPhase !== 'initial') return;
 
@@ -83,39 +68,64 @@ const AnimatedRevealViewer = () => {
                         const positions = Cesium.Cartesian3.fromDegreesArrayHeights([...start, ...end]);
                         points.push(positions[0], positions[1]);
 
-                        collarDataSource.entities.add({ position: positions[0], point: { pixelSize: 8, color: Cesium.Color.DODGERBLUE } });
-                        
-                        const color = getAssayColor(feature.properties.graphitic_carbon, Cesium, 0.0); // Start transparent
-                        traceDataSource.entities.add({ 
+                        collarDataSource.entities.add({
+                            position: positions[0],
+                            point: {
+                                pixelSize: 8,
+                                color: Cesium.Color.DODGERBLUE,
+                                outlineColor: Cesium.Color.WHITE.withAlpha(0.7),
+                                outlineWidth: 1.5,
+                            },
+                        });
+
+                        const color = getAssayColor(feature.properties.graphitic_carbon, Cesium, 0.0);
+                        traceDataSource.entities.add({
                             name: feature.properties.hole_id,
-                            polyline: { positions, width: 5, material: new Cesium.ColorMaterialProperty(color) }
+                            polyline: {
+                                positions,
+                                width: 5,
+                                material: new Cesium.ColorMaterialProperty(color),
+                            },
                         });
                     }
                 });
 
+                collarDataSource.show = showCollars;
+                traceDataSource.show = showTraces;
                 await viewer.dataSources.add(collarDataSource);
                 viewer.scene.requestRender();
                 await viewer.dataSources.add(traceDataSource);
                 viewer.scene.requestRender();
                 dataSources.current = [collarDataSource, traceDataSource];
-                
+
                 const boundingSphere = Cesium.BoundingSphere.fromPoints(points);
                 sceneData.current = { boundingSphere, siteCenter: boundingSphere.center };
 
                 setAnimationPhase('ready');
             } catch (error) {
-                console.error("Error loading scene data:", error);
-                setAnimationPhase('initial'); // Reset on error
+                console.error('Error loading scene data:', error);
+                setAnimationPhase('initial');
             }
         };
 
         loadData();
-    }, [viewer, animationPhase]);
+    }, [animationPhase, showCollars, showTraces, viewer]);
 
-    // Phase 2-4: Animation Controller
+    useEffect(() => {
+        const collarDataSource = dataSources.current.find(ds => ds.name === 'collars');
+        if (collarDataSource) collarDataSource.show = showCollars;
+        if (viewer && !viewer.isDestroyed()) viewer.scene.requestRender();
+    }, [showCollars, viewer]);
+
+    useEffect(() => {
+        const traceDataSource = dataSources.current.find(ds => ds.name === 'traces');
+        if (traceDataSource) traceDataSource.show = showTraces;
+        if (viewer && !viewer.isDestroyed()) viewer.scene.requestRender();
+    }, [showTraces, viewer]);
+
+
     useEffect(() => {
         if (animationPhase === 'ready') {
-            // Automatically start the animation sequence once data is ready
             setAnimationPhase('surface');
             return;
         }
@@ -131,78 +141,15 @@ const AnimatedRevealViewer = () => {
                 viewer.scene.screenSpaceCameraController.enableInputs = false;
                 await viewer.camera.flyToBoundingSphere(boundingSphere, {
                     duration: 2.0,
-                    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), 2000)
+                    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), 2000),
                 });
                 viewer.scene.requestRender();
-                setAnimationPhase('slice');
-            }
-            else if (animationPhase === 'slice') {
-                const enu = Cesium.Transforms.eastNorthUpToFixedFrame(siteCenter);
-                const east4 = Cesium.Matrix4.getColumn(enu, 0, new Cesium.Cartesian4());
-                const east = Cesium.Cartesian3.fromCartesian4(east4);
-                const planeNormal = Cesium.Cartesian3.normalize(east, new Cesium.Cartesian3());
-                const distance = -Cesium.Cartesian3.dot(planeNormal, siteCenter);
-
-                const halfMapPlane = new Cesium.ClippingPlane(planeNormal, distance - boundingSphere.radius);
-                sceneData.current.halfMapPlane = halfMapPlane; // Store for tick listener
-
-                const planeCollection = new Cesium.ClippingPlaneCollection({
-                    planes: [halfMapPlane],
-                    edgeWidth: 1.5,
-                    edgeColor: Cesium.Color.WHITE,
-                    enabled: true
-                });
-                viewer.scene.globe.clippingPlanes = planeCollection;
-                viewer.scene.requestRender();
-                cleanupFuncs.current.push(() => { if(viewer.scene.globe.clippingPlanes) viewer.scene.globe.clippingPlanes.enabled = false; });
-
-                viewer.scene.globe.undergroundColor = Cesium.Color.BLACK;
-                viewer.scene.globe.depthTestAgainstTerrain = true;
-
-                const up4 = Cesium.Matrix4.getColumn(enu, 2, new Cesium.Cartesian4());
-                const up = Cesium.Cartesian3.fromCartesian4(up4);
-                const gridPlaneDef = new Cesium.Plane(Cesium.Cartesian3.normalize(up, new Cesium.Cartesian3()), -Cesium.Cartesian3.dot(up, siteCenter));
-                const gridSize = boundingSphere.radius * 3.0;
-                
-                const gridEntity = viewer.entities.add({
-                    position: siteCenter,
-                    plane: { plane: gridPlaneDef, dimensions: new Cesium.Cartesian2(gridSize, gridSize), material: new Cesium.GridMaterialProperty({ color: Cesium.Color.fromCssColorString('#6b7280'), cellAlpha: 0.35, lineCount: new Cesium.Cartesian2(24, 24) }) }
-                });
-                viewer.scene.requestRender();
-                cleanupFuncs.current.push(() => viewer.entities.remove(gridEntity));
-
-                const verticalGridEntity = viewer.entities.add({
-                    plane: {
-                        plane: new Cesium.CallbackProperty(() => new Cesium.Plane(planeNormal, sceneData.current.halfMapPlane.distance), false),
-                        dimensions: new Cesium.Cartesian2(gridSize, boundingSphere.radius * 2.5),
-                        material: new Cesium.GridMaterialProperty({ color: Cesium.Color.fromCssColorString('#6b7280'), cellAlpha: 0.3, lineCount: new Cesium.Cartesian2(24, 12) })
-                    }
-                });
-                viewer.scene.requestRender();
-                cleanupFuncs.current.push(() => viewer.entities.remove(verticalGridEntity));
-
-                const duration = 5.0;
-                const startTime = Cesium.JulianDate.now();
-
-                tickListener = () => {
-                    const elapsed = Cesium.JulianDate.secondsDifference(Cesium.JulianDate.now(), startTime);
-                    const p = Math.min(1.0, elapsed / duration);
-                    const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
-                    sceneData.current.halfMapPlane.distance = Cesium.Math.lerp(distance - boundingSphere.radius, distance, ease);
-                    viewer.scene.requestRender();
-
-                    if (p >= 1.0) {
-                        viewer.clock.onTick.removeEventListener(tickListener);
-                        tickListener = undefined;
-                        setAnimationPhase('final');
-                    }
-                };
-                viewer.clock.onTick.addEventListener(tickListener);
+                setAnimationPhase('final');
             }
             else if (animationPhase === 'final') {
                 const traceDataSource = dataSources.current.find(ds => ds.name === 'traces');
                 if (traceDataSource) {
-                    traceDataSource.entities.values.forEach((e:any) => {
+                    traceDataSource.entities.values.forEach((e: any) => {
                         const material = e.polyline.material.color.getValue(viewer.clock.currentTime);
                         e.polyline.material = new Cesium.ColorMaterialProperty(material.withAlpha(1.0));
                         viewer.scene.requestRender();
@@ -223,15 +170,11 @@ const AnimatedRevealViewer = () => {
         };
     }, [animationPhase, viewer]);
 
-    // Cleanup effect
     useEffect(() => {
         return () => {
             if (viewer && !viewer.isDestroyed()) {
                 dataSources.current.forEach(ds => viewer.dataSources.remove(ds, true));
                 cleanupFuncs.current.forEach(func => func());
-                if (viewer.scene.globe.clippingPlanes) {
-                    viewer.scene.globe.clippingPlanes.enabled = false;
-                }
                 viewer.scene.screenSpaceCameraController.enableInputs = true;
                 viewer.scene.globe.depthTestAgainstTerrain = false;
             }
@@ -241,13 +184,15 @@ const AnimatedRevealViewer = () => {
     const handleAnimateDiscovery = () => {
         const traceDataSource = dataSources.current.find(ds => ds.name === 'traces');
         if (!traceDataSource) return;
+        setShowTraces(true);
         const sortedEntities = [...traceDataSource.entities.values].sort((a, b) => a.name.localeCompare(b.name));
-        sortedEntities.forEach(entity => { if(entity.polyline) entity.polyline.show = false; });
+        sortedEntities.forEach(entity => { if (entity.polyline) entity.polyline.show = false; });
         let index = 0;
         const interval = setInterval(() => {
             if (index < sortedEntities.length) {
                 const entity = sortedEntities[index];
                 if (entity.polyline) entity.polyline.show = true;
+                viewer?.scene.requestRender();
                 index++;
             } else {
                 clearInterval(interval);
@@ -256,24 +201,44 @@ const AnimatedRevealViewer = () => {
         cleanupFuncs.current.push(() => clearInterval(interval));
     };
 
-    const handleToggleVisibility = (filter: string) => {
-        const traceDataSource = dataSources.current.find(ds => ds.name === 'traces');
-        if (!traceDataSource) return;
-        traceDataSource.entities.values.forEach((entity: any) => {
-            if (entity.polyline) {
-                if (filter === 'all') {
-                    entity.polyline.show = true;
-                } else {
-                    entity.polyline.show = entity.name.startsWith(filter);
-                }
-            }
-        });
-    };
-
     return (
         <>
-            <Legend title={graphiticCarbonLegendData.title} type="categorical" items={graphiticCarbonLegendData.items} show={controlsVisible} />
-            <DrillholeControls show={controlsVisible} onAnimate={handleAnimateDiscovery} onToggle={handleToggleVisibility} />
+            {controlsVisible ? (
+                <>
+                    <OverlaySlot slot="bottom-left" wrapperClassName="legend-panel">
+                        <Legend
+                            title={graphiticCarbonLegendData.title}
+                            type="categorical"
+                            items={graphiticCarbonLegendData.items}
+                            guidance="Assay intervals are shown downhole; warmer colors indicate higher graphitic carbon."
+                            show
+                        />
+                    </OverlaySlot>
+
+                    <OverlaySlot slot="bottom-center">
+                        <button
+                            type="button"
+                            onClick={handleAnimateDiscovery}
+                            className="pointer-events-auto rounded-[16px] border border-white/12 bg-[linear-gradient(180deg,rgba(9,13,20,0.94),rgba(8,10,14,0.82))] px-4 py-2 text-xs font-semibold text-white shadow-[0_18px_42px_rgba(0,0,0,0.34)] backdrop-blur-xl transition hover:border-[#f1d2bf]/28"
+                            data-no-deck-wheel
+                        >
+                            <span className="inline-flex items-center gap-2"><Play className="h-3.5 w-3.5" /> Animate discovery</span>
+                        </button>
+                    </OverlaySlot>
+
+                    <OverlaySlot slot="bottom-right">
+                        <SceneModePill label="Subsurface" detail="Drag to orbit, wheel to zoom, use presets above." />
+                    </OverlaySlot>
+
+                    <DrillholeViewerHud
+                        mode="assay"
+                        showCollars={showCollars}
+                        showTraces={showTraces}
+                        onShowCollarsChange={setShowCollars}
+                        onShowTracesChange={setShowTraces}
+                    />
+                </>
+            ) : null}
         </>
     );
 };

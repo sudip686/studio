@@ -1,6 +1,6 @@
 // BlockModelCarbonView.tsx
 'use client';
-import { useRef, useState, useMemo, useEffect } from 'react';
+import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { useThreeScene } from '@/contexts/three-scene-context';
 import { useDataCache, BlockSegment } from '@/lib/data-cache';
@@ -14,6 +14,25 @@ import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
 
 const CARBON_PALETTE = ['#17304a', '#205375', '#2b7a78', '#78c07f', '#f6d860', '#f08a5d'];
+const DEFAULT_BLOCK_MODEL_FIT = {
+  padding: 1.16,
+  targetScreenFraction: 0.82,
+  minDistance: 360,
+  maxDistance: 24000,
+  screenBiasX: 0.14,
+  screenBiasY: 0.03,
+  viewDir: new THREE.Vector3(0.86, 0.66, 1.0).normalize(),
+};
+
+const PRESENTATION_BLOCK_MODEL_FIT = {
+  padding: 1.12,
+  targetScreenFraction: 0.86,
+  minDistance: 320,
+  maxDistance: 22000,
+  screenBiasX: 0.12,
+  screenBiasY: 0,
+  viewDir: new THREE.Vector3(1.02, 0.72, 0.56).normalize(),
+};
 
 function colorForCarbon(vRaw: any, min: number, max: number): string {
     const value = Number(vRaw);
@@ -28,15 +47,33 @@ function colorForCarbon(vRaw: any, min: number, max: number): string {
 
 type AssayRangeFilter = { min: number; max: number } | null;
 
-export default function BlockModelCarbonViewer({
-  opacity = 0.8, assayFilterRange
-}: { opacity?: number; assayFilterRange?: AssayRangeFilter }) {
+function rangesMatch(left: AssayRangeFilter | undefined, right: AssayRangeFilter | undefined) {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return Math.abs(left.min - right.min) < 0.0001 && Math.abs(left.max - right.max) < 0.0001;
+}
 
-  const { scene, camera, controls, dynamicGroup, renderer, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
-  const mountedRef = useRef(false);
-  const { blockModelData, loadingStatus, error, refetch } = useDataCache();
+export default function BlockModelCarbonViewer({
+  opacity = 0.8,
+  assayFilterRange,
+  presentationMode = false,
+  meshVisible = true,
+  terrainOpacity = 1,
+}: {
+  opacity?: number;
+  assayFilterRange?: AssayRangeFilter;
+  presentationMode?: boolean;
+  meshVisible?: boolean;
+  terrainOpacity?: number;
+}) {
+
+  const { camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
+  const effectiveTerrainOpacity = Math.min(1, terrainOpacity * 1.3);
+  const viewGroupRef = useRef<THREE.Group | null>(null);
+  const { blockModelData, resourceStatus, resourceErrors, loadBlockModel } = useDataCache();
   const [showTraces, setShowTraces] = useState(true);
   const [localRange, setLocalRange] = useState<AssayRangeFilter>(assayFilterRange ?? null);
+  const cameraFitOptions = presentationMode ? PRESENTATION_BLOCK_MODEL_FIT : DEFAULT_BLOCK_MODEL_FIT;
 
   const carbonRange = useMemo(() => {
     if (!blockModelData) return { min: 0, max: 10 };
@@ -62,22 +99,49 @@ export default function BlockModelCarbonViewer({
   }, [blockModelData]);
 
   useEffect(() => {
-    if (assayFilterRange) {
-      setLocalRange({ ...assayFilterRange });
-      return;
+    if (!blockModelData && resourceStatus.blockModel === 'idle') {
+      loadBlockModel();
     }
-    if (!localRange && Number.isFinite(carbonRange.min) && Number.isFinite(carbonRange.max)) {
-      setLocalRange({ min: carbonRange.min, max: carbonRange.max });
-    }
-  }, [assayFilterRange, carbonRange.min, carbonRange.max, localRange]);
+  }, [blockModelData, loadBlockModel, resourceStatus.blockModel]);
 
   useEffect(() => {
-    if (!scene || !camera || !controls || !dynamicGroup || !renderer) return;
-    if (mountedRef.current) return;
-    mountedRef.current = true;
+    if (assayFilterRange) {
+      setLocalRange((current) => (rangesMatch(current, assayFilterRange) ? current : { ...assayFilterRange }));
+      return;
+    }
+    if (Number.isFinite(carbonRange.min) && Number.isFinite(carbonRange.max)) {
+      setLocalRange((current) => {
+        const nextRange = { min: carbonRange.min, max: carbonRange.max };
+        if (current && rangesMatch(current, nextRange)) {
+          return current;
+        }
+        return current ?? nextRange;
+      });
+    }
+  }, [assayFilterRange, carbonRange.min, carbonRange.max]);
 
+  const disposeViewGroup = useCallback((group: THREE.Group | null, meshes: THREE.InstancedMesh[] = []) => {
+    if (!group || !dynamicGroup) return;
+
+    dynamicGroup.remove(group);
+    meshes.forEach((mesh) => unregisterTooltipObject(mesh));
+    group.traverse((object) => {
+      if ((object as THREE.Mesh).geometry) {
+        (object as THREE.Mesh).geometry.dispose();
+      }
+      if ((object as THREE.Mesh).material) {
+        const material = (object as THREE.Mesh).material;
+        Array.isArray(material) ? material.forEach((entry) => entry.dispose()) : material.dispose();
+      }
+    });
+  }, [dynamicGroup, unregisterTooltipObject]);
+
+  useEffect(() => {
+    disposeViewGroup(viewGroupRef.current);
+    viewGroupRef.current = null;
+
+    if (!camera || !controls || !dynamicGroup) return;
     if (!blockModelData || !Array.isArray(blockModelData) || blockModelData.length === 0) {
-      console.warn('[BlockModelCarbonViewer] blocks not ready or wrong shape:', blockModelData);
       return;
     }
 
@@ -94,7 +158,6 @@ export default function BlockModelCarbonViewer({
     });
 
     if (filteredBlocks.length === 0) {
-      console.warn('[BlockModelCarbonViewer] No blocks after filtering.');
       return;
     }
 
@@ -103,6 +166,7 @@ export default function BlockModelCarbonViewer({
     const viewGroup = new THREE.Group();
     viewGroup.name = 'BlockModelCarbonView_Group';
     dynamicGroup.add(viewGroup);
+    viewGroupRef.current = viewGroup;
 
     const geometries: THREE.BufferGeometry[] = [];
     const materials: THREE.Material[] = [];
@@ -164,35 +228,18 @@ export default function BlockModelCarbonViewer({
     });
 
     requestAnimationFrame(() => {
-      fitCameraToGroupWorldAware(camera, controls, viewGroup, {
-        padding: 1.16,
-        targetScreenFraction: 0.82,
-        minDistance: 360,
-        maxDistance: 24000,
-        screenBiasX: 0.14,
-        screenBiasY: 0.03,
-        viewDir: new THREE.Vector3(0.86, 0.66, 1.0).normalize(),
-      });
+      fitCameraToGroupWorldAware(camera, controls, viewGroup, cameraFitOptions);
     });
 
     return () => {
-      dynamicGroup.remove(viewGroup);
-      blockMeshes.forEach(mesh => unregisterTooltipObject(mesh));
-      viewGroup.traverse(o => {
-        if ((o as THREE.Mesh).geometry) (o as THREE.Mesh).geometry.dispose();
-        if ((o as THREE.Mesh).material) {
-          const m = (o as THREE.Mesh).material;
-          Array.isArray(m) ? m.forEach(mm => mm.dispose()) : m.dispose();
-        }
-      });
-      geometries.forEach(g => g.dispose());
-      materials.forEach(m => m.dispose());
-      mountedRef.current = false;
+      if (viewGroupRef.current === viewGroup) {
+        viewGroupRef.current = null;
+      }
+      disposeViewGroup(viewGroup, blockMeshes);
     };
   }, [
     blockModelData,
     opacity,
-    scene,
     camera,
     controls,
     dynamicGroup,
@@ -202,10 +249,35 @@ export default function BlockModelCarbonViewer({
     carbonRange.max,
     registerTooltipObject,
     unregisterTooltipObject,
+    disposeViewGroup,
+    cameraFitOptions,
   ]);
 
-  if (loadingStatus === 'loading') return <div>Loading...</div>;
-  if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
+  if (resourceStatus.blockModel === 'loading' || (resourceStatus.blockModel === 'idle' && !blockModelData)) {
+    return (
+      <div className="viewer-status-card">
+        <div className="viewer-status-card__spinner" />
+        <div className="viewer-status-card__copy">
+          <strong>Loading carbon block model</strong>
+          <span>Building the terrain, block model, and lithology overlays for the current chapter.</span>
+        </div>
+      </div>
+    );
+  }
+  if (resourceErrors.blockModel && !blockModelData) {
+    return <ErrorDisplay message={resourceErrors.blockModel} onRetry={loadBlockModel} />;
+  }
+
+  if (!blockModelData) {
+    return (
+      <div className="viewer-status-card viewer-status-card--subtle">
+        <div className="viewer-status-card__copy">
+          <strong>No block model yet</strong>
+          <span>Refresh once the carbon model dataset is available.</span>
+        </div>
+      </div>
+    );
+  }
 
   const carbonGradient = `linear-gradient(to right, ${CARBON_PALETTE.join(', ')})`;
 
@@ -218,93 +290,134 @@ export default function BlockModelCarbonViewer({
 
   return (
     <>
-      <TerrainSurfaceLayer verticalScale={1} modelCenter={modelCenter} quality="presentation" />
-      <BoreholeLayer modelCenter={modelCenter} type="lithology" visible={showTraces} />
-      <OverlaySlot slot="top-left" wrapperClassName="w-[272px] max-w-[calc(100vw-2rem)] flex flex-col items-start">
-        <div className="pointer-events-auto overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(10,15,24,0.92),rgba(5,9,16,0.72))] p-3 text-white shadow-[0_22px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-white/74">
-              <span className="uppercase tracking-[0.18em] text-white/48">Carbon filter</span>
-              <button
-                className="text-[11px] text-orange-300 hover:text-orange-200"
-                onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
-              >
-                Reset
-              </button>
+      <TerrainSurfaceLayer
+        verticalScale={1}
+        modelCenter={modelCenter}
+        quality="presentation"
+        meshVisible={meshVisible}
+        meshOpacity={effectiveTerrainOpacity}
+      />
+      <BoreholeLayer
+        modelCenter={modelCenter}
+        type="lithology"
+        visible={showTraces}
+        visualMode={presentationMode ? 'presentation' : 'default'}
+      />
+      <OverlaySlot slot="top-right" wrapperClassName="overlay-inspector-slot overlay-inspector-slot--right">
+        <aside className="overlay-inspector" data-testid="carbon-model-inspector">
+            <div className="overlay-inspector__header">
+              <p className="overlay-inspector__eyebrow">Block model chapter</p>
+              <h3 className="overlay-inspector__title">Carbon controls</h3>
+              <p className="overlay-inspector__summary">
+                Focus the model on higher-grade blocks and keep drillhole traces available for quick geological context.
+              </p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-[11px] text-white/72">
-                Min
-                <input
-                  type="number"
-                  step="0.1"
-                  value={localRange?.min ?? carbonRange.min}
-                  onChange={(e) => setLocalRange(prev => ({
-                    min: Number(e.target.value),
-                    max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
-                  }))}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
-                />
-              </label>
-              <label className="text-[11px] text-white/72">
-                Max
-                <input
-                  type="number"
-                  step="0.1"
-                  value={localRange?.max ?? carbonRange.max}
-                  onChange={(e) => setLocalRange(prev => ({
-                    min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
-                    max: Number(e.target.value)
-                  }))}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/28 px-2 py-1 text-[11px] text-white"
-                />
-              </label>
+            <div className="overlay-inspector__body">
+              <section className="overlay-inspector__section">
+                <div className="overlay-inspector__section-top">
+                  <span className="overlay-inspector__section-label">Carbon filter</span>
+                  <div className="overlay-inspector__pill-row">
+                    <button
+                      type="button"
+                      className="overlay-inspector__pill"
+                      onClick={() => setLocalRange({ min: 3, max: carbonRange.max })}
+                    >
+                      &gt;3% TGC
+                    </button>
+                    <button
+                      type="button"
+                      className="overlay-inspector__pill"
+                      onClick={() => setLocalRange({ min: 5, max: carbonRange.max })}
+                    >
+                      &gt;5% TGC
+                    </button>
+                    <button
+                      type="button"
+                      className="overlay-inspector__link"
+                      onClick={() => setLocalRange({ min: carbonRange.min, max: carbonRange.max })}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+                <div className="overlay-inspector__field-grid">
+                  <label className="overlay-inspector__field">
+                    <span>Minimum</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={localRange?.min ?? carbonRange.min}
+                      onChange={(e) => setLocalRange(prev => ({
+                        min: Number(e.target.value),
+                        max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+                      }))}
+                    />
+                  </label>
+                  <label className="overlay-inspector__field">
+                    <span>Maximum</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={localRange?.max ?? carbonRange.max}
+                      onChange={(e) => setLocalRange(prev => ({
+                        min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+                        max: Number(e.target.value)
+                      }))}
+                    />
+                  </label>
+                </div>
+                <div className="overlay-inspector__slider-stack">
+                  <label className="overlay-inspector__slider-label">
+                    Lower cutoff
+                    <input
+                      type="range"
+                      min={carbonRange.min}
+                      max={carbonRange.max}
+                      step={0.1}
+                      value={localRange?.min ?? carbonRange.min}
+                      onChange={(e) => setLocalRange(prev => ({
+                        min: Number(e.target.value),
+                        max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
+                      }))}
+                      className="range-slider w-full"
+                    />
+                  </label>
+                  <label className="overlay-inspector__slider-label">
+                    Upper cutoff
+                    <input
+                      type="range"
+                      min={carbonRange.min}
+                      max={carbonRange.max}
+                      step={0.1}
+                      value={localRange?.max ?? carbonRange.max}
+                      onChange={(e) => setLocalRange(prev => ({
+                        min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
+                        max: Number(e.target.value)
+                      }))}
+                      className="range-slider w-full"
+                    />
+                  </label>
+                </div>
+                <label className="overlay-inspector__check">
+                  <input type="checkbox" checked={showTraces} onChange={e => setShowTraces(e.target.checked)} />
+                  <span>Show drillhole traces</span>
+                </label>
+              </section>
+              <Legend title="Lithology" items={lithologyLegendItems} fullWidth />
+              <Legend
+                title="Carbon Value"
+                type="gradient"
+                gradient={carbonGradient}
+                minLabel={(localRange?.min ?? carbonRange.min).toFixed(2)}
+                maxLabel={(localRange?.max ?? carbonRange.max).toFixed(2)}
+                guidance="Blocks are colored by graphitic carbon concentration from low to high."
+                fullWidth
+              />
             </div>
-            <input
-              type="range"
-              min={carbonRange.min}
-              max={carbonRange.max}
-              step={0.1}
-              value={localRange?.min ?? carbonRange.min}
-              onChange={(e) => setLocalRange(prev => ({
-                min: Number(e.target.value),
-                max: Math.max(Number(e.target.value), prev?.max ?? carbonRange.max)
-              }))}
-              className="range-slider w-full"
-            />
-            <input
-              type="range"
-              min={carbonRange.min}
-              max={carbonRange.max}
-              step={0.1}
-              value={localRange?.max ?? carbonRange.max}
-              onChange={(e) => setLocalRange(prev => ({
-                min: Math.min(prev?.min ?? carbonRange.min, Number(e.target.value)),
-                max: Number(e.target.value)
-              }))}
-              className="range-slider w-full"
-            />
-          </div>
-          <label className="flex items-center gap-2 pt-2 text-[12px] text-white/80">
-            <input type="checkbox" checked={showTraces} onChange={e=>setShowTraces(e.target.checked)} />
-            Show traces
-          </label>
-        </div>
-      </OverlaySlot>
-
-      <OverlaySlot slot="bottom-left">
-        <div className="flex flex-col gap-3">
-          <Legend title="Lithology" items={lithologyLegendItems} />
-          <Legend
-            title="Carbon Value"
-            type="gradient"
-            gradient={carbonGradient}
-            minLabel={(localRange?.min ?? carbonRange.min).toFixed(2)}
-            maxLabel={(localRange?.max ?? carbonRange.max).toFixed(2)}
-            guidance="Viridis-inspired grade ramp tuned for stronger contrast, with warmer tones marking stronger graphitic carbon concentrations."
-          />
-        </div>
+        </aside>
       </OverlaySlot>
     </>
   );
 }
+
+

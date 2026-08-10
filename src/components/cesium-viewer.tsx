@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { DrillholeTooltip } from './ui/tooltip';
 
-
+// Declare global types
 declare global {
     interface Window {
         Cesium: any;
@@ -78,29 +79,6 @@ const Legend = ({ view, assayRange, show }: { view: CesiumView, assayRange: { mi
                     </div>
                 </div>
             )}
-        </div>
-    );
-};
-
-const TooltipContent = ({ data }: { data: any }) => {
-    if (!data) return null;
-
-    return (
-        <div
-            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none"
-            style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-        >
-            <p className="font-bold text-base mb-1">Hole ID: {data.content.hole_id}</p>
-            <ul className="list-none space-y-1">
-                <li><strong>Lat:</strong> {data.content.latitude?.toFixed(5)}</li>
-                <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
-                <li><strong>Depth From:</strong> {data.content.depth_from?.toFixed(2)} m</li>
-                <li><strong>Depth To:</strong> {data.content.depth_to?.toFixed(2)} m</li>
-                {data.content.lithology && <li><strong>Lithology:</strong> {data.content.lithology}</li>}
-                {data.content.graphitic_carbon !== undefined && (
-                    <li><strong>Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
-                )}
-            </ul>
         </div>
     );
 };
@@ -192,17 +170,30 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                 viewer.dataSources.add(kmzDataSource);
                 viewer.flyTo(kmzDataSource);
 
-                // Create a single label for the entire KMZ
+                // Geospatially anchored project label; keep it tied to the KMZ centre rather than screen pixels.
                 kmlLabelRef.current = viewer.entities.add({
-                    position: Cesium.Cartesian3.fromDegrees(38.78, -4.8), // Approximate center
+                    position: Cesium.Cartesian3.fromDegrees(38.785, -4.813, 450),
+                    point: {
+                        pixelSize: 12,
+                        color: Cesium.Color.WHITE.withAlpha(0.95),
+                        outlineColor: Cesium.Color.fromCssColorString('#c7551b').withAlpha(0.98),
+                        outlineWidth: 4,
+                        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                    },
                     label: {
-                        text: 'Tanga Graphite',
-                        font: '16pt sans-serif',
-                        fillColor: Cesium.Color.YELLOW,
+                        text: 'Tanga Project',
+                        font: '700 15px Poppins, Inter, sans-serif',
+                        fillColor: Cesium.Color.WHITE.withAlpha(0.96),
+                        backgroundColor: Cesium.Color.fromCssColorString('#05080c').withAlpha(0.78),
+                        showBackground: true,
+                        backgroundPadding: new Cesium.Cartesian2(10, 6),
                         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                        outlineWidth: 2,
+                        outlineColor: Cesium.Color.fromCssColorString('#05080c').withAlpha(0.92),
+                        outlineWidth: 3,
+                        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
                         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                        pixelOffset: new Cesium.Cartesian2(0, -9)
+                        pixelOffset: new Cesium.Cartesian2(0, -22),
+                        disableDepthTestDistance: Number.POSITIVE_INFINITY,
                     }
                 });
             }
@@ -489,7 +480,7 @@ const CesiumViewer = ({ view }: CesiumViewerProps) => {
                 </tbody></table>
             </div>
             <Legend view={view} assayRange={assayRange} show={view === 'geojson_drillholes_lithology' || view === 'geojson_drillholes_assay'} />
-            {tooltip.display && <TooltipContent data={tooltip} />}
+            {tooltip.display && <DrillholeTooltip data={tooltip} />}
         </div>
     );
 };

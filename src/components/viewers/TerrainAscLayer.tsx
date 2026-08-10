@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useThreeScene } from '../../contexts/three-scene-context';
 import {
@@ -17,6 +17,8 @@ export function TerrainAscLayer({
   clipRadiusM = DEFAULT_CLIPPING_RADIUS,
   quality = 'interactive',
   onLoaded,
+  meshVisible: propsMeshVisible,
+  meshOpacity = 1,
 }: {
   verticalScale?: number;
   modelCenter?: { lon: number; lat: number };
@@ -28,16 +30,76 @@ export function TerrainAscLayer({
     size: THREE.Vector3;
     maxY: number;
   }) => void;
+  meshVisible?: boolean;
+  meshOpacity?: number;
 }) {
-  const { dynamicGroup, renderer, setTerrainMaxY } = useThreeScene();
+  const [meshVisibleState, setMeshVisibleState] = useState(true);
+  const meshRef = useRef<THREE.Mesh | null>(null);
+  const { dynamicGroup, renderer, setTerrainMaxY, camera, controls } = useThreeScene();
   const terrainGroupRef = useRef<THREE.Group | null>(null);
   const initializedRef = useRef(false);
-  const meshRef = useRef<THREE.Mesh | null>(null);
+  const adaptiveQualityRef = useRef<'low' | 'medium' | 'high'>('high');
 
+  const meshVisible = propsMeshVisible !== undefined ? propsMeshVisible : meshVisibleState;
+  const applyOpacity = useCallback((material: THREE.Material | THREE.Material[] | null | undefined, opacityRaw: number) => {
+    if (!material) return;
+    const opacity = THREE.MathUtils.clamp(opacityRaw, 0.05, 1);
+    const materials = Array.isArray(material) ? material : [material];
+    materials.forEach((m) => {
+      const mat = m as THREE.Material & { opacity?: number; transparent?: boolean; depthWrite?: boolean; needsUpdate?: boolean };
+      if (typeof mat.opacity === 'number') {
+        mat.opacity = opacity;
+        mat.transparent = opacity < 0.999;
+        mat.depthWrite = opacity >= 0.999;
+        mat.needsUpdate = true;
+      }
+    });
+  }, []);
+
+  // Adaptive quality: adjust based on camera distance for presentation slides
   const centerKey = useMemo(
     () => (modelCenter ? `${modelCenter.lon.toFixed(6)}_${modelCenter.lat.toFixed(6)}` : 'none'),
     [modelCenter],
   );
+
+  const getAdaptiveQuality = useCallback(() => {
+    if (!camera || !controls) return adaptiveQualityRef.current;
+
+    // Calculate distance from camera to terrain center
+    const terrainPosition = new THREE.Vector3();
+    if (dynamicGroup) {
+      dynamicGroup.getWorldPosition(terrainPosition);
+      const distance = camera.position.distanceTo(terrainPosition);
+
+      // Adaptive quality based on distance
+      if (distance < 5000) {
+        adaptiveQualityRef.current = 'high';
+      } else if (distance < 15000) {
+        adaptiveQualityRef.current = 'medium';
+      } else {
+        adaptiveQualityRef.current = 'low';
+      }
+    }
+    return adaptiveQualityRef.current;
+  }, [camera, controls, dynamicGroup]);
+
+  // Monitor camera movement for quality adjustment
+  useEffect(() => {
+    let lastCameraPosition = new THREE.Vector3();
+    const checkCameraMovement = () => {
+      if (camera) {
+        const movement = camera.position.distanceTo(lastCameraPosition);
+        if (movement > 100) {
+          // Reduce quality during fast movement to maintain performance
+          adaptiveQualityRef.current = 'medium';
+        }
+        lastCameraPosition.copy(camera.position);
+      }
+    };
+
+    const interval = setInterval(checkCameraMovement, 100);
+    return () => clearInterval(interval);
+  }, [camera]);
 
   useEffect(() => {
     if (!dynamicGroup || !modelCenter || initializedRef.current) return;
@@ -66,25 +128,40 @@ export function TerrainAscLayer({
           ];
 
     const attachMesh = (geometry: THREE.BufferGeometry, material: THREE.Material, renderOrder: number) => {
+      const previousMesh = meshRef.current;
+      if (previousMesh && previousMesh.parent === group) {
+        group.remove(previousMesh);
+        const previousMaterial = previousMesh.material;
+        if (Array.isArray(previousMaterial)) {
+          previousMaterial.forEach((entry) => entry.dispose());
+        } else {
+          previousMaterial.dispose();
+        }
+        meshRef.current = null;
+      }
+
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.visible = meshVisible;
+      applyOpacity(mesh.material, meshOpacity);
+      console.log('[TerrainAscLayer] Attaching mesh, visible:', meshVisible);
+      meshRef.current = mesh;
       mesh.renderOrder = renderOrder;
       mesh.frustumCulled = false;
       mesh.receiveShadow = true;
       mesh.castShadow = true;
       group.add(mesh);
 
-      if (meshRef.current) {
-        group.remove(meshRef.current);
-        const previousGeometry = meshRef.current.geometry as THREE.BufferGeometry;
-        if (!previousGeometry.userData?.sharedTerrainGeometry) {
-          previousGeometry.dispose();
-        }
-        const previousMaterial = meshRef.current.material as THREE.Material;
-        previousMaterial.dispose();
-      }
-
-      meshRef.current = mesh;
       return mesh;
+    };
+
+    const toggleMeshVisibility = () => {
+      setMeshVisibleState((prev) => {
+        const next = !prev;
+        if (meshRef.current) {
+          meshRef.current.visible = next;
+        }
+        return next;
+      });
     };
 
     const updateBounds = () => {
@@ -107,7 +184,13 @@ export function TerrainAscLayer({
 
     prepareTerrainSurface(modelCenter, verticalScale, renderer, { includeHigh: preferHighQuality })
       .then((resources) => {
+        console.log('[TerrainAscLayer] prepareTerrainSurface resolved:', {
+          texture: resources.texture?.name,
+          hasHighGeom: !!resources.highGeometry,
+          hasLowGeom: !!resources.lowGeometry
+        });
         if (disposed || !terrainGroupRef.current) return;
+
 
         attachMesh(
           preferHighQuality && resources.highGeometry ? resources.highGeometry : resources.lowGeometry,
@@ -162,6 +245,7 @@ export function TerrainAscLayer({
       })
       .catch((error) => {
         console.error('[TerrainAscLayer] Failed to load terrain data:', error);
+        console.log('[TerrainAscLayer] Error details:', describeTerrainError(error));
         initializedRef.current = false;
       });
 
@@ -174,7 +258,7 @@ export function TerrainAscLayer({
         clearTimeout(timeoutId);
       }
     };
-  }, [dynamicGroup, centerKey, verticalScale, renderer, clipRadiusM, quality, modelCenter, onLoaded, setTerrainMaxY]);
+  }, [applyOpacity, dynamicGroup, centerKey, verticalScale, renderer, clipRadiusM, quality, modelCenter, onLoaded, setTerrainMaxY, meshOpacity, meshVisible]);
 
   useEffect(() => {
     return () => {
@@ -194,10 +278,23 @@ export function TerrainAscLayer({
         });
         terrainGroupRef.current = null;
         initializedRef.current = false;
-        meshRef.current = null;
       }
     };
   }, [dynamicGroup]);
 
+  // Sync mesh visibility - respond to propsMeshVisible changes immediately
+  useEffect(() => {
+    if (meshRef.current) {
+      meshRef.current.visible = meshVisible;
+    }
+  }, [meshVisible]);
+
+  useEffect(() => {
+    if (!meshRef.current) return;
+    applyOpacity(meshRef.current.material, meshOpacity);
+  }, [applyOpacity, meshOpacity]);
+
+
   return null;
 }
+

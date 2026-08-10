@@ -1,0 +1,17 @@
+{
+  "bounds_utm": {
+    "minX": 388973.2318170635,
+    "maxX": 611017.5944954907,
+    "minY": 9336673.844026534,
+    "maxY": 9557887.961892288
+  },
+  "width": 1024,
+  "height": 1024,
+  "elevation_m": {
+    "min": 0,
+    "max": 2293.557568887488
+  },
+  "crs_epsg": 32737,
+  "rgb_texture": "texture_rgb_8192.png",
+  "source_height_grid": "height.bin"
+}

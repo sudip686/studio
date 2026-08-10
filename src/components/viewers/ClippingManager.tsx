@@ -95,8 +95,8 @@ export default function ClippingManager() {
                     modelMatrix: modelMatrix,
                     planes: planes,
                     unionClippingRegions: clippingMode === 'box',
-                    edgeWidth: 1.0,
-                    edgeColor: Cesium.Color.WHITE,
+                    edgeWidth: 0.35,
+                    edgeColor: Cesium.Color.WHITE.withAlpha(0.45),
                     enabled: true,
                 });
 
@@ -121,3 +121,6 @@ export default function ClippingManager() {
 
     return null;
 }
+
+
+

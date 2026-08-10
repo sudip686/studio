@@ -18,6 +18,12 @@ export function OverlayRoot({
   bottomOffsetPx?: number | string;
   children: React.ReactNode;
 }) {
+  // Check if we're on a presentation slide for proper overlay positioning
+  const pathSegments = typeof window !== 'undefined' ? window.location.pathname.split('/').filter(Boolean) : [];
+  const isPresentationSlide = ['lithology', 'assay', 'carbon_model', 'classification'].some(id =>
+    pathSegments.includes(id)
+  );
+
   return (
     <OverlayProvider
       baseSlots={baseSlots}
@@ -25,6 +31,7 @@ export function OverlayRoot({
       rightOffsetPx={rightOffsetPx ?? 0}
       topOffsetPx={topOffsetPx ?? "var(--header-height, 0px)"}
       bottomOffsetPx={bottomOffsetPx}
+      dataPresentationMode={isPresentationSlide}
     >
       {children}
     </OverlayProvider>

@@ -54,53 +54,55 @@ export function StoryStageCard({
         className={`story-stage story-stage--${stageMode} story-stage--${resolvedMediaLayout}`}
         data-testid="story-panel"
       >
-        <div className="story-stage__topline">
-          <div className="story-stage__meta">
-            <span className="story-stage__act">{actLabels[slide.narrative?.act ?? "journey"] ?? "Act II"}</span>
-            <span className="story-stage__chapter">
-              {slide.chapter ?? slide.narrative?.chapterTitle ?? "Project story"}
-            </span>
-          </div>
-          <div className="story-stage__counter">
-            <span>{String(slideNumber).padStart(2, "0")}</span>
-            <small>{String(slideCount).padStart(2, "0")}</small>
-          </div>
-        </div>
-
-        <div className="story-stage__content">
-          <div className="story-stage__copy">
-            <p className="story-stage__eyebrow">{slide.narrative?.storyBeat ?? "Project narrative"}</p>
-            <h1 className="story-stage__title">{slide.title}</h1>
-            {slide.subtitle ? <p className="story-stage__subtitle">{slide.subtitle}</p> : null}
-            {slide.narrative?.narrationScript ? (
-              <p className="story-stage__script">{slide.narrative.narrationScript}</p>
-            ) : null}
-
-            {isHero ? (
-              <div className="story-stage__hero-actions">
-                <button type="button" onClick={onStartTour} className="story-stage__primary">
-                  {isAutoplay ? "Playing Guided Story" : "Begin Guided Story"}
-                </button>
-                <p className="story-stage__hero-note">
-                  Structured investor walkthrough from regional context to resource confidence.
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          {showSidePanel && (isTechnical || isClosing) && evidenceItems.length > 0 ? (
-            <div className="story-stage__side-panel">
-              <p className="story-stage__side-label">{isClosing ? "Investment Case" : "Key Evidence"}</p>
-              <div className="story-stage__evidence-grid">
-                {evidenceItems.map((item) => (
-                  <div key={`${item.label}-${item.value}`} className="story-stage__evidence-card">
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </div>
-                ))}
-              </div>
+        <div className="story-stage__surface">
+          <div className="story-stage__topline">
+            <div className="story-stage__meta">
+              <span className="story-stage__act">{actLabels[slide.narrative?.act ?? "journey"] ?? "Act II"}</span>
+              <span className="story-stage__chapter">
+                {slide.chapter ?? slide.narrative?.chapterTitle ?? "Project story"}
+              </span>
             </div>
-          ) : null}
+            <div className="story-stage__counter">
+              <span>{String(slideNumber).padStart(2, "0")}</span>
+              <small>{String(slideCount).padStart(2, "0")}</small>
+            </div>
+          </div>
+
+          <div className="story-stage__content">
+            <div className="story-stage__copy">
+              <p className="story-stage__eyebrow">{slide.narrative?.storyBeat ?? "Project narrative"}</p>
+              <h1 className="story-stage__title">{slide.title}</h1>
+              {slide.subtitle ? <p className="story-stage__subtitle">{slide.subtitle}</p> : null}
+              {slide.narrative?.narrationScript ? (
+                <p className="story-stage__script">{slide.narrative.narrationScript}</p>
+              ) : null}
+
+              {isHero ? (
+                <div className="story-stage__hero-actions">
+                  <button type="button" onClick={onStartTour} className="story-stage__primary">
+                    {isAutoplay ? "Autoplay Running" : "Start Autoplay"}
+                  </button>
+                  <p className="story-stage__hero-note">
+                    Step through the deck from regional context to resource confidence.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            {showSidePanel && (isTechnical || isClosing) && evidenceItems.length > 0 ? (
+              <div className="story-stage__side-panel">
+                <p className="story-stage__side-label">{isClosing ? "Investment Case" : "Key Evidence"}</p>
+                <div className="story-stage__evidence-grid">
+                  {evidenceItems.map((item) => (
+                    <div key={`${item.label}-${item.value}`} className="story-stage__evidence-card">
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {!isTechnical && slide.facts && slide.facts.length > 0 ? (

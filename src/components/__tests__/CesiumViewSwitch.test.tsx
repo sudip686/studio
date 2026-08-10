@@ -4,6 +4,36 @@ import CesiumViewSwitch from '../CesiumViewSwitch';
 
 const disableAoiCutaway = jest.fn();
 const enableAoiCutaway = jest.fn();
+const mockFlyTo = jest.fn(() => Promise.resolve());
+const mockDataSourceAdd = jest.fn(async (dataSource: any) => dataSource);
+const mockKmlLoad = jest.fn(async () => ({ show: false, entities: { values: [] } }));
+
+beforeAll(() => {
+  (window as any).Cesium = {
+    KmlDataSource: {
+      load: mockKmlLoad,
+    },
+    JulianDate: {
+      now: jest.fn(() => 0),
+    },
+    Color: {
+      fromCssColorString: jest.fn(() => ({
+        withAlpha: jest.fn(() => ({})),
+      })),
+      WHITE: {
+        withAlpha: jest.fn(() => ({})),
+      },
+    },
+    Math: {
+      toRadians: (value: number) => value,
+    },
+    HeadingPitchRange: function HeadingPitchRange(this: any, heading: number, pitch: number, range: number) {
+      this.heading = heading;
+      this.pitch = pitch;
+      this.range = range;
+    },
+  };
+});
 
 jest.mock('@/contexts/cesium-context', () => ({
   useCesium: () => ({
@@ -14,8 +44,10 @@ jest.mock('@/contexts/cesium-context', () => ({
           clippingPlanes: undefined,
           translucency: {},
         },
+        screenSpaceCameraController: {},
         requestRender: jest.fn(),
       },
+      flyTo: mockFlyTo,
       camera: {
         cancelFlight: jest.fn(),
         flyTo: jest.fn(),
@@ -24,6 +56,7 @@ jest.mock('@/contexts/cesium-context', () => ({
         remove: jest.fn(),
       },
       dataSources: {
+        add: mockDataSourceAdd,
         remove: jest.fn(),
       },
       imageryLayers: {
@@ -87,6 +120,9 @@ describe('CesiumViewSwitch drillhole routing', () => {
   beforeEach(() => {
     disableAoiCutaway.mockClear();
     enableAoiCutaway.mockClear();
+    mockFlyTo.mockClear();
+    mockDataSourceAdd.mockClear();
+    mockKmlLoad.mockClear();
   });
 
   it('keeps drillhole coverage on the collar map view', async () => {
@@ -113,6 +149,14 @@ describe('CesiumViewSwitch drillhole routing', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('drillhole-layer-assay')).not.toBeNull();
       expect(screen.queryByTestId('legend')).not.toBeNull();
+    });
+  });
+
+  it('keeps the assay drillhole view above ground', async () => {
+    render(<CesiumViewSwitch view="geojson_drillholes_assay" />);
+    await waitFor(() => {
+      expect(screen.queryByTestId('drillhole-layer-assay')).not.toBeNull();
+      expect(disableAoiCutaway).toHaveBeenCalled();
     });
   });
 });

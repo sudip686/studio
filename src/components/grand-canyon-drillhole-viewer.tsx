@@ -4,29 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
 import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData, ASSET_BASE_URL } from '@/lib/constants';
+import { DrillholeTooltip } from './ui/tooltip';
 import * as Cesium from 'cesium';
 
 interface GrandCanyonDrillholeViewerProps {
   displayMode: 'assay' | 'lithology';
 }
-
-// Generic tooltip from resource-model-viewer
-const TooltipContent = ({ data }: { data: any }) => {
-    if (!data || !data.content) return null;
-    const propertyEntries = Object.entries(data.content).map(([key, value]) => {
-        const displayValue = typeof value === 'number' ? value.toFixed(3) : String(value);
-        return <li key={key}><strong>{key}:</strong> {displayValue}</li>;
-    });
-    return (
-        <div
-            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none z-50"
-            style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-        >
-            <p className="font-bold text-base mb-1">Entity Properties</p>
-            <ul className="list-none space-y-1">{propertyEntries}</ul>
-        </div>
-    );
-};
 
 const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerProps) => {
   const { viewer, ready } = useCesium();
@@ -333,7 +316,7 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
                 show={true}
             />
         )}
-        <TooltipContent data={tooltip} />
+            <DrillholeTooltip data={tooltip} />
         <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(255,255,255,0.8)', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', borderRadius: '8px' }}>
             <h4>Resource Model Controls</h4>
             <div>

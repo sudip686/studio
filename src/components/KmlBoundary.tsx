@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 
 import { useCesium } from '@/contexts/cesium-context';
 import { fitViewerToDataSource } from '@/lib/utils/cesium-fit';
@@ -36,10 +36,10 @@ const KmlBoundary = ({ styled = false }: KmlBoundaryProps) => {
                         entity.show = true;
                         if (entity.polygon) {
                             entity.polygon.outline = true;
-                            entity.polygon.outlineColor = Cesium.Color.RED;
-                            entity.polygon.outlineWidth = 5;
+                            entity.polygon.outlineColor = Cesium.Color.fromCssColorString('#c7551b').withAlpha(0.95);
+                            entity.polygon.outlineWidth = 3;
                             entity.polygon.fill = styled;
-                            entity.polygon.material = styled ? Cesium.Color.WHITE.withAlpha(0.5) : undefined;
+                            entity.polygon.material = styled ? Cesium.Color.fromCssColorString('#c7551b').withAlpha(0.16) : undefined;
                             // Ensure boundary is drawn on the surface only (avoid "double" outlines from altitude data)
                             entity.polygon.height = 0;
                             (entity.polygon as any).extrudedHeight = undefined;
@@ -48,8 +48,8 @@ const KmlBoundary = ({ styled = false }: KmlBoundaryProps) => {
                         }
                         if (entity.polyline) {
                             entity.polyline.show = true;
-                            entity.polyline.material = Cesium.Color.RED;
-                            entity.polyline.width = 5;
+                            entity.polyline.material = Cesium.Color.fromCssColorString('#c7551b').withAlpha(0.95);
+                            entity.polyline.width = 3;
                             // Clamp boundary polylines to ground so only one line renders
                             entity.polyline.clampToGround = true;
                             entity.polyline.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
@@ -58,17 +58,29 @@ const KmlBoundary = ({ styled = false }: KmlBoundaryProps) => {
 
                     let kmlLabel = null;
                     kmlLabel = viewer.entities.add({
-                        position: Cesium.Cartesian3.fromDegrees(38.78, -4.8),
-                        label: {
-                            text: 'Tanga Graphite',
-                            font: '24pt sans-serif',
-                            fillColor: Cesium.Color.RED,
-                            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                        position: Cesium.Cartesian3.fromDegrees(38.785, -4.813, 450),
+                        point: {
+                            pixelSize: 12,
+                            color: Cesium.Color.WHITE.withAlpha(0.95),
+                            outlineColor: Cesium.Color.fromCssColorString('#c7551b').withAlpha(0.98),
                             outlineWidth: 4,
+                            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                        },
+                        label: {
+                            text: 'Tanga Project',
+                            font: '700 15px Poppins, Inter, sans-serif',
+                            fillColor: Cesium.Color.WHITE.withAlpha(0.96),
+                            backgroundColor: Cesium.Color.fromCssColorString('#05080c').withAlpha(0.78),
+                            showBackground: true,
+                            backgroundPadding: new Cesium.Cartesian2(10, 6),
+                            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                            outlineColor: Cesium.Color.fromCssColorString('#05080c').withAlpha(0.92),
+                            outlineWidth: 3,
+                            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
                             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                            pixelOffset: new Cesium.Cartesian2(0, -9),
+                            pixelOffset: new Cesium.Cartesian2(0, -22),
                             show: true,
-                            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                            heightReference: Cesium.HeightReference.NONE,
                             disableDepthTestDistance: Number.POSITIVE_INFINITY
                         }
                     });
@@ -81,7 +93,7 @@ const KmlBoundary = ({ styled = false }: KmlBoundaryProps) => {
                     viewer.camera.cancelFlight?.();
 
                     // 1) render one frame so DataSourceDisplay builds draw commands
-                    renderController?.pulse?.(); // <— call the controller
+                    renderController?.pulse?.(); // <â€” call the controller
 
                     // The dataSource is ready after KmlDataSource.load resolves, so no need to await dataSource.readyPromise
 
@@ -144,3 +156,5 @@ const KmlBoundary = ({ styled = false }: KmlBoundaryProps) => {
 };
 
 export default KmlBoundary;
+
+

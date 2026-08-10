@@ -43,12 +43,12 @@ export default function ScenePreloader() {
       const idleWarm = () => {
         const deferredUrls: Array<{ candidates: string[]; opts?: RequestInit }> = [
           {
-            candidates: ['/lithology_data.geojson'],
-            opts: { cache: 'force-cache' },
+            candidates: ['/api/lithology-data'],
+            opts: { cache: 'no-store' },
           },
           {
-            candidates: ['/assay_data.geojson'],
-            opts: { cache: 'force-cache' },
+            candidates: ['/api/assay-data'],
+            opts: { cache: 'no-store' },
           },
         ];
 
@@ -56,9 +56,14 @@ export default function ScenePreloader() {
           warmFirstAvailable(candidates, opts);
         });
 
+        // Prioritize high-res 8K texture for presentation slides (lithology, assay, carbon_model, classification)
+        const isPresentationSlide = typeof window !== 'undefined'
+          ? window.location.pathname
+              ?.split('/')
+              .some((segment) => ['lithology', 'assay', 'carbon_model', 'classification'].includes(segment))
+          : false;
         const textureCandidates = [
-          '/texture_rgb_8192.png',
-          '/terrain_texture_8k.jpg',
+          ...(isPresentationSlide ? ['/terrain_texture_8k.jpg', '/texture_rgb_8192.png'] : ['/texture_rgb_8192.png', '/terrain_texture_8k.jpg']),
         ];
 
         textureCandidates.forEach((src) => {

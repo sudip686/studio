@@ -5,8 +5,6 @@
 // provides sampleElevationAtLonLat(lon, lat) in meters AMSL.
 
 import proj4 from 'proj4';
-import { ASSET_BASE_URL } from '@/lib/constants';
-
 type TerrainMeta = {
   crs_epsg: number;
   bounds_utm: { minX: number; minY: number; maxX: number; maxY: number };
@@ -42,7 +40,7 @@ async function ensureLoaded(): Promise<void> {
     _meta = await metaResp.json() as TerrainMeta;
 
     // Load height.bin
-    const binResp = await fetch(`${ASSET_BASE_URL}/height.bin`);
+    const binResp = await fetch('/height.bin', { cache: 'force-cache' });
     if (!binResp.ok) throw new Error(`Failed to load height.bin: ${binResp.statusText}`);
     const arrayBuffer = await binResp.arrayBuffer();
     _heightData = new Float32Array(arrayBuffer);

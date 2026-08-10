@@ -2,29 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
+import { BlockModelTooltip } from './ui/tooltip';
 
 declare global {
     interface Window {
         Cesium: any;
     }
 }
-
-const TooltipContent = ({ data }: { data: any }) => {
-    if (!data) return null;
-    const propertyEntries = Object.entries(data.content).map(([key, value]) => {
-        const displayValue = typeof value === 'number' ? value.toFixed(3) : String(value);
-        return <li key={key}><strong>{key}:</strong> {displayValue}</li>;
-    });
-    return (
-        <div
-            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none z-50"
-            style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-        >
-            <p className="font-bold text-base mb-1">Entity Properties</p>
-            <ul className="list-none space-y-1">{propertyEntries}</ul>
-        </div>
-    );
-};
 
 const ResourceModelViewer = () => {
     const { viewer, ready } = useCesium(); // Using new context
@@ -182,7 +166,7 @@ const ResourceModelViewer = () => {
 
     return (
         <div className="h-full w-full relative">
-            {tooltip.display && <TooltipContent data={tooltip} />}
+            {tooltip.display && <BlockModelTooltip data={tooltip} />}
             <div style={{ position: 'absolute', top: 10, left: 10, background: 'white', padding: '10px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', borderRadius: '8px' }}>
                 <h4>Resource Model Controls</h4>
                 {assayRangeFilter && assayRangeBounds && selectedProperty === "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC" && (

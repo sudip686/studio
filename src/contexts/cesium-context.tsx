@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { createContext, useContext, useRef, useState, useEffect } from 'react';
 import { createRenderController, RenderController } from '@/lib/cesium-render-controller';
 import { bufferRectangleMeters } from '@/lib/utils/rectangle-utils';
@@ -53,9 +53,80 @@ const Ctx = createContext<CesiumCtx>({
 
 export const useCesium = () => useContext(Ctx);
 
-export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMode?: InteractionMode }> = ({
+const RESOLUTION_SCALE_BY_PROFILE: Record<PerfProfile, number> = {
+  performance: 0.84,
+  balanced: 0.92,
+  quality: 1,
+};
+
+const GLOBE_SSE_BY_PROFILE: Record<PerfProfile, number> = {
+  performance: 2.8,
+  balanced: 2.2,
+  quality: 1.9,
+};
+
+const CESIUM_CDN_BASE = 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium';
+let cesiumGlobalPromise: Promise<any> | null = null;
+
+function loadCesiumGlobal() {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Cesium can only be loaded in the browser.'));
+  }
+
+  const existingCesium = (window as any).Cesium;
+  if (existingCesium) {
+    return Promise.resolve(existingCesium);
+  }
+
+  if (cesiumGlobalPromise) {
+    return cesiumGlobalPromise;
+  }
+
+  cesiumGlobalPromise = new Promise((resolve, reject) => {
+    const finish = () => {
+      const runtime = (window as any).Cesium;
+      if (runtime) {
+        resolve(runtime);
+      } else {
+        reject(new Error('Cesium script loaded but window.Cesium is unavailable.'));
+      }
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[data-cesium-runtime="true"], script[src*="/Cesium.js"]'
+    );
+    if (existingScript) {
+      existingScript.addEventListener('load', finish, { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('Failed to load Cesium.')), { once: true });
+      return;
+    }
+
+    (window as any).CESIUM_BASE_URL = `${CESIUM_CDN_BASE}/`;
+
+    const script = document.createElement('script');
+    script.src = `${CESIUM_CDN_BASE}/Cesium.js`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.cesiumRuntime = 'true';
+    script.onload = finish;
+    script.onerror = () => reject(new Error('Failed to load Cesium.'));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    cesiumGlobalPromise = null;
+    throw error;
+  });
+
+  return cesiumGlobalPromise;
+}
+
+export const CesiumProvider: React.FC<{
+  children: React.ReactNode;
+  interactionMode?: InteractionMode;
+  perfProfile?: PerfProfile;
+}> = ({
   children,
   interactionMode = 'explore',
+  perfProfile = 'quality',
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const initializedRef = useRef(false);
@@ -72,6 +143,22 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
   const controllerRef = useRef<RenderController | null>(null);
   const boundaryDataSourcesRef = useRef<any[]>([]);
   const boundaryEntitiesRef = useRef<any[]>([]);
+
+  const applyTilesetProfile = React.useCallback((targetTileset: any, profile: PerfProfile) => {
+    try {
+      if (!targetTileset) return;
+      targetTileset.maximumScreenSpaceError =
+        profile === 'performance' ? 18 : profile === 'balanced' ? 12 : 8;
+      targetTileset.dynamicScreenSpaceError = profile !== 'quality';
+      targetTileset.skipLevelOfDetail = profile === 'performance';
+      targetTileset.preferLeaves = profile === 'quality';
+      targetTileset.foveatedScreenSpaceError = profile !== 'quality';
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    applyTilesetProfileRef.current = applyTilesetProfile;
+  }, [applyTilesetProfile]);
 
   const safeRemoveDataSource = React.useCallback((targetViewer: any, dataSource: any) => {
     try {
@@ -532,27 +619,14 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
 
     (async () => {
       if (destroyed || !containerRef.current) return;
-      const Cesium = (window as any).Cesium;
+      const Cesium = await loadCesiumGlobal();
       if (!Cesium) return;
 
       Cesium.Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN || '';
 
-      // 1. Viewer with terrain
-      let terrainProvider;
-      try {
-        terrainProvider = await Cesium.createWorldTerrainAsync({
-            requestVertexNormals: true,
-            requestWaterMask: false,
-        });
-      } catch (e) {
-        console.warn("Failed to load World Terrain (likely missing/invalid Ion token). Falling back to Ellipsoid.", e);
-        terrainProvider = new Cesium.EllipsoidTerrainProvider();
-      }
-      
-      if (destroyed) return;
-
+      // 1. Viewer starts immediately with a lightweight terrain provider.
       v = new Cesium.Viewer(containerRef.current, {
-        terrainProvider,
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
         animation: false, timeline: false, geocoder: false, homeButton: false,
         sceneModePicker: false, baseLayerPicker: false, navigationHelpButton: false,
         infoBox: false, selectionIndicator: false, requestRenderMode: true,
@@ -560,6 +634,21 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
       });
       if (destroyed) { v.destroy(); return; }
       setViewer(v);
+
+      if (typeof Cesium.createWorldTerrainAsync === 'function') {
+        void Cesium.createWorldTerrainAsync({
+          requestVertexNormals: true,
+          requestWaterMask: false,
+        })
+          .then((terrainProvider: any) => {
+            if (destroyed || !v || v.isDestroyed?.()) return;
+            v.terrainProvider = terrainProvider;
+            v.scene.requestRender?.();
+          })
+          .catch((e: unknown) => {
+            console.warn("Failed to load World Terrain (likely missing/invalid Ion token). Using Ellipsoid terrain.", e);
+          });
+      }
 
       // 2. Load boundary layers and determine AOI from the merged project KMZ
       let aoi: any;
@@ -577,9 +666,9 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
         setKmlDataSource(kmlDs);
 
         const polygonSets = styleBoundaryDataSource(Cesium, kmlDs, {
-          outlineColor: '#f59e0b',
-          lineColor: '#fbbf24',
-          lineWidth: 6,
+          outlineColor: '#c7551b',
+          lineColor: '#2dd4bf',
+          lineWidth: 3,
           fill: false,
         }) ?? [];
         const allPositions = polygonSets.flat();
@@ -593,11 +682,11 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
               polyline: {
                 positions: [...polyPositions, polyPositions[0]],
                 clampToGround: true,
-                width: 7,
+                width: 4,
                 material: new Cesium.PolylineGlowMaterialProperty({
-                  glowPower: 0.18,
+                  glowPower: 0.08,
                   taperPower: 0.75,
-                  color: Cesium.Color.fromCssColorString('#fbbf24').withAlpha(0.98),
+                  color: Cesium.Color.fromCssColorString('#c7551b').withAlpha(0.96),
                 }),
               },
             });
@@ -614,17 +703,26 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
           const polyCenter = Cesium.BoundingSphere.fromPoints(allPositions).center;
           const label = v.entities.add({
             position: polyCenter,
+            point: {
+              pixelSize: 12,
+              color: Cesium.Color.WHITE.withAlpha(0.95),
+              outlineColor: Cesium.Color.fromCssColorString('#c7551b').withAlpha(0.98),
+              outlineWidth: 4,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            },
             label: {
-              text: 'Tanga Graphite',
-              font: 'bold 20px sans-serif',
+              text: 'Tanga Project',
+              font: '700 15px Poppins, Inter, sans-serif',
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              fillColor: Cesium.Color.fromCssColorString('#fde68a'),
-              outlineColor: Cesium.Color.BLACK,
+              fillColor: Cesium.Color.WHITE.withAlpha(0.96),
+              outlineColor: Cesium.Color.fromCssColorString('#05080c').withAlpha(0.92),
               outlineWidth: 3,
               showBackground: true,
-              backgroundColor: new Cesium.Color(5 / 255, 16 / 255, 26 / 255, 0.72),
+              backgroundColor: Cesium.Color.fromCssColorString('#05080c').withAlpha(0.78),
+              backgroundPadding: new Cesium.Cartesian2(10, 6),
+              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-              pixelOffset: new Cesium.Cartesian2(0, -20),
+              pixelOffset: new Cesium.Cartesian2(0, -22),
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
               eyeOffset: new Cesium.Cartesian3(0, 0, -100)
             }
@@ -642,7 +740,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
             id: 'tanga-primary',
             kind: 'primary',
             dataSource: kmlDs,
-            color: '#fbbf24',
+            color: '#c7551b',
             label: polygonSets.length > 1 ? 'Merged licence footprint' : 'Project AOI',
           },
         ]);
@@ -656,16 +754,24 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
       // 3. Create buffered AOI and add limited aerial imagery
       let aoiBuffered: any;
       if (aoi) {
-        aoiBuffered = bufferRectangleMeters(Cesium, aoi, 25000); // 25km buffer
+        aoiBuffered = bufferRectangleMeters(Cesium, aoi, 90000); // Wider imagery footprint for presentation framing
       }
 
       const aerialProvider = Cesium.createWorldImagery
         ? Cesium.createWorldImagery({ style: Cesium.IonWorldImageryStyle.AERIAL })
         : await Cesium.IonImageryProvider.fromAssetId(2);
       
-      const aerialLayer = new Cesium.ImageryLayer(aerialProvider, {
-        rectangle: aoiBuffered
-      });
+      const aerialLayer = new Cesium.ImageryLayer(
+        aerialProvider,
+        interactionMode === 'presentation' || !aoiBuffered
+          ? undefined
+          : { rectangle: aoiBuffered }
+      );
+      aerialLayer.alpha = 1.0;
+      aerialLayer.brightness = 1.16;
+      aerialLayer.contrast = 1.08;
+      aerialLayer.saturation = 1.14;
+      aerialLayer.gamma = 0.92;
       if (destroyed) return;
       v.imageryLayers.add(aerialLayer);
 
@@ -674,15 +780,15 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
       v.scene.globe.translucency.enabled = false;
       v.scene.globe.depthTestAgainstTerrain = true;
       v.scene.globe.enableLighting = true;
-      v.scene.light.intensity = 2.7;
-      v.scene.globe.baseColor = Cesium.Color.WHITE.withAlpha(0.18);
-      v.scene.atmosphere.brightnessShift = 0.34;
-      v.scene.skyAtmosphere.brightnessShift = 0.22;
-      v.scene.globe.maximumScreenSpaceError = interactionMode === 'presentation' ? 1.9 : 1.8;
+      v.scene.light.intensity = 3.2;
+      v.scene.globe.baseColor = Cesium.Color.fromCssColorString('#dbeafe').withAlpha(0.36);
+      v.scene.atmosphere.brightnessShift = 0.52;
+      v.scene.skyAtmosphere.brightnessShift = 0.36;
+      v.scene.globe.maximumScreenSpaceError = interactionMode === 'presentation' ? GLOBE_SSE_BY_PROFILE[perfProfile] : 1.8;
       v.scene.globe.tileCacheSize = interactionMode === 'presentation' ? 160 : 220;
       v.targetFrameRate = interactionMode === 'presentation' ? 30 : 45;
-      try { v.scene.skyBox.brightnessShift = 0.18; } catch {}
-      try { v.scene.terrainExaggeration = 1.18; } catch {}
+      try { v.scene.skyBox.brightnessShift = 0.24; } catch {}
+      try { v.scene.terrainExaggeration = 1.3; } catch {}
 
       // 5. Configure navigation to match the active interaction mode.
       const controller = v.scene.screenSpaceCameraController;
@@ -719,7 +825,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
       controller.lookDamping = interactionMode === 'presentation' ? 0.008 : 0.015;
       controller.bounceAnimationTime = 0;
       controller.maximumMovementRatio = interactionMode === 'presentation' ? 0.7 : 0.85;
-      v.resolutionScale = interactionMode === 'presentation' ? 1.0 : 0.82;
+      v.resolutionScale = interactionMode === 'presentation' ? RESOLUTION_SCALE_BY_PROFILE[perfProfile] : 0.82;
 
       // 6. Fly camera to AOI
       if (aoiBuffered) {
@@ -763,7 +869,23 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
       setReady(false);
       initializedRef.current = false;
     };
-  }, [interactionMode, safeRemoveDataSource, safeRemoveEntity]);
+  }, [interactionMode, safeRemoveDataSource, safeRemoveEntity, applyTilesetProfile]);
+
+  useEffect(() => {
+    if (!viewer || !ready || (viewer as any)?.isDestroyed?.() || !(viewer as any).scene) return;
+    const v: any = viewer;
+
+    try {
+      if (interactionMode === 'presentation') {
+        v.resolutionScale = RESOLUTION_SCALE_BY_PROFILE[perfProfile];
+        v.scene.globe.maximumScreenSpaceError = GLOBE_SSE_BY_PROFILE[perfProfile];
+      }
+      if (tileset) {
+        applyTilesetProfile(tileset, perfProfile);
+      }
+      v.scene.requestRender?.();
+    } catch {}
+  }, [applyTilesetProfile, interactionMode, perfProfile, ready, tileset, viewer]);
 
   // InteractionQualityScaler: lighten rendering during active interaction (pointer/touch/wheel),
   // then restore crisp quality shortly after idle. Cesium-only; fully guarded.
@@ -837,7 +959,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
       if (restoreTimer) clearTimeout(restoreTimer);
       restore();
     };
-  }, [viewer, ready, tileset]);
+  }, [viewer, ready, tileset, perfProfile]);
   // Keyboard toggles for convenience: U = underground toggle, P = fast nav, F = free-fly toggle
   useEffect(() => {
     if (!viewer || !ready) return;
@@ -869,3 +991,7 @@ export const CesiumProvider: React.FC<{ children: React.ReactNode; interactionMo
     </Ctx.Provider>
   );
 };
+
+
+
+

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { useCesium } from '@/contexts/cesium-context';
-import { Legend } from '@/components/ui/legend';
 import { OverlaySlot } from '@/ui/overlays';
-import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLOR_MAP_CSS } from '@/lib/constants';
+import { LITHOLOGY_COLOR_MAP_CSS } from '@/lib/constants';
+import { DrillholeTooltip } from './ui/tooltip';
 
 declare global {
     interface Window {
@@ -23,21 +23,6 @@ interface ProcessedDrillhole {
     assayValues: number[];
     avgAssay: number | null;
     maxAssay: number | null;
-}
-
-function flyToDrillholeCluster(viewer: any, positions: any[]) {
-    if (!viewer || viewer.isDestroyed?.() || positions.length === 0) return;
-    const Cesium = window.Cesium;
-    const boundingSphere = Cesium.BoundingSphere.fromPoints(positions);
-    const range = Math.max(4200, Math.min(16000, boundingSphere.radius * 3.15));
-    viewer.camera.flyToBoundingSphere(boundingSphere, {
-        duration: 1.8,
-        offset: new Cesium.HeadingPitchRange(
-            Cesium.Math.toRadians(18),
-            Cesium.Math.toRadians(-60),
-            range
-        ),
-    });
 }
 
 // --- Helper Functions ---
@@ -69,31 +54,6 @@ const getContinuousColor = (value: number, min: number, max: number, paletteName
 
 const norm = (s: any) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-// --- UI Components ---
-
-const TooltipContent = ({ data }: { data: any }) => {
-    if (!data || !data.content) return null;
-    return (
-        <div
-            className="absolute pointer-events-none rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(9,15,24,0.94),rgba(7,11,18,0.82))] p-3 text-xs text-white shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl"
-            style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-        >
-            <p className="mb-1 text-base font-bold">Hole ID: {data.content.hole_id}</p>
-            <ul className="list-none space-y-1">
-                <li><strong>Lat:</strong> {data.content.latitude?.toFixed(5)}</li>
-                <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
-                {data.content.lithology && <li><strong>Lithologies:</strong> {data.content.lithology}</li>}
-                {data.content.graphitic_carbon !== undefined && (
-                    <li><strong>Avg. Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
-                )}
-                {data.content.max_graphitic_carbon !== undefined && (
-                    <li><strong>Max. Graphitic Carbon:</strong> {data.content.max_graphitic_carbon?.toFixed(3)} %</li>
-                )}
-            </ul>
-        </div>
-    );
-};
-
 // --- View-Specific Components ---
 
 interface LithologyMapViewProps {
@@ -101,9 +61,10 @@ interface LithologyMapViewProps {
     ready: boolean;
     processedData: Map<string, ProcessedDrillhole>;
     uniqueLithologies: string[];
+    presentationMode?: boolean;
 }
 
-function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: LithologyMapViewProps) {
+function LithologyMapView({ viewer, ready, processedData, uniqueLithologies, presentationMode = false }: LithologyMapViewProps) {
     const [lithologyFilter, setLithologyFilter] = useState('All');
     const entitiesRef = useRef<any[]>([]);
     const lithologyColorMapCesiumRef = useRef<any>({});
@@ -126,7 +87,6 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
             entitiesRef.current = [];
 
             let plotted = 0;
-            const plottedPositions: any[] = [];
             Array.from(processedData.values()).forEach((data: ProcessedDrillhole, i) => {
                 const hTop = Number(clamped[i]?.height ?? 0);
                 if (typeof data.longitude !== 'number' || typeof data.latitude !== 'number' || !Number.isFinite(data.longitude) || !Number.isFinite(data.latitude)) return;
@@ -140,6 +100,8 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
                     const color = lithologyColorMapCesiumRef.current[key] ?? lithologyColorMapCesiumRef.current.unknown;
 
                     const entity = new Cesium.Entity({
+                        id: data.hole_id,
+                        name: data.hole_id,
                         position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude, hTop),
                         point: {
                             pixelSize: 20,
@@ -148,17 +110,22 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
                             outlineWidth: 1,
                             disableDepthTestDistance: Number.POSITIVE_INFINITY,
                         },
-                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay, max_graphitic_carbon: data.maxAssay }
+                        properties: {
+                            hole_id: data.hole_id,
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            lithology: Array.from(data.lithologies).join(', '),
+                            graphitic_carbon: data.avgAssay,
+                            max_graphitic_carbon: data.maxAssay
+                        }
                     });
                     viewer.entities.add(entity);
                     entitiesRef.current.push(entity);
-                    plottedPositions.push(entity.position?.getValue?.(viewer.clock.currentTime));
                     plotted++;
                 }
             });
-            if (plottedPositions.length > 0) {
-                flyToDrillholeCluster(viewer, plottedPositions.filter(Boolean));
-            }
+            console.log('Drillhole entities plotted:', plotted);
+            // Camera is now handled by CesiumViewSwitch - do not fly to cluster here
         })();
 
         return () => {
@@ -168,9 +135,13 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
         };
     }, [viewer, ready, processedData, lithologyFilter]);
 
+    if (presentationMode) {
+        return null;
+    }
+
     return (
         <>
-            <OverlaySlot slot="top-left" wrapperClassName="w-[296px] max-w-[calc(100vw-2rem)] flex flex-col items-start">
+            <OverlaySlot slot="top-right" wrapperClassName="overlay-inspector-slot overlay-inspector-slot--right">
               <div className="pointer-events-auto w-full overflow-hidden rounded-[22px] border border-[#f1d2bf]/14 bg-[linear-gradient(180deg,rgba(24,16,12,0.92),rgba(10,9,8,0.76))] p-3.5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
                 <div className="mb-3">
                     <p className="text-[10px] uppercase tracking-[0.28em] text-[#f1d2bf]/52">Drillhole view</p>
@@ -191,14 +162,6 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
                 </div>
               </div>
             </OverlaySlot>
-            <OverlaySlot slot="bottom-center">
-              <Legend
-                  title={drillholeLocationMapLithologyLegendData.title}
-                  type="categorical"
-                  items={drillholeLocationMapLithologyLegendData.items}
-                  show={true}
-              />
-            </OverlaySlot>
         </>
     );
 }
@@ -208,9 +171,10 @@ interface AssayMapViewProps {
     ready: boolean;
     processedData: Map<string, ProcessedDrillhole>;
     ranges: { avg: { min: number, max: number }, max: { min: number, max: number } };
+    presentationMode?: boolean;
 }
 
-function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProps) {
+function AssayMapView({ viewer, ready, processedData, ranges, presentationMode = false }: AssayMapViewProps) {
     const [assayFilterValue, setAssayFilterValue] = useState(0);
     const [metric, setMetric] = useState<'average' | 'max'>('max');
     const [scaleType, setScaleType] = useState<'continuous' | 'discrete'>('continuous');
@@ -233,7 +197,6 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
             entitiesRef.current = [];
 
             let plotted = 0;
-            const plottedPositions: any[] = [];
             Array.from(processedData.values()).forEach((data: ProcessedDrillhole, i) => {
                 const hTop = Number(clamped[i]?.height ?? 0);
                 if (typeof data.longitude !== 'number' || typeof data.latitude !== 'number' || !Number.isFinite(data.longitude) || !Number.isFinite(data.latitude)) return;
@@ -259,6 +222,8 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                     }
 
                     const entity = new Cesium.Entity({
+                        id: data.hole_id,
+                        name: data.hole_id,
                         position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude, hTop),
                         point: {
                             pixelSize: pointSize,
@@ -267,17 +232,22 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                             outlineWidth: 1,
                             disableDepthTestDistance: Number.POSITIVE_INFINITY,
                         },
-                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay, max_graphitic_carbon: data.maxAssay }
+                        properties: {
+                            hole_id: data.hole_id,
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            lithology: Array.from(data.lithologies).join(', '),
+                            graphitic_carbon: data.avgAssay,
+                            max_graphitic_carbon: data.maxAssay
+                        }
                     });
                     viewer.entities.add(entity);
                     entitiesRef.current.push(entity);
-                    plottedPositions.push(entity.position?.getValue?.(viewer.clock.currentTime));
                     plotted++;
                 }
             });
-            if (plottedPositions.length > 0) {
-                flyToDrillholeCluster(viewer, plottedPositions.filter(Boolean));
-            }
+            console.log('Assay drillhole entities plotted:', plotted);
+            // Camera is now handled by CesiumViewSwitch - do not fly to cluster here
         })();
 
         return () => {
@@ -287,9 +257,13 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
         };
     }, [viewer, ready, processedData, assayFilterValue, scaleType, continuousPalette, manualBreaks, currentRange, metric, pointSize]);
 
+    if (presentationMode) {
+        return null;
+    }
+
     return (
         <>
-            <OverlaySlot slot="top-left" wrapperClassName="w-[296px] max-w-[calc(100vw-2rem)] flex flex-col items-start">
+            <OverlaySlot slot="top-right" wrapperClassName="overlay-inspector-slot overlay-inspector-slot--right">
               <div className="pointer-events-auto flex w-full flex-col gap-3 overflow-hidden rounded-[22px] border border-[#f1d2bf]/14 bg-[linear-gradient(180deg,rgba(24,16,12,0.92),rgba(10,9,8,0.76))] p-3.5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
                 <div>
                     <p className="text-[10px] uppercase tracking-[0.28em] text-[#f1d2bf]/52">Drillhole view</p>
@@ -392,16 +366,6 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                 <p className="text-[11px] leading-5 text-white/62">Use the controls to tune the color mapping and quickly isolate stronger graphitic carbon collars.</p>
               </div>
             </OverlaySlot>
-            <OverlaySlot slot="bottom-center">
-              <Legend
-                  title={`${metric === 'average' ? 'Avg.' : 'Max.'} Assay (Graphitic Carbon)`}
-                  type="gradient"
-                  gradient={`linear-gradient(to right, ${(CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis']).join(', ')})`}
-                  minLabel={currentRange.min.toFixed(2)}
-                  maxLabel={currentRange.max.toFixed(2)}
-                  show={true}
-              />
-            </OverlaySlot>
         </>
     );
 }
@@ -412,9 +376,10 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
 interface DrillholeLocationMapProps {
     displayMode: 'lithology' | 'assay';
     imageryAlpha?: number;
+    presentationMode?: boolean;
 }
 
-const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
+const DrillholeLocationMap = ({ displayMode, presentationMode = false }: DrillholeLocationMapProps) => {
     const { viewer, ready } = useCesium();
     const { drillholeData } = useDataCache();
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
@@ -493,29 +458,54 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
     useEffect(() => {
         if (!viewer || !ready) return;
         const Cesium = window.Cesium;
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        const canvas = viewer.scene.canvas;
+        const handler = new Cesium.ScreenSpaceEventHandler(canvas);
 
         handler.setInputAction((movement: any) => {
             const picked = viewer.scene.pick(movement.endPosition);
-            if (!picked) {
-                if (tooltip.display) setTooltip({ display: false, top: 0, left: 0, content: null });
+            if (!picked || !Cesium.defined(picked)) {
+                setTooltip(prev => prev.display ? { display: false, top: 0, left: 0, content: null } : prev);
                 return;
             }
-            if (Cesium.defined(picked.id) && picked.id?.properties) {
-                const props = picked.id.properties.getValue(viewer.clock.currentTime);
-                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: props });
-            } else {
-                if (tooltip.display) setTooltip({ display: false, top: 0, left: 0, content: null });
+
+            const entity = picked.id;
+            if (!entity) {
+                setTooltip(prev => prev.display ? { display: false, top: 0, left: 0, content: null } : prev);
+                return;
             }
+
+            const props = entity.properties?.getValue
+                ? entity.properties.getValue(Cesium.JulianDate.now())
+                : entity.properties ?? null;
+
+            const content = props
+                ? {
+                    hole_id: props.hole_id ?? entity.id ?? entity.name ?? 'Unknown',
+                    latitude: props.latitude ?? entity.latitude ?? entity._latitude,
+                    longitude: props.longitude ?? entity.longitude ?? entity._longitude,
+                    lithology: props.lithology,
+                    graphitic_carbon: props.graphitic_carbon ?? entity.graphitic_carbon ?? entity._graphitic_carbon,
+                    max_graphitic_carbon: props.max_graphitic_carbon,
+                }
+                : null;
+
+            if (content) {
+                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content });
+            } else {
+                setTooltip(prev => prev.display ? { display: false, top: 0, left: 0, content: null } : prev);
+            }
+
             viewer.scene.requestRender();
         }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-        return () => { if (!handler.isDestroyed()) handler.destroy(); };
-    }, [viewer, ready, tooltip.display]);
+        return () => {
+            if (!handler.isDestroyed()) handler.destroy();
+        };
+    }, [viewer, ready]);
 
     return (
         <div className="h-full w-full relative pointer-events-none">
-            {tooltip.display && <TooltipContent data={tooltip} />}
+            {tooltip.display && <DrillholeTooltip data={tooltip} />}
             
             {displayMode === 'lithology' ? (
                 <LithologyMapView 
@@ -523,6 +513,7 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
                     ready={ready} 
                     processedData={processedData}
                     uniqueLithologies={uniqueLithologies}
+                    presentationMode={presentationMode}
                 />
             ) : (
                 <AssayMapView 
@@ -530,6 +521,7 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
                     ready={ready}
                     processedData={processedData}
                     ranges={ranges}
+                    presentationMode={presentationMode}
                 />
             )}
         </div>
