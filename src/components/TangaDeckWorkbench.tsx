@@ -3419,10 +3419,16 @@ export default function TangaDeckWorkbench() {
 
       if (callout.anchor) {
         try {
+          // Cap the elevation used for projection. Some callouts carry huge
+          // elevationOffsets (up to 160 km) which, on a pitched map, throw the
+          // projected anchor far from the actual location — so the leader line
+          // pointed at empty map. Clamp to a small lift so it sits on the zone.
+          const anchorZ = heightAt(callout.anchor.lon, callout.anchor.lat)
+            + clamp(callout.anchor.elevationOffset ?? 0, 0, 300);
           const projected = viewport.project([
             callout.anchor.lon,
             callout.anchor.lat,
-            heightAt(callout.anchor.lon, callout.anchor.lat) + (callout.anchor.elevationOffset ?? 0),
+            anchorZ,
           ]);
           if (Number.isFinite(projected[0]) && Number.isFinite(projected[1])) {
             anchorPixelX = clamp(projected[0], 18, stageSize.width - 18);
@@ -4382,9 +4388,11 @@ export default function TangaDeckWorkbench() {
           onPointerDown={markUiInteraction}
         >
           <div className="tanga-deck__ranking-head">
-            <span>Peer Context</span>
-            <strong>{tangaRankingInserted ? 'Tanga inserted after the resource reveal' : 'Top 10 public graphite projects'}</strong>
-            <small>M&I contained graphite basis; click any globe dot or row for owner, listing, grade, flake distribution and metallurgy notes.</small>
+            <span>{tangaRankingInserted ? 'Global Ranking' : 'Peer Context'}</span>
+            <strong>{tangaRankingInserted ? 'Tanga enters the world’s top 5 graphite deposits' : 'Top 10 public graphite projects'}</strong>
+            <small>{tangaRankingInserted
+              ? 'Ranked #5 by M&I contained graphite — ahead of every other Tanzanian peer.'
+              : 'M&I contained graphite basis; click any globe dot or row for owner, listing, grade, flake distribution and metallurgy notes.'}</small>
           </div>
 
           <ol className="tanga-deck__ranking-list">
@@ -4415,7 +4423,10 @@ export default function TangaDeckWorkbench() {
               >
                 <span className="tanga-deck__rank-number">{project.displayRank}</span>
                 <span className="tanga-deck__rank-main">
-                  <strong>{project.project}</strong>
+                  <strong>
+                    {project.project}
+                    {project.isTanga && <span className="tanga-deck__rank-badge">NEW · TOP 5</span>}
+                  </strong>
                   <small>{project.company} / {project.country}</small>
                   <span className="tanga-deck__rank-bar" aria-hidden="true"><i /></span>
                 </span>

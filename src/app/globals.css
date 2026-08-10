@@ -13073,3 +13073,32 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
 @media (prefers-reduced-motion: reduce) {
   .tanga-deck__scene-flash { animation: none; opacity: 0; }
 }
+
+/* ═════ "NEW · TOP 5" badge on the Tanga ranking row ═════ */
+.tanga-deck__rank-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #0a1018;
+  background: linear-gradient(90deg, #ffce8a, #d96a2a);
+  box-shadow: 0 0 14px rgba(217, 106, 42, 0.7);
+  vertical-align: middle;
+  white-space: nowrap;
+  animation: proBadgePulse 2.2s ease-in-out infinite;
+}
+@keyframes proBadgePulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(217,106,42,0.55); }
+  50% { box-shadow: 0 0 22px rgba(217,106,42,0.9); }
+}
+.tanga-deck__ranking-list li.is-tanga {
+  outline: 1px solid rgba(217, 106, 42, 0.5);
+  outline-offset: -1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__rank-badge { animation: none; }
+}
