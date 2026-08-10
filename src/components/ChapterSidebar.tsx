@@ -8,9 +8,9 @@ interface ChapterSidebarProps {
 
 export function ChapterSidebar({ activeId, onSelect }: ChapterSidebarProps) {
   return (
-    <div className="absolute top-6 right-6 z-20 w-64 md:w-72">
-      <Panel className="max-h-[80vh] overflow-y-auto">
-        <p className="text-[11px] uppercase tracking-[0.25em] text-gray-500 mb-2">
+    <div className="absolute top-4 right-4 z-20 w-64 md:w-72">
+      <Panel className="max-h-[calc(100vh-8rem)] overflow-y-auto">
+        <p className="text-[11px] uppercase tracking-[0.25em] text-white/52 mb-3">
           Chapters
         </p>
 
@@ -22,21 +22,21 @@ export function ChapterSidebar({ activeId, onSelect }: ChapterSidebarProps) {
                 key={ch.id}
                 onClick={() => onSelect?.(ch.id)}
                 className={
-                  'text-left rounded-xl px-3 py-2 transition border ' +
+                  'text-left rounded-lg px-3 py-2 transition-all border ' +
                   (active
-                    ? 'bg-white/10 border-accent/70'
-                    : 'bg-white/0 border-white/5 hover:bg-white/5')
+                    ? 'bg-white/10 border-[#cc5a28]/70'
+                    : 'bg-white/0 border-white/5 hover:bg-white/5 hover:border-white/10')
                 }
               >
                 <p
                   className={
-                    'text-xs md:text-sm font-medium ' +
-                    (active ? 'text-accent' : 'text-gray-100')
+                    'text-sm font-medium ' +
+                    (active ? 'text-white' : 'text-white/86')
                   }
                 >
                   {ch.title}
                 </p>
-                <p className="mt-1 text-[11px] text-gray-400 line-clamp-2">
+                <p className="mt-1 text-xs text-white/48 line-clamp-2">
                   {ch.summary}
                 </p>
               </button>
@@ -52,17 +52,17 @@ export function ChapterSidebar({ activeId, onSelect }: ChapterSidebarProps) {
               if (!active) return null;
               return (
                 <>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-gray-500 mb-1">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/52 mb-1">
                     Scene notes
                   </p>
-                  <p className="text-xs text-gray-300">{active.summary}</p>
+                  <p className="text-sm text-white/72">{active.summary}</p>
                   <ul className="mt-2 space-y-1.5">
                     {active.bullets.map((b) => (
                       <li
                         key={b}
-                        className="text-[11px] text-gray-400 flex gap-2"
+                        className="text-xs text-white/48 flex gap-2"
                       >
-                        <span className="mt-[6px] h-[4px] w-[4px] rounded-full bg-accent" />
+                        <span className="mt-[5px] h-[4px] w-[4px] rounded-full bg-[#cc5a28]" />
                         <span>{b}</span>
                       </li>
                     ))}

@@ -39,6 +39,7 @@ interface BoreholeLayerProps {
     assayRange?: { min: number, max: number };
     visible?: boolean;
     transparency?: number;
+    visualMode?: 'default' | 'presentation';
     onLoaded?: () => void;
 }
 
@@ -49,11 +50,11 @@ export default function BoreholeLayerFixed({
     assayRange = { min: 0, max: 1 },
     visible = true,
     transparency = 1.0,
+    visualMode = 'default',
     onLoaded
 }: BoreholeLayerProps) {
     const sceneContext = useThreeSceneSafe();
     const { drillholeData, processedLithologyData } = useDataCache();
-    console.log('[BoreholeLayer] Version 20260211-Fixed - sceneContext:', !!sceneContext);
     const meshRefs = useRef<THREE.InstancedMesh[]>([]);
     const initializedRef = useRef(false);
     
@@ -61,6 +62,13 @@ export default function BoreholeLayerFixed({
     const centerKey = useMemo(() => 
         modelCenter ? `${modelCenter.lon.toFixed(6)}_${modelCenter.lat.toFixed(6)}` : 'none', 
     [modelCenter]);
+    const cylinderGeometry = useMemo(() => {
+        const radius = visualMode === 'presentation' ? 2.85 : 2.15;
+        const radialSegments = visualMode === 'presentation' ? 18 : 14;
+        const geometry = new THREE.CylinderGeometry(radius, radius, 1, radialSegments, 1, false);
+        geometry.center();
+        return geometry;
+    }, [visualMode]);
 
     useEffect(() => {
         if (!sceneContext || !sceneContext.dynamicGroup || !visible || !modelCenter || !drillholeData) return;
@@ -71,7 +79,6 @@ export default function BoreholeLayerFixed({
             meshRefs.current.forEach(mesh => {
                 dynamicGroup.remove(mesh);
                 if (unregisterTooltipObject) unregisterTooltipObject(mesh);
-                mesh.geometry.dispose();
                 (mesh.material as THREE.Material).dispose();
             });
             meshRefs.current = [];
@@ -89,8 +96,6 @@ export default function BoreholeLayerFixed({
             }
             return;
         }
-
-        console.log(`[BoreholeLayer] Rendering ${features.length} ${type} features from geojson`);
 
         const groups = new Map<string, any[]>();
         const legendMap = processedLithologyData?.legendMap ?? LITHOLOGY_COLORS.map;
@@ -118,16 +123,17 @@ export default function BoreholeLayerFixed({
 
         const newMeshes: THREE.InstancedMesh[] = [];
         const tmpObj = new THREE.Object3D();
-        const geom = new THREE.CylinderGeometry(2.5, 2.5, 1, 8);
-        geom.center();
 
         for (const [hex, feats] of groups.entries()) {
-            const mat = new THREE.MeshPhongMaterial({
+            const mat = new THREE.MeshStandardMaterial({
                 color: new THREE.Color(hex),
                 transparent: transparency < 1.0,
                 opacity: transparency,
-                clipShadows: false,
-                shininess: 30
+                roughness: visualMode === 'presentation' ? 0.24 : type === 'lithology' ? 0.44 : 0.34,
+                metalness: visualMode === 'presentation' ? 0.16 : type === 'lithology' ? 0.08 : 0.1,
+                emissive: type === 'lithology' ? new THREE.Color(hex).multiplyScalar(0.1) : new THREE.Color(hex).multiplyScalar(0.08),
+                emissiveIntensity: visualMode === 'presentation' ? (type === 'lithology' ? 0.34 : 0.3) : type === 'lithology' ? 0.22 : 0.16,
+                depthWrite: transparency >= 1.0,
             });
 
             let totalSegments = 0;
@@ -140,7 +146,7 @@ export default function BoreholeLayerFixed({
 
             if (totalSegments === 0) continue;
 
-            const mesh = new THREE.InstancedMesh(geom, mat, totalSegments);
+            const mesh = new THREE.InstancedMesh(cylinderGeometry, mat, totalSegments);
             let idx = 0;
             const instanceMap: any[] = [];
 
@@ -162,6 +168,7 @@ export default function BoreholeLayerFixed({
 
                     const mid = new THREE.Vector3().addVectors(v1, v2).multiplyScalar(0.5);
                     const height = v1.distanceTo(v2);
+                    if (height <= 0.001) continue;
 
                     tmpObj.position.copy(mid);
                     tmpObj.scale.set(1, height, 1);
@@ -179,6 +186,8 @@ export default function BoreholeLayerFixed({
             mesh.computeBoundingSphere();
             mesh.frustumCulled = false;
             mesh.userData.isBorehole = true;
+            mesh.castShadow = false;
+            mesh.receiveShadow = false;
 
             dynamicGroup.add(mesh);
             newMeshes.push(mesh);
@@ -207,7 +216,13 @@ export default function BoreholeLayerFixed({
         return () => {
             disposeMeshes();
         };
-    }, [sceneContext?.dynamicGroup, visible, transparency, centerKey, type, assayFilterRange?.min, assayFilterRange?.max, assayRange.min, assayRange.max, drillholeData, processedLithologyData]);
+    }, [sceneContext?.dynamicGroup, visible, transparency, centerKey, type, assayFilterRange?.min, assayFilterRange?.max, assayRange.min, assayRange.max, drillholeData, processedLithologyData, cylinderGeometry, visualMode]);
+
+    useEffect(() => {
+        return () => {
+            cylinderGeometry.dispose();
+        };
+    }, [cylinderGeometry]);
 
     return null;
 }

@@ -7,6 +7,7 @@ import { useDataCache } from '@/lib/data-cache';
 import { Scene, PerspectiveCamera, WebGLRenderer, DirectionalLight, AmbientLight, Plane, Vector3, Object3D, MeshPhongMaterial, Color, BoxGeometry, InstancedMesh } from 'three';
 import { Legend } from '@/components/ui/legend';
 import { OverlaySlot } from '@/ui/overlays';
+import { CesiumSceneUtilities } from './ProfessionalViewerHud';
 
 const RESC_LEGEND_ITEMS = [
   { label: 'Measured',  color: '#0000ff' },
@@ -38,7 +39,7 @@ const colorForResc = (v: any) => {
 
 export default function ResourceEstimationClippingViewer() {
   const { viewer, ready } = useCesium();
-  const { blockModelData, loadingStatus, error } = useDataCache();
+  const { blockModelData, resourceStatus, resourceErrors } = useDataCache();
   const threeStateRef = useRef<any>(null);
   const [clippingHeight, setClippingHeight] = useState(0);
   const clippingPlaneRef = useRef<any>(null);
@@ -190,11 +191,19 @@ export default function ResourceEstimationClippingViewer() {
     }
   }, [clippingHeight, viewer]);
 
-  if (loadingStatus === 'loading') return <div className="text-white">Loading Block Model...</div>;
-  if (error) return <div className="text-white">Error: {error}</div>;
+  if (resourceStatus.blockModel === 'loading' || (resourceStatus.blockModel === 'idle' && !blockModelData)) {
+    return <div className="text-white">Loading Block Model...</div>;
+  }
+  if (resourceErrors.blockModel && !blockModelData) {
+    return <div className="text-white">Error: {resourceErrors.blockModel}</div>;
+  }
 
   return (
     <>
+      <CesiumSceneUtilities
+        title="Resource estimation"
+        subtitle="Classification blocks, elevation clipping, and 3D camera control."
+      />
       <OverlaySlot slot="bottom-left">
         <Legend
           title="Resource Classification"
@@ -204,8 +213,8 @@ export default function ResourceEstimationClippingViewer() {
       </OverlaySlot>
 
       <OverlaySlot slot="top-left">
-        <div className="pointer-events-auto text-white bg-black/30 border border-white/10 backdrop-blur-md rounded-[18px] shadow-[0_18px_45px_rgba(0,0,0,0.65)] px-4 py-3 w-fit max-w-[70vw]">
-          <div className="text-xs uppercase tracking-[0.3em] text-accent/80">Clipping</div>
+        <div className="pointer-events-auto w-[19rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[22px] border border-white/12 bg-[linear-gradient(180deg,rgba(9,13,20,0.94),rgba(8,10,14,0.82))] px-4 py-3 text-white shadow-[0_22px_56px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#f1d2bf]/62">Clipping</div>
           <div className="mt-2 flex flex-col gap-2">
             <label className="text-xs text-gray-200">Clipping Height (Elevation)</label>
             <input
@@ -215,7 +224,7 @@ export default function ResourceEstimationClippingViewer() {
               step="10"
               value={clippingHeight}
               onChange={(e) => setClippingHeight(parseFloat(e.target.value))}
-              className="w-64 max-w-[60vw]"
+              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/12 accent-[#e6743b]"
             />
             <div className="text-xs text-gray-200/90">{clippingHeight} m</div>
           </div>

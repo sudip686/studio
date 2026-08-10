@@ -1,14 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
-import { Canvas, useFrame, useThree, extend } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text, Html, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDataCache } from '@/lib/data-cache';
 import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
-
-// Extend OrbitControls for custom controls
-extend({ OrbitControls });
 
 // Presentation slides configuration
 const PRESENTATION_SLIDES = [

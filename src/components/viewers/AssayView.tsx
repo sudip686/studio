@@ -3,13 +3,33 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { useDataCache } from '@/lib/data-cache';
-import { Legend } from '@/components/ui/legend';
-import { OverlaySlot } from '@/ui/overlays';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { useThreeScene } from '@/contexts/three-scene-context';
 import { fitCameraToGroupWorldAware } from '@/lib/utils/three-helpers';
 import TerrainSurfaceLayer from './TerrainSurfaceLayer';
 import BoreholeLayer from './BoreholeLayer';
+
+const DEFAULT_ASSAY_FIT = {
+    padding: 1.14,
+    targetScreenFraction: 0.82,
+    minDistance: 260,
+    maxDistance: 22000,
+    screenBiasX: 0.18,
+    screenBiasY: 0.04,
+    containMode: 'best-fit' as const,
+    viewDir: new THREE.Vector3(0.84, 0.64, 1.04).normalize(),
+};
+
+const PRESENTATION_ASSAY_FIT = {
+    padding: 1.11,
+    targetScreenFraction: 0.87,
+    minDistance: 240,
+    maxDistance: 20000,
+    screenBiasX: 0.12,
+    screenBiasY: -0.03,
+    containMode: 'best-fit' as const,
+    viewDir: new THREE.Vector3(1.02, 0.6, 0.58).normalize(),
+};
 
 const ASSAY_COLOR_STEPS = 100;
 const assayColorCache: { [step: number]: string } = {};
@@ -28,153 +48,139 @@ function colorForAssay(vRaw: any, min: number, max: number): string {
 
 type AssayRangeFilter = { min: number; max: number } | null;
 
-export default function AssayViewer({ assayFilterRange }: { assayFilterRange?: AssayRangeFilter }) {
-    console.log('[AssayViewer] Mounting version with fixed imports');
-    const { processedAssayData, loadingStatus, error, refetch } = useDataCache();
+function rangesMatch(left: AssayRangeFilter | undefined, right: AssayRangeFilter | undefined) {
+    if (!left && !right) return true;
+    if (!left || !right) return false;
+    return Math.abs(left.min - right.min) < 0.0001 && Math.abs(left.max - right.max) < 0.0001;
+}
+
+export default function AssayViewer({
+    assayFilterRange,
+    presentationMode = false,
+    meshVisible = true,
+    terrainOpacity = 1,
+}: {
+    assayFilterRange?: AssayRangeFilter;
+    presentationMode?: boolean;
+    meshVisible?: boolean;
+    terrainOpacity?: number;
+}) {
+    const { processedAssayData, resourceStatus, resourceErrors, refetch } = useDataCache();
 
     const assayRange = useMemo(() => {
         if (!processedAssayData || !processedAssayData.assayRange) return { min: 0, max: 1 };
         return processedAssayData.assayRange;
     }, [processedAssayData]);
 
-    const assayGradient = useMemo(() => {
-        const startColor = colorForAssay(assayRange.min, assayRange.min, assayRange.max);
-        const midColor = colorForAssay((assayRange.min + assayRange.max) / 2, assayRange.min, assayRange.max);
-        const endColor = colorForAssay(assayRange.max, assayRange.min, assayRange.max);
-        return `linear-gradient(to right, ${startColor}, ${midColor}, ${endColor})`;
-    }, [assayRange]);
-
-    const { scene, camera, controls, dynamicGroup, registerTooltipObject, unregisterTooltipObject } = useThreeScene();
+    const { camera, controls, dynamicGroup } = useThreeScene();
     const [terrainReady, setTerrainReady] = useState(false);
     const [boreholesReady, setBoreholesReady] = useState(false);
     const [localRange, setLocalRange] = useState<AssayRangeFilter>(assayFilterRange ?? null);
+    const cameraFitOptions = presentationMode ? PRESENTATION_ASSAY_FIT : DEFAULT_ASSAY_FIT;
+    const effectiveTerrainOpacity = Math.min(1, terrainOpacity * 1.3);
 
     const onTerrainLoaded = useCallback(() => setTerrainReady(true), []);
     const onBoreholesLoaded = useCallback(() => setBoreholesReady(true), []);
 
     useEffect(() => {
         if (assayFilterRange) {
-            setLocalRange({ ...assayFilterRange });
-        } else {
-            setLocalRange({ min: assayRange.min, max: assayRange.max });
+            setLocalRange((current) => (rangesMatch(current, assayFilterRange) ? current : { ...assayFilterRange }));
+            return;
         }
+
+        setLocalRange((current) => {
+            const nextRange = { min: assayRange.min, max: assayRange.max };
+            if (current && rangesMatch(current, nextRange)) {
+                return current;
+            }
+            return current ?? nextRange;
+        });
     }, [assayFilterRange, assayRange.min, assayRange.max]);
 
     const tryFit = () => {
         if (!camera || !controls || !dynamicGroup) return;
         // Fit as soon as either terrain or boreholes are ready (then refit once both are ready)
         if (!terrainReady && !boreholesReady) return;
-        requestAnimationFrame(() => {
+
+        // Use requestIdleCallback for non-critical fitting operations
+        const fitOperation = () => {
             dynamicGroup.updateMatrixWorld(true);
             fitCameraToGroupWorldAware(camera, controls, dynamicGroup, {
-                padding: 1.3,
-                minDistance: 200,
-                maxDistance: 20000,
+                ...cameraFitOptions,
                 filter: (o) => !!o.userData.isBorehole,
             });
             console.log('[AssayView] Camera fitted to terrain + boreholes.');
-        });
+        };
+
+        if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(fitOperation, { timeout: 2000 });
+        } else {
+            requestAnimationFrame(fitOperation);
+        }
     };
 
     useEffect(() => {
         tryFit();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [terrainReady, boreholesReady]);
+    }, [terrainReady, boreholesReady, presentationMode]);
 
-    if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
+    // DEBUG: Log meshVisible prop
+    useEffect(() => {
+        console.log('[AssayView] meshVisible:', meshVisible);
+    }, [meshVisible]);
+
+    if (resourceStatus.assay === 'loading' || (resourceStatus.assay === 'idle' && !processedAssayData)) {
+        return (
+            <div className="viewer-status-card">
+                <div className="viewer-status-card__spinner" />
+                <div className="viewer-status-card__copy">
+                    <strong>Loading assay model</strong>
+                    <span>Preparing terrain, drillhole intervals, and grade filters.</span>
+                </div>
+            </div>
+        );
+    }
+
+    if (resourceErrors.assay && !processedAssayData) {
+        return <ErrorDisplay message={resourceErrors.assay} onRetry={refetch} />;
+    }
+
+    if (!processedAssayData) {
+        return (
+            <div className="viewer-status-card viewer-status-card--subtle">
+                <div className="viewer-status-card__copy">
+                    <strong>No assay data yet</strong>
+                    <span>Refresh the chapter once the assay dataset becomes available.</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>
-            <TerrainSurfaceLayer 
-                verticalScale={1} 
+            <TerrainSurfaceLayer
+                verticalScale={1}
                 modelCenter={processedAssayData?.modelCenter}
+                quality="presentation"
                 onLoaded={onTerrainLoaded}
+                meshVisible={meshVisible}
+                meshOpacity={effectiveTerrainOpacity}
+                showEnvironment={false}
+                sceneMode={'clean'}
             />
             <BoreholeLayer 
                 modelCenter={processedAssayData?.modelCenter} 
                 type="assay" 
                 assayFilterRange={localRange ?? undefined}
                 assayRange={assayRange}
+                visualMode={presentationMode ? 'presentation' : 'default'}
                 onLoaded={onBoreholesLoaded}
             />
-            <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
-                <div className="pointer-events-auto bg-black/60 text-white rounded p-3 space-y-3">
-                    <div className="space-y-1">
-                        <div className="flex items-center justify-between text-xs text-white/80">
-                            <span>Assay range filter</span>
-                            <button
-                                className="text-[11px] text-orange-300 hover:text-orange-200"
-                                onClick={() => setLocalRange({ min: assayRange.min, max: assayRange.max })}
-                            >
-                                Reset
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <label className="text-xs">
-                                Min
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={localRange?.min ?? assayRange.min}
-                                    onChange={(e) => setLocalRange(prev => ({
-                                        min: Number(e.target.value),
-                                        max: Math.max(Number(e.target.value), prev?.max ?? assayRange.max)
-                                    }))}
-                                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
-                                />
-                            </label>
-                            <label className="text-xs">
-                                Max
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={localRange?.max ?? assayRange.max}
-                                    onChange={(e) => setLocalRange(prev => ({
-                                        min: Math.min(prev?.min ?? assayRange.min, Number(e.target.value)),
-                                        max: Number(e.target.value)
-                                    }))}
-                                    className="mt-1 w-full rounded bg-black/30 border border-white/10 px-2 py-1 text-xs"
-                                />
-                            </label>
-                        </div>
-                        <input
-                            type="range"
-                            min={assayRange.min}
-                            max={assayRange.max}
-                            step={0.1}
-                            value={localRange?.min ?? assayRange.min}
-                            onChange={(e) => setLocalRange(prev => ({
-                                min: Number(e.target.value),
-                                max: Math.max(Number(e.target.value), prev?.max ?? assayRange.max)
-                            }))}
-                            className="w-full"
-                        />
-                        <input
-                            type="range"
-                            min={assayRange.min}
-                            max={assayRange.max}
-                            step={0.1}
-                            value={localRange?.max ?? assayRange.max}
-                            onChange={(e) => setLocalRange(prev => ({
-                                min: Math.min(prev?.min ?? assayRange.min, Number(e.target.value)),
-                                max: Number(e.target.value)
-                            }))}
-                            className="w-full"
-                        />
-                    </div>
-                </div>
-            </OverlaySlot>
-
-            <OverlaySlot slot="bottom-left">
-                <Legend 
-                    title="Assay Value" 
-                    type="gradient"
-                    gradient={assayGradient}
-                    minLabel={(localRange?.min ?? assayRange.min).toFixed(2)}
-                    maxLabel={(localRange?.max ?? assayRange.max).toFixed(2)}
-                    guidance="Higher values trend toward red; lower values trend toward green. Use the hover tooltip to inspect exact values at a location."
-                />
-            </OverlaySlot>
         </>
     );
 }
+
+
+
+
+

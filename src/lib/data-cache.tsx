@@ -1,358 +1,827 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import * as THREE from 'three';
-import { toFixed, orientationFrom } from '@/lib/boreholes/borehole-cylinders';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { LITHOLOGY_COLOR_MAP } from '@/lib/boreholes/colors';
-import { ASSET_BASE_URL } from '@/lib/constants';
 
-// ## Data Structures & Constants ##
+type ResourceStatus = 'idle' | 'loading' | 'success' | 'error';
+type CacheResourceKey = 'lithology' | 'assay' | 'blockModel';
+type DataCacheContextValue = DataCache & {
+  refetch: () => void;
+  loadBlockModel: () => void;
+};
+type FetchJsonOptions = {
+  label: string;
+  candidates: string[];
+  attempts?: number;
+  timeoutMs?: number;
+  validate?: (payload: any) => boolean;
+};
+
+const DEFAULT_MODEL_CENTER = { lon: 0, lat: 0 };
+const REMOTE_ASSET_BASE_URL = process.env.NEXT_PUBLIC_ASSET_BASE_URL?.replace(/\/$/, '') ?? '';
+const GEOJSON_FETCH_ATTEMPTS = 2;
+const GEOJSON_FETCH_TIMEOUT_MS = 7000;
+
 export interface DrillholeSegment {
-    lon: number; lat: number; elevation: number; depth_from: number; depth_to: number; hole_id: string;
-    lithology?: string; graphitic_carbon?: number; feature: any;
+  lon: number;
+  lat: number;
+  elevation: number;
+  depth_from: number;
+  depth_to: number;
+  hole_id: string;
+  lithology?: string;
+  graphitic_carbon?: number;
+  feature: any;
 }
+
 export interface BlockSegment {
-    lon: number; lat: number; elevation: number; Id: string; dX: number; dY: number; dZ: number;
-    "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"?: string | number; RescCalc?: string; feature: any;
+  lon: number;
+  lat: number;
+  elevation: number;
+  Id: string;
+  dX: number;
+  dY: number;
+  dZ: number;
+  'Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'?: string | number;
+  RescCalc?: string;
+  feature: any;
 }
 
 interface BoreholeInfo {
-    segments: DrillholeSegment[];
-    orientation: { midpoint: THREE.Vector3; quaternion: THREE.Quaternion; length: number; } | null;
+  segments: DrillholeSegment[];
+  orientation: {
+    midpoint: { x: number; y: number; z: number };
+    quaternion: { x: number; y: number; z: number; w: number };
     length: number;
+  } | null;
+  length: number;
 }
 
 interface ProcessedLithologyData {
-    byHoleId: Record<string, BoreholeInfo>;
-    modelCenter: { lon: number; lat: number; };
-    grouped?: Record<string, any[]>; // Pre-grouped by color for fast rendering
-    legendItems: { label: string; color: string }[];
-    legendMap: Record<string, string>;
+  byHoleId: Record<string, BoreholeInfo>;
+  modelCenter: { lon: number; lat: number };
+  grouped?: Record<string, DrillholeSegment[]>;
+  legendItems: { label: string; color: string }[];
+  legendMap: Record<string, string>;
 }
 
 interface ProcessedAssayData {
-    byHoleId: Record<string, BoreholeInfo>;
-    modelCenter: { lon: number; lat: number; };
-    assayRange: { min: number; max: number; };
-    grouped?: Record<string, any[]>; // Pre-grouped by color for fast rendering
+  byHoleId: Record<string, BoreholeInfo>;
+  modelCenter: { lon: number; lat: number };
+  assayRange: { min: number; max: number };
+  grouped?: Record<string, Array<DrillholeSegment & { colorT: number }>>;
 }
 
 interface DataCache {
-    drillholeData: {
-        lithology: DrillholeSegment[];
-        assay: DrillholeSegment[];
-    } | null;
-    blockModelData: BlockSegment[] | null;
-    processedLithologyData: ProcessedLithologyData | null;
-    processedAssayData: ProcessedAssayData | null;
-    loadingStatus: 'idle' | 'loading' | 'success' | 'error';
-    error: string | null;
-    // Performance monitoring
-    memoryUsage: number;
-    dataSize: { lithology: number; assay: number; blockModel: number };
+  drillholeData: {
+    lithology: DrillholeSegment[];
+    assay: DrillholeSegment[];
+  } | null;
+  blockModelData: BlockSegment[] | null;
+  processedLithologyData: ProcessedLithologyData | null;
+  processedAssayData: ProcessedAssayData | null;
+  loadingStatus: ResourceStatus;
+  error: string | null;
+  resourceStatus: Record<CacheResourceKey, ResourceStatus>;
+  resourceErrors: Record<CacheResourceKey, string | null>;
+  memoryUsage: number;
+  dataSize: { lithology: number; assay: number; blockModel: number };
 }
 
-const DataCacheContext = createContext<(DataCache & { refetch: () => void; }) | undefined>(undefined);
+type DrillholeDataState = NonNullable<DataCache['drillholeData']>;
+
+const initialResourceStatus: Record<CacheResourceKey, ResourceStatus> = {
+  lithology: 'idle',
+  assay: 'idle',
+  blockModel: 'idle',
+};
+
+const initialResourceErrors: Record<CacheResourceKey, string | null> = {
+  lithology: null,
+  assay: null,
+  blockModel: null,
+};
+
+const initialState: DataCache = {
+  drillholeData: null,
+  blockModelData: null,
+  processedLithologyData: null,
+  processedAssayData: null,
+  loadingStatus: 'idle',
+  error: null,
+  resourceStatus: initialResourceStatus,
+  resourceErrors: initialResourceErrors,
+  memoryUsage: 0,
+  dataSize: { lithology: 0, assay: 0, blockModel: 0 },
+};
+
+const resourceCandidates: Record<CacheResourceKey, string[]> = {
+  lithology: [
+    '/lithology_data.geojson',
+    REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/lithology_data.geojson` : '',
+    '/api/lithology-data',
+  ].filter(Boolean),
+  assay: [
+    '/assay_data.geojson',
+    REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/assay_data.geojson` : '',
+    '/api/assay-data',
+  ].filter(Boolean),
+  blockModel: [
+    '/BlockModel.geojson',
+    REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/BlockModel.geojson` : '',
+    '/api/block-model',
+  ].filter(Boolean),
+};
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isGeoJsonFeatureCollection(payload: any) {
+  return Boolean(payload && Array.isArray(payload.features));
+}
+
+function hasResourceData(cache: DataCache, resource: CacheResourceKey) {
+  if (resource === 'lithology') {
+    return Boolean(cache.drillholeData?.lithology?.length);
+  }
+  if (resource === 'assay') {
+    return Boolean(cache.drillholeData?.assay?.length);
+  }
+  return Boolean(cache.blockModelData?.length);
+}
+
+function measureDataSize(cache: Pick<DataCache, 'drillholeData' | 'blockModelData'>) {
+  return {
+    lithology: cache.drillholeData?.lithology?.length ? JSON.stringify(cache.drillholeData.lithology).length : 0,
+    assay: cache.drillholeData?.assay?.length ? JSON.stringify(cache.drillholeData.assay).length : 0,
+    blockModel: cache.blockModelData?.length ? JSON.stringify(cache.blockModelData).length : 0,
+  };
+}
+
+function deriveCacheState(next: DataCache): DataCache {
+  const dataSize = measureDataSize(next);
+  const memoryUsage =
+    dataSize.lithology +
+    dataSize.assay +
+    dataSize.blockModel +
+    (next.processedLithologyData ? JSON.stringify(next.processedLithologyData).length : 0) +
+    (next.processedAssayData ? JSON.stringify(next.processedAssayData).length : 0);
+
+  const hasAnyData =
+    !!next.drillholeData?.lithology?.length ||
+    !!next.drillholeData?.assay?.length ||
+    !!next.blockModelData?.length;
+  const hasPendingResource = Object.values(next.resourceStatus).some(
+    (status) => status === 'idle' || status === 'loading'
+  );
+  const allResourcesSettled = Object.values(next.resourceStatus).every(
+    (status) => status === 'success' || status === 'error'
+  );
+  const error =
+    hasAnyData
+      ? null
+      : Object.entries(next.resourceErrors)
+          .filter(([, value]) => value)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(' | ') || (allResourcesSettled ? 'No data could be loaded.' : null);
+
+  let loadingStatus: ResourceStatus = 'idle';
+  if (hasPendingResource && !hasAnyData) {
+    loadingStatus = 'loading';
+  } else if (hasAnyData) {
+    loadingStatus = 'success';
+  } else if (allResourcesSettled) {
+    loadingStatus = 'error';
+  }
+
+  return {
+    ...next,
+    loadingStatus,
+    error,
+    memoryUsage,
+    dataSize,
+  };
+}
+
+const DataCacheContext = createContext<DataCacheContextValue | undefined>(undefined);
+
+function normalizeLithology(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function fallbackColor(value: string) {
+  const hash = hashString(value);
+  const hue = hash % 360;
+  const saturation = 55 + (hash % 20);
+  const lightness = 40 + (hash % 20);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+function getModelCenter(points: Array<{ lon: number; lat: number }>) {
+  if (points.length === 0) {
+    return DEFAULT_MODEL_CENTER;
+  }
+
+  const centerLon = points.reduce((sum, point) => sum + point.lon, 0) / points.length;
+  const centerLat = points.reduce((sum, point) => sum + point.lat, 0) / points.length;
+
+  return { lon: centerLon, lat: centerLat };
+}
+
+function projectPointToLocalMeters(point: { lon: number; lat: number; elevation: number }, center: { lon: number; lat: number }) {
+  const earthRadiusMeters = 6371e3;
+  const dLon = (point.lon - center.lon) * (Math.PI / 180);
+  const dLat = (point.lat - center.lat) * (Math.PI / 180);
+
+  return {
+    x: earthRadiusMeters * dLon * Math.cos(center.lat * Math.PI / 180),
+    y: Number.isFinite(point.elevation) ? point.elevation : 0,
+    z: earthRadiusMeters * dLat,
+  };
+}
+
+function normalizeVector(vector: { x: number; y: number; z: number }) {
+  const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+  if (!Number.isFinite(length) || length < 0.001) {
+    return null;
+  }
+
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+    z: vector.z / length,
+    length,
+  };
+}
+
+function quaternionFromZAxis(direction: { x: number; y: number; z: number }) {
+  const from = { x: 0, y: 0, z: 1 };
+  const dot = from.x * direction.x + from.y * direction.y + from.z * direction.z;
+
+  if (dot < -0.999999) {
+    return { x: 1, y: 0, z: 0, w: 0 };
+  }
+
+  const cross = {
+    x: from.y * direction.z - from.z * direction.y,
+    y: from.z * direction.x - from.x * direction.z,
+    z: from.x * direction.y - from.y * direction.x,
+  };
+  const quaternion = {
+    x: cross.x,
+    y: cross.y,
+    z: cross.z,
+    w: 1 + dot,
+  };
+  const length = Math.sqrt(
+    quaternion.x * quaternion.x +
+      quaternion.y * quaternion.y +
+      quaternion.z * quaternion.z +
+      quaternion.w * quaternion.w
+  );
+
+  if (!Number.isFinite(length) || length < 0.001) {
+    return { x: 0, y: 0, z: 0, w: 1 };
+  }
+
+  return {
+    x: quaternion.x / length,
+    y: quaternion.y / length,
+    z: quaternion.z / length,
+    w: quaternion.w / length,
+  };
+}
+
+function buildBoreholeIndex(segments: DrillholeSegment[]) {
+  const byHoleId: Record<string, BoreholeInfo> = {};
+  const points: Array<{ lon: number; lat: number; elevation: number }> = [];
+
+  for (const segment of segments) {
+    if (!byHoleId[segment.hole_id]) {
+      byHoleId[segment.hole_id] = { segments: [], orientation: null, length: 0 };
+    }
+
+    byHoleId[segment.hole_id].segments.push(segment);
+    points.push({ lon: segment.lon, lat: segment.lat, elevation: segment.elevation });
+  }
+
+  const modelCenter = getModelCenter(points);
+
+  for (const borehole of Object.values(byHoleId)) {
+    if (borehole.segments.length === 0) continue;
+
+    const firstSegment = borehole.segments[0];
+    const lastSegment = borehole.segments[borehole.segments.length - 1];
+    const p0 = projectPointToLocalMeters(firstSegment, modelCenter);
+    const p1 = projectPointToLocalMeters(lastSegment, modelCenter);
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const dz = p1.z - p0.z;
+    const direction = normalizeVector({ x: dx, y: dy, z: dz });
+    const length = direction?.length ?? 0.01;
+
+    borehole.orientation = {
+      midpoint: {
+        x: (p0.x + p1.x) / 2,
+        y: (p0.y + p1.y) / 2,
+        z: (p0.z + p1.z) / 2,
+      },
+      quaternion: direction ? quaternionFromZAxis(direction) : { x: 0, y: 0, z: 0, w: 1 },
+      length,
+    };
+    borehole.length = length;
+  }
+
+  return {
+    byHoleId,
+    modelCenter,
+  };
+}
+
+function parseDrillholeFeatures(geoJson: any): DrillholeSegment[] {
+  return (geoJson?.features ?? []).flatMap((feature: any) => {
+    const properties = feature?.properties ?? {};
+    const coordinates = feature?.geometry?.coordinates;
+
+    if (feature?.geometry?.type !== 'LineString' || !Array.isArray(coordinates) || coordinates.length < 2) {
+      return [];
+    }
+
+    const [startCoords] = coordinates;
+    if (!Array.isArray(startCoords) || startCoords.length < 3) {
+      return [];
+    }
+
+    return [
+      {
+        lon: Number(startCoords[0]),
+        lat: Number(startCoords[1]),
+        elevation: Number(startCoords[2]),
+        depth_from: Number(properties.depth_from ?? 0),
+        depth_to: Number(properties.depth_to ?? 0),
+        hole_id: String(properties.hole_id ?? ''),
+        lithology: properties.lithology,
+        graphitic_carbon: properties.graphitic_carbon,
+        feature,
+      },
+    ];
+  });
+}
+
+function parseBlockModelFeatures(geoJson: any): BlockSegment[] {
+  return (geoJson?.features ?? []).flatMap((feature: any) => {
+    const coordinates = feature?.geometry?.coordinates;
+    if (!Array.isArray(coordinates) || coordinates.length < 3) {
+      return [];
+    }
+
+    const properties = feature?.properties ?? {};
+
+    return [
+      {
+        lon: Number(coordinates[0]),
+        lat: Number(coordinates[1]),
+        elevation: Number(coordinates[2]),
+        Id: String(properties.Id ?? ''),
+        dX: Number(properties.dX ?? 10),
+        dY: Number(properties.dY ?? 10),
+        dZ: Number(properties.dZ ?? 10),
+        'Kr, GRAPHITIC_CARBON in GM_Litho: GRSC': properties['Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'],
+        RescCalc: properties.RescCalc,
+        feature,
+      },
+    ];
+  });
+}
+
+function processLithologyData(segments: DrillholeSegment[]): ProcessedLithologyData {
+  const { byHoleId, modelCenter } = buildBoreholeIndex(segments);
+  const lithologySet = new Set<string>();
+
+  for (const segment of segments) {
+    lithologySet.add(String(segment.lithology ?? 'UNKNOWN'));
+  }
+
+  const legendMap: Record<string, string> = {};
+  const legendItems: Array<{ label: string; color: string }> = [];
+  const grouped: Record<string, DrillholeSegment[]> = {};
+
+  for (const lithology of Array.from(lithologySet).sort((left, right) => left.localeCompare(right))) {
+    const normalized = normalizeLithology(lithology);
+    const baseColor = LITHOLOGY_COLOR_MAP[lithology];
+    const isUnknown = normalized === 'unknown' || normalized === 'nan';
+    const color = baseColor ?? (isUnknown ? (LITHOLOGY_COLOR_MAP.UNKNOWN ?? fallbackColor(lithology)) : fallbackColor(lithology));
+
+    legendMap[normalized] = color;
+    legendItems.push({ label: lithology, color });
+  }
+
+  for (const borehole of Object.values(byHoleId)) {
+    for (const segment of borehole.segments) {
+      const lithology = String(segment.lithology ?? 'UNKNOWN');
+      const normalized = normalizeLithology(lithology);
+      const color = legendMap[normalized] ?? fallbackColor(lithology);
+
+      if (!grouped[color]) {
+        grouped[color] = [];
+      }
+
+      grouped[color].push(segment);
+    }
+  }
+
+  return {
+    byHoleId,
+    modelCenter,
+    grouped,
+    legendItems,
+    legendMap,
+  };
+}
+
+function processAssayData(segments: DrillholeSegment[]): ProcessedAssayData {
+  const { byHoleId, modelCenter } = buildBoreholeIndex(segments);
+  const assayValues = segments
+    .map((segment) => Number(segment.graphitic_carbon))
+    .filter((value) => Number.isFinite(value));
+
+  const assayRange =
+    assayValues.length === 0
+      ? { min: 0, max: 1 }
+      : { min: Math.min(...assayValues), max: Math.max(...assayValues) };
+
+  const grouped: Record<string, Array<DrillholeSegment & { colorT: number }>> = {};
+
+  for (const borehole of Object.values(byHoleId)) {
+    for (const segment of borehole.segments) {
+      const value = Number(segment.graphitic_carbon ?? 0);
+      const colorT =
+        assayRange.max > assayRange.min
+          ? (value - assayRange.min) / (assayRange.max - assayRange.min)
+          : 0.5;
+      const key = `assay_${colorT.toFixed(2)}`;
+
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+
+      grouped[key].push({ ...segment, colorT });
+    }
+  }
+
+  return {
+    byHoleId,
+    modelCenter,
+    assayRange,
+    grouped,
+  };
+}
+
+async function fetchJson({
+  label,
+  candidates,
+  attempts = GEOJSON_FETCH_ATTEMPTS,
+  timeoutMs = GEOJSON_FETCH_TIMEOUT_MS,
+  validate,
+}: FetchJsonOptions) {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    for (const candidate of Array.from(new Set(candidates.filter(Boolean)))) {
+      const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(`Timed out while fetching ${label}.`), timeoutMs)
+        : null;
+
+      try {
+        const response = await fetch(candidate, {
+          cache: candidate.startsWith('/api/') ? 'no-store' : 'force-cache',
+          signal: controller?.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${label} from ${candidate}: ${response.status} ${response.statusText}`);
+        }
+
+        const payload = await response.json();
+        if (validate && !validate(payload)) {
+          throw new Error(`Invalid ${label} payload from ${candidate}.`);
+        }
+
+        return payload;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+      } finally {
+        if (timeoutId !== null) {
+          clearTimeout(timeoutId);
+        }
+      }
+    }
+
+    if (attempt < attempts - 1) {
+      await delay(500 * (attempt + 1));
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to fetch ${label}.`);
+}
 
 export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
-    const [cache, setCache] = useState<DataCache>({
-        drillholeData: null,
-        blockModelData: null,
-        processedLithologyData: null,
-        processedAssayData: null,
-        loadingStatus: 'idle',
+  const [cache, setCache] = useState<DataCache>(initialState);
+  const [loadRevision, setLoadRevision] = useState(0);
+  const autoRetryCountRef = useRef(0);
+  const blockModelLoadRef = useRef<Promise<void> | null>(null);
+
+  const refetch = useCallback(() => {
+    setCache((current) =>
+      deriveCacheState({
+        ...current,
         error: null,
-        memoryUsage: 0,
-        dataSize: { lithology: 0, assay: 0, blockModel: 0 },
+        resourceStatus: initialResourceStatus,
+        resourceErrors: initialResourceErrors,
+      })
+    );
+    setLoadRevision((current) => current + 1);
+  }, []);
+
+  const loadBlockModel = useCallback(() => {
+    if (blockModelLoadRef.current) return;
+
+    let shouldLoad = false;
+    setCache((current) => {
+      if (current.blockModelData?.length || current.resourceStatus.blockModel === 'loading') {
+        return current;
+      }
+
+      shouldLoad = true;
+      return deriveCacheState({
+        ...current,
+        resourceStatus: {
+          ...current.resourceStatus,
+          blockModel: 'loading',
+        },
+        resourceErrors: {
+          ...current.resourceErrors,
+          blockModel: null,
+        },
+      });
     });
 
-    const refetch = useCallback(() => {
-        setCache(c => ({ ...c, loadingStatus: 'idle' }));
-    }, []);
+    if (!shouldLoad) return;
 
-    useEffect(() => {
-        const loadData = async () => {
-            setCache(c => ({ ...c, loadingStatus: 'loading', error: null }));
-            try {
-                const [lithologyResponse, assayResponse, blockModelResponse] = await Promise.all([
-                    fetch('/lithology_data.geojson'),
-                    fetch('/assay_data.geojson'),
-                    fetch(`${ASSET_BASE_URL}/BlockModel.geojson`)
-                ]);
-
-                if (!lithologyResponse.ok) throw new Error(`Failed to fetch lithology: ${lithologyResponse.statusText}`);
-                if (!assayResponse.ok) throw new Error(`Failed to fetch assay: ${assayResponse.statusText}`);
-                if (!blockModelResponse.ok) throw new Error(`Failed to fetch block model: ${blockModelResponse.statusText}`);
-
-                const [lithologyGeoJson, assayGeoJson, blockModelGeoJson] = await Promise.all([
-                    lithologyResponse.json(),
-                    assayResponse.json(),
-                    blockModelResponse.json()
-                ]);
-
-                // Parse lithology features
-                const parsedLithologyFeatures: DrillholeSegment[] = (lithologyGeoJson.features || []).flatMap((f: any) => {
-                    const p = f.properties;
-                    if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) return [];
-                    const [startCoords, endCoords] = f.geometry.coordinates;
-                    if (!startCoords || startCoords.length < 3 || !endCoords || endCoords.length < 3) return [];
-                    return [{
-                        lon: startCoords[0], lat: startCoords[1], elevation: startCoords[2],
-                        depth_from: p.depth_from, depth_to: p.depth_to, hole_id: p.hole_id,
-                        lithology: p.lithology, graphitic_carbon: p.graphitic_carbon,
-                        feature: f
-                    }];
-                });
-
-                // Parse assay features
-                const parsedAssayFeatures: DrillholeSegment[] = (assayGeoJson.features || []).flatMap((f: any) => {
-                    const p = f.properties;
-                    if (f.geometry.type !== 'LineString' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) return [];
-                    const [startCoords, endCoords] = f.geometry.coordinates;
-                    if (!startCoords || startCoords.length < 3 || !endCoords || endCoords.length < 3) return [];
-                    return [{
-                        lon: startCoords[0], lat: startCoords[1], elevation: startCoords[2],
-                        depth_from: p.depth_from, depth_to: p.depth_to, hole_id: p.hole_id,
-                        lithology: p.lithology, graphitic_carbon: p.graphitic_carbon,
-                        feature: f
-                    }];
-                });
-
-                const parsedDrillholes = [...parsedLithologyFeatures, ...parsedAssayFeatures];
-                
-                const parsedBlockModel: BlockSegment[] = blockModelGeoJson.features.map((f:any) => {
-                    const p = f.properties ?? {};
-                    const [lon, lat, elev] = f.geometry.coordinates;
-                    return {
-                        lon, lat, elevation: elev,
-                        Id: String(p.Id ?? ''),
-                        dX: Number(p.dX ?? 10), dY: Number(p.dY ?? 10), dZ: Number(p.dZ ?? 10),
-                        "Kr, GRAPHITIC_CARBON in GM_Litho: GRSC": p["Kr, GRAPHITIC_CARBON in GM_Litho: GRSC"],
-                        RescCalc: p.RescCalc,
-                        feature: f
-                    };
-                });
-
-                console.log('Parsed drillholes:', parsedDrillholes);
-                console.log('Parsed lithology features:', parsedLithologyFeatures);
-                console.log('Parsed assay features:', parsedAssayFeatures);
-
-                // Use lithology features as lithology data
-                const lithologyData = parsedLithologyFeatures;
-                console.log('Lithology data:', lithologyData);
-
-                // Use assay features as assay data (not filtered by graphitic_carbon presence)
-                const assayData = parsedAssayFeatures;
-                console.log('Assay data:', assayData);
-
-                // Process Lithology Data
-                const lithologyByHoleId: Record<string, BoreholeInfo> = {};
-                const allLithologyPoints: { lon: number; lat: number; elevation: number; }[] = [];
-
-                lithologyData.forEach(segment => {
-                    if (!lithologyByHoleId[segment.hole_id]) {
-                        lithologyByHoleId[segment.hole_id] = { segments: [], orientation: null, length: 0 };
-                    }
-                    lithologyByHoleId[segment.hole_id].segments.push(segment);
-                    allLithologyPoints.push({ lon: segment.lon, lat: segment.lat, elevation: segment.elevation });
-                });
-
-                const centerLonLithology = allLithologyPoints.reduce((acc, p) => acc + p.lon, 0) / allLithologyPoints.length;
-                const centerLatLithology = allLithologyPoints.reduce((acc, p) => acc + p.lat, 0) / allLithologyPoints.length;
-                const modelCenterLithology = { lon: centerLonLithology, lat: centerLatLithology };
-
-                // Calculate orientation for each lithology borehole
-                Object.values(lithologyByHoleId).forEach(borehole => {
-                    if (borehole.segments.length > 0) {
-                        const firstSegment = borehole.segments[0];
-                        const lastSegment = borehole.segments[borehole.segments.length - 1];
-
-                        const p0 = toFixed([firstSegment.lat, firstSegment.lon, firstSegment.elevation]);
-                        const p1 = toFixed([lastSegment.lat, lastSegment.lon, lastSegment.elevation]);
-                        // Calculate length manually: |p1 - p0|
-                        const dx = p1.x - p0.x;
-                        const dy = p1.y - p0.y;
-                        const dz = p1.z - p0.z;
-                        const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
-                        const { midpoint, quaternion } = orientationFrom(p0, p1);
-                        borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
-                        borehole.length = length;
-                    }
-                });
-
-                const normalizeLithology = (value: string) =>
-                    value.trim().toLowerCase().replace(/\s+/g, ' ');
-
-                const hashString = (value: string) => {
-                    let hash = 0;
-                    for (let i = 0; i < value.length; i += 1) {
-                        hash = (hash << 5) - hash + value.charCodeAt(i);
-                        hash |= 0; // Keep 32-bit
-                    }
-                    return Math.abs(hash);
-                };
-
-                const fallbackColor = (value: string) => {
-                    const hash = hashString(value);
-                    const hue = hash % 360;
-                    const saturation = 55 + (hash % 20);
-                    const lightness = 40 + (hash % 20);
-                    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-                };
-
-                const legendMap: Record<string, string> = {};
-                const legendItems: { label: string; color: string }[] = [];
-                const lithologySet = new Set<string>();
-                lithologyData.forEach(segment => {
-                    const lith = String(segment.lithology ?? 'UNKNOWN');
-                    lithologySet.add(lith);
-                });
-
-                const sortedLithologies = Array.from(lithologySet).sort((a, b) => a.localeCompare(b));
-                sortedLithologies.forEach(lith => {
-                    const normalized = normalizeLithology(lith);
-                    const baseColor = LITHOLOGY_COLOR_MAP[lith];
-                    const isUnknown = normalized === 'unknown' || normalized === 'nan';
-                    const color = baseColor ?? (isUnknown ? (LITHOLOGY_COLOR_MAP.UNKNOWN ?? fallbackColor(lith)) : fallbackColor(lith));
-                    legendMap[normalized] = color;
-                    legendItems.push({ label: lith, color });
-                });
-
-                // Pre-group lithology by color for fast rendering
-                const groupedLithology: Record<string, any[]> = {};
-                Object.values(lithologyByHoleId).forEach(borehole => {
-                    borehole.segments.forEach(segment => {
-                        const lith = String(segment.lithology ?? 'UNKNOWN');
-                        const normalized = normalizeLithology(lith);
-                        const css = legendMap[normalized] ?? fallbackColor(lith);
-                        if (!groupedLithology[css]) {
-                            groupedLithology[css] = [];
-                        }
-                        groupedLithology[css].push(segment);
-                    });
-                });
-
-                // Process Assay Data
-                const assayByHoleId: Record<string, BoreholeInfo> = {};
-                const allAssayPoints: { lon: number; lat: number; elevation: number; }[] = [];
-
-                assayData.forEach(segment => {
-                    if (!assayByHoleId[segment.hole_id]) {
-                        assayByHoleId[segment.hole_id] = { segments: [], orientation: null, length: 0 };
-                    }
-                    assayByHoleId[segment.hole_id].segments.push(segment);
-                    allAssayPoints.push({ lon: segment.lon, lat: segment.lat, elevation: segment.elevation });
-                });
-
-                const centerLonAssay = allAssayPoints.reduce((acc, p) => acc + p.lon, 0) / allAssayPoints.length;
-                const centerLatAssay = allAssayPoints.reduce((acc, p) => acc + p.lat, 0) / allAssayPoints.length;
-                const modelCenterAssay = { lon: centerLonAssay, lat: centerLatAssay };
-
-                const assayValues = assayData.map(d => d.graphitic_carbon).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
-                const assayRange = assayValues.length === 0 ? { min: 0, max: 1 } : { min: Math.min(...assayValues), max: Math.max(...assayValues) };
-
-                // Calculate orientation for each assay borehole
-                Object.values(assayByHoleId).forEach(borehole => {
-                    if (borehole.segments.length > 0) {
-                        const firstSegment = borehole.segments[0];
-                        const lastSegment = borehole.segments[borehole.segments.length - 1];
-
-                        const p0 = toFixed([firstSegment.lat, firstSegment.lon, firstSegment.elevation]);
-                        const p1 = toFixed([lastSegment.lat, lastSegment.lon, lastSegment.elevation]);
-                        // Calculate length manually: |p1 - p0|
-                        const dx = p1.x - p0.x;
-                        const dy = p1.y - p0.y;
-                        const dz = p1.z - p0.z;
-                        const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
-                        const { midpoint, quaternion } = orientationFrom(p0, p1);
-                        borehole.orientation = { midpoint: new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z), quaternion: new THREE.Quaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w), length };
-                        borehole.length = length;
-                    }
-                });
-
-                // Pre-group assay by graphitic_carbon value for color mapping
-                const groupedAssay: Record<string, any[]> = {};
-                Object.values(assayByHoleId).forEach(borehole => {
-                    borehole.segments.forEach(segment => {
-                        const v = Number(segment.graphitic_carbon ?? 0);
-                        const t = assayRange.max > assayRange.min ? (v - assayRange.min) / (assayRange.max - assayRange.min) : 0.5;
-                        const colorKey = `assay_${t.toFixed(2)}`; // Group by normalized value
-                        if (!groupedAssay[colorKey]) {
-                            groupedAssay[colorKey] = [];
-                        }
-                        groupedAssay[colorKey].push({ ...segment, colorT: t });
-                    });
-                });
-
-                // Calculate data sizes for performance monitoring
-                const dataSizes = {
-                    lithology: JSON.stringify(lithologyData).length,
-                    assay: JSON.stringify(assayData).length,
-                    blockModel: JSON.stringify(parsedBlockModel).length,
-                };
-
-                // Estimate memory usage (rough approximation)
-                const memoryUsage = dataSizes.lithology + dataSizes.assay + dataSizes.blockModel +
-                    JSON.stringify(lithologyByHoleId).length +
-                    JSON.stringify(assayByHoleId).length +
-                    JSON.stringify(groupedLithology).length +
-                    JSON.stringify(groupedAssay).length;
-
-                setCache({
-                    drillholeData: {
-                        lithology: lithologyData,
-                        assay: assayData
-                    },
-                    blockModelData: parsedBlockModel,
-                    processedLithologyData: {
-                        byHoleId: lithologyByHoleId,
-                        modelCenter: modelCenterLithology,
-                        grouped: groupedLithology,
-                        legendItems,
-                        legendMap,
-                    },
-                    processedAssayData: {
-                        byHoleId: assayByHoleId,
-                        modelCenter: modelCenterAssay,
-                        assayRange: assayRange,
-                        grouped: groupedAssay,
-                    },
-                    loadingStatus: 'success',
-                    error: null,
-                    memoryUsage,
-                    dataSize: dataSizes,
-                });
-                console.log('Processed Lithology Data:', lithologyByHoleId);
-                console.log('Processed Assay Data:', assayByHoleId);
-
-            } catch (error) {
-                console.error("Failed to load data:", error);
-                setCache(c => ({
-                    ...c,
-                    loadingStatus: 'error',
-                    error: error instanceof Error ? error.message : String(error)
-                }));
-            }
-        };
-
-        if (cache.loadingStatus === 'idle') {
-            loadData();
+    blockModelLoadRef.current = fetchJson({
+      label: 'block model data',
+      candidates: resourceCandidates.blockModel,
+      validate: isGeoJsonFeatureCollection,
+    })
+      .then((payload) => {
+        const blockSegments = parseBlockModelFeatures(payload);
+        if (blockSegments.length === 0) {
+          throw new Error('Block model payload loaded but no blocks were parsed.');
         }
-    }, [cache.loadingStatus]);
 
-    const value = useMemo(() => ({ ...cache, refetch }), [cache, refetch]);
+        setCache((current) =>
+          deriveCacheState({
+            ...current,
+            blockModelData: blockSegments,
+            resourceStatus: {
+              ...current.resourceStatus,
+              blockModel: 'success',
+            },
+            resourceErrors: {
+              ...current.resourceErrors,
+              blockModel: null,
+            },
+          })
+        );
+      })
+      .catch((error) => {
+        setCache((current) =>
+          deriveCacheState({
+            ...current,
+            resourceStatus: {
+              ...current.resourceStatus,
+              blockModel: 'error',
+            },
+            resourceErrors: {
+              ...current.resourceErrors,
+              blockModel: error instanceof Error ? error.message : String(error),
+            },
+          })
+        );
+      })
+      .finally(() => {
+        blockModelLoadRef.current = null;
+      });
+  }, []);
 
-    return (
-        <DataCacheContext.Provider value={value}>
-            {children}
-        </DataCacheContext.Provider>
+  useEffect(() => {
+    let cancelled = false;
+    let idleHandle: number | null = null;
+    let timerHandle: number | null = null;
+
+    const loadData = async () => {
+      setCache((current) =>
+        deriveCacheState({
+          ...current,
+          resourceStatus: {
+            lithology: 'loading',
+            assay: 'loading',
+            blockModel: 'idle',
+          },
+          resourceErrors: initialResourceErrors,
+        })
+      );
+
+      const getCurrentDrillholeData = (drillholeData: DataCache['drillholeData']): DrillholeDataState => ({
+        lithology: drillholeData?.lithology ?? [],
+        assay: drillholeData?.assay ?? [],
+      });
+
+      const commitUpdate = (updater: (current: DataCache) => DataCache) => {
+        if (cancelled) return;
+        setCache((current) => deriveCacheState(updater(current)));
+      };
+
+      void fetchJson({
+        label: 'lithology data',
+        candidates: resourceCandidates.lithology,
+        validate: isGeoJsonFeatureCollection,
+      })
+        .then((payload) => {
+          const lithologySegments = parseDrillholeFeatures(payload);
+          if (lithologySegments.length === 0) {
+            throw new Error('Lithology payload loaded but no drillhole segments were parsed.');
+          }
+          const processedLithologyData =
+            lithologySegments.length > 0 ? processLithologyData(lithologySegments) : null;
+
+          commitUpdate((current) => {
+            const drillholeData = getCurrentDrillholeData(current.drillholeData);
+            return {
+              ...current,
+              drillholeData: {
+                ...drillholeData,
+                lithology: lithologySegments,
+              },
+              processedLithologyData,
+              resourceStatus: {
+                ...current.resourceStatus,
+                lithology: 'success',
+              },
+              resourceErrors: {
+                ...current.resourceErrors,
+                lithology: null,
+              },
+            };
+          });
+        })
+        .catch((error) => {
+          commitUpdate((current) => ({
+            ...current,
+            resourceStatus: {
+              ...current.resourceStatus,
+              lithology: 'error',
+            },
+            resourceErrors: {
+              ...current.resourceErrors,
+              lithology: error instanceof Error ? error.message : String(error),
+            },
+          }));
+        });
+
+      void fetchJson({
+        label: 'assay data',
+        candidates: resourceCandidates.assay,
+        validate: isGeoJsonFeatureCollection,
+      })
+        .then((payload) => {
+          const assaySegments = parseDrillholeFeatures(payload);
+          if (assaySegments.length === 0) {
+            throw new Error('Assay payload loaded but no drillhole segments were parsed.');
+          }
+          const processedAssayData = assaySegments.length > 0 ? processAssayData(assaySegments) : null;
+
+          commitUpdate((current) => {
+            const drillholeData = getCurrentDrillholeData(current.drillholeData);
+            return {
+              ...current,
+              drillholeData: {
+                ...drillholeData,
+                assay: assaySegments,
+              },
+              processedAssayData,
+              resourceStatus: {
+                ...current.resourceStatus,
+                assay: 'success',
+              },
+              resourceErrors: {
+                ...current.resourceErrors,
+                assay: null,
+              },
+            };
+          });
+        })
+        .catch((error) => {
+          commitUpdate((current) => ({
+            ...current,
+            resourceStatus: {
+              ...current.resourceStatus,
+              assay: 'error',
+            },
+            resourceErrors: {
+              ...current.resourceErrors,
+              assay: error instanceof Error ? error.message : String(error),
+            },
+          }));
+        });
+    };
+
+    const startLoading = () => {
+      if (!cancelled) {
+        void loadData();
+      }
+    };
+
+    const browserWindow =
+      typeof window === 'undefined'
+        ? null
+        : (window as Window & typeof globalThis & {
+            requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+            cancelIdleCallback?: (handle: number) => void;
+          });
+
+    if (browserWindow?.requestIdleCallback) {
+      idleHandle = browserWindow.requestIdleCallback(startLoading, { timeout: 2200 });
+    } else if (browserWindow) {
+      timerHandle = browserWindow.setTimeout(startLoading, 900);
+    } else {
+      void loadData();
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleHandle !== null && browserWindow?.cancelIdleCallback) {
+        browserWindow.cancelIdleCallback(idleHandle);
+      }
+      if (timerHandle !== null) {
+        clearTimeout(timerHandle);
+      }
+    };
+  }, [loadRevision]);
+
+  useEffect(() => {
+    const failedResources = (Object.keys(cache.resourceStatus) as CacheResourceKey[]).filter(
+      (resource) => cache.resourceStatus[resource] === 'error' && !hasResourceData(cache, resource)
     );
+
+    if (failedResources.length === 0) {
+      autoRetryCountRef.current = 0;
+      return;
+    }
+
+    if (autoRetryCountRef.current >= 2) {
+      return;
+    }
+
+    const retryAttempt = autoRetryCountRef.current + 1;
+    const retryDelayMs = retryAttempt * 2500;
+    const timer = setTimeout(() => {
+      autoRetryCountRef.current = retryAttempt;
+      refetch();
+    }, retryDelayMs);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    cache.resourceStatus.lithology,
+    cache.resourceStatus.assay,
+    cache.resourceStatus.blockModel,
+    cache.drillholeData?.lithology?.length,
+    cache.drillholeData?.assay?.length,
+    cache.blockModelData?.length,
+    refetch,
+  ]);
+
+  const value = useMemo(() => ({ ...cache, refetch, loadBlockModel }), [cache, loadBlockModel, refetch]);
+
+  return <DataCacheContext.Provider value={value}>{children}</DataCacheContext.Provider>;
 };
 
 export const useDataCache = () => {
-    const context = useContext(DataCacheContext);
-    if (context === undefined) {
-        throw new Error('useDataCache must be used within a DataCacheProvider');
-    }
-    return context;
+  const context = useContext(DataCacheContext);
+  if (context === undefined) {
+    throw new Error('useDataCache must be used within a DataCacheProvider');
+  }
+  return context;
 };

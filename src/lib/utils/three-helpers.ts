@@ -50,12 +50,18 @@ function computeBoxFromObject(object: THREE.Object3D, filter?: (o: THREE.Object3
 
 type FitOptions = {
   padding?: number;
+  // Desired fraction of the viewport height/width the fitted content should occupy.
+  // Smaller values keep more breathing room and avoid an over-zoomed initial frame.
+  targetScreenFraction?: number;
   // Limit the horizontal (XZ) area considered when fitting. Helps avoid huge terrain meshes
   // forcing the camera to zoom out too far. Units are in scene meters.
   clampXZRadius?: number;
   // Safety clamps for distance from target
   minDistance?: number;
   maxDistance?: number;
+  screenBiasX?: number;
+  screenBiasY?: number;
+  containMode?: 'vertical' | 'horizontal' | 'best-fit';
   // Optional direction from which to view the scene (defaults to slightly top-down)
   viewDir?: THREE.Vector3;
   // Optional filter to include only specific objects in bounds calculation
@@ -70,10 +76,14 @@ export function fitCameraToGroupWorldAware(
 ) {
   const opts: FitOptions = typeof paddingOrOptions === 'number' ? { padding: paddingOrOptions } : (paddingOrOptions ?? {});
   const padding = opts.padding ?? 1.2;
+  const targetScreenFraction = opts.targetScreenFraction;
   const clampR = opts.clampXZRadius;
   const minDistance = opts.minDistance ?? 25;
   const maxDistance = opts.maxDistance ?? Infinity;
-  const viewDir = opts.viewDir ?? new THREE.Vector3(0, 1, 1).normalize();
+  const screenBiasX = THREE.MathUtils.clamp(opts.screenBiasX ?? 0, -0.45, 0.45);
+  const screenBiasY = THREE.MathUtils.clamp(opts.screenBiasY ?? 0, -0.35, 0.35);
+  const containMode = opts.containMode ?? 'best-fit';
+  const viewDir = opts.viewDir ?? new THREE.Vector3(0.82, 0.7, 1.04).normalize();
   
   // Use custom box computation to handle InstancedMesh
   const box = computeBoxFromObject(group, opts.filter);
@@ -95,20 +105,64 @@ export function fitCameraToGroupWorldAware(
     const center = new THREE.Vector3();
     box.getSize(size);
     box.getCenter(center);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    
-    // Guard against zero size (single point)
-    const effectiveSize = maxDim > 0.1 ? maxDim : 100;
 
-    const fov = (camera.fov * Math.PI) / 180;
-    let distance = (effectiveSize / 2) / Math.tan(fov / 2);
-    distance *= padding;
-    // Apply distance clamps
+    const corners = [
+      new THREE.Vector3(box.min.x, box.min.y, box.min.z),
+      new THREE.Vector3(box.min.x, box.min.y, box.max.z),
+      new THREE.Vector3(box.min.x, box.max.y, box.min.z),
+      new THREE.Vector3(box.min.x, box.max.y, box.max.z),
+      new THREE.Vector3(box.max.x, box.min.y, box.min.z),
+      new THREE.Vector3(box.max.x, box.min.y, box.max.z),
+      new THREE.Vector3(box.max.x, box.max.y, box.min.z),
+      new THREE.Vector3(box.max.x, box.max.y, box.max.z),
+    ];
+
+    const dir = viewDir.clone().normalize();
+    const worldUp = Math.abs(dir.dot(new THREE.Vector3(0, 1, 0))) > 0.98
+      ? new THREE.Vector3(0, 0, 1)
+      : new THREE.Vector3(0, 1, 0);
+    const right = new THREE.Vector3().crossVectors(worldUp, dir).normalize();
+    const up = new THREE.Vector3().crossVectors(dir, right).normalize();
+    const target = center
+      .clone()
+      .add(right.clone().multiplyScalar((size.x * 0.5) * screenBiasX))
+      .add(up.clone().multiplyScalar((size.y * 0.5) * screenBiasY));
+
+    let halfWidth = 0;
+    let halfHeight = 0;
+    let halfDepth = 0;
+
+    for (const corner of corners) {
+      const offset = corner.clone().sub(target);
+      halfWidth = Math.max(halfWidth, Math.abs(offset.dot(right)));
+      halfHeight = Math.max(halfHeight, Math.abs(offset.dot(up)));
+      halfDepth = Math.max(halfDepth, Math.abs(offset.dot(dir)));
+    }
+
+    if (halfWidth < 0.1 && halfHeight < 0.1 && halfDepth < 0.1) {
+      halfWidth = 50;
+      halfHeight = 50;
+      halfDepth = 50;
+    }
+
+    const fov = THREE.MathUtils.degToRad(camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(fov / 2) * camera.aspect);
+    const distanceByHeight = halfHeight / Math.tan(fov / 2);
+    const distanceByWidth = halfWidth / Math.tan(hFov / 2);
+
+    let distance = containMode === 'vertical'
+      ? distanceByHeight
+      : containMode === 'horizontal'
+        ? distanceByWidth
+        : Math.max(distanceByHeight, distanceByWidth);
+
+    distance = (distance + halfDepth) * padding;
+    if (typeof targetScreenFraction === 'number' && targetScreenFraction > 0 && targetScreenFraction < 1) {
+      distance /= targetScreenFraction;
+    }
     distance = Math.max(minDistance, Math.min(distance, maxDistance));
 
-    // Use an oblique angle (Bird's eye view) instead of side view
-    const dir = viewDir.clone().normalize();
-    const newPos = center.clone().add(dir.multiplyScalar(distance));
+    const newPos = target.clone().add(dir.multiplyScalar(distance));
     
     // Ensure far plane is sufficient
     const far = Math.max(distance * 10, 5_000_000);
@@ -117,7 +171,7 @@ export function fitCameraToGroupWorldAware(
     camera.updateProjectionMatrix();
 
     camera.position.copy(newPos);
-    controls.target.copy(center);
+    controls.target.copy(target);
     controls.update();
   } else {
       console.warn('[fitCameraToGroupWorldAware] Bounding box is empty.');

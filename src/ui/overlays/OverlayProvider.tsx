@@ -31,10 +31,11 @@ const OverlayContext = createContext<OverlayContextValue>({
 type OverlayProviderProps = {
   baseSlots?: OverlaySlotContent;
   children: React.ReactNode;
-  leftOffsetPx?: number;
-  rightOffsetPx?: number;
-  topOffsetPx?: number;
-  bottomOffsetPx?: number;
+  leftOffsetPx?: number | string;
+  rightOffsetPx?: number | string;
+  topOffsetPx?: number | string;
+  bottomOffsetPx?: number | string;
+  dataPresentationMode?: boolean;
 };
 
 const isSameNode = (a: React.ReactNode, b: React.ReactNode): boolean => {

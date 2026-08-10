@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface MetricScaleOverlayProps {
   mode?: 'cesium' | 'three';
@@ -6,19 +6,26 @@ interface MetricScaleOverlayProps {
   className?: string;
 }
 
-export function MetricScaleOverlay({ mode, getMetersIn100px, className }: MetricScaleOverlayProps) {
+export function MetricScaleOverlay({ getMetersIn100px, className }: MetricScaleOverlayProps) {
   const [metersIn100px, setMetersIn100px] = useState(100);
+  const getMetersRef = useRef(getMetersIn100px);
 
   useEffect(() => {
-    if (!getMetersIn100px) {
-        setMetersIn100px(100);
-        return;
+    getMetersRef.current = getMetersIn100px;
+  }, [getMetersIn100px]);
+
+  useEffect(() => {
+    if (!getMetersRef.current) {
+      setMetersIn100px(100);
+      return;
     }
 
     let animationFrameId: number;
 
     const update = () => {
-      setMetersIn100px(getMetersIn100px());
+      if (getMetersRef.current) {
+        setMetersIn100px(getMetersRef.current());
+      }
       animationFrameId = requestAnimationFrame(update);
     };
 
@@ -27,50 +34,50 @@ export function MetricScaleOverlay({ mode, getMetersIn100px, className }: Metric
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [getMetersIn100px]);
+  }, []);
 
-  // Calculate appropriate scale based on meters in 100px
-  // We want a "nice" number (1, 2, 5 * 10^n) that fits well within roughly 100-150px
   const getNiceScale = (meters: number) => {
+    if (!Number.isFinite(meters) || meters <= 0) return 100;
     const exponent = Math.floor(Math.log10(meters));
     const fraction = meters / Math.pow(10, exponent);
-    let niceFraction;
+    let niceFraction = 10;
     if (fraction < 1.5) niceFraction = 1;
     else if (fraction < 3) niceFraction = 2;
     else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-    
     return niceFraction * Math.pow(10, exponent);
   };
 
   const scaleLength = getNiceScale(metersIn100px);
-  const scaleLabel = scaleLength >= 1000 
-    ? `${(scaleLength / 1000).toFixed(scaleLength % 1000 === 0 ? 0 : 1)}km` 
-    : `${scaleLength}m`;
-
-  // Calculate pixel width for the scale bar
-  const pixelWidth = (scaleLength / metersIn100px) * 100;
+  const scaleLabel =
+    scaleLength >= 1000
+      ? `${(scaleLength / 1000).toFixed(scaleLength % 1000 === 0 ? 0 : 1)} km`
+      : `${scaleLength} m`;
+  const pixelWidth = Math.max(52, Math.min(132, (scaleLength / metersIn100px) * 100));
 
   return (
     <div className={`flex flex-col items-center gap-1 pointer-events-auto ${className || ''}`}>
-      <div className="relative flex flex-col items-center gap-2 bg-white/75 rounded-xl px-4 py-3 backdrop-blur-md border border-orange-400/30 shadow-[0_8px_24px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_32px_rgba(249,115,22,0.2)] transition-all duration-300">
-        {/* Enhanced scale bar container */}
-        <div className="flex items-center gap-2">
-          {/* Left tick with glow */}
-          <div className="w-1 h-4 bg-gradient-to-t from-orange-400 to-orange-300 rounded-sm shadow-lg" />
-          {/* Scale bar with enhanced gradient */}
-          <div
-            className="h-2 bg-gradient-to-r from-orange-500 via-orange-400 to-orange-500 rounded-full shadow-lg hover:shadow-[0_0_12px_rgba(249,115,22,0.6)]"
-            style={{ width: `${pixelWidth}px` }}
-          />
-          {/* Right tick with glow */}
-          <div className="w-1 h-4 bg-gradient-to-t from-orange-400 to-orange-300 rounded-sm shadow-lg" />
+      <div className="relative overflow-hidden rounded-[22px] border border-[#f1d2bf]/14 bg-[linear-gradient(180deg,rgba(18,14,13,0.96),rgba(10,9,9,0.88))] px-3 py-2.5 shadow-[0_18px_42px_rgba(0,0,0,0.24)] backdrop-blur-xl transition-all duration-300">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(241,210,191,0.12),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(204,90,40,0.1),transparent_38%)]" />
+        <div className="relative flex flex-col items-center gap-1.5">
+          <div className="flex w-full items-center justify-between gap-3">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-[#f1d2bf]/48">Scale</span>
+            <span className="rounded-full border border-[#f1d2bf]/12 bg-white/[0.06] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/78">
+              Live
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-3.5 w-1 rounded-sm bg-gradient-to-t from-[#cc5a28] to-[#f1d2bf] shadow-[0_0_10px_rgba(204,90,40,0.45)]" />
+            <div
+              className="h-2 rounded-full border border-[#f1d2bf]/12 bg-gradient-to-r from-[#f1d2bf] via-[#cc5a28] to-[#f1d2bf] shadow-[0_0_12px_rgba(204,90,40,0.22)]"
+              style={{ width: `${pixelWidth}px` }}
+            />
+            <div className="h-3.5 w-1 rounded-sm bg-gradient-to-t from-[#cc5a28] to-[#f1d2bf] shadow-[0_0_10px_rgba(204,90,40,0.45)]" />
+          </div>
+          <div className="flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-white/78">
+            <span>0</span>
+            <span>{scaleLabel}</span>
+          </div>
         </div>
-        {/* Enhanced label */}
-        <span className="text-sm font-bold text-gray-800 tracking-wide drop-shadow-sm">{scaleLabel}</span>
-
-        {/* Subtle glow effect */}
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-400/10 via-transparent to-orange-200/10 pointer-events-none" />
       </div>
     </div>
   );

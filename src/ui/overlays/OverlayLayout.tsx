@@ -32,6 +32,7 @@ export function OverlayLayout({
   rightOffsetPx = 0,
   topOffsetPx = 0,
   bottomOffsetPx = 0,
+  dataPresentationMode,
 }: {
   topLeft?: React.ReactNode;
   topCenter?: React.ReactNode;
@@ -44,15 +45,21 @@ export function OverlayLayout({
   rightOffsetPx?: number | string;
   topOffsetPx?: number | string;
   bottomOffsetPx?: number | string;
+  dataPresentationMode?: boolean;
 }) {
+  // Adjust overlay positioning for presentation slides
+  const isPresentation = dataPresentationMode;
+  const adjustedTopOffset = isPresentation ? (topOffsetPx as number) + 20 : topOffsetPx;
+  const hudClass = isPresentation ? `hud hud--presentation` : `hud`;
+
   const px = (value: number | string) =>
     typeof value === "number" ? `${value}px` : value;
   return (
     <div
-      className={`hud ${className ?? ""}`}
+      className={`${hudClass} ${className ?? ""}`}
       style={{
         zIndex: uiTheme.zIndex.overlays,
-        "--hud-offset-top": px(topOffsetPx),
+        "--hud-offset-top": px(adjustedTopOffset),
         "--hud-offset-bottom": px(bottomOffsetPx),
         "--hud-offset-left": px(leftOffsetPx),
         "--hud-offset-right": px(rightOffsetPx),

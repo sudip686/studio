@@ -1,291 +1,300 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import proj4 from 'proj4';
 import { useThreeScene } from '../../contexts/three-scene-context';
-import { projectLonLat } from '@/lib/utils/three-helpers';
-import { ASSET_BASE_URL } from '@/lib/constants';
-
-// Register UTM Zone 37S
-proj4.defs("EPSG:32737", "+proj=utm +zone=37 +south +datum=WGS84 +units=m +no_defs");
-
-function utmToLatLon(easting: number, northing: number) {
-    const [lon, lat] = proj4("EPSG:32737", "WGS84", [easting, northing]);
-    return { lat, lon };
-}
+import {
+  createTerrainMaterial,
+  describeTerrainError,
+  prepareTerrainSurface,
+} from '@/lib/terrain/shared-terrain-cache';
 
 const DEFAULT_CLIPPING_RADIUS = 3000;
 
-const HIGH_RES_SEGMENTS = 1024;
-const LOW_RES_SEGMENTS = 128;
+export function TerrainAscLayer({
+  verticalScale = 1,
+  modelCenter,
+  clipRadiusM = DEFAULT_CLIPPING_RADIUS,
+  quality = 'interactive',
+  onLoaded,
+  meshVisible: propsMeshVisible,
+  meshOpacity = 1,
+}: {
+  verticalScale?: number;
+  modelCenter?: { lon: number; lat: number };
+  clipRadiusM?: number | null;
+  quality?: 'interactive' | 'presentation';
+  onLoaded?: (info: {
+    box: THREE.Box3;
+    center: THREE.Vector3;
+    size: THREE.Vector3;
+    maxY: number;
+  }) => void;
+  meshVisible?: boolean;
+  meshOpacity?: number;
+}) {
+  const [meshVisibleState, setMeshVisibleState] = useState(true);
+  const meshRef = useRef<THREE.Mesh | null>(null);
+  const { dynamicGroup, renderer, setTerrainMaxY, camera, controls } = useThreeScene();
+  const terrainGroupRef = useRef<THREE.Group | null>(null);
+  const initializedRef = useRef(false);
+  const adaptiveQualityRef = useRef<'low' | 'medium' | 'high'>('high');
 
-const terrainCache = {
-    meta: null as any,
-    heightData: null as Float32Array | null,
-    heightPromise: null as Promise<[any, Float32Array]> | null,
-    texture: null as THREE.Texture | null,
-    texturePromise: null as Promise<THREE.Texture> | null,
-};
+  const meshVisible = propsMeshVisible !== undefined ? propsMeshVisible : meshVisibleState;
+  const applyOpacity = useCallback((material: THREE.Material | THREE.Material[] | null | undefined, opacityRaw: number) => {
+    if (!material) return;
+    const opacity = THREE.MathUtils.clamp(opacityRaw, 0.05, 1);
+    const materials = Array.isArray(material) ? material : [material];
+    materials.forEach((m) => {
+      const mat = m as THREE.Material & { opacity?: number; transparent?: boolean; depthWrite?: boolean; needsUpdate?: boolean };
+      if (typeof mat.opacity === 'number') {
+        mat.opacity = opacity;
+        mat.transparent = opacity < 0.999;
+        mat.depthWrite = opacity >= 0.999;
+        mat.needsUpdate = true;
+      }
+    });
+  }, []);
 
-const loadTerrainMetaAndHeight = async () => {
-    if (terrainCache.meta && terrainCache.heightData) {
-        return [terrainCache.meta, terrainCache.heightData] as [any, Float32Array];
+  // Adaptive quality: adjust based on camera distance for presentation slides
+  const centerKey = useMemo(
+    () => (modelCenter ? `${modelCenter.lon.toFixed(6)}_${modelCenter.lat.toFixed(6)}` : 'none'),
+    [modelCenter],
+  );
+
+  const getAdaptiveQuality = useCallback(() => {
+    if (!camera || !controls) return adaptiveQualityRef.current;
+
+    // Calculate distance from camera to terrain center
+    const terrainPosition = new THREE.Vector3();
+    if (dynamicGroup) {
+      dynamicGroup.getWorldPosition(terrainPosition);
+      const distance = camera.position.distanceTo(terrainPosition);
+
+      // Adaptive quality based on distance
+      if (distance < 5000) {
+        adaptiveQualityRef.current = 'high';
+      } else if (distance < 15000) {
+        adaptiveQualityRef.current = 'medium';
+      } else {
+        adaptiveQualityRef.current = 'low';
+      }
     }
-    if (!terrainCache.heightPromise) {
-        terrainCache.heightPromise = Promise.all([
-            fetch('/terrain_meta.json').then(res => res.json()),
-            fetch(`${ASSET_BASE_URL}/height.bin`).then(res => res.arrayBuffer())
-        ]).then(([meta, heightBuffer]) => {
-            const heightData = new Float32Array(heightBuffer);
-            terrainCache.meta = meta;
-            terrainCache.heightData = heightData;
-            return [meta, heightData] as [any, Float32Array];
-        }).catch(err => {
-            terrainCache.heightPromise = null;
-            throw err;
-        });
-    }
-    return terrainCache.heightPromise;
-};
+    return adaptiveQualityRef.current;
+  }, [camera, controls, dynamicGroup]);
 
-const loadTerrainTexture = async (renderer?: THREE.WebGLRenderer | null, texturePath?: string) => {
-    if (terrainCache.texture) return terrainCache.texture;
-    if (!terrainCache.texturePromise) {
-        terrainCache.texturePromise = new Promise((resolve, reject) => {
-            const textureLoader = new THREE.TextureLoader();
-            textureLoader.load(
-                texturePath ?? `${ASSET_BASE_URL}/terrain_texture_8k.jpg`,
-                (texture) => {
-                    texture.colorSpace = THREE.SRGBColorSpace;
-                    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-                    const maxAniso = (renderer?.capabilities.getMaxAnisotropy?.() ?? 16) || 16;
-                    texture.anisotropy = maxAniso;
-                    texture.generateMipmaps = true;
-                    texture.minFilter = THREE.LinearMipmapLinearFilter;
-                    texture.magFilter = THREE.LinearFilter;
-                    texture.needsUpdate = true;
-                    terrainCache.texture = texture;
-                    resolve(texture);
-                },
-                undefined,
-                (err) => {
-                    terrainCache.texturePromise = null;
-                    reject(err);
-                }
-            );
-        });
-    }
-    return terrainCache.texturePromise;
-};
-
-const buildTerrainGeometry = (
-    heightData: Float32Array,
-    meta: any,
-    modelCenter: { lon: number; lat: number },
-    verticalScale: number,
-    segmentsW: number,
-    segmentsH: number
-) => {
-    const { bounds_utm, width: dataW, height: dataH } = meta;
-    const { minX, maxX, minY, maxY } = bounds_utm;
-    const globalWidth = maxX - minX;
-    const globalHeight = maxY - minY;
-
-    const sampleHeight = (easting: number, northing: number) => {
-        const u = (easting - minX) / globalWidth;
-        const v = (maxY - northing) / globalHeight;
-        if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
-        const x = u * (dataW - 1);
-        const y = v * (dataH - 1);
-        const x0 = Math.floor(x);
-        const y0 = Math.floor(y);
-        const x1 = Math.min(x0 + 1, dataW - 1);
-        const y1 = Math.min(y0 + 1, dataH - 1);
-        const dx = x - x0;
-        const dy = y - y0;
-        const h00 = heightData[y0 * dataW + x0];
-        const h10 = heightData[y0 * dataW + x1];
-        const h01 = heightData[y1 * dataW + x0];
-        const h11 = heightData[y1 * dataW + x1];
-        const top = h00 * (1 - dx) + h10 * dx;
-        const bottom = h01 * (1 - dx) + h11 * dx;
-        return top * (1 - dy) + bottom * dy;
+  // Monitor camera movement for quality adjustment
+  useEffect(() => {
+    let lastCameraPosition = new THREE.Vector3();
+    const checkCameraMovement = () => {
+      if (camera) {
+        const movement = camera.position.distanceTo(lastCameraPosition);
+        if (movement > 100) {
+          // Reduce quality during fast movement to maintain performance
+          adaptiveQualityRef.current = 'medium';
+        }
+        lastCameraPosition.copy(camera.position);
+      }
     };
 
-    const geometry = new THREE.BufferGeometry();
-    const vertices = new Float32Array(segmentsW * segmentsH * 3);
-    const uvs = new Float32Array(segmentsW * segmentsH * 2);
-    const indices: number[] = [];
+    const interval = setInterval(checkCameraMovement, 100);
+    return () => clearInterval(interval);
+  }, [camera]);
 
-    for (let iy = 0; iy < segmentsH; iy++) {
-        const rowV = iy / (segmentsH - 1);
-        const northing = maxY - rowV * globalHeight;
+  useEffect(() => {
+    if (!dynamicGroup || !modelCenter || initializedRef.current) return;
+    initializedRef.current = true;
 
-        for (let ix = 0; ix < segmentsW; ix++) {
-            const colU = ix / (segmentsW - 1);
-            const easting = minX + colU * globalWidth;
-            const height = sampleHeight(easting, northing);
-            const idx = (iy * segmentsW + ix);
-            const { lat, lon } = utmToLatLon(easting, northing);
-            const { x, z } = projectLonLat(lon, lat, modelCenter);
+    let disposed = false;
+    let idleCallbackId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-            vertices[idx * 3] = x;
-            vertices[idx * 3 + 1] = height * verticalScale;
-            vertices[idx * 3 + 2] = -z;
+    if (renderer) renderer.localClippingEnabled = true;
 
-            uvs[idx * 2] = colU;
-            uvs[idx * 2 + 1] = 1 - rowV;
-        }
-    }
+    const group = new THREE.Group();
+    group.name = 'TerrainAscLayer';
+    terrainGroupRef.current = group;
+    dynamicGroup.add(group);
 
-    for (let iy = 0; iy < segmentsH - 1; iy++) {
-        for (let ix = 0; ix < segmentsW - 1; ix++) {
-            const a = iy * segmentsW + ix;
-            const b = iy * segmentsW + (ix + 1);
-            const c = (iy + 1) * segmentsW + ix;
-            const d = (iy + 1) * segmentsW + (ix + 1);
-            indices.push(a, c, b);
-            indices.push(b, c, d);
-        }
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    return geometry;
-};
-
-export function TerrainAscLayer({ verticalScale = 1, modelCenter, clipRadiusM = DEFAULT_CLIPPING_RADIUS, onLoaded }: { verticalScale?: number, modelCenter?: { lon: number, lat: number }, clipRadiusM?: number | null, onLoaded?: (info: { box: THREE.Box3; center: THREE.Vector3; size: THREE.Vector3; maxY: number }) => void }) {
-    const { dynamicGroup, renderer, setTerrainMaxY } = useThreeScene();
-    const terrainGroupRef = useRef<THREE.Group | null>(null);
-    const initializedRef = useRef(false);
-    const meshRef = useRef<THREE.Mesh | null>(null);
-
-    const centerKey = useMemo(() => 
-        modelCenter ? `${modelCenter.lon.toFixed(6)}_${modelCenter.lat.toFixed(6)}` : 'none', 
-    [modelCenter]);
-
-    useEffect(() => {
-        if (!dynamicGroup || !modelCenter || initializedRef.current) return;
-        initializedRef.current = true;
-
-        console.log('[TerrainAscLayer] Initializing terrain with binary height & baked texture');
-
-        if (renderer) renderer.localClippingEnabled = true;
-
-        const group = new THREE.Group();
-        group.name = 'TerrainAscLayer';
-        terrainGroupRef.current = group;
-        dynamicGroup.add(group);
-
-        const radius = clipRadiusM ?? DEFAULT_CLIPPING_RADIUS;
-        const clippingPlanes = clipRadiusM === null ? [] : [
+    const radius = clipRadiusM ?? DEFAULT_CLIPPING_RADIUS;
+    const clippingPlanes =
+      clipRadiusM === null
+        ? []
+        : [
             new THREE.Plane(new THREE.Vector3(1, 0, 0), radius),
             new THREE.Plane(new THREE.Vector3(-1, 0, 0), radius),
             new THREE.Plane(new THREE.Vector3(0, 0, 1), radius),
-            new THREE.Plane(new THREE.Vector3(0, 0, -1), radius)
-        ];
+            new THREE.Plane(new THREE.Vector3(0, 0, -1), radius),
+          ];
 
-        loadTerrainMetaAndHeight().then(([meta, heightData]) => {
-            if (!meta || !heightData || !modelCenter) return;
-            if (heightData.length !== meta.width * meta.height) {
-                console.warn(`[TerrainAscLayer] Height data size mismatch. Expected ${meta.width * meta.height}, got ${heightData.length}`);
-            }
+    const attachMesh = (geometry: THREE.BufferGeometry, material: THREE.Material, renderOrder: number) => {
+      const previousMesh = meshRef.current;
+      if (previousMesh && previousMesh.parent === group) {
+        group.remove(previousMesh);
+        const previousMaterial = previousMesh.material;
+        if (Array.isArray(previousMaterial)) {
+          previousMaterial.forEach((entry) => entry.dispose());
+        } else {
+          previousMaterial.dispose();
+        }
+        meshRef.current = null;
+      }
 
-            const texPath = `${ASSET_BASE_URL}/${meta.rgb_texture || 'terrain_texture_8k.jpg'}`;
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.visible = meshVisible;
+      applyOpacity(mesh.material, meshOpacity);
+      console.log('[TerrainAscLayer] Attaching mesh, visible:', meshVisible);
+      meshRef.current = mesh;
+      mesh.renderOrder = renderOrder;
+      mesh.frustumCulled = false;
+      mesh.receiveShadow = true;
+      mesh.castShadow = true;
+      group.add(mesh);
 
-            const makeMaterial = (texture: THREE.Texture | null, color?: number) => new THREE.MeshStandardMaterial({
-                map: texture ?? undefined,
-                color: color ?? 0xffffff,
-                side: THREE.DoubleSide,
-                roughness: 1.0,
-                metalness: 0.0,
-                emissive: 0x222222,
-                emissiveIntensity: 0.5,
-                clippingPlanes: clippingPlanes,
-                polygonOffset: true,
-                polygonOffsetFactor: 1
-            });
+      return mesh;
+    };
 
-            const lowGeometry = buildTerrainGeometry(heightData, meta, modelCenter, verticalScale, LOW_RES_SEGMENTS, LOW_RES_SEGMENTS);
-            const lowMaterial = makeMaterial(null, 0x777777);
-            const lowMesh = new THREE.Mesh(lowGeometry, lowMaterial);
-            lowMesh.renderOrder = 0;
-            lowMesh.frustumCulled = false;
-            lowMesh.receiveShadow = true;
-            lowMesh.castShadow = true;
-            group.add(lowMesh);
-            meshRef.current = lowMesh;
+    const toggleMeshVisibility = () => {
+      setMeshVisibleState((prev) => {
+        const next = !prev;
+        if (meshRef.current) {
+          meshRef.current.visible = next;
+        }
+        return next;
+      });
+    };
 
-            try {
-                group.updateMatrixWorld(true);
-                const box = new THREE.Box3().setFromObject(group);
-                const center = new THREE.Vector3();
-                const size = new THREE.Vector3();
-                box.getCenter(center);
-                box.getSize(size);
-                const maxY = box.max.y;
-                setTerrainMaxY?.(maxY);
-                onLoaded?.({ box, center, size, maxY });
-            } catch (e) {
-                console.warn('[TerrainAscLayer] Failed to compute bounds:', e);
-            }
+    const updateBounds = () => {
+      try {
+        group.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(group);
+        const center = new THREE.Vector3();
+        const size = new THREE.Vector3();
+        box.getCenter(center);
+        box.getSize(size);
+        const maxY = box.max.y;
+        setTerrainMaxY?.(maxY);
+        onLoaded?.({ box, center, size, maxY });
+      } catch (error) {
+        console.warn('[TerrainAscLayer] Failed to compute bounds:', error);
+      }
+    };
 
-            const upgradeToHighRes = async () => {
-                try {
-                    const texture = await loadTerrainTexture(renderer, texPath);
-                    const highGeometry = buildTerrainGeometry(heightData, meta, modelCenter, verticalScale, HIGH_RES_SEGMENTS, HIGH_RES_SEGMENTS);
-                    const highMaterial = makeMaterial(texture, 0xffffff);
-                    const highMesh = new THREE.Mesh(highGeometry, highMaterial);
-                    highMesh.renderOrder = 1;
-                    highMesh.frustumCulled = false;
-                    highMesh.receiveShadow = true;
-                    highMesh.castShadow = true;
-                    group.add(highMesh);
+    const preferHighQuality = quality === 'presentation';
 
-                    if (meshRef.current) {
-                        group.remove(meshRef.current);
-                        meshRef.current.geometry.dispose();
-                        const mat = meshRef.current.material as THREE.Material;
-                        mat.dispose();
-                    }
-                    meshRef.current = highMesh;
-                } catch (e) {
-                    console.error('[TerrainAscLayer] Failed to build high-res terrain:', e);
-                }
-            };
-
-            if ('requestIdleCallback' in window) {
-                (window as any).requestIdleCallback(upgradeToHighRes);
-            } else {
-                setTimeout(upgradeToHighRes, 0);
-            }
-        }).catch(err => {
-            console.error('[TerrainAscLayer] Failed to load terrain data:', err);
-            initializedRef.current = false;
+    prepareTerrainSurface(modelCenter, verticalScale, renderer, { includeHigh: preferHighQuality })
+      .then((resources) => {
+        console.log('[TerrainAscLayer] prepareTerrainSurface resolved:', {
+          texture: resources.texture?.name,
+          hasHighGeom: !!resources.highGeometry,
+          hasLowGeom: !!resources.lowGeometry
         });
+        if (disposed || !terrainGroupRef.current) return;
 
-    }, [dynamicGroup, centerKey, verticalScale, renderer]);
 
-    useEffect(() => {
-        return () => {
-            if (terrainGroupRef.current && dynamicGroup) {
-                dynamicGroup.remove(terrainGroupRef.current);
-                terrainGroupRef.current.traverse((o) => {
-                    if ((o as THREE.Mesh).geometry) (o as THREE.Mesh).geometry.dispose();
-                    if ((o as THREE.Mesh).material) {
-                        const m = (o as THREE.Mesh).material as THREE.Material;
-                        m.dispose();
-                    }
-                });
-                terrainGroupRef.current = null;
-                initializedRef.current = false;
-                meshRef.current = null;
+        attachMesh(
+          preferHighQuality && resources.highGeometry ? resources.highGeometry : resources.lowGeometry,
+          createTerrainMaterial({
+            texture: resources.texture,
+            normalMap: resources.normalMap,
+            clippingPlanes,
+            highQuality: preferHighQuality && !!resources.highGeometry,
+            renderer,
+          }),
+          0,
+        );
+        updateBounds();
+
+        if (preferHighQuality) {
+          return;
+        }
+
+        const upgradeToHighRes = async () => {
+          try {
+            if (disposed || !terrainGroupRef.current) return;
+
+            const upgraded = await prepareTerrainSurface(modelCenter, verticalScale, renderer, { includeHigh: true });
+            if (disposed || !terrainGroupRef.current || !upgraded.highGeometry) return;
+
+            attachMesh(
+              upgraded.highGeometry,
+              createTerrainMaterial({
+                texture: upgraded.texture,
+                normalMap: upgraded.normalMap,
+                clippingPlanes,
+                highQuality: true,
+                renderer,
+              }),
+              1,
+            );
+          } catch (error) {
+            if (!disposed) {
+              console.warn(
+                '[TerrainAscLayer] High-res terrain unavailable, keeping low-res surface.',
+                describeTerrainError(error),
+              );
             }
+          }
         };
-    }, [dynamicGroup, renderer]);
 
-    return null;
+        if ('requestIdleCallback' in window) {
+          idleCallbackId = (window as any).requestIdleCallback(upgradeToHighRes);
+        } else {
+          timeoutId = setTimeout(upgradeToHighRes, 0);
+        }
+      })
+      .catch((error) => {
+        console.error('[TerrainAscLayer] Failed to load terrain data:', error);
+        console.log('[TerrainAscLayer] Error details:', describeTerrainError(error));
+        initializedRef.current = false;
+      });
+
+    return () => {
+      disposed = true;
+      if (idleCallbackId !== null && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleCallbackId);
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [applyOpacity, dynamicGroup, centerKey, verticalScale, renderer, clipRadiusM, quality, modelCenter, onLoaded, setTerrainMaxY, meshOpacity, meshVisible]);
+
+  useEffect(() => {
+    return () => {
+      if (terrainGroupRef.current && dynamicGroup) {
+        dynamicGroup.remove(terrainGroupRef.current);
+        terrainGroupRef.current.traverse((object) => {
+          const mesh = object as THREE.Mesh;
+          const geometry = mesh.geometry as THREE.BufferGeometry | undefined;
+          if (geometry && !geometry.userData?.sharedTerrainGeometry) {
+            geometry.dispose();
+          }
+
+          if (mesh.material) {
+            const material = mesh.material as THREE.Material;
+            material.dispose();
+          }
+        });
+        terrainGroupRef.current = null;
+        initializedRef.current = false;
+      }
+    };
+  }, [dynamicGroup]);
+
+  // Sync mesh visibility - respond to propsMeshVisible changes immediately
+  useEffect(() => {
+    if (meshRef.current) {
+      meshRef.current.visible = meshVisible;
+    }
+  }, [meshVisible]);
+
+  useEffect(() => {
+    if (!meshRef.current) return;
+    applyOpacity(meshRef.current.material, meshOpacity);
+  }, [applyOpacity, meshOpacity]);
+
+
+  return null;
 }
+

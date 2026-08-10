@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDataCache, DrillholeSegment } from '@/lib/data-cache';
 import { useCesium } from '@/contexts/cesium-context';
-import { Legend } from '@/components/ui/legend';
 import { OverlaySlot } from '@/ui/overlays';
-import { drillholeLocationMapLithologyLegendData, LITHOLOGY_COLOR_MAP_CSS } from '@/lib/constants';
-import IonKmlLayer from '@/components/IonKmlLayer';
+import { LITHOLOGY_COLOR_MAP_CSS } from '@/lib/constants';
+import { DrillholeTooltip } from './ui/tooltip';
 
 declare global {
     interface Window {
@@ -55,31 +54,6 @@ const getContinuousColor = (value: number, min: number, max: number, paletteName
 
 const norm = (s: any) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-// --- UI Components ---
-
-const TooltipContent = ({ data }: { data: any }) => {
-    if (!data || !data.content) return null;
-    return (
-        <div
-            className="absolute bg-gray-800 text-white p-3 rounded-md shadow-lg text-xs pointer-events-none"
-            style={{ top: data.top, left: data.left, transform: 'translate(15px, 15px)' }}
-        >
-            <p className="font-bold text-base mb-1">Hole ID: {data.content.hole_id}</p>
-            <ul className="list-none space-y-1">
-                <li><strong>Lat:</strong> {data.content.latitude?.toFixed(5)}</li>
-                <li><strong>Lon:</strong> {data.content.longitude?.toFixed(5)}</li>
-                {data.content.lithology && <li><strong>Lithologies:</strong> {data.content.lithology}</li>}
-                {data.content.graphitic_carbon !== undefined && (
-                    <li><strong>Avg. Graphitic Carbon:</strong> {data.content.graphitic_carbon?.toFixed(3)} %</li>
-                )}
-                {data.content.max_graphitic_carbon !== undefined && (
-                    <li><strong>Max. Graphitic Carbon:</strong> {data.content.max_graphitic_carbon?.toFixed(3)} %</li>
-                )}
-            </ul>
-        </div>
-    );
-};
-
 // --- View-Specific Components ---
 
 interface LithologyMapViewProps {
@@ -87,9 +61,10 @@ interface LithologyMapViewProps {
     ready: boolean;
     processedData: Map<string, ProcessedDrillhole>;
     uniqueLithologies: string[];
+    presentationMode?: boolean;
 }
 
-function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: LithologyMapViewProps) {
+function LithologyMapView({ viewer, ready, processedData, uniqueLithologies, presentationMode = false }: LithologyMapViewProps) {
     const [lithologyFilter, setLithologyFilter] = useState('All');
     const entitiesRef = useRef<any[]>([]);
     const lithologyColorMapCesiumRef = useRef<any>({});
@@ -125,6 +100,8 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
                     const color = lithologyColorMapCesiumRef.current[key] ?? lithologyColorMapCesiumRef.current.unknown;
 
                     const entity = new Cesium.Entity({
+                        id: data.hole_id,
+                        name: data.hole_id,
                         position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude, hTop),
                         point: {
                             pixelSize: 20,
@@ -133,14 +110,22 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
                             outlineWidth: 1,
                             disableDepthTestDistance: Number.POSITIVE_INFINITY,
                         },
-                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay, max_graphitic_carbon: data.maxAssay }
+                        properties: {
+                            hole_id: data.hole_id,
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            lithology: Array.from(data.lithologies).join(', '),
+                            graphitic_carbon: data.avgAssay,
+                            max_graphitic_carbon: data.maxAssay
+                        }
                     });
                     viewer.entities.add(entity);
                     entitiesRef.current.push(entity);
                     plotted++;
                 }
             });
-            console.log(`[DrillholeLocationMap] plotted=${plotted} mode=lithology`);
+            console.log('Drillhole entities plotted:', plotted);
+            // Camera is now handled by CesiumViewSwitch - do not fly to cluster here
         })();
 
         return () => {
@@ -150,31 +135,32 @@ function LithologyMapView({ viewer, ready, processedData, uniqueLithologies }: L
         };
     }, [viewer, ready, processedData, lithologyFilter]);
 
+    if (presentationMode) {
+        return null;
+    }
+
     return (
         <>
-            <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
-              <div className="pointer-events-auto p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
+            <OverlaySlot slot="top-right" wrapperClassName="overlay-inspector-slot overlay-inspector-slot--right">
+              <div className="pointer-events-auto w-full overflow-hidden rounded-[22px] border border-[#f1d2bf]/14 bg-[linear-gradient(180deg,rgba(24,16,12,0.92),rgba(10,9,8,0.76))] p-3.5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+                <div className="mb-3">
+                    <p className="text-[10px] uppercase tracking-[0.28em] text-[#f1d2bf]/52">Drillhole view</p>
+                    <p className="mt-1 text-sm font-semibold text-white/92">Lithology filter</p>
+                </div>
                 <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Filter by Lithology</label>
+                    <label className="text-xs font-semibold text-white/88">Filter by Lithology</label>
                     <select
                         value={lithologyFilter}
                         onChange={(e) => setLithologyFilter(e.target.value)}
-                        className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                        className="rounded-xl border border-white/10 bg-black/28 px-3 py-2 text-sm text-white/95 focus:border-amber-300/50 focus:outline-none focus:ring-2 focus:ring-amber-300/30"
                     >
                         {uniqueLithologies.map((lith: string) => (
                             <option key={lith} value={lith}>{lith}</option>
                         ))}
                     </select>
+                    <p className="text-[11px] leading-5 text-white/62">Displays collar locations colored by the logged lithology present in each drillhole.</p>
                 </div>
               </div>
-            </OverlaySlot>
-            <OverlaySlot slot="bottom-left">
-              <Legend
-                  title={drillholeLocationMapLithologyLegendData.title}
-                  type="categorical"
-                  items={drillholeLocationMapLithologyLegendData.items}
-                  show={true}
-              />
             </OverlaySlot>
         </>
     );
@@ -185,9 +171,10 @@ interface AssayMapViewProps {
     ready: boolean;
     processedData: Map<string, ProcessedDrillhole>;
     ranges: { avg: { min: number, max: number }, max: { min: number, max: number } };
+    presentationMode?: boolean;
 }
 
-function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProps) {
+function AssayMapView({ viewer, ready, processedData, ranges, presentationMode = false }: AssayMapViewProps) {
     const [assayFilterValue, setAssayFilterValue] = useState(0);
     const [metric, setMetric] = useState<'average' | 'max'>('max');
     const [scaleType, setScaleType] = useState<'continuous' | 'discrete'>('continuous');
@@ -235,6 +222,8 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                     }
 
                     const entity = new Cesium.Entity({
+                        id: data.hole_id,
+                        name: data.hole_id,
                         position: Cesium.Cartesian3.fromDegrees(data.longitude, data.latitude, hTop),
                         point: {
                             pixelSize: pointSize,
@@ -243,14 +232,22 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                             outlineWidth: 1,
                             disableDepthTestDistance: Number.POSITIVE_INFINITY,
                         },
-                        properties: { hole_id: data.hole_id, latitude: data.latitude, longitude: data.longitude, lithology: Array.from(data.lithologies).join(', '), graphitic_carbon: data.avgAssay, max_graphitic_carbon: data.maxAssay }
+                        properties: {
+                            hole_id: data.hole_id,
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            lithology: Array.from(data.lithologies).join(', '),
+                            graphitic_carbon: data.avgAssay,
+                            max_graphitic_carbon: data.maxAssay
+                        }
                     });
                     viewer.entities.add(entity);
                     entitiesRef.current.push(entity);
                     plotted++;
                 }
             });
-            console.log(`[DrillholeLocationMap] plotted=${plotted} mode=assay metric=${metric}`);
+            console.log('Assay drillhole entities plotted:', plotted);
+            // Camera is now handled by CesiumViewSwitch - do not fly to cluster here
         })();
 
         return () => {
@@ -260,16 +257,24 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
         };
     }, [viewer, ready, processedData, assayFilterValue, scaleType, continuousPalette, manualBreaks, currentRange, metric, pointSize]);
 
+    if (presentationMode) {
+        return null;
+    }
+
     return (
         <>
-            <OverlaySlot slot="top-right" wrapperClassName="w-[320px] flex flex-col items-end">
-              <div className="pointer-events-auto flex flex-col gap-3 p-4 rounded-2xl backdrop-blur-md bg-black/60 border border-white/15 shadow-2xl max-w-xs">
+            <OverlaySlot slot="top-right" wrapperClassName="overlay-inspector-slot overlay-inspector-slot--right">
+              <div className="pointer-events-auto flex w-full flex-col gap-3 overflow-hidden rounded-[22px] border border-[#f1d2bf]/14 bg-[linear-gradient(180deg,rgba(24,16,12,0.92),rgba(10,9,8,0.76))] p-3.5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+                <div>
+                    <p className="text-[10px] uppercase tracking-[0.28em] text-[#f1d2bf]/52">Drillhole view</p>
+                    <p className="mt-1 text-sm font-semibold text-white/92">Assay controls</p>
+                </div>
                 <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Metric</label>
+                    <label className="text-xs font-semibold text-white/88">Metric</label>
                     <select
                         value={metric}
                         onChange={(e) => setMetric(e.target.value as 'average' | 'max')}
-                        className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                        className="rounded-xl border border-white/10 bg-black/28 px-3 py-2 text-sm text-white/95 focus:border-amber-300/50 focus:outline-none focus:ring-2 focus:ring-amber-300/30"
                     >
                         <option value="max">Maximum</option>
                         <option value="average">Average</option>
@@ -277,7 +282,7 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Point Size: {pointSize}px</label>
+                    <label className="text-xs font-semibold text-white/88">Point Size: {pointSize}px</label>
                     <input
                         type="range"
                         min="5"
@@ -292,19 +297,19 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Min. Graphitic Carbon (%)</label>
+                    <label className="text-xs font-semibold text-white/88">Min. Graphitic Carbon (%)</label>
                     <input
                         type="number"
                         min="0"
                         step="0.5"
                         value={assayFilterValue}
                         onChange={(e) => setAssayFilterValue(Number(e.target.value))}
-                        className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                        className="rounded-xl border border-white/10 bg-black/28 px-3 py-2 text-sm text-white/95 focus:border-amber-300/50 focus:outline-none focus:ring-2 focus:ring-amber-300/30"
                     />
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Scale Type</label>
+                    <label className="text-xs font-semibold text-white/88">Scale Type</label>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setScaleType('continuous')}
@@ -312,7 +317,7 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
                                 scaleType === 'continuous'
                                     ? 'bg-orange-500 text-white shadow-lg'
-                                    : 'bg-black/40 text-white/70 border border-white/20 hover:bg-black/60'
+                                    : 'border border-white/12 bg-white/8 text-white/72 hover:bg-white/12'
                             }`}
                         >
                             Continuous
@@ -323,7 +328,7 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
                             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
                                 scaleType === 'discrete'
                                     ? 'bg-orange-500 text-white shadow-lg'
-                                    : 'bg-black/40 text-white/70 border border-white/20 hover:bg-black/60'
+                                    : 'border border-white/12 bg-white/8 text-white/72 hover:bg-white/12'
                             }`}
                         >
                             Discrete
@@ -333,11 +338,11 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
 
                 {scaleType === 'continuous' && (
                     <div className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Color Palette</label>
+                        <label className="text-xs font-semibold text-white/88">Color Palette</label>
                         <select
                             value={continuousPalette}
                             onChange={(e) => setContinuousPalette(e.target.value)}
-                            className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                            className="rounded-xl border border-white/10 bg-black/28 px-3 py-2 text-sm text-white/95 focus:border-amber-300/50 focus:outline-none focus:ring-2 focus:ring-amber-300/30"
                         >
                             <option value="Viridis">Viridis</option>
                             <option value="Plasma">Plasma</option>
@@ -348,27 +353,18 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
 
                 {scaleType === 'discrete' && (
                     <div className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold text-white/90 drop-shadow-sm">Interval Breaks</label>
+                        <label className="text-xs font-semibold text-white/88">Interval Breaks</label>
                         <input
                             type="text"
                             value={manualBreaks}
                             onChange={(e) => setManualBreaks(e.target.value)}
                             placeholder="1, 1.5, 2"
-                            className="bg-black/40 border border-white/20 rounded-lg px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                            className="rounded-xl border border-white/10 bg-black/28 px-3 py-2 text-sm text-white/95 focus:border-amber-300/50 focus:outline-none focus:ring-2 focus:ring-amber-300/30"
                         />
                     </div>
                 )}
+                <p className="text-[11px] leading-5 text-white/62">Use the controls to tune the color mapping and quickly isolate stronger graphitic carbon collars.</p>
               </div>
-            </OverlaySlot>
-            <OverlaySlot slot="bottom-left">
-              <Legend
-                  title={`${metric === 'average' ? 'Avg.' : 'Max.'} Assay (Graphitic Carbon)`}
-                  type="gradient"
-                  gradient={`linear-gradient(to right, ${(CONTINUOUS_PALETTES[continuousPalette] || CONTINUOUS_PALETTES['Viridis']).join(', ')})`}
-                  minLabel={currentRange.min.toFixed(2)}
-                  maxLabel={currentRange.max.toFixed(2)}
-                  show={true}
-              />
             </OverlaySlot>
         </>
     );
@@ -380,20 +376,19 @@ function AssayMapView({ viewer, ready, processedData, ranges }: AssayMapViewProp
 interface DrillholeLocationMapProps {
     displayMode: 'lithology' | 'assay';
     imageryAlpha?: number;
+    presentationMode?: boolean;
 }
 
-const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
+const DrillholeLocationMap = ({ displayMode, presentationMode = false }: DrillholeLocationMapProps) => {
     const { viewer, ready } = useCesium();
     const { drillholeData } = useDataCache();
     const [tooltip, setTooltip] = useState<{ display: boolean, top: number, left: number, content: any }>({ display: false, top: 0, left: 0, content: null });
     const [processedData, setProcessedData] = useState<Map<string, ProcessedDrillhole>>(new Map());
     const [uniqueLithologies, setUniqueLithologies] = useState<string[]>(['All']);
     const [ranges, setRanges] = useState<{ avg: { min: number, max: number }, max: { min: number, max: number } }>({ avg: { min: 0, max: 1 }, max: { min: 0, max: 1 } });
-    const hasFlownRef = useRef(false);
 
     // Data Processing Hook
     useEffect(() => {
-        console.log('[DrillholeLocationMap] drillholeData:', drillholeData);
         if (!drillholeData) return;
 
         const collarData = new Map<string, ProcessedDrillhole>();
@@ -463,44 +458,54 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
     useEffect(() => {
         if (!viewer || !ready) return;
         const Cesium = window.Cesium;
-        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        const canvas = viewer.scene.canvas;
+        const handler = new Cesium.ScreenSpaceEventHandler(canvas);
 
         handler.setInputAction((movement: any) => {
             const picked = viewer.scene.pick(movement.endPosition);
-            if (!picked) {
-                if (tooltip.display) setTooltip({ display: false, top: 0, left: 0, content: null });
+            if (!picked || !Cesium.defined(picked)) {
+                setTooltip(prev => prev.display ? { display: false, top: 0, left: 0, content: null } : prev);
                 return;
             }
-            if (Cesium.defined(picked.id) && picked.id?.properties) {
-                const props = picked.id.properties.getValue(viewer.clock.currentTime);
-                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content: props });
-            } else {
-                if (tooltip.display) setTooltip({ display: false, top: 0, left: 0, content: null });
+
+            const entity = picked.id;
+            if (!entity) {
+                setTooltip(prev => prev.display ? { display: false, top: 0, left: 0, content: null } : prev);
+                return;
             }
+
+            const props = entity.properties?.getValue
+                ? entity.properties.getValue(Cesium.JulianDate.now())
+                : entity.properties ?? null;
+
+            const content = props
+                ? {
+                    hole_id: props.hole_id ?? entity.id ?? entity.name ?? 'Unknown',
+                    latitude: props.latitude ?? entity.latitude ?? entity._latitude,
+                    longitude: props.longitude ?? entity.longitude ?? entity._longitude,
+                    lithology: props.lithology,
+                    graphitic_carbon: props.graphitic_carbon ?? entity.graphitic_carbon ?? entity._graphitic_carbon,
+                    max_graphitic_carbon: props.max_graphitic_carbon,
+                }
+                : null;
+
+            if (content) {
+                setTooltip({ display: true, top: movement.endPosition.y, left: movement.endPosition.x, content });
+            } else {
+                setTooltip(prev => prev.display ? { display: false, top: 0, left: 0, content: null } : prev);
+            }
+
             viewer.scene.requestRender();
         }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-        return () => { if (!handler.isDestroyed()) handler.destroy(); };
-    }, [viewer, ready, tooltip.display]);
-
-    // Fly-to-entities Hook
-    useEffect(() => {
-        if (viewer && processedData.size > 0 && !hasFlownRef.current) {
-            const entities: any[] = [];
-            viewer.entities.values.forEach((entity: any) => {
-                if(entity.point) entities.push(entity);
-            });
-            if (entities.length > 0) {
-                viewer.flyTo(entities);
-                hasFlownRef.current = true;
-            }
-        }
-    }, [viewer, processedData, displayMode]); // Rerun fly-to when mode changes if needed
+        return () => {
+            if (!handler.isDestroyed()) handler.destroy();
+        };
+    }, [viewer, ready]);
 
     return (
         <div className="h-full w-full relative pointer-events-none">
-            <IonKmlLayer assetId={4310565} />
-            {tooltip.display && <TooltipContent data={tooltip} />}
+            {tooltip.display && <DrillholeTooltip data={tooltip} />}
             
             {displayMode === 'lithology' ? (
                 <LithologyMapView 
@@ -508,6 +513,7 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
                     ready={ready} 
                     processedData={processedData}
                     uniqueLithologies={uniqueLithologies}
+                    presentationMode={presentationMode}
                 />
             ) : (
                 <AssayMapView 
@@ -515,6 +521,7 @@ const DrillholeLocationMap = ({ displayMode }: DrillholeLocationMapProps) => {
                     ready={ready}
                     processedData={processedData}
                     ranges={ranges}
+                    presentationMode={presentationMode}
                 />
             )}
         </div>

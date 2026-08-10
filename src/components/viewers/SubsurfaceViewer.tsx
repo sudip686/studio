@@ -5,6 +5,7 @@ import { useCesium } from '@/contexts/cesium-context';
 import { useGeoScene } from '@/hooks/useGeoScene';
 import { SubsurfaceProvider, useSubsurface } from '@/contexts/subsurface-context';
 import ClippingManager from './ClippingManager';
+import { CesiumSceneUtilities } from './ProfessionalViewerHud';
 
 /**
  * Internal component to bridge useGeoScene state to SubsurfaceContext
@@ -27,16 +28,29 @@ interface SubsurfaceViewerProps {
     children?: ReactNode;
     className?: string;
     initialState?: Partial<import('@/contexts/subsurface-context').SubsurfaceState>;
+    showSceneHud?: boolean;
+    hudTitle?: string;
+    hudSubtitle?: string;
 }
 
 /**
  * Root container for subsurface visualization.
  * Provides context and initializes the Three.js overlay.
  */
-export default function SubsurfaceViewer({ children, className, initialState }: SubsurfaceViewerProps) {
+export default function SubsurfaceViewer({
+    children,
+    className,
+    initialState,
+    showSceneHud = false,
+    hudTitle = 'Subsurface model',
+    hudSubtitle = 'Rotate, clip, and inspect the 3D geological model.',
+}: SubsurfaceViewerProps) {
     return (
         <SubsurfaceProvider initialState={initialState}>
             <ThreeInitializer />
+            {showSceneHud ? (
+                <CesiumSceneUtilities title={hudTitle} subtitle={hudSubtitle} />
+            ) : null}
             <div className={className}>
                 {children}
             </div>

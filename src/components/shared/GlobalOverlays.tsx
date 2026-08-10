@@ -1,19 +1,19 @@
 /**
- * Global overlays that appear on all views - compass, scale, and measurement tool
- * Centralized fixed slots to prevent overlap and ensure smooth UI across resolutions
+ * Shared presentation HUD for compass and scale.
+ * These elements are placed through the overlay slot system so they stay clear of the deck rail and footer.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useCesium } from "@/contexts/cesium-context";
 import { useThreeSceneSafe } from "@/contexts/three-scene-context";
-import { CompassOverlay, LogoOverlay, MetricScaleOverlay } from "@/components/overlays";
-import MeasurementTool from "@/components/MeasurementTool";
+import { CompassOverlay, MetricScaleOverlay } from "@/components/overlays";
 import { OverlaySlot, uiTheme } from "@/ui/overlays";
 
 interface GlobalOverlaysProps {
   mode: "cesium" | "three" | "none";
   hidden?: boolean;
+  showCompass?: boolean;
   measurementMode?: boolean;
   currentView?: string;
   onLogoClick?: () => void;
@@ -22,36 +22,53 @@ interface GlobalOverlaysProps {
 const GlobalOverlays = ({
   mode,
   hidden = false,
-  measurementMode = false,
+  showCompass = true,
   currentView,
-  onLogoClick,
 }: GlobalOverlaysProps) => {
-  const { viewer: cesiumViewer } = useCesium();
+  const cesiumContext = useCesium();
+  const cesiumViewer = mode === "cesium" ? cesiumContext.viewer : null;
   const [isMounted, setIsMounted] = useState(false);
+  const [, forceUpdate] = useState(0);
+  const [debugFrameCount, setDebugFrameCount] = useState(0);
   const threeSceneContext = useThreeSceneSafe();
   const threeCamera = threeSceneContext?.camera;
   const threeControls = threeSceneContext?.controls;
   const threeRenderer = threeSceneContext?.renderer;
 
+  // DEBUG: Log mode changes
+  useEffect(() => {
+    console.log('[GlobalOverlays] Mode changed:', { mode, isCesium: mode === 'cesium', isThree: mode === 'three', cesiumViewer: !!cesiumViewer });
+  }, [mode, cesiumViewer]);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  if (hidden) return null;
-
-  const getCesiumHeading = () => {
+  const getCesiumHeading = useCallback(() => {
     if (!cesiumViewer || cesiumViewer.isDestroyed()) return 0;
-    return cesiumViewer.camera.heading;
-  };
+    const heading = cesiumViewer.camera.heading;
+    console.log('[GlobalOverlays] getCesiumHeading called:', heading, 'viewer:', !!cesiumViewer);
+    return heading;
+  }, [cesiumViewer]);
 
-  const getCesiumMetersIn100px = () => {
-    if (!cesiumViewer || cesiumViewer.isDestroyed()) return 1000;
+  const getCesiumMetersIn100px = useCallback(() => {
+    if (!cesiumViewer || cesiumViewer.isDestroyed()) {
+      console.log('[GlobalOverlays] getCesiumMetersIn100px: viewer not ready');
+      return 1000;
+    }
     const scene = cesiumViewer.scene;
+    if (!scene) {
+      console.log('[GlobalOverlays] getCesiumMetersIn100px: scene not ready');
+      return 1000;
+    }
     const camera = scene.camera;
     const canvas = scene.canvas;
 
     const Cesium = (window as any).Cesium;
-    if (!Cesium) return 1000;
+    if (!Cesium) {
+      console.log('[GlobalOverlays] getCesiumMetersIn100px: Cesium not available');
+      return 1000;
+    }
 
     // Get distance to center of screen
     const center = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
@@ -63,7 +80,9 @@ const GlobalOverlays = ({
         const cartographic = camera.positionCartographic;
         const height = cartographic.height;
         const fov = camera.frustum.fovy;
-        return (2 * height * Math.tan(fov / 2)) / canvas.clientHeight * 100;
+        const result = (2 * height * Math.tan(fov / 2)) / canvas.clientHeight * 100;
+        console.log('[GlobalOverlays] getCesiumMetersIn100px (fallback):', result, 'height:', height);
+        return result;
     }
 
     const distance = Cesium.Cartesian3.distance(camera.positionWC, intersection);
@@ -71,9 +90,31 @@ const GlobalOverlays = ({
     // Estimate meters per pixel at this distance
     const fov = camera.frustum.fovy;
     const metersPerPixel = (2 * distance * Math.tan(fov / 2)) / canvas.clientHeight;
+    const result = metersPerPixel * 100;
+    console.log('[GlobalOverlays] getCesiumMetersIn100px:', result, 'distance:', distance);
 
-    return metersPerPixel * 100;
-  };
+    return result;
+  }, [cesiumViewer]);
+
+  // Force re-render on camera movement for Cesium using preRender event
+  useEffect(() => {
+    if (!cesiumViewer || cesiumViewer.isDestroyed()) return;
+
+    const preRenderHandler = () => {
+      setDebugFrameCount(prev => prev + 1);
+      forceUpdate(prev => prev + 1);
+    };
+
+    cesiumViewer.scene?.preRender?.addEventListener(preRenderHandler);
+    console.log('[GlobalOverlays] Attached preRender listener');
+
+    return () => {
+      if (cesiumViewer && !cesiumViewer.isDestroyed()) {
+        cesiumViewer.scene?.preRender?.removeEventListener(preRenderHandler);
+      }
+      console.log('[GlobalOverlays] Removed preRender listener');
+    };
+  }, [cesiumViewer]);
 
   const getThreeHeading = useCallback(() => {
     if (threeControls) {
@@ -126,8 +167,9 @@ const GlobalOverlays = ({
 
   const isCesium = mode === "cesium";
   const isThree = mode === "three";
-  const showCompassScale = true;
-  const panelClass = `${uiTheme.panel.border} ${uiTheme.panel.blur} ${uiTheme.panel.radius} ${uiTheme.panel.shadow}`;
+  const sceneLabel = isThree ? "3D navigation" : isCesium ? "Map navigation" : "Scene tools";
+
+  if (hidden) return null;
 
   const renderCompass = () => {
     if (isCesium) {
@@ -136,7 +178,7 @@ const GlobalOverlays = ({
           mode="cesium"
           getHeading={getCesiumHeading}
           headingUnit="radians"
-          className="will-change-transform transition-transform duration-150 scale-[0.9]"
+          className="will-change-transform transition-transform duration-150 scale-[0.84]"
         />
       );
     }
@@ -145,66 +187,49 @@ const GlobalOverlays = ({
         <CompassOverlay
           mode="three"
           getHeading={getThreeHeading}
-          className="will-change-transform transition-transform duration-150 scale-[0.9]"
+          className="will-change-transform transition-transform duration-150 scale-[0.84]"
         />
       );
     }
     return (
-      <CompassOverlay
-        mode="cesium"
-        getHeading={() => 0}
-        className="will-change-transform transition-transform duration-150 scale-[0.9]"
-      />
+        <CompassOverlay
+          mode="cesium"
+          getHeading={() => 0}
+          className="will-change-transform transition-transform duration-150 scale-[0.84]"
+        />
     );
   };
 
-  const renderCompassPanel = () => (
-    <div
-      className={`pointer-events-auto ${panelClass} inline-flex w-fit self-end flex-col items-end gap-3 p-2`}
-    >
-      {renderCompass()}
-    </div>
+  const renderScaleOverlay = () => (
+    <MetricScaleOverlay
+      mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
+      getMetersIn100px={
+        isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
+      }
+      className="will-change-transform transition-transform duration-150"
+    />
   );
 
   return (
     <>
+    <OverlaySlot slot="bottom-right">
       <div
-        className={`fixed inset-0 pointer-events-none z-[2000] transition-opacity duration-300 ${
+        className={`pointer-events-auto transition-opacity duration-300 ${
           isMounted ? "opacity-100" : "opacity-0"
         }`}
+        data-no-deck-wheel
       >
-        {showCompassScale && (
-          <div className="absolute bottom-4 right-4 pointer-events-auto">
-            {renderCompassPanel()}
+        <div className="scene-utilities">
+          <div className="scene-utilities__label">
+            {sceneLabel}
           </div>
-        )}
-
-        {showCompassScale && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-auto">
-            <MetricScaleOverlay
-              mode={isCesium ? "cesium" : isThree ? "three" : "cesium"}
-              getMetersIn100px={
-                isCesium ? getCesiumMetersIn100px : isThree ? getThreeMetersIn100px : () => 100
-              }
-              className="will-change-transform transition-transform duration-150"
-            />
+          <div className="scene-utilities__stack">
+            {showCompass ? renderCompass() : null}
+            {renderScaleOverlay()}
           </div>
-        )}
-      </div>
-
-      {/* Keep the logo and measurement tool in the shared overlay slots for now to see if they work */}
-      <OverlaySlot slot="top-left">
-        <LogoOverlay className="will-change-transform transition-transform duration-150" onClick={onLogoClick} />
-      </OverlaySlot>
-
-      <OverlaySlot slot="top-left" wrapperClassName="w-full">
-        <div className="pointer-events-auto">
-          <MeasurementTool
-            mode={isThree ? "three" : "cesium"}
-            className="ui-dialog-inner"
-          />
         </div>
-      </OverlaySlot>
+      </div>
+    </OverlaySlot>
     </>
   );
 };
