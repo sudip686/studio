@@ -50,6 +50,9 @@ const KEYS = [
 
 if (process.argv.includes('--videos') && existsSync(join(PUBLIC, 'media'))) {
   for (const f of readdirSync(join(PUBLIC, 'media'))) {
+    const abs = join(PUBLIC, 'media', f);
+    if (!statSync(abs).isFile()) continue;          // skip subdirectories
+    if (f === '.gitkeep' || f.startsWith('.')) continue;
     const k = posix.join('media', f);
     if (!KEYS.includes(k)) KEYS.push(k);
   }
