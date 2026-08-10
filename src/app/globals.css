@@ -12179,10 +12179,10 @@ body:has(.tanga-deck__notes) .tanga-deck__geo-overlay {
 .tanga-three canvas {
   /* Punchier saturation + a touch of brightness lift so the satellite
      terrain reads bright and vibrant like VRIFY, not flat. */
-  filter: saturate(1.32) contrast(1.08) brightness(1.04);
+  filter: saturate(1.42) brightness(0.9) contrast(1.08);
 }
 @media (prefers-reduced-motion: reduce) {
-  .tanga-three canvas { filter: saturate(1.18) contrast(1.05); }
+  .tanga-three canvas { filter: saturate(1.3) brightness(0.92) contrast(1.06); }
 }
 
 /* ═════ POLISH v5 — scene dots, timer, small refinements ═════ */

@@ -1433,9 +1433,10 @@ export default function TangaThreeGeologyScene({
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Slightly lower exposure lets colors resolve richer instead of washed;
-    // a CSS saturation/contrast filter on the host adds the "vivid" pop.
-    renderer.toneMappingExposure = 1.02;
+    // Lower exposure so the bright satellite terrain doesn't wash out; a CSS
+    // contrast/saturation grade then adds punch. Tuned by measuring canvas
+    // luminance (~220 was washed; target ~185 with more tonal range).
+    renderer.toneMappingExposure = 0.92;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
