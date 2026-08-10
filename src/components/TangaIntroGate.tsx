@@ -6,8 +6,11 @@ import {useEffect, useRef, useState, type CSSProperties, type ReactNode} from 'r
 // production and /public locally. Videos are gitignored — never in the bundle.
 const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_ASSET_BASE_URL || '').replace(/\/$/, '');
 const asset = (path: string) => (ASSET_BASE_URL ? `${ASSET_BASE_URL}${path}` : path);
-const INTRO_VIDEO_SRC = asset('/media/tanga-google-earth-intro-corrected-preview.mp4') + '?v=intro-gate-20260627a';
-const INTRO_POSTER_SRC = asset('/media/tanga-first-slide-story-poster.jpg') + '?v=full-bleed-bright-20260625';
+const VIDEO_KEY = '/media/tanga-google-earth-intro-corrected-preview.mp4';
+const POSTER_KEY = '/media/tanga-first-slide-story-poster.jpg';
+const INTRO_VIDEO_SRC = asset(VIDEO_KEY) + '?v=intro-gate-20260627a';
+const INTRO_VIDEO_SRC_LOCAL = VIDEO_KEY + '?v=intro-gate-20260627a';
+const INTRO_POSTER_SRC = asset(POSTER_KEY) + '?v=full-bleed-bright-20260625';
 const ERROR_FALLBACK_MS = 2000;
 
 type IntroState = 'checking' | 'playing' | 'blocked' | 'finishing' | 'done';
@@ -20,6 +23,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fallbackTimerRef = useRef<number | null>(null);
   const [introState, setIntroState] = useState<IntroState>('checking');
+  const [videoSrc, setVideoSrc] = useState(INTRO_VIDEO_SRC);
   const [videoUnavailable, setVideoUnavailable] = useState(false);
   const [introDuration, setIntroDuration] = useState(50);
 
@@ -57,6 +61,11 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   }, []);
 
   const handleVideoError = () => {
+    // If the R2 copy failed, retry the local /public copy once before giving up.
+    if (videoSrc !== INTRO_VIDEO_SRC_LOCAL) {
+      setVideoSrc(INTRO_VIDEO_SRC_LOCAL);
+      return;
+    }
     setVideoUnavailable(true);
     if (fallbackTimerRef.current) return;
     fallbackTimerRef.current = window.setTimeout(completeIntro, ERROR_FALLBACK_MS);
@@ -92,7 +101,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
               <video
                 ref={videoRef}
                 className="tanga-intro__video"
-                src={INTRO_VIDEO_SRC}
+                src={videoSrc}
                 poster={INTRO_POSTER_SRC}
                 muted
                 playsInline

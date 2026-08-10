@@ -12960,3 +12960,71 @@ body:has(.tanga-deck__notes) .tanga-deck__insight-panel {
 @media (prefers-reduced-motion: reduce) {
   .tanga-deck__coach { animation: proCoachIn 400ms ease; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AUTHORITATIVE LAYOUT RESOLUTION (appended last — wins the cascade).
+   Prevents the stacked overlays from colliding. Every overlay owns a zone.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Scene 10 (closing): the clean CTA card is the finale — hide the heavy
+   860px comparison matrix + ranking so they don't overlap it. */
+.tanga-deck--comparison .tanga-deck__comparison,
+.tanga-deck--comparison .tanga-deck__ranking,
+.tanga-deck--comparison .tanga-deck__peer-popup {
+  display: none !important;
+}
+/* Give the closing card room + centre it cleanly. */
+.tanga-deck__closing {
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: min(560px, 88vw) !important;
+  text-align: center;
+  align-items: center;
+}
+.tanga-deck__closing-metrics { width: 100%; }
+
+/* Inspector (Ctrl+I) and the data/insight panels both sit on the right —
+   show only one at a time so they never stack. */
+body:has(.tanga-deck__inspector) .tanga-deck__data-panel,
+body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Right-column panels: hard-cap height so a long table can't run down into
+   the inspector / voice pill zone. */
+.tanga-deck__data-panel,
+.tanga-deck__insight-panel {
+  max-height: calc(100vh - 200px - 150px) !important;
+  overflow-y: auto;
+}
+
+/* Cover scene: nothing but the cover + pager. Hide every data/story overlay. */
+.tanga-deck--cover .tanga-deck__data-panel,
+.tanga-deck--cover .tanga-deck__insight-panel,
+.tanga-deck--cover .tanga-deck__geo-overlay,
+.tanga-deck--cover .tanga-deck__voice-dock,
+.tanga-deck--cover .tanga-deck__act-ribbon,
+.tanga-deck--cover .tanga-deck__inspector {
+  display: none !important;
+}
+
+/* Ranking scene (1): the peer list is large; keep the insight panel out of
+   its way by hiding the generic insight chips there (ranking IS the content). */
+.tanga-deck--ranking .tanga-deck__insight-panel { display: none !important; }
+
+/* ═════ Cover curtain: hide ALL scene-1 content so the cover is clean ═════ */
+.tanga-deck--cover .tanga-deck__ranking,
+.tanga-deck--cover .tanga-deck__peer-popup,
+.tanga-deck--cover .tanga-deck__topbar,
+.tanga-deck--cover .tanga-deck__pager,
+.tanga-deck--cover .tanga-deck__coach,
+.tanga-deck--cover .tanga-deck__title,
+.tanga-deck--cover .tanga-deck__load-strip {
+  display: none !important;
+}
+/* Make the cover a fuller cinematic curtain (the deck.gl globe still shows
+   at the right edge for depth, but no chrome bleeds through). */
+.tanga-deck__cover {
+  background: linear-gradient(90deg, rgba(4,8,14,0.94) 0%, rgba(4,8,14,0.82) 40%, rgba(4,8,14,0.4) 72%, rgba(4,8,14,0.15) 100%) !important;
+}

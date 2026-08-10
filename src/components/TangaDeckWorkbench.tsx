@@ -3448,8 +3448,12 @@ export default function TangaDeckWorkbench() {
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1;
   const activeDataTable = MODE_DATA_TABLES[activeMode];
   const activeActIndex = actIndexForMode(activeMode);
-  const isCoverScene = activeStoryIndex === 0;
   const isClosingScene = activeStoryIndex === STORY_STEPS.length - 1;
+  // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
+  // the ranking underneath (it does NOT advance — scene 1 is the peer field).
+  const [coverDismissed, setCoverDismissed] = useState(false);
+  const showCover = activeStoryIndex === 0 && !coverDismissed;
+  const isCoverScene = showCover;
   // Scenes without a source-data table still get a panel — key insight chips
   // from SLIDE_FACTS — so the top-left zone is never awkwardly empty.
   const insightFacts = !activeDataTable ? (SLIDE_FACTS[activeMode] ?? []) : [];
@@ -3609,7 +3613,12 @@ export default function TangaDeckWorkbench() {
       const key = event.key;
 
       // Navigation
-      if (key === 'ArrowRight' || key === 'PageDown') { event.preventDefault(); handleNextStory(); return; }
+      if (key === 'ArrowRight' || key === 'PageDown') {
+        event.preventDefault();
+        if (activeStoryIndex === 0 && !coverDismissed) { setCoverDismissed(true); return; }
+        handleNextStory();
+        return;
+      }
       if (key === 'ArrowLeft' || key === 'PageUp')    { event.preventDefault(); handlePrevStory(); return; }
       if (key === 'Home') { event.preventDefault(); goToStoryIndex(0); return; }
       if (key === 'End')  { event.preventDefault(); goToStoryIndex(STORY_STEPS.length - 1); return; }
@@ -3634,7 +3643,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, toggleAnnotations, toggleInspector, isShortcutsOpen, isNotesOpen, isBlackout]);
+  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, toggleAnnotations, toggleInspector, isShortcutsOpen, isNotesOpen, isBlackout, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -3947,7 +3956,7 @@ export default function TangaDeckWorkbench() {
       </div>
 
       {/* First-run coach marks — one-time interactive hint. */}
-      {showCoach && (
+      {showCoach && !showCover && (
         <button type="button" className="tanga-deck__coach" onClick={dismissCoach} aria-label="Dismiss navigation hint">
           <span className="tanga-deck__coach-keys">
             <kbd>&larr;</kbd><kbd>&rarr;</kbd>
@@ -3992,10 +4001,10 @@ export default function TangaDeckWorkbench() {
             <span className="tanga-deck__cover-eyebrow">Sakariya Mines &amp; Minerals · Investor Presentation</span>
             <h1 className="tanga-deck__cover-title">Tanga Graphite</h1>
             <p className="tanga-deck__cover-sub">A drill-defined, JORC-compliant flake graphite resource on Tanzania&rsquo;s Mozambique Belt — 183&nbsp;Mt @ 4.86% TGC, with port, power and rail already in reach.</p>
-            <button type="button" className="tanga-deck__cover-cta" onClick={handleManualNext}>
+            <button type="button" className="tanga-deck__cover-cta" onClick={() => setCoverDismissed(true)}>
               Begin the story <ChevronRight size={18} strokeWidth={2.4} />
             </button>
-            <span className="tanga-deck__cover-hint">Press → or click to begin</span>
+            <span className="tanga-deck__cover-hint">Press &rarr; or click to begin</span>
           </div>
         </div>
       )}
