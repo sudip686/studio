@@ -2113,10 +2113,11 @@ export default function TangaThreeGeologyScene({
       }
 
       if (mode === 'resource' || mode === 'mine_planning') {
-        // Mine planning shows ONLY the minable blocks — those the pit
-        // optimizer captured at the US$1,050/t base case. Using the HighTGC
-        // proxy (≥6% TGC) which closely matches the 95 Mt @ 5.70% pit ore.
-        const activeFocus: ResourceFocus = mode === 'mine_planning' ? 'HighTGC' : resourceFocus;
+        // Mine planning shows the minable resource the pit captures. The pit
+        // optimizer selects the economic block population, so 'All' (the full
+        // resource envelope the model contains) is what the pit shell wraps —
+        // HighTGC was far too aggressive and left the scene empty.
+        const activeFocus: ResourceFocus = mode === 'mine_planning' ? 'All' : resourceFocus;
         const selected = blocks.filter((block) => blockMatchesFocus(block, activeFocus));
         const maxBlocks = activeFocus === 'All' ? 2200 : activeFocus === 'HighTGC' || activeFocus === 'HighFlake' ? 2600 : 3200;
         const step = Math.max(1, Math.ceil(selected.length / maxBlocks));
