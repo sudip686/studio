@@ -3871,7 +3871,7 @@ export default function TangaDeckWorkbench() {
           pager, keyboard shortcuts, autoplay, and speaker notes. */}
 
       {activeDataTable && (
-        <aside className="tanga-deck__data-panel" aria-label={activeDataTable.title}>
+        <aside key={`data-${activeMode}`} className="tanga-deck__data-panel" aria-label={activeDataTable.title}>
           <div className="tanga-deck__data-panel-head">
             <span className="tanga-deck__data-panel-eyebrow">Source data</span>
             <strong className="tanga-deck__data-panel-title">{activeDataTable.title}</strong>
@@ -3924,7 +3924,7 @@ export default function TangaDeckWorkbench() {
       {/* Key-insight chips for scenes without a source-data table — keeps the
           top-left zone purposeful across the whole deck. */}
       {!activeDataTable && insightFacts.length > 0 && !isCoverScene && !isClosingScene && (
-        <aside className="tanga-deck__insight-panel" aria-label="Key facts">
+        <aside key={`insight-${activeMode}`} className="tanga-deck__insight-panel" aria-label="Key facts">
           <span className="tanga-deck__insight-eyebrow">{activeSlide?.narrative?.chapterTitle ?? MODE_LABELS[activeMode]}</span>
           <ul className="tanga-deck__insight-list">
             {insightFacts.map((fact) => (

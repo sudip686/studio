@@ -13,9 +13,21 @@
 //       node scripts/r2-upload.mjs --videos  (also uploads every file in public/media)
 // ─────────────────────────────────────────────────────────────────────────────
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { createReadStream, statSync, existsSync, readdirSync } from 'node:fs';
+import { createReadStream, statSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import mime from 'mime-types';
+
+// Auto-load .env.local (gitignored) so no manual `export` is needed. Only
+// fills vars that aren't already set in the real environment.
+for (const envFile of ['.env.local', '.env']) {
+  if (!existsSync(envFile)) continue;
+  for (const line of readFileSync(envFile, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
+    if (m && process.env[m[1]] === undefined) {
+      process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  }
+}
 
 const BUCKET = 'my-geo-assets';
 const PUBLIC = 'public';
