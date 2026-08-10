@@ -13038,3 +13038,21 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
   max-height: calc(100vh - 260px) !important;
   overflow-y: auto;
 }
+
+/* ═════ Scene 1 (ranking) + scene 10 residual overlap fixes ═════ */
+/* Ranking panel is self-titled — hide the lower-third title, and cap the
+   list height so it clears the bottom pager. */
+.tanga-deck--ranking .tanga-deck__title { display: none !important; }
+.tanga-deck--ranking .tanga-deck__ranking {
+  max-height: calc(100vh - 210px) !important;
+  overflow-y: auto;
+}
+/* Scene 10: the finale card is the focus — drop the act ribbon here. */
+.tanga-deck--comparison .tanga-deck__act-ribbon { display: none !important; }
+
+/* Ranking panel is anchored top+bottom (stretches full height). Lift its
+   bottom above the pager so they don't overlap; the list scrolls if needed. */
+.tanga-deck--ranking .tanga-deck__ranking {
+  bottom: 196px !important;
+  max-height: none !important;
+}
