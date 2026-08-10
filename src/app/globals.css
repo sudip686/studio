@@ -13056,3 +13056,20 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
   bottom: 196px !important;
   max-height: none !important;
 }
+
+/* ═════ Scene-change flash — subtle premium transition on every scene ═════ */
+.tanga-deck__scene-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(217,106,42,0.06) 0%, rgba(4,8,14,0.32) 70%, rgba(4,8,14,0.5) 100%);
+  animation: proSceneFlash 620ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes proSceneFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__scene-flash { animation: none; opacity: 0; }
+}

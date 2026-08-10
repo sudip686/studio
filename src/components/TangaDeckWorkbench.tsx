@@ -3758,6 +3758,10 @@ export default function TangaDeckWorkbench() {
 
       <div className="tanga-deck__shade" />
 
+      {/* Subtle scene-change flash — keyed to activeMode so it re-mounts and
+          fades out each transition, giving every scene a clean "arrival". */}
+      <div key={`flash-${activeMode}`} className="tanga-deck__scene-flash" aria-hidden="true" />
+
       <TangaStoryVideoHero
         visible={storyHeroVisible}
         videoSrc="/media/tanga-google-earth-intro-corrected-preview.mp4?v=story-hero-90s-20260626"
@@ -3910,7 +3914,9 @@ export default function TangaDeckWorkbench() {
                       style={{'--bar': barPct} as any}
                     >
                       {row.cells?.map((cell, cellIndex) => (
-                        <td key={cellIndex} className={cellIndex === 0 ? 'is-label' : 'is-num'}>{cell}</td>
+                        <td key={cellIndex} className={cellIndex === 0 ? 'is-label' : 'is-num'}>
+                          {cellIndex > 0 && /\d/.test(cell) ? <CountUp value={cell} duration={900} /> : cell}
+                        </td>
                       ))}
                     </tr>
                   );
