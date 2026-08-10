@@ -13257,3 +13257,12 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
+
+/* Fix: route elevation-profile was at left:356 (center-left) and overlapped the
+   centre pager on the accessibility scene. Move it to the far-left column. */
+.tanga-deck__route-profile {
+  left: 24px !important;
+  right: auto !important;
+  bottom: 26px !important;
+  width: min(300px, 40vw) !important;
+}
