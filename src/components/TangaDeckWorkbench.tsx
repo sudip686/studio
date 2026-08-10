@@ -4430,10 +4430,27 @@ export default function TangaDeckWorkbench() {
             ))}
           </ol>
 
-          <div className="tanga-deck__ranking-foot">
-            <span>{tangaRankingInserted ? 'Insertion animated' : 'Awaiting resource reveal'}</span>
-            <strong>{tangaRankingInserted ? '#5 peer slot' : 'Say "show resource" to reveal Tanga'}</strong>
-          </div>
+          {tangaRankingInserted ? (
+            <div className="tanga-deck__rank-vs" aria-label="Tanga versus Mahenge">
+              <div className="tanga-deck__rank-vs-head">
+                <span>#5 Tanga</span>
+                <em>vs</em>
+                <span>#4 Mahenge</span>
+              </div>
+              <ul>
+                <li><i>Scale</i><b>7.3 Mt</b><s>comparable</s><b>9.3 Mt</b></li>
+                <li className="is-win"><i>Logistics</i><b>~80 km to port</b><s>coastal edge</s><b>inland south</b></li>
+                <li className="is-win"><i>Metallurgy</i><b>&gt;97% TC</b><s>premium conc.</s><b>large-flake</b></li>
+                <li><i>Listing</i><b>Private</b><s>pre-market entry</s><b>ASX: BKT</b></li>
+              </ul>
+              <p>Comparable scale, a coastal logistics edge and &gt;97% TC metallurgy — entering the global top 5 pre-market.</p>
+            </div>
+          ) : (
+            <div className="tanga-deck__ranking-foot">
+              <span>Awaiting resource reveal</span>
+              <strong>Say &ldquo;show resource&rdquo; to reveal Tanga</strong>
+            </div>
+          )}
         </section>
       )}
 

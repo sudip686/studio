@@ -13128,3 +13128,44 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
   .tanga-deck__ranking-list li.is-tanga,
   .tanga-deck__ranking-list li.is-shifted { animation: none; }
 }
+
+/* ═════ Tanga vs Mahenge peer comparison (ranking reveal) ═════ */
+.tanga-deck__rank-vs {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 106, 42, 0.28);
+  background: linear-gradient(180deg, rgba(217,106,42,0.10), rgba(6,11,18,0.5));
+  animation: proFadeRise 500ms cubic-bezier(0.2,0.8,0.2,1) 700ms both;
+}
+.tanga-deck__rank-vs-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.tanga-deck__rank-vs-head span:first-child { color: #ffce8a; }
+.tanga-deck__rank-vs-head span:last-child { color: rgba(226,232,240,0.7); text-align: right; }
+.tanga-deck__rank-vs-head em { font-style: normal; font-size: 10px; color: rgba(196,205,219,0.5); }
+.tanga-deck__rank-vs ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.tanga-deck__rank-vs li {
+  display: grid;
+  grid-template-columns: 62px 1fr auto 1fr;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 7px;
+}
+.tanga-deck__rank-vs li.is-win { background: rgba(217,106,42,0.14); }
+.tanga-deck__rank-vs li i { font-style: normal; color: rgba(196,205,219,0.6); text-transform: uppercase; letter-spacing: 0.06em; font-size: 9px; }
+.tanga-deck__rank-vs li b { color: #f7f9fc; font-weight: 600; }
+.tanga-deck__rank-vs li b:first-of-type { color: #ffce8a; }
+.tanga-deck__rank-vs li s { text-decoration: none; text-align: center; color: rgba(196,205,219,0.5); font-size: 9px; }
+.tanga-deck__rank-vs li:last-child b:last-of-type,
+.tanga-deck__rank-vs li b:last-of-type { color: rgba(226,232,240,0.78); font-weight: 500; text-align: right; }
+.tanga-deck__rank-vs p { margin: 8px 0 0; font-size: 11px; line-height: 1.4; color: rgba(226,232,240,0.82); }
+@media (prefers-reduced-motion: reduce) { .tanga-deck__rank-vs { animation: none; } }
