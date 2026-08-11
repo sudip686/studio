@@ -22,7 +22,11 @@ import {
   stripWakePhrase,
 } from '@/lib/tanga-voice-command';
 
-const TangaThreeGeologyScene = dynamic(() => import('./TangaThreeGeologyScene'), {
+// Named loader so we can prefetch the (525 KB) Three.js chunk in the background
+// while the user is still on the early map scenes — the first 3D scene then
+// renders instantly instead of downloading on arrival.
+const loadThreeSceneModule = () => import('./TangaThreeGeologyScene');
+const TangaThreeGeologyScene = dynamic(loadThreeSceneModule, {
   ssr: false,
   loading: () => (
     <section className="tanga-three tanga-three--loading is-visible" aria-label="Loading 3D scene">
@@ -3469,6 +3473,23 @@ export default function TangaDeckWorkbench() {
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
   const isFirstStory = activeStoryIndex <= 0;
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1;
+
+  // Prefetch the Three.js scene chunk once the user is a few scenes in (but
+  // before the first 3D scene), so arriving at it is instant. Idle-scheduled so
+  // it never competes with the current scene's work.
+  useEffect(() => {
+    if (threeSceneRequested || activeStoryIndex < 3) return;
+    const w = window as unknown as {requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void};
+    let idle: number | undefined;
+    let timer: number | undefined;
+    const warm = () => { void loadThreeSceneModule(); };
+    if (w.requestIdleCallback) idle = w.requestIdleCallback(warm);
+    else timer = window.setTimeout(warm, 500);
+    return () => {
+      if (idle !== undefined && w.cancelIdleCallback) w.cancelIdleCallback(idle);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activeStoryIndex, threeSceneRequested]);
   const activeDataTable = MODE_DATA_TABLES[activeMode];
   const activeActIndex = actIndexForMode(activeMode);
   const isClosingScene = activeStoryIndex === STORY_STEPS.length - 1;
