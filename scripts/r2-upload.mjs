@@ -48,6 +48,9 @@ const s3 = new S3Client({
 
 // Object keys mirror the /public paths the app fetches.
 const KEYS = [
+  'terrain_hires_meta.json',
+  'height_hires.bin',
+  'terrain_texture_hires.jpg',
   'terrain_preview_meta.json',
   'height_preview_1024.bin',
   'topography.png',

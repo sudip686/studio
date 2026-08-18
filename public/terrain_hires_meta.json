@@ -1,0 +1,17 @@
+{
+  "bounds_utm": {
+    "minX": 472359.62572800094,
+    "maxX": 479959.62572800094,
+    "minY": 9464402.587291513,
+    "maxY": 9471602.587291513
+  },
+  "width": 2048,
+  "height": 1940,
+  "elevation_m": {
+    "min": 204.29443359375,
+    "max": 1008.1314086914062
+  },
+  "crs_epsg": 32737,
+  "rgb_texture": "terrain_texture_hires.jpg",
+  "source_height_grid": "height_hires.bin"
+}
