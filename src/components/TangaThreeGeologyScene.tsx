@@ -660,6 +660,15 @@ function threeCallouts(mode: GeologyMode, focus: ResourceFocus): ThreeCallout[] 
       {id: 'grade', label: 'TGC color ramp', detail: 'Every block is shaded by graphite grade', x: 36, y: 62, tone: '#facc15', anchor: [-520, -140, 700], side: 'right'},
     ];
   }
+  if (mode === 'mine_planning') {
+    // One callout only, anchored on the pit/west side so its box sits in the
+    // upper-left over the terrain — clear of both the right-docked Pit &
+    // Financial panel and the bottom-left drillhole legend.
+    return [
+      {id: 'pit', label: 'Pit shell', detail: 'Optimised shell over the graphite resource, staged in phased benches', x: 33, y: 34, tone: '#f59e0b', anchor: [-620, -60, 300], side: 'right'},
+    ];
+  }
+  // metallurgy (default)
   return [
     {id: 'samples', label: 'Sample transfer', detail: 'Selected drill intervals pulse into the lab circuit', x: 44, y: 36, tone: '#d96b2b', anchor: [940, 520, -1130], side: 'right'},
     {id: 'recoveries', label: 'Data reveal', detail: '>97% TC concentrate with recovery metrics', x: 62, y: 58, tone: '#b9954b', anchor: [1540, 350, -1120], side: 'left'},
@@ -2772,7 +2781,9 @@ export default function TangaThreeGeologyScene({
       ? 'Metallurgy reveal'
       : mode === 'subsurface'
         ? 'Subsurface cutaway'
-        : 'Drillhole volume';
+        : mode === 'mine_planning'
+          ? 'Mine plan'
+          : 'Drillhole volume';
 
   return (
     <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`)} aria-hidden={!visible}>
@@ -2798,7 +2809,7 @@ export default function TangaThreeGeologyScene({
             ))}
           </div>
           <div className="tanga-three__hud">
-            <span>Three.js geology stage</span>
+            <span>Interactive 3D model</span>
             <strong>{sceneHeading}</strong>
             <small>{status}</small>
           </div>
