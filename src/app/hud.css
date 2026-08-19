@@ -238,3 +238,85 @@
   font-family: var(--font-mono) !important;
   font-variant-numeric: tabular-nums;
 }
+
+/* ===========================================================================
+   PHASE 3 — futuristic polish: command-center framing + live signal motion.
+   =========================================================================== */
+
+/* 3.1 — viewport-corner reticles + edge vignette (depth without a hard box).
+   Eight thin bars (H+V per corner) drawn as backgrounds on one fixed element,
+   plus a radial vignette. Sits above the scene, below the panels, inert. */
+.hud-frame {
+  position: fixed;
+  inset: 12px;
+  z-index: 6;
+  pointer-events: none;
+  --tick: 24px;
+  --rc: rgba(var(--hud-cyan), 0.38);
+  background-repeat: no-repeat;
+  background-image:
+    linear-gradient(var(--rc), var(--rc)), linear-gradient(var(--rc), var(--rc)),
+    linear-gradient(var(--rc), var(--rc)), linear-gradient(var(--rc), var(--rc)),
+    linear-gradient(var(--rc), var(--rc)), linear-gradient(var(--rc), var(--rc)),
+    linear-gradient(var(--rc), var(--rc)), linear-gradient(var(--rc), var(--rc));
+  background-position:
+    0 0, 0 0,                       /* top-left  H, V */
+    100% 0, 100% 0,                 /* top-right H, V */
+    0 100%, 0 100%,                 /* bot-left  H, V */
+    100% 100%, 100% 100%;           /* bot-right H, V */
+  background-size:
+    var(--tick) 1px, 1px var(--tick),
+    var(--tick) 1px, 1px var(--tick),
+    var(--tick) 1px, 1px var(--tick),
+    var(--tick) 1px, 1px var(--tick);
+}
+/* Vignette layer — separate fixed pseudo so it never fights the reticle bg. */
+.hud-frame::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 46%, transparent 58%, rgba(3, 7, 12, 0.42) 100%);
+}
+
+/* 3.2 — the single "live" element (autoplay while ticking) gets a soft warm
+   pulse so the running state reads at a glance. Warm = live, by our rule. */
+@keyframes hud-live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--deck-accent, 204, 90, 40), 0.0); }
+  50%      { box-shadow: 0 0 18px 2px rgba(var(--deck-accent, 204, 90, 40), 0.35); }
+}
+.tanga-deck__pager-play.is-ticking {
+  animation: hud-live-pulse 2.2s var(--ease-hud) infinite;
+}
+
+/* 3.3 — the active ACT tab gets a thin cyan underscan line for the HUD read. */
+.tanga-deck__act-ribbon .is-active::after,
+.tanga-deck__act-ribbon [aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 6px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--hud-cyan), 0.85), transparent);
+}
+
+/* 3.4 — panels rise in with one shared easing (gentle, no layout thrash). */
+.tanga-deck__data-panel,
+.tanga-deck__insight-panel,
+.tanga-three__grade-legend,
+.tanga-three__drill-legend {
+  animation: hud-panel-in var(--dur-med) var(--ease-hud) both;
+}
+@keyframes hud-panel-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__pager-play.is-ticking,
+  .tanga-deck__data-panel,
+  .tanga-deck__insight-panel,
+  .tanga-three__grade-legend,
+  .tanga-three__drill-legend { animation: none; }
+}

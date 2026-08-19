@@ -3804,6 +3804,10 @@ export default function TangaDeckWorkbench() {
 
       <div className="tanga-deck__shade" />
 
+      {/* HUD command-center frame: viewport-corner reticles + edge vignette.
+          Pure decoration, non-interactive. Styled in hud.css (Phase 3). */}
+      <div className="hud-frame" aria-hidden="true" />
+
       {/* Subtle scene-change flash — keyed to activeMode so it re-mounts and
           fades out each transition, giving every scene a clean "arrival". */}
       <div key={`flash-${activeMode}`} className="tanga-deck__scene-flash" aria-hidden="true" />
