@@ -496,3 +496,43 @@ html, body { overflow-x: hidden; }
   .tanga-deck__data-table td,
   .tanga-deck__data-table th { font-size: 0.72rem; }
 }
+
+/* ===========================================================================
+   PHASE 11 — VRIFY-style callouts. Reference: vrify.com decks use small,
+   uniform callouts with a cyan left-accent edge and a thin white leader line to
+   a precise anchor. Ours were chunkier per-tone boxes. Tighten + unify them.
+   =========================================================================== */
+.tanga-deck__callout,
+.tanga-three__callout {
+  max-width: 192px !important;
+  padding: 7px 9px 8px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--hud-line) !important;
+  border-left: 2px solid rgba(var(--hud-cyan), 0.75) !important;
+  background: linear-gradient(180deg, rgba(10, 16, 22, 0.9), rgba(6, 11, 18, 0.93)) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45) !important;
+}
+/* Thin, cool leader line + crisp anchor dot (was a thick tone-glow bar). */
+.tanga-three__callout::before {
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, rgba(214, 234, 246, 0.72)) !important;
+  box-shadow: none !important;
+}
+.tanga-three__callout::after {
+  width: 6px !important; height: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  background: rgba(var(--hud-cyan), 0.95) !important;
+  box-shadow: 0 0 9px rgba(var(--hud-cyan), 0.6) !important;
+}
+/* Callout title → cyan micro-label; detail → tight body. */
+.tanga-deck__callout > span,
+.tanga-three__callout > span {
+  color: rgba(var(--hud-cyan), 0.95) !important;
+  font-size: 0.62rem !important;
+  letter-spacing: 0.12em !important;
+}
+.tanga-deck__callout > strong,
+.tanga-three__callout > strong {
+  font-size: 0.78rem !important;
+  line-height: 1.25 !important;
+}
