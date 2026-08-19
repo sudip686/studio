@@ -1,0 +1,161 @@
+/* ============================================================================
+   HUD LAYER — cool sci-fi / command-center chrome over the 3D deck.
+   Loaded AFTER globals.css so it wins by source order. See plans/ui-hud-redesign.md.
+
+   Strategy: additive override layer. We do NOT edit the 13k-line globals.css
+   (which has 8+ duplicate topbar blocks + a !important "palette discipline"
+   pass). Instead we impose a consistent HUD system here with matched
+   specificity (double-class .x.x = 0,2,0) and !important only where the
+   palette-discipline layer forces a value.
+   ============================================================================ */
+
+:root {
+  /* Cool HUD base ------------------------------------------------------ */
+  --hud-cyan: 94, 234, 212;            /* teal-300 — cool signal            */
+  --hud-ice: 148, 197, 255;            /* cool secondary fill               */
+  --hud-slate-0: 8, 13, 18;            /* deepest panel ground              */
+  --hud-slate-1: 14, 21, 28;
+  --hud-line: rgba(148, 197, 255, 0.16);      /* structural hairline        */
+  --hud-line-strong: rgba(148, 197, 255, 0.30);
+  --hud-line-live: rgba(var(--deck-accent, 204, 90, 40), 0.6); /* warm=active */
+  --hud-text: rgba(233, 242, 252, 0.94);
+  --hud-text-dim: rgba(183, 201, 222, 0.72);
+  --hud-micro: rgba(148, 197, 255, 0.72);
+
+  /* Glass panel primitive --------------------------------------------- */
+  --glass-bg: linear-gradient(180deg, rgba(14, 21, 28, 0.74), rgba(8, 13, 18, 0.86));
+  --glass-blur: 15px;
+  --glass-radius: 12px;
+  --glass-pad: clamp(12px, 1vw, 16px);
+  --glass-glow: 0 0 0 1px rgba(94, 234, 212, 0.10), 0 10px 34px rgba(0, 0, 0, 0.5);
+
+  /* Motion ------------------------------------------------------------- */
+  --ease-hud: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 160ms;
+  --dur-med: 320ms;
+  --dur-slow: 620ms;
+
+  /* Technical type ----------------------------------------------------- */
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", monospace;
+}
+
+/* ---------------------------------------------------------------------------
+   Reusable glass-panel primitive. Phase 2 migrates panels onto `.hud-panel`;
+   Phase 1 already routes the key panels through the component overrides below.
+   --------------------------------------------------------------------------- */
+.hud-panel {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-glow);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  color: var(--hud-text);
+}
+/* Corner ticks — the "instrument" detail. */
+.hud-panel::before,
+.hud-panel::after {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.hud-panel::before {
+  top: 6px; left: 6px;
+  border-top: 1px solid rgba(var(--hud-cyan), 0.55);
+  border-left: 1px solid rgba(var(--hud-cyan), 0.55);
+}
+.hud-panel::after {
+  bottom: 6px; right: 6px;
+  border-bottom: 1px solid rgba(var(--hud-cyan), 0.55);
+  border-right: 1px solid rgba(var(--hud-cyan), 0.55);
+}
+
+/* ===========================================================================
+   PHASE 1.1 — Top-left cluster: stop the brand / command overlap.
+   Force a single robust 3-column row (brand | flexible gap | command) that
+   holds at every width, and never lets the command slide under the brand.
+   Double-class specificity (0,2,0) beats the `--three-active .topbar` rule.
+   =========================================================================== */
+.tanga-deck__topbar.tanga-deck__topbar {
+  display: grid;
+  grid-template-columns: auto 1fr minmax(340px, 520px);
+  align-items: center;
+  gap: 16px;
+  top: 16px;
+  /* Globals rules cap the bar (max-width:640) and set right:auto in a media
+     query, which collapses the 1fr spacer and drags the command under the
+     brand. Force a full-width stretch so the command docks far-right, clear. */
+  left: clamp(16px, 1.6vw, 28px) !important;
+  right: clamp(16px, 1.6vw, 28px) !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
+.tanga-deck__brand.tanga-deck__brand {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.tanga-deck__brand-lockup img { max-width: 168px; }
+
+/* Command form: never overflow, never overlap. It owns column 3 only. */
+.tanga-deck__command.tanga-deck__command {
+  grid-column: 3;
+  min-width: 0;
+  border: 1px solid var(--hud-line-strong);
+  background: linear-gradient(180deg, rgba(14, 21, 28, 0.78), rgba(8, 13, 18, 0.9));
+}
+.tanga-deck__command.tanga-deck__command input { min-width: 0; }
+
+/* Below the point where a full command bar + brand can't coexist on one row,
+   drop the free-text command (keep brand + scene chip). The voice dock and the
+   RUN/MIC still exist elsewhere; the deck is arrow/click driven here. */
+@media (max-width: 1180px) {
+  .tanga-deck__topbar.tanga-deck__topbar {
+    grid-template-columns: auto 1fr;
+  }
+  .tanga-deck__command.tanga-deck__command { display: none; }
+}
+
+/* ===========================================================================
+   PHASE 1.2 — Legends (TGC grade, drillhole) must size to content and scroll
+   internally, never clip labels at the panel edge.
+   =========================================================================== */
+.tanga-deck__legend.tanga-deck__legend,
+.tanga-deck__grade-legend.tanga-deck__grade-legend,
+.tanga-deck__geo-overlay .tanga-deck__legend {
+  max-height: min(46vh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.tanga-deck__legend li,
+.tanga-deck__grade-legend li,
+.tanga-deck__legend-row {
+  white-space: normal;      /* let long labels wrap instead of clipping */
+  overflow: visible;
+}
+
+/* ===========================================================================
+   PHASE 1.3 — Keep the globe/terrain the hero: cap the side data panels and
+   dock them, so the centre column stays scene-only.
+   =========================================================================== */
+.tanga-deck__data-panel.tanga-deck__data-panel {
+  width: min(300px, 24vw);
+  border: 1px solid var(--hud-line);
+  background: var(--glass-bg);
+}
+.tanga-deck__insight-panel.tanga-deck__insight-panel {
+  width: min(300px, 24vw);
+  border: 1px solid var(--hud-line);
+  background: var(--glass-bg);
+}
+
+/* Structural borders go cool; the palette-discipline layer forced them to a
+   flat white — override with matched !important, cool hairline. */
+.tanga-deck__data-panel.tanga-deck__data-panel,
+.tanga-deck__insight-panel.tanga-deck__insight-panel {
+  border-color: var(--hud-line) !important;
+}
