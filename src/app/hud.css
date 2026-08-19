@@ -321,3 +321,33 @@
   .tanga-three__grade-legend,
   .tanga-three__drill-legend { animation: none; }
 }
+
+/* ===========================================================================
+   PHASE 4 — occlusion hardening. On dense 3D scenes (metallurgy, mine-plan) the
+   scene's own reveal/metric cards and camera-anchored callouts can drift into
+   the right gutter where the deck's data panel is docked. Make the fixed data
+   panels read as SOLID instrument panels that sit decisively on top, so nothing
+   bleeds through them and the key figures stay legible.
+   =========================================================================== */
+.tanga-deck__data-panel.tanga-deck__data-panel,
+.tanga-deck__insight-panel.tanga-deck__insight-panel {
+  z-index: 16 !important;
+  background:
+    linear-gradient(180deg, rgba(11, 17, 23, 0.95), rgba(6, 10, 15, 0.975)) !important;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+/* Camera-anchored callouts stay subordinate to the fixed panels and are held to
+   a compact footprint so they intrude less over the terrain. */
+.tanga-three__callout {
+  max-width: 200px;
+  z-index: 4;
+}
+
+/* If the scene ever renders a metric "outlier" card, keep it from sitting on top
+   of the docked data panel — it drops behind the solid panel instead. */
+.tanga-three__callout-layer,
+.tanga-three__callout-layer .is-outlier {
+  z-index: 4;
+}
