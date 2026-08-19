@@ -219,19 +219,28 @@ const POWER_GRID_NODES = [
   },
 ];
 
+// Semantic 3-category site palette (was 5+ arbitrary hues — teal/yellow/slate/
+// sky/red — which read as random coloured boxes on the imagery). Now:
+//   INFRA    cool cyan-slate — built infrastructure (plant, crusher, admin…)
+//   WATER    muted blue      — water management
+//   MATERIAL muted amber     — ore / product stockpiles (the "value")
+const MINE_INFRA_COLOR: [number, number, number, number] = [128, 196, 214, 168];
+const MINE_WATER_COLOR: [number, number, number, number] = [70, 158, 210, 132];
+const MINE_MATERIAL_COLOR: [number, number, number, number] = [226, 168, 82, 170];
+
 const HYPOTHETICAL_MINE_FACILITIES = [
-  {id: 'process-plant', name: 'Hypothetical processing plant', east: 0, north: 0, width: 260, depth: 126, height: 36, bearing: -18, color: [45, 212, 191, 188], detail: 'Low-relief DEM plant pad'},
-  {id: 'crusher', name: 'Primary crusher', east: -310, north: 115, width: 145, depth: 82, height: 26, bearing: -18, color: [250, 204, 21, 192], detail: 'Concept ROM front end'},
-  {id: 'workshop', name: 'Workshop and stores', east: 210, north: -240, width: 190, depth: 92, height: 18, bearing: 12, color: [148, 163, 184, 178], detail: 'Concept maintenance area'},
-  {id: 'admin', name: 'Admin / gatehouse', east: 330, north: 130, width: 86, depth: 54, height: 12, bearing: 10, color: [125, 211, 252, 186], detail: 'Concept site office'},
-  {id: 'substation', name: 'Mine substation', east: -190, north: -260, width: 104, depth: 72, height: 16, bearing: 4, color: [250, 204, 21, 210], detail: 'Concept grid tie-in'},
-  {id: 'water-pond', name: 'Water pond', east: -470, north: -285, width: 260, depth: 156, height: 3, bearing: 18, color: [56, 189, 248, 142], detail: 'Concept water management'},
+  {id: 'process-plant', name: 'Hypothetical processing plant', east: 0, north: 0, width: 260, depth: 126, height: 36, bearing: -18, color: MINE_INFRA_COLOR, detail: 'Low-relief DEM plant pad'},
+  {id: 'crusher', name: 'Primary crusher', east: -310, north: 115, width: 145, depth: 82, height: 26, bearing: -18, color: MINE_INFRA_COLOR, detail: 'Concept ROM front end'},
+  {id: 'workshop', name: 'Workshop and stores', east: 210, north: -240, width: 190, depth: 92, height: 18, bearing: 12, color: MINE_INFRA_COLOR, detail: 'Concept maintenance area'},
+  {id: 'admin', name: 'Admin / gatehouse', east: 330, north: 130, width: 86, depth: 54, height: 12, bearing: 10, color: MINE_INFRA_COLOR, detail: 'Concept site office'},
+  {id: 'substation', name: 'Mine substation', east: -190, north: -260, width: 104, depth: 72, height: 16, bearing: 4, color: MINE_INFRA_COLOR, detail: 'Concept grid tie-in'},
+  {id: 'water-pond', name: 'Water pond', east: -470, north: -285, width: 260, depth: 156, height: 3, bearing: 18, color: MINE_WATER_COLOR, detail: 'Concept water management'},
 ];
 
 const HYPOTHETICAL_MINE_POINTS = [
-  {id: 'rom-pad', name: 'ROM stockpile', east: -540, north: 210, radius: 92, height: 30, color: [239, 68, 68, 166], detail: 'Concept ore stockpile'},
-  {id: 'product-stockpile', name: 'Product stockpile', east: 270, north: -60, radius: 76, height: 22, color: [45, 212, 191, 162], detail: 'Concept concentrate loadout'},
-  {id: 'process-tanks', name: 'Process tanks', east: 50, north: 140, radius: 34, height: 42, color: [125, 211, 252, 182], detail: 'Concept reagent/water tanks'},
+  {id: 'rom-pad', name: 'ROM stockpile', east: -540, north: 210, radius: 92, height: 30, color: MINE_MATERIAL_COLOR, detail: 'Concept ore stockpile'},
+  {id: 'product-stockpile', name: 'Product stockpile', east: 270, north: -60, radius: 76, height: 22, color: MINE_MATERIAL_COLOR, detail: 'Concept concentrate loadout'},
+  {id: 'process-tanks', name: 'Process tanks', east: 50, north: 140, radius: 34, height: 42, color: MINE_INFRA_COLOR, detail: 'Concept reagent/water tanks'},
 ];
 
 const MODE_LABELS: Record<WorkbenchMode, string> = {
@@ -2702,7 +2711,10 @@ export default function TangaDeckWorkbench() {
     const showCutaway = false;
     const showMineInfrastructure = activeMode === 'project' || activeMode === 'accessibility';
     const showDetailedLocalContext = activeMode === 'topography';
-    const showPowerGrid = activeMode === 'accessibility' || activeMode === 'project';
+    // Power grid belongs to the access/infrastructure story only. It used to
+    // also render on the project-focus scene, where the bright yellow corridor
+    // beam dominated a slide that's about the licence area, not power.
+    const showPowerGrid = activeMode === 'accessibility';
     const showVillageLabels = activeMode === 'project';
     const terrainCells = showFastLocalSurface ? localTerrainCells(heightAt, activeMode) : [];
     const mineFacilities = showMineInfrastructure ? locatedMineFacilities() : [];
@@ -2854,12 +2866,12 @@ export default function TangaDeckWorkbench() {
         filled: true,
         stroked: true,
         extruded: true,
-        wireframe: true,
+        wireframe: false,
         getElevation: (feature: any) => Number(feature.properties?.height ?? 12),
-        getFillColor: (feature: any) => feature.properties?.color ?? [45, 212, 191, 170],
-        getLineColor: [255, 255, 255, 160],
-        getLineWidth: 2,
-        lineWidthMinPixels: 1.5,
+        getFillColor: (feature: any) => feature.properties?.color ?? MINE_INFRA_COLOR,
+        getLineColor: [226, 240, 250, 90],
+        getLineWidth: 1.5,
+        lineWidthMinPixels: 1,
         material: {
           ambient: 0.32,
           diffuse: 0.56,
@@ -2941,10 +2953,11 @@ export default function TangaDeckWorkbench() {
         id: 'power-grid-corridors',
         data: gridCorridors,
         getPath: (item: any) => item.path,
-        getColor: [250, 204, 21, 238],
-        getWidth: 96,
+        // Softer, thinner amber corridor — reads as a power line, not a beam.
+        getColor: [245, 197, 66, 176],
+        getWidth: 52,
         widthUnits: 'meters',
-        widthMinPixels: 3,
+        widthMinPixels: 2,
         jointRounded: true,
         capRounded: true,
         pickable: true,
