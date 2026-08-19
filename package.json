@@ -83,6 +83,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/three": "^0.165.0",
+    "agent-browser": "^0.27.0",
     "genkit-cli": "^1.26.0",
     "playwright": "^1.60.0",
     "postcss": "^8",

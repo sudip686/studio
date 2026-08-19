@@ -15,3 +15,13 @@ This project uses senior specialist guidance for implementation, review, UI/UX, 
 - Prefer reusable viewer controls and presentation HUD components over one-off overlays.
 - Keep geology, resource, and drilling visuals clear about evidence and uncertainty; avoid unsupported resource/reserve claims.
 - Verify visual changes with browser screenshots where possible, especially for 3D scenes.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
