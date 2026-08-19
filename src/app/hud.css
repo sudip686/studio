@@ -159,3 +159,82 @@
 .tanga-deck__insight-panel.tanga-deck__insight-panel {
   border-color: var(--hud-line) !important;
 }
+
+/* ===========================================================================
+   PHASE 2 — cool HUD unification.
+   Re-scope the accent: structural micro-labels + borders go cool cyan; the warm
+   orange survives ONLY as the live/active signal (active ACT tab, autoplay,
+   primary CTA), which we deliberately leave untouched below.
+   =========================================================================== */
+
+/* 2.1 — every micro-label / eyebrow becomes a cool cyan readout label. */
+[class^="tanga-deck__"][class*="eyebrow"],
+.tanga-deck__legend-head > span,
+.tanga-deck__pager-label {
+  color: rgba(var(--hud-cyan), 0.92) !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase;
+}
+
+/* 2.2 — numeric / instrument readouts in technical mono with tabular figures. */
+.tanga-deck__pager-count,
+.tanga-deck__scale em,
+.tanga-deck__scale small,
+.tanga-deck__compass small,
+.tanga-deck__data-table td,
+.tanga-deck__data-table th {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* 2.3 — unify the overlay panels onto one cool glass treatment (hairline +
+   faint cyan glow). The compass is round, so it keeps its own styling. */
+.tanga-deck__legend,
+.tanga-deck__scale,
+.tanga-deck__grade-legend,
+.tanga-deck__pager {
+  border: 1px solid var(--hud-line) !important;
+  box-shadow: var(--glass-glow);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+/* 2.4 — cool the active-tool ring on the pager toward cyan, but keep the warm
+   autoplay button as the single "live" signal. */
+.tanga-deck__pager-btn.is-active:not(.tanga-deck__pager-play) {
+  border-color: rgba(var(--hud-cyan), 0.55) !important;
+  color: rgba(var(--hud-cyan), 0.95) !important;
+  box-shadow: 0 0 18px rgba(var(--hud-cyan), 0.16);
+}
+
+/* 2.5 — hairline dividers inside panels go cool instead of warm. */
+.tanga-deck__data-panel-head,
+.tanga-deck__data-table th {
+  border-color: var(--hud-line) !important;
+}
+
+/* 2.6 — the Three.js scene renders its OWN overlays (`tanga-three__*`), separate
+   from the deck chrome. Bring them into the same cool HUD system. */
+.tanga-three__drill-legend-head > span,
+.tanga-three__grade-head > span,
+[class^="tanga-three__"][class*="eyebrow"] {
+  color: rgba(var(--hud-cyan), 0.92) !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase;
+}
+.tanga-three__drill-legend,
+.tanga-three__grade-legend,
+.tanga-three__scale,
+.tanga-three__camera-readout {
+  border: 1px solid var(--hud-line) !important;
+  box-shadow: var(--glass-glow);
+}
+.tanga-three__scale,
+.tanga-three__scale *,
+.tanga-three__camera-readout,
+.tanga-three__grade-head + * ,
+.tanga-three__bearing {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
