@@ -1289,21 +1289,23 @@ function sceneCalloutsForMode(
     ];
   }
   if (mode === 'project') {
+    // One bold callout only — the licence. (Was 2; the village-context box added
+    // noise and repeated what the map already shows.)
     return [
-      {id: 'aoi', label: 'Sakariya project area', detail: 'Graphite project outline locked to licence centre', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
-      {id: 'village', label: 'Village context', detail: 'Local villages, roads, vegetation and concept mine pad', boxX: 64, boxY: 57, tone: '#a89c94', anchor: {lon: 38.7858716, lat: -4.8049321, elevationOffset: 160}, offset: {x: 120, y: 72}},
+      {id: 'aoi', label: 'Sakariya project area', detail: 'Contiguous licence over the flake-graphite resource', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
     ];
   }
   if (mode === 'topography') {
+    // One callout — the relief story. (The AOI outline is already drawn + labelled.)
     return [
       {id: 'relief', label: 'Local DEM surface', detail: `${routeProfile.minElevation}-${routeProfile.maxElevation} m relief window under the project`, boxX: 50, boxY: 33, tone: '#a89c94', anchor: {...PROJECT_CENTER, elevationOffset: 130}},
-      {id: 'aoi', label: 'Project AOI outline', detail: 'Boundary sits directly over the terrain surface', boxX: 66, boxY: 50, tone: '#c7551b', anchor: {lon: PROJECT_CENTER.lon + 0.018, lat: PROJECT_CENTER.lat - 0.014, elevationOffset: 120}, offset: {x: 112, y: -66}},
     ];
   }
   if (mode === 'accessibility') {
     const targetTone = routeTarget === 'power' ? '#41200e' : routeTarget === 'rail' ? '#41200e' : '#c7551b';
+    // Two callouts — the route and the grid. (Dropped the redundant "Tanga
+    // project" origin box; the project is obvious as the route's start.)
     return [
-      {id: 'start', label: 'Tanga project', detail: 'Route origin at the project area', boxX: 41, boxY: 43, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 320}, offset: {x: 98, y: -92}},
       {id: 'route', label: `${routeProfile.distanceLabel} / ${routeProfile.durationLabel}`, detail: `${routeProfile.source === 'osrm' ? 'Road geometry' : 'Indicative route'} to ${routeProfile.targetLabel}`, boxX: 52, boxY: 61, tone: targetTone, anchor: {...ROUTE_TARGETS[routeTarget], elevationOffset: 420}},
       {id: 'power', label: 'Hale + New Pangani', detail: powerGridDistanceSummary(), boxX: 66, boxY: 49, tone: '#41200e', anchor: {lon: 38.636, lat: -5.326, elevationOffset: 440}, offset: {x: 118, y: -84}},
     ];
@@ -2804,14 +2806,17 @@ export default function TangaDeckWorkbench() {
         filled: true,
         stroked: true,
         extruded: false,
+        // The licence is THE asset — give it a clearly-highlighted warm fill and
+        // a crisp bright core outline so it reads as the hero of the slide, not
+        // a faint thin line lost on the terrain.
         getFillColor: (feature) => isProjectLayer(feature)
-          ? [217, 106, 42, activeMode === 'project' ? 36 : 22]
+          ? [240, 152, 72, activeMode === 'project' ? 64 : 44]
           : [250, 204, 21, 8],
-        getLineColor: (feature) => isProjectLayer(feature) ? [255, 232, 200, 255] : [255, 236, 179, 220],
-        getLineWidth: (feature) => isProjectLayer(feature) ? 2.8 : 2,
+        getLineColor: (feature) => isProjectLayer(feature) ? [255, 236, 205, 255] : [255, 236, 179, 220],
+        getLineWidth: (feature) => isProjectLayer(feature) ? 3.4 : 2,
         lineWidthUnits: 'pixels' as any,
-        lineWidthMinPixels: 1.5,
-        lineWidthMaxPixels: 4,
+        lineWidthMinPixels: 2,
+        lineWidthMaxPixels: 5,
         parameters: {depthTest: false} as any,
       }),
       // Layer 4: the area label — "6.4 sq km · 100% owned" at the polygon
@@ -2939,8 +2944,8 @@ export default function TangaDeckWorkbench() {
         getPosition: (feature) => featurePoint(feature, 8, heightAt),
         getElevation: treeHeight,
         getFillColor: (feature) => String(feature.properties?.kind ?? '').includes('centroid')
-          ? [68, 222, 128, 132]
-          : [34, 197, 94, 98],
+          ? [64, 190, 118, 92]
+          : [40, 150, 92, 64],
         pickable: true,
         material: {
           ambient: 0.36,
@@ -3157,8 +3162,8 @@ export default function TangaDeckWorkbench() {
         extruded: true,
         elevationScale: 1,
         getPosition: (feature) => featurePoint(feature, 24, heightAt),
-        getElevation: 155,
-        getFillColor: [250, 204, 21, 150],
+        getElevation: 120,
+        getFillColor: [224, 198, 150, 96],
         pickable: true,
         material: {
           ambient: 0.42,
@@ -3171,11 +3176,11 @@ export default function TangaDeckWorkbench() {
         id: 'village-rings',
         data: villages,
         getPosition: (feature) => featurePoint(feature, 32, heightAt),
-        getRadius: 300,
+        getRadius: 260,
         radiusUnits: 'meters',
-        getFillColor: [250, 204, 21, 42],
-        getLineColor: [250, 204, 21, 220],
-        lineWidthMinPixels: 2,
+        getFillColor: [228, 204, 150, 20],
+        getLineColor: [232, 208, 150, 120],
+        lineWidthMinPixels: 1,
         stroked: true,
         filled: true,
         pickable: true,
@@ -3186,14 +3191,16 @@ export default function TangaDeckWorkbench() {
         data: villages.length ? villages : labels,
         getPosition: (feature) => featurePoint(feature, 70, heightAt),
         getText: (feature) => String(feature.properties?.name ?? ''),
-        getSize: (feature) => String(feature.properties?.class ?? '') === 'village' ? 15 : 12,
-        getColor: [255, 255, 255, 238],
+        // Subtle supporting labels — smaller, lighter box — so they give
+        // geographic context without competing with the licence hero.
+        getSize: (feature) => String(feature.properties?.class ?? '') === 'village' ? 12 : 11,
+        getColor: [231, 240, 250, 224],
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'bottom',
         billboard: true,
         background: true,
-        getBackgroundColor: [5, 10, 15, 172],
-        backgroundPadding: [7, 4],
+        getBackgroundColor: [6, 11, 17, 120],
+        backgroundPadding: [5, 3],
         parameters: {depthTest: false} as any,
       }),
       showRoute && new PathLayer({

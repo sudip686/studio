@@ -376,3 +376,12 @@
 /* The top-right compass dial collides with the now flush-right ranking panel
    and adds nothing to a global peer overview — hide it on this scene only. */
 .tanga-deck--ranking .tanga-deck__geo-overlay { display: none !important; }
+
+/* ===========================================================================
+   PHASE 6 — map-slide polish. The satellite basemap rendered muddy/dark and
+   ungraded, which is the main reason the map slides read as unprofessional.
+   Lift it into a crisp, premium image with a measured grade.
+   =========================================================================== */
+.tanga-deck__deck-stage canvas {
+  filter: saturate(1.16) contrast(1.11) brightness(1.13);
+}
