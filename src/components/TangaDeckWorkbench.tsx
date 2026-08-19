@@ -219,19 +219,28 @@ const POWER_GRID_NODES = [
   },
 ];
 
+// Semantic 3-category site palette (was 5+ arbitrary hues — teal/yellow/slate/
+// sky/red — which read as random coloured boxes on the imagery). Now:
+//   INFRA    cool cyan-slate — built infrastructure (plant, crusher, admin…)
+//   WATER    muted blue      — water management
+//   MATERIAL muted amber     — ore / product stockpiles (the "value")
+const MINE_INFRA_COLOR: [number, number, number, number] = [128, 196, 214, 168];
+const MINE_WATER_COLOR: [number, number, number, number] = [70, 158, 210, 132];
+const MINE_MATERIAL_COLOR: [number, number, number, number] = [226, 168, 82, 170];
+
 const HYPOTHETICAL_MINE_FACILITIES = [
-  {id: 'process-plant', name: 'Hypothetical processing plant', east: 0, north: 0, width: 260, depth: 126, height: 36, bearing: -18, color: [45, 212, 191, 188], detail: 'Low-relief DEM plant pad'},
-  {id: 'crusher', name: 'Primary crusher', east: -310, north: 115, width: 145, depth: 82, height: 26, bearing: -18, color: [250, 204, 21, 192], detail: 'Concept ROM front end'},
-  {id: 'workshop', name: 'Workshop and stores', east: 210, north: -240, width: 190, depth: 92, height: 18, bearing: 12, color: [148, 163, 184, 178], detail: 'Concept maintenance area'},
-  {id: 'admin', name: 'Admin / gatehouse', east: 330, north: 130, width: 86, depth: 54, height: 12, bearing: 10, color: [125, 211, 252, 186], detail: 'Concept site office'},
-  {id: 'substation', name: 'Mine substation', east: -190, north: -260, width: 104, depth: 72, height: 16, bearing: 4, color: [250, 204, 21, 210], detail: 'Concept grid tie-in'},
-  {id: 'water-pond', name: 'Water pond', east: -470, north: -285, width: 260, depth: 156, height: 3, bearing: 18, color: [56, 189, 248, 142], detail: 'Concept water management'},
+  {id: 'process-plant', name: 'Hypothetical processing plant', east: 0, north: 0, width: 260, depth: 126, height: 36, bearing: -18, color: MINE_INFRA_COLOR, detail: 'Low-relief DEM plant pad'},
+  {id: 'crusher', name: 'Primary crusher', east: -310, north: 115, width: 145, depth: 82, height: 26, bearing: -18, color: MINE_INFRA_COLOR, detail: 'Concept ROM front end'},
+  {id: 'workshop', name: 'Workshop and stores', east: 210, north: -240, width: 190, depth: 92, height: 18, bearing: 12, color: MINE_INFRA_COLOR, detail: 'Concept maintenance area'},
+  {id: 'admin', name: 'Admin / gatehouse', east: 330, north: 130, width: 86, depth: 54, height: 12, bearing: 10, color: MINE_INFRA_COLOR, detail: 'Concept site office'},
+  {id: 'substation', name: 'Mine substation', east: -190, north: -260, width: 104, depth: 72, height: 16, bearing: 4, color: MINE_INFRA_COLOR, detail: 'Concept grid tie-in'},
+  {id: 'water-pond', name: 'Water pond', east: -470, north: -285, width: 260, depth: 156, height: 3, bearing: 18, color: MINE_WATER_COLOR, detail: 'Concept water management'},
 ];
 
 const HYPOTHETICAL_MINE_POINTS = [
-  {id: 'rom-pad', name: 'ROM stockpile', east: -540, north: 210, radius: 92, height: 30, color: [239, 68, 68, 166], detail: 'Concept ore stockpile'},
-  {id: 'product-stockpile', name: 'Product stockpile', east: 270, north: -60, radius: 76, height: 22, color: [45, 212, 191, 162], detail: 'Concept concentrate loadout'},
-  {id: 'process-tanks', name: 'Process tanks', east: 50, north: 140, radius: 34, height: 42, color: [125, 211, 252, 182], detail: 'Concept reagent/water tanks'},
+  {id: 'rom-pad', name: 'ROM stockpile', east: -540, north: 210, radius: 92, height: 30, color: MINE_MATERIAL_COLOR, detail: 'Concept ore stockpile'},
+  {id: 'product-stockpile', name: 'Product stockpile', east: 270, north: -60, radius: 76, height: 22, color: MINE_MATERIAL_COLOR, detail: 'Concept concentrate loadout'},
+  {id: 'process-tanks', name: 'Process tanks', east: 50, north: 140, radius: 34, height: 42, color: MINE_INFRA_COLOR, detail: 'Concept reagent/water tanks'},
 ];
 
 const MODE_LABELS: Record<WorkbenchMode, string> = {
@@ -419,8 +428,8 @@ const MODE_NARRATIVE_SOURCE: Record<WorkbenchMode, string> = {
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   ranking: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   tanzania: {longitude: 35.8, latitude: -6.1, zoom: 4.15, pitch: 8, bearing: 0},
-  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.45, pitch: 58, bearing: 28},
-  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 70, bearing: 34},
+  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 42, bearing: 20},
+  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 50, bearing: 26},
   accessibility: {longitude: 38.94, latitude: -4.94, zoom: 8.45, pitch: 18, bearing: 0},
   drillholes: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 62, bearing: 24},
   subsurface: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.55, pitch: 74, bearing: 38},
@@ -1280,21 +1289,23 @@ function sceneCalloutsForMode(
     ];
   }
   if (mode === 'project') {
+    // One bold callout only — the licence. (Was 2; the village-context box added
+    // noise and repeated what the map already shows.)
     return [
-      {id: 'aoi', label: 'Sakariya project area', detail: 'Copper project outline locked to licence centre', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
-      {id: 'village', label: 'Village context', detail: 'Local villages, roads, vegetation and concept mine pad', boxX: 64, boxY: 57, tone: '#a89c94', anchor: {lon: 38.7858716, lat: -4.8049321, elevationOffset: 160}, offset: {x: 120, y: 72}},
+      {id: 'aoi', label: 'Sakariya project area', detail: 'Contiguous licence over the flake-graphite resource', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
     ];
   }
   if (mode === 'topography') {
+    // One callout — the relief story. (The AOI outline is already drawn + labelled.)
     return [
       {id: 'relief', label: 'Local DEM surface', detail: `${routeProfile.minElevation}-${routeProfile.maxElevation} m relief window under the project`, boxX: 50, boxY: 33, tone: '#a89c94', anchor: {...PROJECT_CENTER, elevationOffset: 130}},
-      {id: 'aoi', label: 'Project AOI outline', detail: 'Boundary sits directly over the terrain surface', boxX: 66, boxY: 50, tone: '#c7551b', anchor: {lon: PROJECT_CENTER.lon + 0.018, lat: PROJECT_CENTER.lat - 0.014, elevationOffset: 120}, offset: {x: 112, y: -66}},
     ];
   }
   if (mode === 'accessibility') {
     const targetTone = routeTarget === 'power' ? '#41200e' : routeTarget === 'rail' ? '#41200e' : '#c7551b';
+    // Two callouts — the route and the grid. (Dropped the redundant "Tanga
+    // project" origin box; the project is obvious as the route's start.)
     return [
-      {id: 'start', label: 'Tanga project', detail: 'Route origin at the project area', boxX: 41, boxY: 43, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 320}, offset: {x: 98, y: -92}},
       {id: 'route', label: `${routeProfile.distanceLabel} / ${routeProfile.durationLabel}`, detail: `${routeProfile.source === 'osrm' ? 'Road geometry' : 'Indicative route'} to ${routeProfile.targetLabel}`, boxX: 52, boxY: 61, tone: targetTone, anchor: {...ROUTE_TARGETS[routeTarget], elevationOffset: 420}},
       {id: 'power', label: 'Hale + New Pangani', detail: powerGridDistanceSummary(), boxX: 66, boxY: 49, tone: '#41200e', anchor: {lon: 38.636, lat: -5.326, elevationOffset: 440}, offset: {x: 118, y: -84}},
     ];
@@ -2702,7 +2713,10 @@ export default function TangaDeckWorkbench() {
     const showCutaway = false;
     const showMineInfrastructure = activeMode === 'project' || activeMode === 'accessibility';
     const showDetailedLocalContext = activeMode === 'topography';
-    const showPowerGrid = activeMode === 'accessibility' || activeMode === 'project';
+    // Power grid belongs to the access/infrastructure story only. It used to
+    // also render on the project-focus scene, where the bright yellow corridor
+    // beam dominated a slide that's about the licence area, not power.
+    const showPowerGrid = activeMode === 'accessibility';
     const showVillageLabels = activeMode === 'project';
     const terrainCells = showFastLocalSurface ? localTerrainCells(heightAt, activeMode) : [];
     const mineFacilities = showMineInfrastructure ? locatedMineFacilities() : [];
@@ -2792,14 +2806,17 @@ export default function TangaDeckWorkbench() {
         filled: true,
         stroked: true,
         extruded: false,
+        // The licence is THE asset — give it a clearly-highlighted warm fill and
+        // a crisp bright core outline so it reads as the hero of the slide, not
+        // a faint thin line lost on the terrain.
         getFillColor: (feature) => isProjectLayer(feature)
-          ? [217, 106, 42, activeMode === 'project' ? 36 : 22]
+          ? [240, 152, 72, activeMode === 'project' ? 64 : 44]
           : [250, 204, 21, 8],
-        getLineColor: (feature) => isProjectLayer(feature) ? [255, 232, 200, 255] : [255, 236, 179, 220],
-        getLineWidth: (feature) => isProjectLayer(feature) ? 2.8 : 2,
+        getLineColor: (feature) => isProjectLayer(feature) ? [255, 236, 205, 255] : [255, 236, 179, 220],
+        getLineWidth: (feature) => isProjectLayer(feature) ? 3.4 : 2,
         lineWidthUnits: 'pixels' as any,
-        lineWidthMinPixels: 1.5,
-        lineWidthMaxPixels: 4,
+        lineWidthMinPixels: 2,
+        lineWidthMaxPixels: 5,
         parameters: {depthTest: false} as any,
       }),
       // Layer 4: the area label — "6.4 sq km · 100% owned" at the polygon
@@ -2854,12 +2871,12 @@ export default function TangaDeckWorkbench() {
         filled: true,
         stroked: true,
         extruded: true,
-        wireframe: true,
+        wireframe: false,
         getElevation: (feature: any) => Number(feature.properties?.height ?? 12),
-        getFillColor: (feature: any) => feature.properties?.color ?? [45, 212, 191, 170],
-        getLineColor: [255, 255, 255, 160],
-        getLineWidth: 2,
-        lineWidthMinPixels: 1.5,
+        getFillColor: (feature: any) => feature.properties?.color ?? MINE_INFRA_COLOR,
+        getLineColor: [226, 240, 250, 90],
+        getLineWidth: 1.5,
+        lineWidthMinPixels: 1,
         material: {
           ambient: 0.32,
           diffuse: 0.56,
@@ -2927,8 +2944,8 @@ export default function TangaDeckWorkbench() {
         getPosition: (feature) => featurePoint(feature, 8, heightAt),
         getElevation: treeHeight,
         getFillColor: (feature) => String(feature.properties?.kind ?? '').includes('centroid')
-          ? [68, 222, 128, 132]
-          : [34, 197, 94, 98],
+          ? [64, 190, 118, 92]
+          : [40, 150, 92, 64],
         pickable: true,
         material: {
           ambient: 0.36,
@@ -2941,10 +2958,11 @@ export default function TangaDeckWorkbench() {
         id: 'power-grid-corridors',
         data: gridCorridors,
         getPath: (item: any) => item.path,
-        getColor: [250, 204, 21, 238],
-        getWidth: 96,
+        // Softer, thinner amber corridor — reads as a power line, not a beam.
+        getColor: [245, 197, 66, 176],
+        getWidth: 52,
         widthUnits: 'meters',
-        widthMinPixels: 3,
+        widthMinPixels: 2,
         jointRounded: true,
         capRounded: true,
         pickable: true,
@@ -3031,7 +3049,11 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      activeMode !== 'ranking' && new TextLayer<any>({
+      // Only where a point label is genuinely needed to locate Tanga (country /
+      // regional views). On the local project & topography scenes the licence
+      // badge + glowing boundary already mark it, so the extra label just
+      // overlapped the badge — dropped there.
+      (activeMode === 'tanzania' || activeMode === 'accessibility') && new TextLayer<any>({
         id: 'project-marker-label',
         data: [{lon: PROJECT_CENTER.lon, lat: PROJECT_CENTER.lat, z: heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + (activeMode === 'tanzania' ? 112000 : 620), label: 'Tanga project'}],
         getPosition: (item) => [item.lon, item.lat, item.z],
@@ -3144,8 +3166,8 @@ export default function TangaDeckWorkbench() {
         extruded: true,
         elevationScale: 1,
         getPosition: (feature) => featurePoint(feature, 24, heightAt),
-        getElevation: 155,
-        getFillColor: [250, 204, 21, 150],
+        getElevation: 120,
+        getFillColor: [224, 198, 150, 96],
         pickable: true,
         material: {
           ambient: 0.42,
@@ -3158,11 +3180,11 @@ export default function TangaDeckWorkbench() {
         id: 'village-rings',
         data: villages,
         getPosition: (feature) => featurePoint(feature, 32, heightAt),
-        getRadius: 300,
+        getRadius: 260,
         radiusUnits: 'meters',
-        getFillColor: [250, 204, 21, 42],
-        getLineColor: [250, 204, 21, 220],
-        lineWidthMinPixels: 2,
+        getFillColor: [228, 204, 150, 20],
+        getLineColor: [232, 208, 150, 120],
+        lineWidthMinPixels: 1,
         stroked: true,
         filled: true,
         pickable: true,
@@ -3173,14 +3195,16 @@ export default function TangaDeckWorkbench() {
         data: villages.length ? villages : labels,
         getPosition: (feature) => featurePoint(feature, 70, heightAt),
         getText: (feature) => String(feature.properties?.name ?? ''),
-        getSize: (feature) => String(feature.properties?.class ?? '') === 'village' ? 15 : 12,
-        getColor: [255, 255, 255, 238],
+        // Subtle supporting labels — smaller, lighter box — so they give
+        // geographic context without competing with the licence hero.
+        getSize: (feature) => String(feature.properties?.class ?? '') === 'village' ? 12 : 11,
+        getColor: [231, 240, 250, 224],
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'bottom',
         billboard: true,
         background: true,
-        getBackgroundColor: [5, 10, 15, 172],
-        backgroundPadding: [7, 4],
+        getBackgroundColor: [6, 11, 17, 120],
+        backgroundPadding: [5, 3],
         parameters: {depthTest: false} as any,
       }),
       showRoute && new PathLayer({
@@ -3803,6 +3827,10 @@ export default function TangaDeckWorkbench() {
       )}
 
       <div className="tanga-deck__shade" />
+
+      {/* HUD command-center frame: viewport-corner reticles + edge vignette.
+          Pure decoration, non-interactive. Styled in hud.css (Phase 3). */}
+      <div className="hud-frame" aria-hidden="true" />
 
       {/* Subtle scene-change flash — keyed to activeMode so it re-mounts and
           fades out each transition, giving every scene a clean "arrival". */}

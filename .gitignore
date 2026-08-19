@@ -2,6 +2,7 @@
 public/height.bin
 public/BlockModel.geojson
 public/texture_rgb_8192.png
+public/height_hires.bin
 public/dem_utm.tif
 # Heavy assets — MUST live on R2, never in git / the Vercel bundle.
 # Videos (2.6 GB total) and multi-MB test meshes. Small geojsons in
@@ -33,6 +34,10 @@ public/*.kmz
 
 # local workspace artifacts
 /.claude/
+# agent-browser CLI skill install (dev-only tooling, never part of the app build)
+/agent-browser/
+/.agents/
+/skills-lock.json
 models/vosk-*
 /.playwright-cli/
 /.playwright-mcp/
