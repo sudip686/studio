@@ -5146,15 +5146,21 @@ body {
 }
 
 .tanga-deck__topbar {
+  /* Consolidated from 8 duplicate base blocks (was L5148/6402/7111/8167/8942/
+     9457/10112/12386). Last-wins values preserved; hud.css still overrides the
+     layout at higher specificity. Appearance (bg/border/shadow/blur) comes from
+     the shared overlay rule + palette pass, untouched. */
   position: absolute;
-  top: 18px;
-  left: 24px;
-  right: 24px;
-  z-index: 12;
+  top: clamp(24px, 2.1vh, 36px);
+  left: clamp(32px, 3.1vw, 80px);
+  right: auto !important;
   display: grid;
-  grid-template-columns: 230px minmax(260px, 1fr) minmax(520px, 720px);
-  align-items: center;
-  gap: 14px;
+  grid-template-columns: minmax(240px, 330px) minmax(0, 1fr) minmax(560px, 720px);
+  align-items: start;
+  gap: var(--hm-space-8);
+  width: max-content !important;
+  max-width: min(52vw, 640px) !important;
+  z-index: 12;
 }
 
 .tanga-deck__brand {
@@ -6399,10 +6405,6 @@ body {
 }
 
 /* Sakariya low-chrome pass: keep the data stage dominant and tuck controls into instruments. */
-.tanga-deck__topbar {
-  top: 16px;
-  grid-template-columns: 238px minmax(0, 1fr) minmax(350px, 470px);
-}
 
 .tanga-deck__brand {
   min-width: 220px;
@@ -7108,14 +7110,6 @@ body {
 }
 
 /* Tanga desktop presenter: keep the canvas dominant and make controls behave like a light HUD. */
-.tanga-deck__topbar {
-  top: 18px;
-  left: 24px;
-  right: 24px;
-  grid-template-columns: 210px minmax(180px, 1fr) minmax(640px, 760px);
-  align-items: start;
-  gap: 12px;
-}
 
 .tanga-deck__brand {
   min-height: 48px;
@@ -8164,9 +8158,6 @@ body {
 }
 
 /* VRIFY-like presenter HUD pass: keep the geology dominant and make instruments quiet. */
-.tanga-deck__topbar {
-  grid-template-columns: 260px minmax(0, 1fr) minmax(420px, 540px);
-}
 
 .tanga-deck__command {
   position: relative;
@@ -8939,14 +8930,6 @@ h3 {
 }
 
 /* Sakariya deck declutter pass: fewer visible controls, more canvas. */
-.tanga-deck__topbar {
-  top: 18px;
-  right: 24px;
-  left: 24px;
-  grid-template-columns: 260px minmax(0, 1fr) minmax(380px, 520px);
-  gap: 12px;
-  align-items: start;
-}
 
 .tanga-deck__chips {
   display: none;
@@ -9454,13 +9437,6 @@ h3 {
 }
 
 /* VRIFY-inspired cleanup: compact command pill, no always-open prompt chrome. */
-.tanga-deck__topbar {
-  top: 16px;
-  right: 24px;
-  left: 24px;
-  grid-template-columns: 238px minmax(0, 1fr) minmax(320px, 392px);
-  align-items: start;
-}
 
 .tanga-deck--three-active .tanga-deck__topbar {
   grid-template-columns: 226px minmax(0, 1fr) minmax(300px, 372px);
@@ -10109,13 +10085,6 @@ h3 {
   display: none !important;
 }
 
-.tanga-deck__topbar {
-  top: clamp(24px, 2.1vh, 36px);
-  right: clamp(32px, 3.1vw, 80px);
-  left: clamp(32px, 3.1vw, 80px);
-  grid-template-columns: minmax(240px, 330px) minmax(0, 1fr) minmax(560px, 720px);
-  gap: var(--hm-space-8);
-}
 
 .tanga-deck__brand {
   gap: var(--hm-space-3);
@@ -12382,11 +12351,6 @@ body:has(.tanga-deck__notes) .tanga-deck__geo-overlay {
    Also declutter — shrink topbar to hug its brand + scene chip on the left. */
 .tanga-deck__act-ribbon {
   top: 88px !important;
-}
-.tanga-deck__topbar {
-  right: auto !important;
-  width: max-content !important;
-  max-width: min(52vw, 640px) !important;
 }
 /* On the cover scene, hide the act ribbon (cover owns the whole frame) */
 .tanga-deck--cover .tanga-deck__act-ribbon { display: none; }
