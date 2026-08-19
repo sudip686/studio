@@ -428,8 +428,8 @@ const MODE_NARRATIVE_SOURCE: Record<WorkbenchMode, string> = {
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   ranking: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   tanzania: {longitude: 35.8, latitude: -6.1, zoom: 4.15, pitch: 8, bearing: 0},
-  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.45, pitch: 58, bearing: 28},
-  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 70, bearing: 34},
+  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 42, bearing: 20},
+  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 50, bearing: 26},
   accessibility: {longitude: 38.94, latitude: -4.94, zoom: 8.45, pitch: 18, bearing: 0},
   drillholes: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 62, bearing: 24},
   subsurface: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.55, pitch: 74, bearing: 38},
