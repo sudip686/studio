@@ -443,3 +443,11 @@
 }
 .tanga-deck__scale em { font-family: var(--font-mono) !important; }
 .tanga-deck__scale small { font-family: var(--font-mono) !important; color: rgba(148, 197, 255, 0.7) !important; }
+
+/* ===========================================================================
+   PHASE 9 — intro video playback fix. A CSS `filter` on the playing <video>
+   (globals.css:51) forces a per-frame filter-compositing pass, a classic cause
+   of the "stuck / frame-by-frame" stutter the user reported. The grade is mild
+   and cosmetic — drop it so the video decodes/composites on the fast path.
+   =========================================================================== */
+.tanga-intro__video { filter: none !important; }
