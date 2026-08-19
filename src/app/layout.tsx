@@ -1,4 +1,5 @@
 import './globals.css';
+import './globals-intro.css';
 import './hud.css';
 import type {Metadata, Viewport} from 'next';
 import ServiceWorkerRegistrar from './ServiceWorkerRegistrar';
