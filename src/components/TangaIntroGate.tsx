@@ -8,8 +8,8 @@ const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_ASSET_BASE_URL || '').replace(/\
 const asset = (path: string) => (ASSET_BASE_URL ? `${ASSET_BASE_URL}${path}` : path);
 const VIDEO_KEY = '/media/tanga-google-earth-intro-corrected-preview.mp4';
 const POSTER_KEY = '/media/tanga-first-slide-story-poster.jpg';
-const INTRO_VIDEO_SRC = asset(VIDEO_KEY) + '?v=intro-gate-20260627a';
-const INTRO_VIDEO_SRC_LOCAL = VIDEO_KEY + '?v=intro-gate-20260627a';
+const INTRO_VIDEO_SRC = asset(VIDEO_KEY) + '?v=intro-opt-1080-20260819';
+const INTRO_VIDEO_SRC_LOCAL = VIDEO_KEY + '?v=intro-opt-1080-20260819';
 const INTRO_POSTER_SRC = asset(POSTER_KEY) + '?v=full-bleed-bright-20260625';
 const ERROR_FALLBACK_MS = 2000;
 

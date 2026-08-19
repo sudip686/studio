@@ -37,6 +37,19 @@
 
   /* Technical type ----------------------------------------------------- */
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", monospace;
+
+  /* #7 — font tokens: single source of truth for the (deliberate) type system.
+     display  = headings / hero          (Poppins → Montserrat)
+     tech     = technical display labels (Space Grotesk)
+     body     = running text / UI        (Inter)
+     mono     = numeric / instrument readouts (above)
+     Additive scaffolding — existing rules keep working; new work should use
+     these tokens so families stay consistent. Full migration of the ~60 hard-
+     coded font-family declarations is a separate, sign-off-gated pass (it would
+     visibly change type). */
+  --font-display: "Poppins", "Montserrat", "Inter", system-ui, sans-serif;
+  --font-tech: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
 }
 
 /* ---------------------------------------------------------------------------
@@ -458,4 +471,28 @@
 @media (prefers-reduced-motion: reduce) {
   .tanga-intro__timeline span,
   .tanga-intro__fallback::before { animation: none !important; }
+}
+
+/* ===========================================================================
+   PHASE 10 — #12 graceful degradation on smaller viewports. The deck is
+   desktop-first (a 3D command workspace); this is a safety net for laptops /
+   small windows, NOT a full mobile layout. Prevent horizontal overflow and keep
+   the docked panels from spilling off-screen or over the pager.
+   =========================================================================== */
+html, body { overflow-x: hidden; }
+
+@media (max-width: 1024px) {
+  /* Narrow the docked data/insight panels and the ranking rail so they stay on
+     screen; the command bar already hides below 1180px. */
+  .tanga-deck__data-panel.tanga-deck__data-panel,
+  .tanga-deck__insight-panel.tanga-deck__insight-panel {
+    width: min(272px, 44vw) !important;
+  }
+  .tanga-deck__ranking.tanga-deck__ranking {
+    width: min(560px, calc(100vw - 32px)) !important;
+    min-width: 0 !important;
+  }
+  /* Keep the source-data table readable but compact. */
+  .tanga-deck__data-table td,
+  .tanga-deck__data-table th { font-size: 0.72rem; }
 }

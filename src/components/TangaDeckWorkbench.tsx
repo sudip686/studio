@@ -3838,7 +3838,7 @@ export default function TangaDeckWorkbench() {
 
       <TangaStoryVideoHero
         visible={storyHeroVisible}
-        videoSrc="/media/tanga-google-earth-intro-corrected-preview.mp4?v=story-hero-90s-20260626"
+        videoSrc="/media/tanga-google-earth-intro-corrected-preview.mp4?v=story-hero-opt-1080-20260819"
         posterSrc="/media/tanga-first-slide-story-poster.jpg?v=story-hero-20260625"
         onComplete={completeStoryHero}
         onShowRanking={dismissStoryHero}
