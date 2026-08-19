@@ -5153,14 +5153,14 @@ body {
   position: absolute;
   top: clamp(24px, 2.1vh, 36px);
   left: clamp(32px, 3.1vw, 80px);
-  right: auto !important;
   display: grid;
   grid-template-columns: minmax(240px, 330px) minmax(0, 1fr) minmax(560px, 720px);
   align-items: start;
   gap: var(--hm-space-8);
-  width: max-content !important;
-  max-width: min(52vw, 640px) !important;
   z-index: 12;
+  /* right / width / max-width intentionally omitted — hud.css sets them at
+     higher specificity (the topbar is full-width there), so base !important
+     copies were dead weight. */
 }
 
 .tanga-deck__brand {
