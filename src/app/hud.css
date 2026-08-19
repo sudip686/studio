@@ -385,3 +385,12 @@
 .tanga-deck__deck-stage canvas {
   filter: saturate(1.16) contrast(1.11) brightness(1.13);
 }
+
+/* ===========================================================================
+   PHASE 7 — VRIFY-style full-bleed map. Reference: vrify.com decks render the
+   3D map edge-to-edge with minimal chrome and NO large title panel over it.
+   Remove our big left "Tanga, Tanzania" title block so the map is the slide
+   (the scene is still named by the pager label + ACT ribbon). Keeps the docked
+   data panel on the right — that's the one piece of analytical chrome we keep.
+   =========================================================================== */
+.tanga-deck__title { display: none !important; }

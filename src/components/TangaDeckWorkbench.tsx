@@ -3049,7 +3049,11 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      activeMode !== 'ranking' && new TextLayer<any>({
+      // Only where a point label is genuinely needed to locate Tanga (country /
+      // regional views). On the local project & topography scenes the licence
+      // badge + glowing boundary already mark it, so the extra label just
+      // overlapped the badge — dropped there.
+      (activeMode === 'tanzania' || activeMode === 'accessibility') && new TextLayer<any>({
         id: 'project-marker-label',
         data: [{lon: PROJECT_CENTER.lon, lat: PROJECT_CENTER.lat, z: heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + (activeMode === 'tanzania' ? 112000 : 620), label: 'Tanga project'}],
         getPosition: (item) => [item.lon, item.lat, item.z],
