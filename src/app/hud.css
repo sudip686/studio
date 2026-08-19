@@ -394,3 +394,52 @@
    data panel on the right — that's the one piece of analytical chrome we keep.
    =========================================================================== */
 .tanga-deck__title { display: none !important; }
+
+/* ===========================================================================
+   PHASE 8 — premium HUD instruments. Re-theme the compass and scale onto the
+   cool cyan system (they used warm yellow, which clashed with the HUD) and set
+   their readouts in mono, matching VRIFY's clean cool instruments.
+   =========================================================================== */
+
+/* Compass — cool cyan bezel, mono cardinals, clean two-tone needle. */
+.tanga-deck__compass {
+  border: 1px solid var(--hud-line-strong) !important;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(94, 234, 212, 0.10), transparent 60%),
+    linear-gradient(180deg, rgba(12, 19, 27, 0.78), rgba(6, 11, 18, 0.7)) !important;
+}
+.tanga-deck__compass::before {
+  border-color: rgba(94, 234, 212, 0.30) !important;
+  box-shadow: inset 0 0 16px rgba(94, 234, 212, 0.10) !important;
+}
+.tanga-deck__compass-ring span {
+  font-family: var(--font-mono) !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  color: rgba(198, 220, 236, 0.66) !important;
+}
+.tanga-deck__compass-ring span:nth-child(1) { color: rgba(94, 234, 212, 0.98) !important; }  /* N */
+.tanga-deck__compass-needle {
+  width: 3px !important;
+  background: linear-gradient(180deg, rgba(94, 234, 212, 1) 0 47%, rgba(226, 240, 250, 0.22) 47% 100%) !important;
+  box-shadow: 0 0 12px rgba(94, 234, 212, 0.55) !important;
+}
+.tanga-deck__compass small {
+  font-family: var(--font-mono) !important;
+  border-color: var(--hud-line) !important;
+  background: rgba(6, 11, 18, 0.9) !important;
+  color: rgba(148, 197, 255, 0.9) !important;
+}
+
+/* Scale bar — cool bracket, mono distance, hairline panel. */
+.tanga-deck__scale {
+  border: 1px solid var(--hud-line) !important;
+}
+.tanga-deck__scale span,
+.tanga-deck__scale span::before {
+  border-color: rgba(220, 238, 248, 0.92) !important;
+  background-color: rgba(220, 238, 248, 0.92);
+  box-shadow: 0 0 12px rgba(94, 234, 212, 0.28) !important;
+}
+.tanga-deck__scale em { font-family: var(--font-mono) !important; }
+.tanga-deck__scale small { font-family: var(--font-mono) !important; color: rgba(148, 197, 255, 0.7) !important; }
