@@ -170,6 +170,7 @@
 /* 2.1 — every micro-label / eyebrow becomes a cool cyan readout label. */
 [class^="tanga-deck__"][class*="eyebrow"],
 .tanga-deck__legend-head > span,
+.tanga-deck__ranking-head > span,
 .tanga-deck__pager-label {
   color: rgba(var(--hud-cyan), 0.92) !important;
   letter-spacing: 0.16em !important;
