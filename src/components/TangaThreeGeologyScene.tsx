@@ -1046,11 +1046,11 @@ function createTerrainPatchGeometry(mode: GeologyMode) {
 }
 
 function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mode: GeologyMode) {
-  // Higher segmentation captures fine relief so silhouettes no longer look
-  // faceted at close cameras. 320×256 ≈ 82k verts — comfortable for modern
-  // GPUs and matches the 1024² heightmap resolution more faithfully.
-  const segmentsX = 320;
-  const segmentsY = 256;
+  // Dense segmentation captures the fine relief now available in the 2048×1940
+  // hi-res heightmap (~3.7 m spacing). 512×448 ≈ 230k verts — comfortable for
+  // modern GPUs and keeps ridgelines crisp instead of faceted at close cameras.
+  const segmentsX = 512;
+  const segmentsY = 448;
   const width = TERRAIN_PATCH_WIDTH;
   const depth = TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
@@ -1433,14 +1433,16 @@ export default function TangaThreeGeologyScene({
     camera.updateProjectionMatrix();
 
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
-    renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
+    // Render at up to 2× device pixels so the high-res draped satellite texture
+    // stays crisp (the terrain is the hero) instead of softening at 1.5×.
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // Lower exposure so the bright satellite terrain doesn't wash out; a CSS
     // contrast/saturation grade then adds punch. Tuned by measuring canvas
     // luminance (~220 was washed; target ~185 with more tonal range).
-    renderer.toneMappingExposure = 0.92;
+    renderer.toneMappingExposure = 1.02;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
@@ -1627,12 +1629,23 @@ export default function TangaThreeGeologyScene({
     key.shadow.normalBias = 1.5;
     key.shadow.camera.updateProjectionMatrix();
     scene.add(key);
-    const rim = new THREE.PointLight(0x2dd4bf, 2200, 5200);
-    rim.position.set(-1200, 500, -900);
-    scene.add(rim);
-    const amber = new THREE.PointLight(0xfacc15, 900, 4200);
-    amber.position.set(1400, -220, 1350);
-    scene.add(amber);
+    // Decorative colour accents. Both kept subtle so the overhead sun always
+    // wins on the terrain *top*. Previously an amber PointLight sat BELOW the
+    // surface (y=-220) at high intensity, lighting the underside brighter than
+    // the top — which read as "brighter from the bottom, dull on top". The warm
+    // underglow now only exists where there's a subsurface block model to reveal.
+    const showsBlockModel =
+      mode === 'subsurface' || mode === 'resource' || mode === 'mine_planning';
+    const teal = new THREE.PointLight(0x2dd4bf, showsBlockModel ? 900 : 420, 5200);
+    teal.position.set(-1200, 620, -900);
+    scene.add(teal);
+    if (showsBlockModel) {
+      // Gentle warm underglow to lift the voxel model off the dark backdrop —
+      // dim enough that it never out-shines the key light on the surface above.
+      const amber = new THREE.PointLight(0xfacc15, 300, 4200);
+      amber.position.set(1400, -220, 1350);
+      scene.add(amber);
+    }
 
     const stage = new THREE.Group();
     groupRef.current = stage;
