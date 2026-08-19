@@ -1281,7 +1281,7 @@ function sceneCalloutsForMode(
   }
   if (mode === 'project') {
     return [
-      {id: 'aoi', label: 'Sakariya project area', detail: 'Copper project outline locked to licence centre', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
+      {id: 'aoi', label: 'Sakariya project area', detail: 'Graphite project outline locked to licence centre', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
       {id: 'village', label: 'Village context', detail: 'Local villages, roads, vegetation and concept mine pad', boxX: 64, boxY: 57, tone: '#a89c94', anchor: {lon: 38.7858716, lat: -4.8049321, elevationOffset: 160}, offset: {x: 120, y: 72}},
     ];
   }

@@ -356,3 +356,23 @@
    top-centre and collided with the ACT ribbon; it duplicates the deck pager's
    scene dots + the ACT ribbon, so hide it. Navigation is unaffected. */
 .tanga-three__story-strip { display: none !important; }
+
+/* ===========================================================================
+   PHASE 5 — scene-1 (ranking) rebalance. The ranking panel sat at right:190px,
+   a big centre block that crowded the globe off to the far-left dark edge. Dock
+   it as a clean right rail with a capped width so the globe + peer dots own the
+   left half of the frame. (Other map scenes 2-5/10 are already well balanced.)
+   =========================================================================== */
+.tanga-deck__ranking.tanga-deck__ranking,
+.tanga-deck--ranking .tanga-deck__ranking.tanga-deck__ranking {
+  right: clamp(20px, 2vw, 32px) !important;
+  /* Keep the content width (≈690) so the MT columns never clip; only the right
+     offset changes, docking it flush-right so the globe owns the left half. */
+  width: min(690px, calc(100vw - 700px)) !important;
+  min-width: 560px !important;
+  border-color: var(--hud-line) !important;
+}
+
+/* The top-right compass dial collides with the now flush-right ranking panel
+   and adds nothing to a global peer overview — hide it on this scene only. */
+.tanga-deck--ranking .tanga-deck__geo-overlay { display: none !important; }
