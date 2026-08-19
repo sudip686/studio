@@ -37,6 +37,19 @@
 
   /* Technical type ----------------------------------------------------- */
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", monospace;
+
+  /* #7 — font tokens: single source of truth for the (deliberate) type system.
+     display  = headings / hero          (Poppins → Montserrat)
+     tech     = technical display labels (Space Grotesk)
+     body     = running text / UI        (Inter)
+     mono     = numeric / instrument readouts (above)
+     Additive scaffolding — existing rules keep working; new work should use
+     these tokens so families stay consistent. Full migration of the ~60 hard-
+     coded font-family declarations is a separate, sign-off-gated pass (it would
+     visibly change type). */
+  --font-display: "Poppins", "Montserrat", "Inter", system-ui, sans-serif;
+  --font-tech: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
 }
 
 /* ---------------------------------------------------------------------------
@@ -394,3 +407,132 @@
    data panel on the right — that's the one piece of analytical chrome we keep.
    =========================================================================== */
 .tanga-deck__title { display: none !important; }
+
+/* ===========================================================================
+   PHASE 8 — premium HUD instruments. Re-theme the compass and scale onto the
+   cool cyan system (they used warm yellow, which clashed with the HUD) and set
+   their readouts in mono, matching VRIFY's clean cool instruments.
+   =========================================================================== */
+
+/* Compass — cool cyan bezel, mono cardinals, clean two-tone needle. */
+.tanga-deck__compass {
+  border: 1px solid var(--hud-line-strong) !important;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(94, 234, 212, 0.10), transparent 60%),
+    linear-gradient(180deg, rgba(12, 19, 27, 0.78), rgba(6, 11, 18, 0.7)) !important;
+}
+.tanga-deck__compass::before {
+  border-color: rgba(94, 234, 212, 0.30) !important;
+  box-shadow: inset 0 0 16px rgba(94, 234, 212, 0.10) !important;
+}
+.tanga-deck__compass-ring span {
+  font-family: var(--font-mono) !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  color: rgba(198, 220, 236, 0.66) !important;
+}
+.tanga-deck__compass-ring span:nth-child(1) { color: rgba(94, 234, 212, 0.98) !important; }  /* N */
+.tanga-deck__compass-needle {
+  width: 3px !important;
+  background: linear-gradient(180deg, rgba(94, 234, 212, 1) 0 47%, rgba(226, 240, 250, 0.22) 47% 100%) !important;
+  box-shadow: 0 0 12px rgba(94, 234, 212, 0.55) !important;
+}
+.tanga-deck__compass small {
+  font-family: var(--font-mono) !important;
+  border-color: var(--hud-line) !important;
+  background: rgba(6, 11, 18, 0.9) !important;
+  color: rgba(148, 197, 255, 0.9) !important;
+}
+
+/* Scale bar — cool bracket, mono distance, hairline panel. */
+.tanga-deck__scale {
+  border: 1px solid var(--hud-line) !important;
+}
+.tanga-deck__scale span,
+.tanga-deck__scale span::before {
+  border-color: rgba(220, 238, 248, 0.92) !important;
+  background-color: rgba(220, 238, 248, 0.92);
+  box-shadow: 0 0 12px rgba(94, 234, 212, 0.28) !important;
+}
+.tanga-deck__scale em { font-family: var(--font-mono) !important; }
+.tanga-deck__scale small { font-family: var(--font-mono) !important; color: rgba(148, 197, 255, 0.7) !important; }
+
+/* ===========================================================================
+   PHASE 9 — intro video playback fix. A CSS `filter` on the playing <video>
+   (globals.css:51) forces a per-frame filter-compositing pass, a classic cause
+   of the "stuck / frame-by-frame" stutter the user reported. The grade is mild
+   and cosmetic — drop it so the video decodes/composites on the fast path.
+   =========================================================================== */
+.tanga-intro__video { filter: none !important; }
+
+/* #14 — honour reduced-motion for the intro's own CSS animations (the JS gate
+   in TangaIntroGate stops the video autoplay; this stops the progress bar and
+   the fallback drift so nothing moves for reduced-motion users). */
+@media (prefers-reduced-motion: reduce) {
+  .tanga-intro__timeline span,
+  .tanga-intro__fallback::before { animation: none !important; }
+}
+
+/* ===========================================================================
+   PHASE 10 — #12 graceful degradation on smaller viewports. The deck is
+   desktop-first (a 3D command workspace); this is a safety net for laptops /
+   small windows, NOT a full mobile layout. Prevent horizontal overflow and keep
+   the docked panels from spilling off-screen or over the pager.
+   =========================================================================== */
+html, body { overflow-x: hidden; }
+
+@media (max-width: 1024px) {
+  /* Narrow the docked data/insight panels and the ranking rail so they stay on
+     screen; the command bar already hides below 1180px. */
+  .tanga-deck__data-panel.tanga-deck__data-panel,
+  .tanga-deck__insight-panel.tanga-deck__insight-panel {
+    width: min(272px, 44vw) !important;
+  }
+  .tanga-deck__ranking.tanga-deck__ranking {
+    width: min(560px, calc(100vw - 32px)) !important;
+    min-width: 0 !important;
+  }
+  /* Keep the source-data table readable but compact. */
+  .tanga-deck__data-table td,
+  .tanga-deck__data-table th { font-size: 0.72rem; }
+}
+
+/* ===========================================================================
+   PHASE 11 — VRIFY-style callouts. Reference: vrify.com decks use small,
+   uniform callouts with a cyan left-accent edge and a thin white leader line to
+   a precise anchor. Ours were chunkier per-tone boxes. Tighten + unify them.
+   =========================================================================== */
+.tanga-deck__callout,
+.tanga-three__callout {
+  max-width: 192px !important;
+  padding: 7px 9px 8px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--hud-line) !important;
+  border-left: 2px solid rgba(var(--hud-cyan), 0.75) !important;
+  background: linear-gradient(180deg, rgba(10, 16, 22, 0.9), rgba(6, 11, 18, 0.93)) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45) !important;
+}
+/* Thin, cool leader line + crisp anchor dot (was a thick tone-glow bar). */
+.tanga-three__callout::before {
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, rgba(214, 234, 246, 0.72)) !important;
+  box-shadow: none !important;
+}
+.tanga-three__callout::after {
+  width: 6px !important; height: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  background: rgba(var(--hud-cyan), 0.95) !important;
+  box-shadow: 0 0 9px rgba(var(--hud-cyan), 0.6) !important;
+}
+/* Callout title → cyan micro-label; detail → tight body. */
+.tanga-deck__callout > span,
+.tanga-three__callout > span {
+  color: rgba(var(--hud-cyan), 0.95) !important;
+  font-size: 0.62rem !important;
+  letter-spacing: 0.12em !important;
+}
+.tanga-deck__callout > strong,
+.tanga-three__callout > strong {
+  font-size: 0.78rem !important;
+  line-height: 1.25 !important;
+}

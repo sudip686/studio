@@ -7,252 +7,6 @@
 @tailwind components;
 @tailwind utilities;
 
-.tanga-intro-app {
-  min-height: 100vh;
-}
-
-.tanga-intro-app.is-preloading {
-  pointer-events: none;
-}
-
-.tanga-intro {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 66% 48%, rgba(217, 107, 43, 0.16), transparent 30%),
-    radial-gradient(circle at 18% 58%, rgba(185, 149, 75, 0.12), transparent 28%),
-    #060708;
-  color: #fff;
-  font-family: "Poppins", "Montserrat", "Inter", Arial, sans-serif;
-  opacity: 1;
-  transition: opacity 620ms cubic-bezier(0.16, 1, 0.3, 1), visibility 620ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.tanga-intro.is-finishing {
-  opacity: 0;
-  visibility: hidden;
-}
-
-.tanga-intro__media,
-.tanga-intro__video,
-.tanga-intro__fallback,
-.tanga-intro__shade {
-  position: absolute;
-  inset: 0;
-}
-
-.tanga-intro__video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: #030201;
-  filter: saturate(1.04) contrast(1.12) brightness(1.0);
-}
-
-.tanga-intro__fallback {
-  background:
-    linear-gradient(120deg, rgba(3, 2, 1, 0.2), rgba(3, 2, 1, 0.86)),
-    radial-gradient(circle at 58% 50%, rgba(217, 107, 43, 0.26), transparent 28%),
-    radial-gradient(circle at 40% 54%, rgba(255, 255, 255, 0.12), transparent 16%),
-    linear-gradient(180deg, #060403, #0b0705 46%, #020100);
-}
-
-.tanga-intro__fallback::before {
-  content: "";
-  position: absolute;
-  width: min(46vw, 720px);
-  aspect-ratio: 1;
-  left: 42%;
-  top: 47%;
-  border-radius: 999px;
-  transform: translate(-50%, -50%);
-  background:
-    radial-gradient(circle at 42% 38%, rgba(255, 255, 255, 0.72), transparent 0 4%, rgba(255, 255, 255, 0.12) 4.5%, transparent 6%),
-    radial-gradient(circle at 54% 48%, rgba(217, 107, 43, 0.24), transparent 0 3%, transparent 3.5%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), transparent 55%),
-    linear-gradient(142deg, rgba(245, 241, 235, 0.28), rgba(217, 107, 43, 0.08));
-  border: 1px solid rgba(245, 241, 235, 0.16);
-  box-shadow: 0 0 120px rgba(217, 107, 43, 0.18);
-  animation: tanga-intro-drift 14s ease-in-out infinite alternate;
-}
-
-.tanga-intro__fallback::after {
-  content: "";
-  position: absolute;
-  inset: auto 14% 18% 30%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(217, 107, 43, 0.72), rgba(245, 241, 235, 0.24), transparent);
-  transform: rotate(-11deg);
-  box-shadow: 0 0 28px rgba(217, 107, 43, 0.38);
-}
-
-.tanga-intro__shade {
-  background:
-    linear-gradient(90deg, rgba(3, 2, 1, 0.78), rgba(3, 2, 1, 0.18) 45%, rgba(3, 2, 1, 0.58)),
-    linear-gradient(180deg, rgba(3, 2, 1, 0.72), transparent 32%, rgba(3, 2, 1, 0.86));
-  pointer-events: none;
-}
-
-.tanga-intro__brand {
-  position: absolute;
-  left: clamp(2rem, 4vw, 5.5rem);
-  top: clamp(1.5rem, 3vw, 4rem);
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  filter: drop-shadow(0 18px 42px rgba(0, 0, 0, 0.38));
-}
-
-.tanga-intro__brand-mark {
-  width: clamp(2.5rem, 3vw, 4rem);
-  height: clamp(2.5rem, 3vw, 4rem);
-  border-radius: 999px;
-}
-
-.tanga-intro__brand-wordmark {
-  width: clamp(8.75rem, 10vw, 15rem);
-  height: auto;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.tanga-intro__copy {
-  position: absolute;
-  left: clamp(2rem, 4vw, 5.5rem);
-  bottom: clamp(5.25rem, 9vw, 10rem);
-  width: min(44rem, 48vw);
-  text-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
-}
-
-.tanga-intro__copy span,
-.tanga-intro__notice,
-.tanga-intro__blocked span {
-  color: #d96b2b;
-  font-size: clamp(0.68rem, 0.62vw, 0.88rem);
-  font-weight: 800;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-}
-
-.tanga-intro__copy h1 {
-  margin: 0.85rem 0 1rem;
-  color: #fff;
-  font-size: clamp(4rem, 7vw, 9.5rem);
-  line-height: 0.9;
-  letter-spacing: 0;
-}
-
-.tanga-intro__copy p {
-  max-width: 34rem;
-  margin: 0;
-  color: rgba(245, 241, 235, 0.82);
-  font-size: clamp(1rem, 1.1vw, 1.55rem);
-  line-height: 1.55;
-}
-
-.tanga-intro__skip,
-.tanga-intro__blocked button {
-  border: 1px solid rgba(245, 241, 235, 0.22);
-  border-radius: 999px;
-  background: rgba(219, 234, 254, 0.16);
-  color: #fff;
-  font: 700 0.76rem/1 "Poppins", "Montserrat", "Inter", Arial, sans-serif;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  backdrop-filter: blur(18px);
-  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
-}
-
-.tanga-intro__skip {
-  position: absolute;
-  right: clamp(1.5rem, 3vw, 4rem);
-  bottom: clamp(1.5rem, 3vw, 4rem);
-  padding: 0.95rem 1.35rem;
-}
-
-.tanga-intro__skip:hover,
-.tanga-intro__blocked button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(217, 107, 43, 0.72);
-  background: rgba(217, 107, 43, 0.84);
-}
-
-.tanga-intro__timeline {
-  position: absolute;
-  left: clamp(2rem, 4vw, 5.5rem);
-  right: clamp(8rem, 12vw, 16rem);
-  bottom: clamp(2rem, 3.6vw, 4.75rem);
-  height: 2px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(245, 241, 235, 0.14);
-}
-
-.tanga-intro__timeline span {
-  display: block;
-  width: 100%;
-  height: 100%;
-  transform-origin: left center;
-  background: linear-gradient(90deg, #d96b2b, #b9954b, rgba(245, 241, 235, 0.72));
-  animation: tanga-intro-progress var(--tanga-intro-duration, 50s) linear both;
-}
-
-.tanga-intro__blocked,
-.tanga-intro__notice {
-  position: absolute;
-  right: clamp(1.5rem, 3vw, 4rem);
-  top: clamp(1.5rem, 3vw, 4rem);
-  max-width: 24rem;
-  border: 1px solid rgba(217, 107, 43, 0.28);
-  border-radius: 0.85rem;
-  background: rgba(219, 234, 254, 0.16);
-  padding: 1rem;
-  backdrop-filter: blur(18px);
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
-}
-
-.tanga-intro__blocked {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.tanga-intro__blocked strong {
-  color: #fff;
-  font-size: 1rem;
-}
-
-.tanga-intro__blocked button {
-  justify-self: start;
-  margin-top: 0.35rem;
-  padding: 0.8rem 1rem;
-}
-
-.tanga-intro__notice {
-  top: auto;
-  bottom: clamp(5rem, 6vw, 7rem);
-  color: rgba(245, 241, 235, 0.82);
-  letter-spacing: 0.16em;
-}
-
-@keyframes tanga-intro-progress {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
-@keyframes tanga-intro-drift {
-  from {
-    transform: translate(-52%, -48%) rotate(-8deg) scale(0.96);
-  }
-  to {
-    transform: translate(-45%, -52%) rotate(10deg) scale(1.04);
-  }
-}
 
 
 @layer base {
@@ -5392,15 +5146,21 @@ body {
 }
 
 .tanga-deck__topbar {
+  /* Consolidated from 8 duplicate base blocks (was L5148/6402/7111/8167/8942/
+     9457/10112/12386). Last-wins values preserved; hud.css still overrides the
+     layout at higher specificity. Appearance (bg/border/shadow/blur) comes from
+     the shared overlay rule + palette pass, untouched. */
   position: absolute;
-  top: 18px;
-  left: 24px;
-  right: 24px;
-  z-index: 12;
+  top: clamp(24px, 2.1vh, 36px);
+  left: clamp(32px, 3.1vw, 80px);
   display: grid;
-  grid-template-columns: 230px minmax(260px, 1fr) minmax(520px, 720px);
-  align-items: center;
-  gap: 14px;
+  grid-template-columns: minmax(240px, 330px) minmax(0, 1fr) minmax(560px, 720px);
+  align-items: start;
+  gap: var(--hm-space-8);
+  z-index: 12;
+  /* right / width / max-width intentionally omitted — hud.css sets them at
+     higher specificity (the topbar is full-width there), so base !important
+     copies were dead weight. */
 }
 
 .tanga-deck__brand {
@@ -6645,10 +6405,6 @@ body {
 }
 
 /* Sakariya low-chrome pass: keep the data stage dominant and tuck controls into instruments. */
-.tanga-deck__topbar {
-  top: 16px;
-  grid-template-columns: 238px minmax(0, 1fr) minmax(350px, 470px);
-}
 
 .tanga-deck__brand {
   min-width: 220px;
@@ -7354,14 +7110,6 @@ body {
 }
 
 /* Tanga desktop presenter: keep the canvas dominant and make controls behave like a light HUD. */
-.tanga-deck__topbar {
-  top: 18px;
-  left: 24px;
-  right: 24px;
-  grid-template-columns: 210px minmax(180px, 1fr) minmax(640px, 760px);
-  align-items: start;
-  gap: 12px;
-}
 
 .tanga-deck__brand {
   min-height: 48px;
@@ -8410,9 +8158,6 @@ body {
 }
 
 /* VRIFY-like presenter HUD pass: keep the geology dominant and make instruments quiet. */
-.tanga-deck__topbar {
-  grid-template-columns: 260px minmax(0, 1fr) minmax(420px, 540px);
-}
 
 .tanga-deck__command {
   position: relative;
@@ -9185,14 +8930,6 @@ h3 {
 }
 
 /* Sakariya deck declutter pass: fewer visible controls, more canvas. */
-.tanga-deck__topbar {
-  top: 18px;
-  right: 24px;
-  left: 24px;
-  grid-template-columns: 260px minmax(0, 1fr) minmax(380px, 520px);
-  gap: 12px;
-  align-items: start;
-}
 
 .tanga-deck__chips {
   display: none;
@@ -9700,13 +9437,6 @@ h3 {
 }
 
 /* VRIFY-inspired cleanup: compact command pill, no always-open prompt chrome. */
-.tanga-deck__topbar {
-  top: 16px;
-  right: 24px;
-  left: 24px;
-  grid-template-columns: 238px minmax(0, 1fr) minmax(320px, 392px);
-  align-items: start;
-}
 
 .tanga-deck--three-active .tanga-deck__topbar {
   grid-template-columns: 226px minmax(0, 1fr) minmax(300px, 372px);
@@ -10355,13 +10085,6 @@ h3 {
   display: none !important;
 }
 
-.tanga-deck__topbar {
-  top: clamp(24px, 2.1vh, 36px);
-  right: clamp(32px, 3.1vw, 80px);
-  left: clamp(32px, 3.1vw, 80px);
-  grid-template-columns: minmax(240px, 330px) minmax(0, 1fr) minmax(560px, 720px);
-  gap: var(--hm-space-8);
-}
 
 .tanga-deck__brand {
   gap: var(--hm-space-3);
@@ -11283,19 +11006,6 @@ h3 {
   bottom: 64px !important;
 }
 
-/* Intro and right-side overlay stability pass. */
-.tanga-intro {
-  z-index: 1200 !important;
-}
-
-.tanga-intro__video {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-.tanga-intro__copy {
-  max-width: min(640px, calc(100vw - 96px)) !important;
-}
 
 .tanga-three__grade-legend {
   position: absolute !important;
@@ -12641,11 +12351,6 @@ body:has(.tanga-deck__notes) .tanga-deck__geo-overlay {
    Also declutter — shrink topbar to hug its brand + scene chip on the left. */
 .tanga-deck__act-ribbon {
   top: 88px !important;
-}
-.tanga-deck__topbar {
-  right: auto !important;
-  width: max-content !important;
-  max-width: min(52vw, 640px) !important;
 }
 /* On the cover scene, hide the act ribbon (cover owns the whole frame) */
 .tanga-deck--cover .tanga-deck__act-ribbon { display: none; }
