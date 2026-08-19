@@ -451,3 +451,11 @@
    and cosmetic — drop it so the video decodes/composites on the fast path.
    =========================================================================== */
 .tanga-intro__video { filter: none !important; }
+
+/* #14 — honour reduced-motion for the intro's own CSS animations (the JS gate
+   in TangaIntroGate stops the video autoplay; this stops the progress bar and
+   the fallback drift so nothing moves for reduced-motion users). */
+@media (prefers-reduced-motion: reduce) {
+  .tanga-intro__timeline span,
+  .tanga-intro__fallback::before { animation: none !important; }
+}

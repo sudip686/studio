@@ -46,6 +46,18 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
     const video = videoRef.current;
     if (!video) return;
 
+    // Accessibility: never autoplay the cinematic for users who ask for reduced
+    // motion. Hold the static poster briefly (no motion), then enter the deck —
+    // the "Skip intro" button is always available too. Matches the CountUp
+    // reduced-motion handling.
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      const holdTimer = window.setTimeout(completeIntro, 3500);
+      return () => window.clearTimeout(holdTimer);
+    }
+
     const playPromise = video.play();
     if (playPromise) {
       playPromise.catch(() => setIntroState('blocked'));
