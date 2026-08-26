@@ -10,6 +10,7 @@ import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCi
 import {Map} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import TangaStoryVideoHero from './TangaStoryVideoHero';
+import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {
   type CameraAction,
   type CommandIntent,
@@ -572,6 +573,16 @@ const MODE_PROMPT_HINTS: Record<WorkbenchMode, string[]> = {
   mine_planning: ['mine', 'plan', 'pit', 'price', 'economic', 'shell', 'ore', 'waste'],
   metallurgy: ['metallurgy', 'flake', 'resource', 'drillholes'],
   comparison: ['compare', 'peer', 'metallurgy', 'resource', 'position'],
+};
+
+// Info interstitials shown just BEFORE entering a scene — placed where they add
+// narrative value from the viewer's side: the resource numbers before the 3D
+// resource model, the metallurgy testwork before the metallurgy reveal, and the
+// battery-anode value story before the closing peer comparison.
+const INFO_BEFORE: Partial<Record<WorkbenchMode, InfoSlideId>> = {
+  resource: 'resource-breakdown',
+  metallurgy: 'flake-purity',
+  comparison: 'battery-value',
 };
 
 const STORY_STEPS: StoryStep[] = [
@@ -3602,13 +3613,23 @@ export default function TangaDeckWorkbench() {
     try { window.localStorage?.setItem('tanga:coachSeen', '1'); } catch { /* ignore */ }
   }, []);
 
+  // Pending info interstitial (a card shown between two scenes). While set, the
+  // scene index does NOT change — one more forward press clears it and advances.
+  const [pendingInfo, setPendingInfo] = useState<InfoSlideId | null>(null);
+
   const handlePrevStory = useCallback(() => {
+    // Back out of an info card without leaving the current scene.
+    if (pendingInfo) { setPendingInfo(null); return; }
     goToStoryIndex(activeStoryIndex - 1);
-  }, [goToStoryIndex, activeStoryIndex]);
+  }, [goToStoryIndex, activeStoryIndex, pendingInfo]);
 
   const handleNextStory = useCallback(() => {
+    if (pendingInfo) { setPendingInfo(null); goToStoryIndex(activeStoryIndex + 1); return; }
+    const nextMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
+    const info = nextMode ? INFO_BEFORE[nextMode] : undefined;
+    if (info) { setPendingInfo(info); return; }
     goToStoryIndex(activeStoryIndex + 1);
-  }, [goToStoryIndex, activeStoryIndex]);
+  }, [goToStoryIndex, activeStoryIndex, pendingInfo]);
 
   // Explicit manual actions from the presenter — pause autoplay so nothing
   // auto-advances after they take the wheel.
@@ -3789,6 +3810,7 @@ export default function TangaDeckWorkbench() {
         isCoverScene && 'tanga-deck--cover',
         isAutoplay && 'tanga-deck--autoplay'
       )}
+      data-act={MODE_ACT[activeMode]}
       data-testid="tanga-deck-workbench"
     >
       <div className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
@@ -3831,6 +3853,11 @@ export default function TangaDeckWorkbench() {
       {/* HUD command-center frame: viewport-corner reticles + edge vignette.
           Pure decoration, non-interactive. Styled in hud.css (Phase 3). */}
       <div className="hud-frame" aria-hidden="true" />
+
+      {/* Info interstitial — an editorial data card shown between scenes. */}
+      {pendingInfo && (
+        <TangaInfoSlide key={pendingInfo} id={pendingInfo} onContinue={handleManualNext} />
+      )}
 
       {/* Subtle scene-change flash — keyed to activeMode so it re-mounts and
           fades out each transition, giving every scene a clean "arrival". */}

@@ -536,3 +536,117 @@ html, body { overflow-x: hidden; }
   font-size: 0.78rem !important;
   line-height: 1.25 !important;
 }
+
+/* ===========================================================================
+   PHASE 12 — per-act accent. Same palette we already use (the STORY_ACTS tints
+   + cyan base), but each act carries a distinct secondary accent so the deck
+   doesn't read as ten identical slides. Cyan stays the structural signal; the
+   act tint rides a few chrome accents and shifts cool → warm → gold with the
+   Opportunity → Asset → Value arc.
+   =========================================================================== */
+.tanga-deck[data-act="opportunity"] { --act: 143, 180, 214; }  /* #8FB4D6 */
+.tanga-deck[data-act="asset"]       { --act: 217, 106, 42; }   /* #D96A2A */
+.tanga-deck[data-act="value"]       { --act: 224, 169, 79; }   /* #E0A94F */
+
+/* Docked panels get an act-tinted top cap — the clearest per-act cue. */
+.tanga-deck__data-panel.tanga-deck__data-panel,
+.tanga-deck__insight-panel.tanga-deck__insight-panel {
+  border-top: 2px solid rgba(var(--act, 94, 234, 212), 0.62) !important;
+}
+/* Active pager dot takes the act tint (was always warm). */
+.tanga-deck__pager-dot.is-active,
+.tanga-deck__pager-dot[aria-selected="true"] {
+  background: rgba(var(--act, 94, 234, 212), 0.95) !important;
+  box-shadow: 0 0 10px rgba(var(--act, 94, 234, 212), 0.5) !important;
+}
+/* Faint act atmosphere — a soft top-edge glow that changes per act. */
+.tanga-deck[data-act] .hud-frame::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 42% at 50% -8%, rgba(var(--act, 94, 234, 212), 0.10), transparent 62%);
+}
+
+/* ===========================================================================
+   PHASE 13 — INFO SLIDES. Full-screen editorial interstitials between the 3D
+   scenes (real AMC MRE data) so the deck isn't ten identical terrain+panel
+   slides. Distinct layouts: data table / bar chart / value flow.
+   =========================================================================== */
+.tanga-info {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center;
+  padding: clamp(20px, 5vw, 64px);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.06), transparent 55%),
+    linear-gradient(180deg, rgba(6, 10, 15, 0.92), rgba(4, 7, 11, 0.96));
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+.tanga-info__card {
+  position: relative; width: min(760px, 92vw); cursor: default;
+  padding: clamp(22px, 3.4vw, 40px);
+  border: 1px solid var(--hud-line-strong);
+  border-top: 2px solid rgba(var(--act, 94, 234, 212), 0.7);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(14, 21, 28, 0.9), rgba(8, 13, 18, 0.94));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(94, 234, 212, 0.06);
+}
+.tanga-info__card::before, .tanga-info__card::after {
+  content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none; opacity: 0.7;
+}
+.tanga-info__card::before { top: 8px; left: 8px; border-top: 1px solid rgba(94,234,212,.5); border-left: 1px solid rgba(94,234,212,.5); }
+.tanga-info__card::after  { bottom: 8px; right: 8px; border-bottom: 1px solid rgba(94,234,212,.5); border-right: 1px solid rgba(94,234,212,.5); }
+.tanga-info__eyebrow {
+  font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: rgba(var(--hud-cyan), 0.95);
+}
+.tanga-info__title {
+  font-family: "Space Grotesk", "Poppins", sans-serif; font-weight: 700;
+  font-size: clamp(1.5rem, 3.4vw, 2.4rem); letter-spacing: -0.01em;
+  color: var(--hud-text); margin: 8px 0 6px; line-height: 1.1;
+}
+.tanga-info__sub { color: var(--hud-text-dim); max-width: 56ch; font-size: 0.95rem; margin: 0 0 18px; }
+.tanga-info__src {
+  margin-top: 18px; font-family: var(--font-mono); font-size: 0.62rem;
+  letter-spacing: 0.04em; color: rgba(148, 197, 255, 0.55);
+}
+/* table */
+.tanga-info__stack { display: flex; height: 10px; border-radius: 5px; overflow: hidden; border: 1px solid var(--hud-line); margin-bottom: 14px; }
+.tanga-info__stack i { display: block; height: 100%; }
+.tanga-info__table { width: 100%; border-collapse: collapse; }
+.tanga-info__table th, .tanga-info__table td {
+  text-align: right; padding: 6px 10px; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: 0.86rem; color: var(--hud-text);
+}
+.tanga-info__table th { color: rgba(148,197,255,.6); font-weight: 500; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--hud-line); }
+.tanga-info__table td:first-child, .tanga-info__table th:first-child { text-align: left; color: var(--hud-text-dim); }
+.tanga-info__table tr.is-total td { border-top: 1px solid var(--hud-line-strong); color: var(--hud-text); font-weight: 700; padding-top: 8px; }
+.tanga-info__table tr.is-total td:first-child { color: rgba(var(--hud-cyan), 0.95); }
+/* bars */
+.tanga-info__purity { position: absolute; right: clamp(22px,3.4vw,40px); top: clamp(22px,3.4vw,40px); text-align: right; }
+.tanga-info__purity .big { display: block; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: clamp(1.6rem,3.4vw,2.3rem); color: rgba(var(--hud-cyan), 0.98); line-height: 1; }
+.tanga-info__purity .cap { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(148,197,255,.6); }
+.tanga-info__bars { display: flex; align-items: flex-end; gap: clamp(6px,1.4vw,16px); height: clamp(120px,20vh,180px); margin-top: 8px; }
+.tanga-info__bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; transform-origin: bottom; }
+.tanga-info__bar .col { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, rgba(79,214,192,.85), rgba(79,214,192,.3)); }
+.tanga-info__bar .v { font-family: var(--font-mono); font-size: 0.66rem; color: var(--hud-text-dim); }
+.tanga-info__bar .id { font-family: var(--font-mono); font-size: 0.56rem; color: rgba(148,197,255,.5); }
+/* flow */
+.tanga-info__flow { display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap; }
+.tanga-info__chip { flex: 1; min-width: 150px; border: 1px solid var(--hud-line-strong); border-radius: 10px; padding: 14px 16px; background: rgba(20, 30, 42, 0.55); }
+.tanga-info__chip .k { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(148,197,255,.6); }
+.tanga-info__chip .val { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 1.05rem; color: var(--hud-text); margin-top: 4px; }
+.tanga-info__chip.is-hero { border-color: rgba(94,234,212,.5); background: rgba(94,234,212,.08); }
+.tanga-info__chip.is-hero .val { color: rgba(var(--hud-cyan), 0.98); }
+/* continue */
+.tanga-info__continue {
+  margin-top: 22px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 18px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(var(--hud-cyan), 0.5);
+  background: rgba(94, 234, 212, 0.1); color: rgba(var(--hud-cyan), 0.98);
+  font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase;
+  transition: background var(--dur-fast) var(--ease-hud), border-color var(--dur-fast) var(--ease-hud);
+}
+.tanga-info__continue:hover, .tanga-info__continue:focus-visible { background: rgba(94, 234, 212, 0.2); border-color: rgba(var(--hud-cyan), 0.8); outline: none; }
+@media (prefers-reduced-motion: reduce) { .tanga-info, .tanga-info__card * { animation: none !important; } }
