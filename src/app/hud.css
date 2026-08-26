@@ -536,3 +536,34 @@ html, body { overflow-x: hidden; }
   font-size: 0.78rem !important;
   line-height: 1.25 !important;
 }
+
+/* ===========================================================================
+   PHASE 12 — per-act accent. Same palette we already use (the STORY_ACTS tints
+   + cyan base), but each act carries a distinct secondary accent so the deck
+   doesn't read as ten identical slides. Cyan stays the structural signal; the
+   act tint rides a few chrome accents and shifts cool → warm → gold with the
+   Opportunity → Asset → Value arc.
+   =========================================================================== */
+.tanga-deck[data-act="opportunity"] { --act: 143, 180, 214; }  /* #8FB4D6 */
+.tanga-deck[data-act="asset"]       { --act: 217, 106, 42; }   /* #D96A2A */
+.tanga-deck[data-act="value"]       { --act: 224, 169, 79; }   /* #E0A94F */
+
+/* Docked panels get an act-tinted top cap — the clearest per-act cue. */
+.tanga-deck__data-panel.tanga-deck__data-panel,
+.tanga-deck__insight-panel.tanga-deck__insight-panel {
+  border-top: 2px solid rgba(var(--act, 94, 234, 212), 0.62) !important;
+}
+/* Active pager dot takes the act tint (was always warm). */
+.tanga-deck__pager-dot.is-active,
+.tanga-deck__pager-dot[aria-selected="true"] {
+  background: rgba(var(--act, 94, 234, 212), 0.95) !important;
+  box-shadow: 0 0 10px rgba(var(--act, 94, 234, 212), 0.5) !important;
+}
+/* Faint act atmosphere — a soft top-edge glow that changes per act. */
+.tanga-deck[data-act] .hud-frame::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 42% at 50% -8%, rgba(var(--act, 94, 234, 212), 0.10), transparent 62%);
+}

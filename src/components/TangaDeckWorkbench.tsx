@@ -3789,6 +3789,7 @@ export default function TangaDeckWorkbench() {
         isCoverScene && 'tanga-deck--cover',
         isAutoplay && 'tanga-deck--autoplay'
       )}
+      data-act={MODE_ACT[activeMode]}
       data-testid="tanga-deck-workbench"
     >
       <div className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
