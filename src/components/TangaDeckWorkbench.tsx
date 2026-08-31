@@ -804,7 +804,10 @@ const PEER_MAP_STYLE = {
       id: 'peer-map-background',
       type: 'background',
       paint: {
-        'background-color': '#0b0b0b',
+        // Deep space navy (geolibre-style) so the globe's atmosphere rim reads
+        // as a lit planet in space, not a disc on black. The starfield overlay
+        // adds stars on top of this.
+        'background-color': '#050a14',
       },
     },
     {
@@ -3852,6 +3855,10 @@ export default function TangaDeckWorkbench() {
 
       {/* HUD command-center frame: viewport-corner reticles + edge vignette.
           Pure decoration, non-interactive. Styled in hud.css (Phase 3). */}
+      {/* Geolibre-style starfield behind the globe (CSS-gated to the globe
+          overview scenes; screen-blended so it only shows in the dark space). */}
+      <div className="tanga-starfield" aria-hidden="true" />
+
       <div className="hud-frame" aria-hidden="true" />
 
       {/* Info interstitial — an editorial data card shown between scenes. */}
