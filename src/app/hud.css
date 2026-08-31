@@ -639,6 +639,13 @@ html, body { overflow-x: hidden; }
 .tanga-info__chip .val { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 1.05rem; color: var(--hud-text); margin-top: 4px; }
 .tanga-info__chip.is-hero { border-color: rgba(94,234,212,.5); background: rgba(94,234,212,.08); }
 .tanga-info__chip.is-hero .val { color: rgba(var(--hud-cyan), 0.98); }
+/* cross-section svg */
+.tanga-info__section { margin-top: 4px; }
+.tanga-info__section svg {
+  width: 100%; height: auto; display: block;
+  border: 1px solid var(--hud-line); border-radius: 8px;
+  background: linear-gradient(180deg, rgba(8,13,18,.55), rgba(10,16,22,.35));
+}
 /* continue */
 .tanga-info__continue {
   margin-top: 22px; display: inline-flex; align-items: center; gap: 8px;

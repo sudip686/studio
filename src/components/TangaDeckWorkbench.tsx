@@ -580,6 +580,7 @@ const MODE_PROMPT_HINTS: Record<WorkbenchMode, string[]> = {
 // resource model, the metallurgy testwork before the metallurgy reveal, and the
 // battery-anode value story before the closing peer comparison.
 const INFO_BEFORE: Partial<Record<WorkbenchMode, InfoSlideId>> = {
+  drillholes: 'cross-section',
   resource: 'resource-breakdown',
   metallurgy: 'flake-purity',
   comparison: 'battery-value',
