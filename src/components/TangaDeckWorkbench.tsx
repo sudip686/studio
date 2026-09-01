@@ -1800,6 +1800,9 @@ export default function TangaDeckWorkbench() {
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
   const [resourceFocus, setResourceFocus] = useState<ResourceFocus>('Indicated');
   const [viewState, setViewState] = useState<DeckViewState>(VIEW_STATES[DEFAULT_MODE]);
+  // Timestamp of the last user camera gesture (or scene change) — the idle
+  // slow-orbit only kicks in once the camera has been still for a beat.
+  const lastCameraInteractRef = useRef<number>(0);
   const [commandText, setCommandText] = useState('');
   const [statusText, setStatusText] = useState('Peer ranking ready');
   const [pipeline, setPipeline] = useState('Text/voice -> intent -> map action');
@@ -3824,6 +3827,38 @@ export default function TangaDeckWorkbench() {
     return () => window.clearTimeout(timer);
   }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, autoplaySec]);
 
+  // Idle slow-orbit: once an immersive scene has flown in and settled, gently
+  // rotate the camera bearing (geolibre / VRIFY "never frozen" feel). Cancels
+  // the instant the user grabs the camera and resumes after a short settle.
+  // Off for reduced-motion, the cover, the globe overview, and 3D scenes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (threeVisible || isCoverScene) return;
+    const ORBIT_MODES = new Set<WorkbenchMode>(['project', 'topography', 'accessibility', 'mine_planning', 'drillholes', 'resource', 'metallurgy']);
+    if (!ORBIT_MODES.has(activeMode)) return;
+
+    const SETTLE_MS = 3600;   // clear the fly-in (≤2.4s) + a beat before orbiting
+    const SPEED = 1.5;        // degrees per second — a calm, barely-there drift
+    lastCameraInteractRef.current = performance.now();
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      if (now - lastCameraInteractRef.current < SETTLE_MS) return;
+      setViewState((cur) => {
+        // Strip any leftover flyTo props so the bearing nudge applies instantly
+        // (no per-frame transition) — the SETTLE window already cleared the fly-in.
+        const {transitionInterpolator, transitionEasing, transitionDuration, ...rest} = cur as any;
+        return {...rest, bearing: (((rest.bearing ?? 0) + SPEED * dt) % 360)};
+      });
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [activeMode, threeVisible, isCoverScene]);
+
   const toggleAutoplay = useCallback(() => setIsAutoplay((prev) => !prev), []);
   const toggleBlackout = useCallback(() => setIsBlackout((prev) => !prev), []);
   const toggleNotes = useCallback(() => setIsNotesOpen((prev) => !prev), []);
@@ -3977,7 +4012,13 @@ export default function TangaDeckWorkbench() {
           layers={layers}
           effects={[TANGA_LIGHTING]}
           useDevicePixels={1}
-          onViewStateChange={({viewState: nextViewState}: any) => setViewState(nextViewState as DeckViewState)}
+          onViewStateChange={({viewState: nextViewState, interactionState}: any) => {
+            // A real user gesture pauses the idle orbit; it resumes after settle.
+            if (interactionState && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)) {
+              lastCameraInteractRef.current = performance.now();
+            }
+            setViewState(nextViewState as DeckViewState);
+          }}
           onClick={handleDeckClick}
           getTooltip={getTooltip}
         >
