@@ -82,7 +82,13 @@ type DeckViewState = {
   bearing: number;
   transitionDuration?: number;
   transitionInterpolator?: unknown;
+  transitionEasing?: (t: number) => number;
 };
+
+// Cinematic ease-in-out cubic — camera flights glide in and settle out (a calm,
+// geolibre-style move) instead of a linear snap.
+const cinematicEase = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const CINEMATIC_FLY = () => new FlyToInterpolator({curve: 1.55});
 
 type GeoJsonFeature = {
   type: 'Feature';
@@ -1926,8 +1932,9 @@ export default function TangaDeckWorkbench() {
     setViewState({
       ...target,
       bearing: bearingOverride ?? target.bearing,
-      transitionDuration: 1500,
-      transitionInterpolator: new FlyToInterpolator(),
+      transitionDuration: 2400,
+      transitionInterpolator: CINEMATIC_FLY(),
+      transitionEasing: cinematicEase,
     });
   }, []);
 
@@ -1995,8 +2002,9 @@ export default function TangaDeckWorkbench() {
     setViewState({
       ...viewState,
       bearing: nextBearing,
-      transitionDuration: 900,
-      transitionInterpolator: new FlyToInterpolator(),
+      transitionDuration: 1500,
+      transitionInterpolator: CINEMATIC_FLY(),
+      transitionEasing: cinematicEase,
     });
     setStatusText(`Rotated view to ${Math.round(nextBearing)} degrees`);
   }, [isThreeMode, issueThreeCameraCommand, viewState]);
@@ -2037,8 +2045,9 @@ export default function TangaDeckWorkbench() {
     setViewState((current) => {
       const next: DeckViewState = {
         ...current,
-        transitionDuration: 900,
-        transitionInterpolator: new FlyToInterpolator(),
+        transitionDuration: 1500,
+        transitionInterpolator: CINEMATIC_FLY(),
+        transitionEasing: cinematicEase,
       };
 
       if (action === 'zoomIn') next.zoom = clamp(current.zoom + 1.15, 2.2, 15.2);
