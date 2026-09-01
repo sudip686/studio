@@ -742,3 +742,57 @@ html, body { overflow-x: hidden; }
 .tanga-deck__locator-readout span { font-size: .64rem; letter-spacing: .03em; color: rgba(203,222,240,.82); font-variant-numeric: tabular-nums; line-height: 1.35; }
 .tanga-deck__locator-readout span:last-child { color: rgba(94,234,212,.92); }
 @media (prefers-reduced-motion: reduce) { .tanga-deck__locator-pulse { animation: none; } }
+
+/* ===========================================================================
+   PHASE 16 — premium compass instrument (replaces the busy 4-letter dial with
+   a clean ticked bezel + a single north arrow). New markup: .tanga-compass.
+   =========================================================================== */
+.tanga-deck__compass.tanga-compass {
+  position: relative; width: 62px !important; height: 62px !important;
+  display: grid; place-items: center; border-radius: 999px !important;
+  border: 1px solid var(--hud-line-strong) !important;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(94,234,212,.10), transparent 60%),
+    linear-gradient(180deg, rgba(12,19,27,.84), rgba(6,11,18,.76)) !important;
+  box-shadow: var(--glass-glow) !important;
+  overflow: visible !important;
+}
+/* fixed bezel ring */
+.tanga-deck__compass.tanga-compass::before {
+  content: ""; position: absolute; inset: 6px; border-radius: 999px;
+  border: 1px solid rgba(94,234,212,.22) !important;
+  box-shadow: none !important;
+}
+/* fixed N/E/S/W tick marks on the rim */
+.tanga-deck__compass.tanga-compass::after {
+  content: ""; position: absolute; inset: 2px; border-radius: 999px; pointer-events: none;
+  background: conic-gradient(
+    rgba(148,197,255,.5) 0 2deg, transparent 2deg 88deg,
+    rgba(148,197,255,.4) 90deg 92deg, transparent 92deg 178deg,
+    rgba(148,197,255,.4) 180deg 182deg, transparent 182deg 268deg,
+    rgba(148,197,255,.4) 270deg 272deg, transparent 272deg 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 22px, #000 22px 27px, transparent 27px);
+  mask: radial-gradient(circle, transparent 0 22px, #000 22px 27px, transparent 27px);
+}
+.tanga-compass__rose { position: absolute; inset: 0; transition: transform 520ms var(--ease-hud); }
+/* north arrow (triangle) pointing up = true north */
+.tanga-compass__arrow {
+  position: absolute; left: 50%; top: 7px; transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 15px solid rgba(94,234,212,.98);
+  filter: drop-shadow(0 0 4px rgba(94,234,212,.55));
+}
+.tanga-compass__n {
+  position: absolute; left: 50%; top: 15px; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 8px; font-weight: 800; color: #06121a; line-height: 1;
+}
+.tanga-compass__deg {
+  position: absolute !important; bottom: -7px !important; left: 50% !important; right: auto !important;
+  transform: translateX(-50%);
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--hud-line) !important;
+  background: rgba(6,11,18,.92) !important;
+  font-family: var(--font-mono) !important; font-size: 8.5px !important; letter-spacing: .02em;
+  color: rgba(148,197,255,.92) !important;
+}

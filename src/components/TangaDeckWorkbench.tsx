@@ -4019,15 +4019,12 @@ export default function TangaDeckWorkbench() {
       )}
 
       <section className="tanga-deck__geo-overlay" aria-label="Map legend compass and scale">
-        <div className="tanga-deck__compass" aria-label={`Bearing ${Math.round(compassBearing)} degrees`}>
-          <div className="tanga-deck__compass-ring" style={{transform: `rotate(${-compassBearing}deg)`}}>
-            <span>N</span>
-            <span>E</span>
-            <span>S</span>
-            <span>W</span>
+        <div className="tanga-deck__compass tanga-compass" aria-label={`Bearing ${Math.round(compassBearing)} degrees`}>
+          <div className="tanga-compass__rose" style={{transform: `rotate(${-compassBearing}deg)`}}>
+            <i className="tanga-compass__arrow" />
+            <span className="tanga-compass__n">N</span>
           </div>
-          <div className="tanga-deck__compass-needle" />
-          <small>{Math.round(compassBearing)} deg</small>
+          <small className="tanga-compass__deg">{Math.round(compassBearing)}°</small>
         </div>
 
         <div className="tanga-deck__legend">
