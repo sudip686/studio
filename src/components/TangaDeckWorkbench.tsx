@@ -3685,12 +3685,14 @@ export default function TangaDeckWorkbench() {
       push('lbl-license', 'TANGA LICENSE · 6.4 sq km · 100% OWNED', PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, 260, '#f0b64a');
     }
     if (activeMode === 'project') {
-      // Keep to a few spread-out facilities so the pinned chips don't overlap.
+      // Keep to a couple of spread-out facilities, with concise labels so the
+      // pinned chips stay narrow and don't crowd the panel.
+      const MINE_SHORT: Record<string, string> = {'process-plant': 'Processing plant', 'product-stockpile': 'Product stockpile'};
       const picks = [
-        ...locatedMineFacilities().filter((i) => ['process-plant', 'water-pond'].includes(i.id)),
+        ...locatedMineFacilities().filter((i) => ['process-plant'].includes(i.id)),
         ...locatedMinePoints().filter((i) => ['product-stockpile'].includes(i.id)),
       ];
-      picks.forEach((i: any) => push(`mine-${i.id}`, i.name, i.lon, i.lat, 95, '#8fb4d6'));
+      picks.forEach((i: any) => push(`mine-${i.id}`, MINE_SHORT[i.id] ?? i.name, i.lon, i.lat, 95, '#8fb4d6'));
       (villages.length ? villages : labels).slice(0, 6).forEach((feature, idx) => {
         const name = String(feature.properties?.name ?? '');
         const point = featurePoint(feature, 70, heightAt);
@@ -3720,7 +3722,7 @@ export default function TangaDeckWorkbench() {
       width: stageSize.width, height: stageSize.height,
       longitude: viewState.longitude, latitude: viewState.latitude, zoom: viewState.zoom, pitch: viewState.pitch, bearing: viewState.bearing,
     });
-    return mapLabelSources.map((source) => {
+    const positioned = mapLabelSources.map((source) => {
       let boxPixelX = stageSize.width / 2;
       let boxPixelY = stageSize.height / 2;
       try {
@@ -3741,6 +3743,38 @@ export default function TangaDeckWorkbench() {
       } catch { /* no pointer */ }
       return {...source, boxPixelX, boxPixelY, anchorPixelX, anchorPixelY};
     });
+
+    // Keep chips clear of the chrome: the top bar / act ribbon, the bottom pager,
+    // and the docked right-hand data panel — so no label is hidden behind a panel.
+    const W = stageSize.width;
+    const H = stageSize.height;
+    // The docked right-hand data/insight panel starts at ~70% of the stage width
+    // across viewports, so keep chip centres within the left 60% — their right
+    // edge (≈ +95px) then always clears the panel. Left edge stays off the logo.
+    const safeL = W * 0.05;
+    const safeR = W * 0.6;
+    const safeT = 104;       // below the top bar + act ribbon
+    const safeB = H - 104;   // above the pager
+    positioned.forEach((label) => {
+      label.boxPixelX = clamp(label.boxPixelX, safeL, safeR);
+      label.boxPixelY = clamp(label.boxPixelY, safeT, safeB);
+    });
+    // Greedy vertical de-collision: chips near each other in X are pushed apart
+    // in Y so two labels never overlap. Process top-to-bottom, only push down.
+    const MIN_GAP = 28;
+    const X_PROX = 150;
+    const placed: typeof positioned = [];
+    positioned.slice().sort((a, b) => a.boxPixelY - b.boxPixelY).forEach((label) => {
+      let y = label.boxPixelY;
+      placed.forEach((other) => {
+        if (Math.abs(other.boxPixelX - label.boxPixelX) < X_PROX && Math.abs(other.boxPixelY - y) < MIN_GAP) {
+          y = other.boxPixelY + MIN_GAP;
+        }
+      });
+      label.boxPixelY = clamp(y, safeT, safeB);
+      placed.push(label);
+    });
+    return positioned;
   }, [mapLabelSources, activeMode, stageSize.width, stageSize.height, viewState.longitude, viewState.latitude, viewState.zoom, viewState.pitch, viewState.bearing]);
 
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
