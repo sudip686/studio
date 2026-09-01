@@ -826,3 +826,46 @@ html, body { overflow-x: hidden; }
   font-family: var(--font-mono) !important; color: rgba(233,242,252,.95) !important;
   font-size: 11px !important; font-weight: 600 !important;
 }
+
+/* ===========================================================================
+   PHASE 18 - pinned map labels. The map's place labels (licence, marker, mine
+   facilities, villages, power, route) are HTML chips pinned to a fixed screen
+   slot with a pointer line to the live-projected anchor, so the text holds
+   still on zoom/pan and only the pointer tracks the location.
+   =========================================================================== */
+.tanga-deck__map-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+.tanga-deck__leader-svg--pin line {
+  stroke-width: 1.1px !important;
+  stroke-dasharray: 3 4 !important;
+  opacity: 0.6 !important;
+  filter: drop-shadow(0 0 5px currentColor) !important;
+}
+.tanga-deck__leader-svg--pin circle {
+  stroke-width: 1.2px !important;
+  filter: drop-shadow(0 0 6px currentColor) !important;
+}
+.tanga-deck__pin-label {
+  position: absolute;
+  left: var(--pin-x);
+  top: var(--pin-y);
+  transform: translate(-50%, -50%);
+  max-width: 190px;
+  padding: 4px 9px;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(233, 242, 252, 0.96);
+  background: linear-gradient(180deg, rgba(6, 12, 20, 0.82), rgba(3, 7, 14, 0.7));
+  border: 1px solid color-mix(in srgb, var(--pin-tone, #8fb4d6) 52%, rgba(255, 255, 255, 0.14));
+  border-radius: 5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  animation: hud-panel-in var(--dur-med, 0.4s) var(--ease-hud, ease) both;
+}

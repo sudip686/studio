@@ -2992,7 +2992,8 @@ export default function TangaDeckWorkbench() {
       }),
       // Layer 4: the area label — "6.4 sq km · 100% owned" at the polygon
       // centroid. Only shown when we're actively looking at the license.
-      showLocalContext && (activeMode === 'project' || activeMode === 'topography') && new TextLayer({
+      // Replaced by the pinned map-label overlay (fixed screen slot + pointer).
+      false && new TextLayer({
         id: 'project-boundary-label',
         data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'TANGA LICENSE · 6.4 sq km · 100% OWNED'}],
         getPosition: (d: any) => d.position,
@@ -3089,7 +3090,7 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      showMineInfrastructure && activeMode !== 'accessibility' && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'hypothetical-mine-labels',
         data: mineLabels,
         getPosition: (item) => [item.lon, item.lat, heightAt(item.lon, item.lat) + 95],
@@ -3173,7 +3174,7 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      showPowerGrid && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'power-grid-labels',
         data: POWER_GRID_NODES,
         getPosition: (node) => [node.lon, node.lat, heightAt(node.lon, node.lat) + (activeMode === 'accessibility' ? 1220 : 820)],
@@ -3224,7 +3225,7 @@ export default function TangaDeckWorkbench() {
       // regional views). On the local project & topography scenes the licence
       // badge + glowing boundary already mark it, so the extra label just
       // overlapped the badge — dropped there.
-      (activeMode === 'tanzania' || activeMode === 'accessibility') && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'project-marker-label',
         data: [{lon: PROJECT_CENTER.lon, lat: PROJECT_CENTER.lat, z: heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + (activeMode === 'tanzania' ? 112000 : 620), label: 'Tanga project'}],
         getPosition: (item) => [item.lon, item.lat, item.z],
@@ -3361,7 +3362,7 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      showVillageLabels && new TextLayer<GeoJsonFeature>({
+      false && new TextLayer<GeoJsonFeature>({
         id: 'village-labels',
         data: villages.length ? villages : labels,
         getPosition: (feature) => featurePoint(feature, 70, heightAt),
@@ -3416,7 +3417,7 @@ export default function TangaDeckWorkbench() {
         capRounded: true,
         parameters: {depthTest: false} as any,
       }),
-      showRoute && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'access-route-labels',
         data: [
           {
@@ -3665,6 +3666,82 @@ export default function TangaDeckWorkbench() {
       };
     });
   }, [heightAt, sceneCallouts, stageSize.height, stageSize.width, viewState.bearing, viewState.latitude, viewState.longitude, viewState.pitch, viewState.zoom]);
+
+  // ── Pinned map labels ──────────────────────────────────────────────────────
+  // The map's place labels (licence, marker, mine facilities, villages, power,
+  // route) used to be geo-anchored deck.gl TextLayers, so they swam across the
+  // screen on every zoom/pan. Instead we pin each label to a FIXED screen slot
+  // (its position projected at the scene's canonical view) and draw a pointer
+  // line to the live-projected anchor — so the text holds still and only the
+  // pointer tracks the location. Same idea as the titled callouts.
+  const mapLabelSources = useMemo(() => {
+    const out: Array<{id: string; text: string; lon: number; lat: number; z: number; tone: string}> = [];
+    const push = (id: string, text: string, lon: number, lat: number, lift: number, tone: string) => {
+      if (!text) return;
+      out.push({id, text, lon, lat, z: heightAt(lon, lat) + lift, tone});
+    };
+    if (activeMode === 'project' || activeMode === 'topography') {
+      push('lbl-license', 'TANGA LICENSE · 6.4 sq km · 100% OWNED', PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, 260, '#f0b64a');
+    }
+    if (activeMode === 'project') {
+      // Keep to a few spread-out facilities so the pinned chips don't overlap.
+      const picks = [
+        ...locatedMineFacilities().filter((i) => ['process-plant', 'water-pond'].includes(i.id)),
+        ...locatedMinePoints().filter((i) => ['product-stockpile'].includes(i.id)),
+      ];
+      picks.forEach((i: any) => push(`mine-${i.id}`, i.name, i.lon, i.lat, 95, '#8fb4d6'));
+      (villages.length ? villages : labels).slice(0, 6).forEach((feature, idx) => {
+        const name = String(feature.properties?.name ?? '');
+        const point = featurePoint(feature, 70, heightAt);
+        if (name) out.push({id: `village-${idx}`, text: name, lon: point[0], lat: point[1], z: point[2], tone: '#a7c0d8'});
+      });
+    }
+    if (activeMode === 'tanzania') {
+      push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
+    }
+    if (activeMode === 'accessibility') {
+      push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
+      POWER_GRID_NODES.forEach((node) => push(`power-${node.id}`, `${node.shortName} · ${node.distanceKm.toFixed(1)} km`, node.lon, node.lat, 300, '#e0a94f'));
+      const target = ROUTE_TARGETS[routeTarget];
+      push('route-target', `${target.label} · ${routeProfile.distanceLabel}`, target.lon, target.lat, 300, '#c7551b');
+    }
+    return out;
+  }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel]);
+
+  const pinnedMapLabels = useMemo(() => {
+    if (!mapLabelSources.length || stageSize.width === 0) return [];
+    const canon = (VIEW_STATES as any)[activeMode] ?? viewState;
+    const canonVp = new WebMercatorViewport({
+      width: stageSize.width, height: stageSize.height,
+      longitude: canon.longitude, latitude: canon.latitude, zoom: canon.zoom, pitch: canon.pitch, bearing: canon.bearing,
+    });
+    const liveVp = new WebMercatorViewport({
+      width: stageSize.width, height: stageSize.height,
+      longitude: viewState.longitude, latitude: viewState.latitude, zoom: viewState.zoom, pitch: viewState.pitch, bearing: viewState.bearing,
+    });
+    return mapLabelSources.map((source) => {
+      let boxPixelX = stageSize.width / 2;
+      let boxPixelY = stageSize.height / 2;
+      try {
+        const p = canonVp.project([source.lon, source.lat, source.z]);
+        if (Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+          boxPixelX = clamp(p[0], 96, stageSize.width - 96);
+          boxPixelY = clamp(p[1], 96, stageSize.height - 60);
+        }
+      } catch { /* keep centre fallback */ }
+      let anchorPixelX: number | null = null;
+      let anchorPixelY: number | null = null;
+      try {
+        const p = liveVp.project([source.lon, source.lat, source.z]);
+        if (Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+          anchorPixelX = clamp(p[0], 8, stageSize.width - 8);
+          anchorPixelY = clamp(p[1], 70, stageSize.height - 24);
+        }
+      } catch { /* no pointer */ }
+      return {...source, boxPixelX, boxPixelY, anchorPixelX, anchorPixelY};
+    });
+  }, [mapLabelSources, activeMode, stageSize.width, stageSize.height, viewState.longitude, viewState.latitude, viewState.zoom, viewState.pitch, viewState.bearing]);
+
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
   const isFirstStory = activeStoryIndex <= 0;
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1;
@@ -4156,6 +4233,28 @@ export default function TangaDeckWorkbench() {
             >
               <span>{callout.label}</span>
               <strong>{callout.detail}</strong>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {annotationsOn && !threeVisible && pinnedMapLabels.length > 0 && (
+        <section className="tanga-deck__map-labels" aria-label="Map place labels">
+          <svg className="tanga-deck__leader-svg tanga-deck__leader-svg--pin" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
+            {pinnedMapLabels.map((label) => label.anchorPixelX !== null && label.anchorPixelY !== null && (
+              <g key={`pin-leader-${label.id}`}>
+                <line x1={label.anchorPixelX} y1={label.anchorPixelY} x2={label.boxPixelX} y2={label.boxPixelY} style={{color: label.tone, stroke: label.tone}} />
+                <circle cx={label.anchorPixelX} cy={label.anchorPixelY} r="3" style={{color: label.tone, fill: label.tone, stroke: '#ffffff'}} />
+              </g>
+            ))}
+          </svg>
+          {pinnedMapLabels.map((label) => (
+            <div
+              key={label.id}
+              className="tanga-deck__pin-label"
+              style={{'--pin-x': `${label.boxPixelX}px`, '--pin-y': `${label.boxPixelY}px`, '--pin-tone': label.tone} as any}
+            >
+              {label.text}
             </div>
           ))}
         </section>
