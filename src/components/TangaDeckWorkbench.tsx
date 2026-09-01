@@ -4236,7 +4236,7 @@ export default function TangaDeckWorkbench() {
         </div>
       )}
 
-      {annotationsOn && !threeVisible && projectedSceneCallouts.length > 0 && !(activeMode === 'ranking' && selectedPeerProject) && (
+      {annotationsOn && !threeVisible && !showCover && projectedSceneCallouts.length > 0 && !(activeMode === 'ranking' && selectedPeerProject) && (
         <section className="tanga-deck__callout-layer" aria-label="Scene callouts">
           <svg className="tanga-deck__leader-svg" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
             {projectedSceneCallouts.map((callout) => callout.anchorPixelX !== null && callout.anchorPixelY !== null && (
@@ -4274,7 +4274,7 @@ export default function TangaDeckWorkbench() {
         </section>
       )}
 
-      {annotationsOn && !threeVisible && pinnedMapLabels.length > 0 && (
+      {annotationsOn && !threeVisible && !showCover && pinnedMapLabels.length > 0 && (
         <section className="tanga-deck__map-labels" aria-label="Map place labels">
           <svg className="tanga-deck__leader-svg tanga-deck__leader-svg--pin" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
             {pinnedMapLabels.map((label) => label.anchorPixelX !== null && label.anchorPixelY !== null && (
