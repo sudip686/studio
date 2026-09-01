@@ -848,13 +848,14 @@ const PEER_MAP_STYLE = {
   projection: {type: 'globe'},
   sources: {
     countryBase: {
+      // Sentinel-2 cloudless satellite mosaic — turns the intro globe into a
+      // real lit planet (geolibre / Google-Earth look) instead of a muddy
+      // desaturated street basemap. Crisp continents make the peer dots pop.
       type: 'raster',
-      tiles: [
-        'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-      ],
+      tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg'],
       tileSize: 256,
-      maxzoom: 19,
-      attribution: 'CARTO Voyager basemap',
+      maxzoom: 15,
+      attribution: 'Sentinel-2 cloudless (s2maps.eu) by EOX IT Services GmbH',
     },
   },
   layers: [
@@ -873,10 +874,10 @@ const PEER_MAP_STYLE = {
       type: 'raster',
       source: 'countryBase',
       paint: {
-        'raster-brightness-min': 0.04,
-        'raster-brightness-max': 0.82,
-        'raster-contrast': 0.18,
-        'raster-saturation': -0.18,
+        'raster-brightness-min': 0.02,
+        'raster-brightness-max': 0.96,
+        'raster-contrast': 0.12,
+        'raster-saturation': 0.08,
       },
     },
   ],
