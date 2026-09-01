@@ -4,7 +4,7 @@ import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'reac
 import dynamic from 'next/dynamic';
 import {DeckGL} from '@deck.gl/react';
 import {ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
-import {FlyToInterpolator} from '@deck.gl/core';
+import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map} from 'react-map-gl/maplibre';
@@ -947,6 +947,87 @@ const TERRAIN_HYPSO_STOPS: Array<[number, [number, number, number]]> = [
   [900, [234, 216, 188]], // high peaks — pale
 ];
 
+// ── Golden-hour sun rig (geolibre / VRIFY look) ──────────────────────────────
+// A single warm, low-angle key light. Azimuth is measured clockwise from north
+// (315° = light from the NW, the classic cartographic hillshade convention so
+// relief reads correctly to the eye); altitude is the sun's height above the
+// horizon (low = long, dramatic shading). These drive BOTH the analytical
+// hillshade baked into the terrain colours below AND the deck.gl LightingEffect
+// that lights the extruded props, so the whole scene shares one light source.
+const SUN_AZIMUTH_DEG = 315;
+const SUN_ALTITUDE_DEG = 34;
+// Vertical exaggeration applied to the DEM gradient *for shading only* — the
+// real relief here is gentle, so without this the hillshade would be a flat
+// wash. It sculpts the slopes without touching the actual cell geometry.
+const RELIEF_SHADE_EXAG = 4.2;
+// Warm key / cool sky-fill tints (0–1 multipliers per channel). Lit slopes pick
+// up golden-hour amber; shadowed slopes fall into a cool blue ambient — the
+// single biggest "cinematic" lever.
+const SUN_WARM_TINT = [1.06, 1.0, 0.9];
+const SKY_COOL_TINT = [0.9, 0.96, 1.08];
+
+const SUN_DIR = (() => {
+  const az = (SUN_AZIMUTH_DEG * Math.PI) / 180;
+  const alt = (SUN_ALTITUDE_DEG * Math.PI) / 180;
+  const horiz = Math.cos(alt);
+  // x = east, y = north, z = up
+  return [horiz * Math.sin(az), horiz * Math.cos(az), Math.sin(alt)] as const;
+})();
+
+// deck.gl lighting rig matching the sun above: a warm golden-hour key light
+// (direction = the ray FROM the sun toward the ground = -SUN_DIR) over a cool
+// sky-blue ambient fill. This lights the extruded props (buildings, mine
+// facilities, columns) so they share the terrain's single light source. No
+// shadow pass — the terrain is a flat depth-test-off surface that could not
+// receive shadows anyway, and the analytical hillshade already carries relief.
+const TANGA_LIGHTING = new LightingEffect({
+  ambient: new AmbientLight({color: [176, 202, 230], intensity: 0.95}),
+  sun: new DirectionalLight({
+    color: [255, 236, 205],
+    intensity: 1.15,
+    direction: [-SUN_DIR[0], -SUN_DIR[1], -SUN_DIR[2]],
+  }),
+  fill: new DirectionalLight({
+    color: [150, 190, 230],
+    intensity: 0.4,
+    direction: [SUN_DIR[0], SUN_DIR[1], -0.5],
+  }),
+});
+
+// Analytical hillshade for one DEM cell from its four corner elevations.
+// Returns a shade factor in ~[ambient, 1]: 1 = fully lit slope facing the sun,
+// ambient = slope in shadow. dxMeters/dyMeters are the cell's ground size.
+function cellHillshade(
+  sw: number, se: number, ne: number, nw: number,
+  dxMeters: number, dyMeters: number
+): number {
+  const dzdx = (((se - sw) + (ne - nw)) / (2 * dxMeters)) * RELIEF_SHADE_EXAG;
+  const dzdy = (((nw - sw) + (ne - se)) / (2 * dyMeters)) * RELIEF_SHADE_EXAG;
+  // Surface normal = normalize(-dzdx, -dzdy, 1)
+  const len = Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1) || 1;
+  const nx = -dzdx / len;
+  const ny = -dzdy / len;
+  const nz = 1 / len;
+  const dot = nx * SUN_DIR[0] + ny * SUN_DIR[1] + nz * SUN_DIR[2];
+  // Ambient floor so shadowed faces stay readable, then a soft-ish knee.
+  return clamp(0.55 + 0.62 * dot, 0.42, 1.18);
+}
+
+// Apply a hillshade factor to an RGB colour, blending in a warm (lit) or cool
+// (shadowed) tint so the terrain reads as lit by a golden-hour sun.
+function shadeTerrainColor(
+  rgb: [number, number, number],
+  shade: number
+): [number, number, number] {
+  const warm = shade >= 1 ? (shade - 1) : 0;          // extra light → warm
+  const cool = shade < 0.85 ? (0.85 - shade) : 0;     // in shadow → cool
+  return [
+    clamp(rgb[0] * shade * (1 + warm * (SUN_WARM_TINT[0] - 1) + cool * (SKY_COOL_TINT[0] - 1)), 0, 255),
+    clamp(rgb[1] * shade * (1 + warm * (SUN_WARM_TINT[1] - 1) + cool * (SKY_COOL_TINT[1] - 1)), 0, 255),
+    clamp(rgb[2] * shade * (1 + warm * (SUN_WARM_TINT[2] - 1) + cool * (SKY_COOL_TINT[2] - 1)), 0, 255),
+  ].map(Math.round) as [number, number, number];
+}
+
 function terrainColor(elevation: number): [number, number, number, number] {
   // Smooth continuous hypsometric tint (interpolated, not banded) so the DEM
   // reads as a real elevation surface rather than 5 flat colour steps.
@@ -1005,11 +1086,15 @@ function localTerrainCells(heightAt: (lon: number, lat: number) => number, mode:
       const nw = terrainPresentationElevation(heightAt, west, north, mode);
       const elevation = (sw + se + ne + nw) / 4;
       const edgeFade = clamp((1.05 - radial) * 1.55, 0.1, 1);
-      const color = terrainColor(elevation);
+      const base = terrainColor(elevation);
+      // Bake analytical golden-hour hillshade into the cell colour so the flat
+      // (non-extruded) DEM surface reads as a lit, sculpted relief.
+      const shade = cellHillshade(sw, se, ne, nw, dx * METERS_PER_DEGREE_LON, dy * METERS_PER_DEGREE_LAT);
+      const [r, g, b] = shadeTerrainColor([base[0], base[1], base[2]], shade);
       cells.push({
         polygon: [[west, south, sw], [east, south, se], [east, north, ne], [west, north, nw]],
         elevation,
-        color: [color[0], color[1], color[2], Math.round(color[3] * edgeFade)] as [number, number, number, number],
+        color: [r, g, b, Math.round(base[3] * edgeFade)] as [number, number, number, number],
         label: `DEM cell ${row + 1}-${column + 1}`,
       });
     }
@@ -3874,6 +3959,7 @@ export default function TangaDeckWorkbench() {
           viewState={viewState as any}
           controller
           layers={layers}
+          effects={[TANGA_LIGHTING]}
           useDevicePixels={1}
           onViewStateChange={({viewState: nextViewState}: any) => setViewState(nextViewState as DeckViewState)}
           onClick={handleDeckClick}
