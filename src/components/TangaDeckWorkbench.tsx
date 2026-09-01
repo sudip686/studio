@@ -3785,14 +3785,15 @@ export default function TangaDeckWorkbench() {
     return () => window.clearInterval(id);
   }, []);
 
-  // ── URL deep-link + resume ────────────────────────────────────────────
-  // On mount: restore scene from #hash, or fall back to last stored scene.
+  // ── URL deep-link ─────────────────────────────────────────────────────
+  // On mount: jump to the scene named in the #hash, if any. A bare URL (no
+  // hash) always starts from the beginning — we intentionally do NOT silently
+  // resume the last-seen scene from localStorage, which surprised the user.
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
-    const hashScene = readHashScene();
-    const stored = hashScene || readStoredScene();
+    const stored = readHashScene();
     if (!stored) return;
     const targetIndex = STORY_STEPS.findIndex((s) => s.mode === stored);
     if (targetIndex >= 0 && targetIndex !== activeStoryIndex) {
