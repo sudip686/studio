@@ -796,3 +796,22 @@ html, body { overflow-x: hidden; }
   font-family: var(--font-mono) !important; font-size: 8.5px !important; letter-spacing: .02em;
   color: rgba(148,197,255,.92) !important;
 }
+
+/* ===========================================================================
+   PHASE 17 — scale-bar polish: a clean bracketed scale rule to match the
+   redesigned compass (crisp end-ticks, cyan glow, mono label).
+   =========================================================================== */
+.tanga-deck__scale.tanga-deck__scale { padding: 8px 12px; }
+.tanga-deck__scale.tanga-deck__scale > div { align-items: flex-end; gap: 9px; }
+.tanga-deck__scale.tanga-deck__scale span {
+  height: 7px !important; border-top: none !important;
+  border-left: 2px solid rgba(220,238,248,.92) !important;
+  border-right: 2px solid rgba(220,238,248,.92) !important;
+  border-bottom: 2px solid rgba(220,238,248,.92) !important;
+  box-shadow: 0 0 10px rgba(94,234,212,.28) !important;
+}
+.tanga-deck__scale.tanga-deck__scale span::before { display: none !important; }
+.tanga-deck__scale.tanga-deck__scale em {
+  font-family: var(--font-mono) !important; color: rgba(233,242,252,.95) !important;
+  font-size: 11px !important; font-weight: 600 !important;
+}
