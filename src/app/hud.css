@@ -869,3 +869,43 @@ html, body { overflow-x: hidden; }
   backdrop-filter: blur(8px);
   animation: hud-panel-in var(--dur-med, 0.4s) var(--ease-hud, ease) both;
 }
+
+/* ===========================================================================
+   PHASE 19 - VRIFY-style pager progress rail. A thin connected track behind the
+   scene dots, filled up to the current scene in the act tint - so the deck
+   reads as a story with a clear "where am I" progress, not just loose dots.
+   =========================================================================== */
+.tanga-deck__pager-dots {
+  position: relative;
+}
+.tanga-deck__pager-dots::before,
+.tanga-deck__pager-dots::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: calc(50% + 1.5px);
+  height: 2px;
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 0;
+}
+.tanga-deck__pager-dots::before {
+  right: 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.tanga-deck__pager-dots::after {
+  width: calc((100% - 8px) * var(--pager-progress, 0));
+  background: linear-gradient(90deg,
+    rgba(var(--act, 217, 106, 42), 0.55),
+    rgba(var(--act, 217, 106, 42), 0.95));
+  box-shadow: 0 0 8px rgba(var(--act, 217, 106, 42), 0.5);
+  transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tanga-deck__pager-dot {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__pager-dots::after { transition: none; }
+}

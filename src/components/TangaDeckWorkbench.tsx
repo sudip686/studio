@@ -4516,7 +4516,12 @@ export default function TangaDeckWorkbench() {
           <strong className="tanga-deck__pager-count">
             {String(activeStoryIndex + 1).padStart(2, '0')} / {String(STORY_STEPS.length).padStart(2, '0')}
           </strong>
-          <div className="tanga-deck__pager-dots" role="tablist" aria-label="Jump to scene">
+          <div
+            className="tanga-deck__pager-dots"
+            role="tablist"
+            aria-label="Jump to scene"
+            style={{'--pager-progress': STORY_STEPS.length > 1 ? activeStoryIndex / (STORY_STEPS.length - 1) : 0} as any}
+          >
             {STORY_STEPS.map((step, i) => (
               <button
                 key={step.mode}
