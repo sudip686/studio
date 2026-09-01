@@ -715,3 +715,30 @@ html, body { overflow-x: hidden; }
   .tanga-deck--ranking .tanga-starfield,
   .tanga-deck--comparison .tanga-starfield { animation: none; opacity: 0.95; }
 }
+
+/* ===========================================================================
+   PHASE 15 — geospatial locator instrument (geolibre-inspired premium detail):
+   a stylised globe with a pulsing Tanga marker + a live lat/lon/zoom readout.
+   Map scenes only; non-interactive.
+   =========================================================================== */
+.tanga-deck__locator {
+  position: fixed; right: clamp(16px, 1.6vw, 28px); bottom: 96px; z-index: 12;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px 7px 7px; border-radius: 12px;
+  border: 1px solid var(--hud-line);
+  background: linear-gradient(180deg, rgba(12,19,27,.8), rgba(6,11,18,.72));
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: var(--glass-glow);
+  pointer-events: none;
+}
+.tanga-deck__locator-globe { width: 42px; height: 42px; display: block; flex: 0 0 auto; }
+.tanga-deck__locator-pulse { transform-box: fill-box; transform-origin: center; animation: tanga-loc-pulse 2.4s ease-out infinite; }
+@keyframes tanga-loc-pulse {
+  0% { transform: scale(.55); opacity: .9; }
+  70% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.tanga-deck__locator-readout { display: flex; flex-direction: column; gap: 1px; font-family: var(--font-mono); }
+.tanga-deck__locator-readout span { font-size: .64rem; letter-spacing: .03em; color: rgba(203,222,240,.82); font-variant-numeric: tabular-nums; line-height: 1.35; }
+.tanga-deck__locator-readout span:last-child { color: rgba(94,234,212,.92); }
+@media (prefers-reduced-motion: reduce) { .tanga-deck__locator-pulse { animation: none; } }

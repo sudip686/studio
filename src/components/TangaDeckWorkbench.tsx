@@ -3903,6 +3903,32 @@ export default function TangaDeckWorkbench() {
           overview scenes; screen-blended so it only shows in the dark space). */}
       <div className="tanga-starfield" aria-hidden="true" />
 
+      {/* Geospatial locator instrument (geolibre-style): a stylised globe with a
+          pulsing Tanga marker + live lat/lon/zoom readout. Map scenes only. */}
+      {!threeVisible && !isCoverScene && (
+        <div className="tanga-deck__locator">
+          <svg className="tanga-deck__locator-globe" viewBox="0 0 60 60" aria-hidden="true">
+            <defs>
+              <radialGradient id="loc-ocean" cx="38%" cy="34%" r="75%">
+                <stop offset="0" stopColor="#17364e" /><stop offset="1" stopColor="#071320" />
+              </radialGradient>
+            </defs>
+            <circle cx="30" cy="30" r="26" fill="url(#loc-ocean)" stroke="rgba(94,234,212,.4)" strokeWidth="1" />
+            <ellipse cx="30" cy="30" rx="26" ry="10" fill="none" stroke="rgba(148,197,255,.18)" strokeWidth=".6" />
+            <ellipse cx="30" cy="30" rx="26" ry="19" fill="none" stroke="rgba(148,197,255,.12)" strokeWidth=".6" />
+            <ellipse cx="30" cy="30" rx="10" ry="26" fill="none" stroke="rgba(148,197,255,.13)" strokeWidth=".6" />
+            <line x1="4" y1="30" x2="56" y2="30" stroke="rgba(148,197,255,.15)" strokeWidth=".6" />
+            <circle className="tanga-deck__locator-pulse" cx="38" cy="34" r="3" fill="rgba(94,234,212,.55)" />
+            <circle cx="38" cy="34" r="2" fill="#5eead4" stroke="#ffffff" strokeWidth=".7" />
+          </svg>
+          <div className="tanga-deck__locator-readout" aria-label="Map position">
+            <span>{Math.abs(viewState.latitude).toFixed(2)}°{viewState.latitude >= 0 ? 'N' : 'S'}</span>
+            <span>{Math.abs(viewState.longitude).toFixed(2)}°{viewState.longitude >= 0 ? 'E' : 'W'}</span>
+            <span>Z{viewState.zoom.toFixed(1)}</span>
+          </div>
+        </div>
+      )}
+
       <div className="hud-frame" aria-hidden="true" />
 
       {/* Info interstitial — an editorial data card shown between scenes. */}
