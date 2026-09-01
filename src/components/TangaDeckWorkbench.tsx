@@ -434,16 +434,16 @@ const MODE_NARRATIVE_SOURCE: Record<WorkbenchMode, string> = {
 
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   ranking: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
-  tanzania: {longitude: 35.8, latitude: -6.1, zoom: 4.15, pitch: 8, bearing: 0},
-  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 42, bearing: 20},
-  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 50, bearing: 26},
-  accessibility: {longitude: 38.94, latitude: -4.94, zoom: 8.45, pitch: 18, bearing: 0},
+  tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.35, pitch: 32, bearing: -12},
+  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
+  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
+  accessibility: {longitude: 38.78, latitude: -4.98, zoom: 8.3, pitch: 38, bearing: -14},
   drillholes: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 62, bearing: 24},
   subsurface: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.55, pitch: 74, bearing: 38},
   resource: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.45, pitch: 68, bearing: 38},
   mine_planning: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.5, pitch: 70, bearing: 40},
   metallurgy: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 66, bearing: 42},
-  comparison: {longitude: 38.5, latitude: -8.1, zoom: 3.25, pitch: 0, bearing: 0},
+  comparison: {longitude: 38.5, latitude: -8.1, zoom: 3.4, pitch: 26, bearing: -8},
 };
 
 const COMMON_PROMPTS: PromptChip[] = [
