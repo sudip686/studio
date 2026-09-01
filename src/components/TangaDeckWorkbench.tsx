@@ -824,14 +824,15 @@ const PEER_MAP_STYLE = {
     },
   ],
   sky: {
+    // Full atmosphere halo on the globe overview (geolibre-style planet glow).
     'atmosphere-blend': [
       'interpolate',
       ['linear'],
       ['zoom'],
       0,
-      0.8,
+      1,
       4,
-      0.62,
+      0.9,
       7,
       0,
     ],
