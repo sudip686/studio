@@ -737,6 +737,24 @@ function peerComparisonNote(project: string) {
   return 'Public graphite peer';
 }
 
+// Shared atmospheric horizon haze (geolibre look). MapLibre's sky spec blends a
+// deep upper sky → a lit horizon band → a hazy fog layer near the ground, so
+// distant terrain recedes into atmosphere instead of ending on a hard edge.
+// Tuned cool-blue with a touch of warmth to sit under the golden-hour sun rig.
+// (Older maplibre versions simply ignore the keys they don't know — harmless.)
+const SKY_HAZE = {
+  'sky-color': '#0a1a2e',
+  'sky-horizon-blend': 0.55,
+  'horizon-color': '#2a4256',
+  'horizon-fog-blend': 0.6,
+  'fog-color': '#5d7182',
+  'fog-ground-blend': 0.78,
+};
+
+// Warm, low golden-hour map light shared by every style, matched to the deck.gl
+// sun rig so maplibre's own 3D shading and the deck overlay agree.
+const MAP_LIGHT = {anchor: 'map' as const, color: '#ffe8c8', intensity: 0.4, position: [1.35, 135, 60] as [number, number, number]};
+
 const BASE_MAP_STYLE = {
   version: 8,
   projection: {type: 'globe'},
@@ -772,6 +790,7 @@ const BASE_MAP_STYLE = {
     },
   ],
   sky: {
+    ...SKY_HAZE,
     'atmosphere-blend': [
       'interpolate',
       ['linear'],
@@ -784,12 +803,7 @@ const BASE_MAP_STYLE = {
       0,
     ],
   },
-  light: {
-    anchor: 'map',
-    color: '#ffffff',
-    intensity: 0.38,
-    position: [1.35, 105, 72],
-  },
+  light: MAP_LIGHT,
 };
 
 // Sentinel-2 cloudless (EOX) — free, uniform, cloud-free 10 m mosaic (CC-BY-4.0,
@@ -823,9 +837,10 @@ const SENTINEL_MAP_STYLE = {
     },
   ],
   sky: {
+    ...SKY_HAZE,
     'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 8, 0],
   },
-  light: {anchor: 'map', color: '#ffffff', intensity: 0.4, position: [1.35, 105, 72]},
+  light: MAP_LIGHT,
 };
 
 const PEER_MAP_STYLE = {
@@ -866,6 +881,7 @@ const PEER_MAP_STYLE = {
     },
   ],
   sky: {
+    ...SKY_HAZE,
     // Full atmosphere halo on the globe overview (geolibre-style planet glow).
     'atmosphere-blend': [
       'interpolate',
