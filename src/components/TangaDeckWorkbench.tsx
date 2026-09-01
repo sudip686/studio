@@ -786,6 +786,42 @@ const BASE_MAP_STYLE = {
   },
 };
 
+// Sentinel-2 cloudless (EOX) — free, uniform, cloud-free 10 m mosaic (CC-BY-4.0,
+// attribution required). Used only on the WIDE scenes (country / closing) where a
+// clean uniform planet reads better than patchy sub-metre tiles; the zoomed-in
+// project scenes keep Esri (sub-metre) for detail.
+const SENTINEL_MAP_STYLE = {
+  version: 8,
+  projection: {type: 'globe'},
+  sources: {
+    s2cloudless: {
+      type: 'raster',
+      tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg'],
+      tileSize: 256,
+      maxzoom: 15,
+      attribution: 'Sentinel-2 cloudless (s2maps.eu) by EOX IT Services GmbH',
+    },
+  },
+  layers: [
+    {id: 's2-background', type: 'background', paint: {'background-color': '#050a14'}},
+    {
+      id: 's2-imagery',
+      type: 'raster',
+      source: 's2cloudless',
+      paint: {
+        'raster-brightness-min': 0,
+        'raster-brightness-max': 0.98,
+        'raster-contrast': 0.1,
+        'raster-saturation': 0.1,
+      },
+    },
+  ],
+  sky: {
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 8, 0],
+  },
+  light: {anchor: 'map', color: '#ffffff', intensity: 0.4, position: [1.35, 105, 72]},
+};
+
 const PEER_MAP_STYLE = {
   version: 8,
   projection: {type: 'globe'},
@@ -2588,7 +2624,13 @@ export default function TangaDeckWorkbench() {
   // Native MapLibre terrain and external DEM hillshade tiles make this globe path
   // slower and have triggered terrain-depth shader errors, so relief is carried by
   // the DeckGL elevated project mesh over a lightweight globe basemap.
-  const mapStyle = useMemo(() => activeMode === 'ranking' ? PEER_MAP_STYLE : BASE_MAP_STYLE, [activeMode]);
+  const mapStyle = useMemo(() => {
+    if (activeMode === 'ranking') return PEER_MAP_STYLE;
+    // Wide regional / closing views get the clean uniform Sentinel-2 mosaic;
+    // the zoomed-in project scenes keep Esri sub-metre imagery.
+    if (activeMode === 'tanzania' || activeMode === 'comparison') return SENTINEL_MAP_STYLE;
+    return BASE_MAP_STYLE;
+  }, [activeMode]);
   const disableNativeTerrain = useCallback((event: any) => {
     const map = event?.target;
     if (!map?.setTerrain) return;
