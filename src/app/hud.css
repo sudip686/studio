@@ -284,13 +284,24 @@
     var(--tick) 1px, 1px var(--tick),
     var(--tick) 1px, 1px var(--tick);
 }
-/* Vignette layer — separate fixed pseudo so it never fights the reticle bg. */
+/* Vignette layer — separate fixed pseudo so it never fights the reticle bg.
+   A cinematic grade: a radial corner vignette to focus the eye on the deposit,
+   plus faint top/bottom gradients that seat the HUD chrome into the scene so it
+   never floats on a hard rectangle. Deliberately subtle — depth, not darkness. */
 .hud-frame::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(120% 90% at 50% 46%, transparent 58%, rgba(3, 7, 12, 0.42) 100%);
+  background:
+    radial-gradient(125% 92% at 50% 44%, transparent 56%, rgba(3, 7, 12, 0.46) 100%),
+    linear-gradient(180deg, rgba(3, 7, 12, 0.28) 0%, transparent 14%),
+    linear-gradient(0deg, rgba(3, 7, 12, 0.30) 0%, transparent 16%);
+}
+/* On the globe overview the vignette would eat the atmosphere rim — ease it. */
+.tanga-deck--ranking .hud-frame::after,
+.tanga-deck--comparison .hud-frame::after {
+  background: radial-gradient(130% 100% at 50% 46%, transparent 66%, rgba(3, 7, 12, 0.34) 100%);
 }
 
 /* 3.2 — the single "live" element (autoplay while ticking) gets a soft warm
