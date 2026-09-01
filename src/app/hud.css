@@ -909,3 +909,25 @@ html, body { overflow-x: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .tanga-deck__pager-dots::after { transition: none; }
 }
+
+/* ===========================================================================
+   PHASE 20 - fine polish: a focus glow on the command bar (geolibre input feel)
+   and an act-tinted accent tick before the data-panel eyebrow (HUD label marker).
+   =========================================================================== */
+.tanga-deck__command.tanga-deck__command:focus-within {
+  border-color: rgba(var(--hud-cyan), 0.6) !important;
+  box-shadow: 0 0 0 1px rgba(var(--hud-cyan), 0.22), 0 0 22px rgba(var(--hud-cyan), 0.16) !important;
+}
+.tanga-deck__data-panel-eyebrow {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+}
+.tanga-deck__data-panel-eyebrow::before {
+  content: "";
+  width: 3px;
+  height: 10px;
+  border-radius: 1px;
+  background: rgba(var(--act, 94, 234, 212), 0.92);
+  box-shadow: 0 0 6px rgba(var(--act, 94, 234, 212), 0.5);
+}
