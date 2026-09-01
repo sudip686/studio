@@ -4,6 +4,10 @@ import {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import proj4 from 'proj4';
 import {LITHOLOGY_COLOR_MAP} from '@/lib/boreholes/colors';
 
@@ -2488,11 +2492,34 @@ export default function TangaThreeGeologyScene({
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
+    // ── Bloom (VRIFY-style emissive glow) ────────────────────────────────────
+    // The high-grade assay drillholes, collars and block-model cells already
+    // carry strong emissive materials; a high-threshold UnrealBloom pass makes
+    // only those bright elements glow, leaving the terrain/imagery untouched.
+    // Kept cheap: threshold 0.82 (few pixels qualify), modest strength/radius,
+    // and OutputPass carries the ACES tonemapping + sRGB the direct render did.
+    const composer = new EffectComposer(renderer);
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(host.clientWidth, host.clientHeight);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(host.clientWidth, host.clientHeight),
+      0.34, // strength — a soft halo, not a blob
+      0.4,  // radius — tight so glow hugs the source
+      0.92  // threshold — only the very brightest emissive cores bloom
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
     const resize = () => {
       if (!hostRef.current) return;
-      camera.aspect = hostRef.current.clientWidth / hostRef.current.clientHeight;
+      const w = hostRef.current.clientWidth;
+      const h = hostRef.current.clientHeight;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(hostRef.current.clientWidth, hostRef.current.clientHeight);
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
+      bloomPass.setSize(w, h);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -2744,7 +2771,7 @@ export default function TangaThreeGeologyScene({
         projectCallouts();
         updateNavInstruments();
       }
-      renderer.render(scene, camera);
+      composer.render();
       frame = requestAnimationFrame(animate);
     };
     animate();
@@ -2758,6 +2785,7 @@ export default function TangaThreeGeologyScene({
       controls.removeEventListener('start', onControlStart);
       controls.removeEventListener('end', onControlEnd);
       controls.dispose();
+      composer.dispose();
       disposeObject(scene);
       renderer.dispose();
       renderer.domElement.remove();
