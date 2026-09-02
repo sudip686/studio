@@ -440,7 +440,10 @@ const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.35, pitch: 32, bearing: -12},
   project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
   topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
-  accessibility: {longitude: 38.78, latitude: -4.98, zoom: 8.3, pitch: 38, bearing: -14},
+  // Framed on the story: project (38.79,-4.81) -> Tanga Port (39.105,-5.064).
+  // The old 8.3 zoom sat NW of the corridor and left it as a small cluster in a
+  // frame of irrelevant inland Tanzania.
+  accessibility: {longitude: 38.95, latitude: -4.98, zoom: 9.55, pitch: 44, bearing: -16},
   drillholes: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 62, bearing: 24},
   subsurface: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.55, pitch: 74, bearing: 38},
   resource: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.45, pitch: 68, bearing: 38},
@@ -968,14 +971,22 @@ function deckHeightAt(lon: number, lat: number) {
   return reliefHeightAt(lon, lat);
 }
 
+// Desaturated, luminance-led elevation ramp. The old saturated teal/green stops
+// laid a murky colour film over the satellite imagery and fought the analytical
+// hillshade; this reads as elevation *shading* — cool deep valleys through
+// neutral mid-slopes to warm ivory ridges — and lets the imagery and relief
+// carry the detail underneath.
 const TERRAIN_HYPSO_STOPS: Array<[number, [number, number, number]]> = [
-  [32, [38, 86, 116]],    // valleys — cool slate
-  [200, [44, 128, 118]],  // teal lowland
-  [340, [92, 150, 92]],   // green foothills
-  [500, [168, 148, 92]],  // tan slopes
-  [680, [204, 168, 112]], // warm ridges
-  [900, [234, 216, 188]], // high peaks — pale
+  [32, [72, 92, 112]],    // valleys — cool grey-blue
+  [200, [104, 120, 128]], // lowland
+  [340, [140, 146, 142]], // neutral mid-slope
+  [500, [180, 172, 156]], // warm stone
+  [680, [214, 200, 176]], // light ridge
+  [900, [244, 236, 220]], // crest — ivory
 ];
+// The tint is a *shading* layer, not a paint layer — keep it light enough that
+// the satellite imagery and the hillshade below stay legible.
+const TERRAIN_TINT_ALPHA = 104;
 
 // ── Golden-hour sun rig (geolibre / VRIFY look) ──────────────────────────────
 // A single warm, low-angle key light. Azimuth is measured clockwise from north
@@ -1073,11 +1084,11 @@ function terrainColor(elevation: number): [number, number, number, number] {
         Math.round(c0[0] + (c1[0] - c0[0]) * t),
         Math.round(c0[1] + (c1[1] - c0[1]) * t),
         Math.round(c0[2] + (c1[2] - c0[2]) * t),
-        150,
+        TERRAIN_TINT_ALPHA,
       ];
     }
   }
-  return [last[1][0], last[1][1], last[1][2], 150];
+  return [last[1][0], last[1][1], last[1][2], TERRAIN_TINT_ALPHA];
 }
 
 function terrainPresentationElevation(
@@ -1817,6 +1828,12 @@ export default function TangaDeckWorkbench() {
   // Timestamp of the last user camera gesture (or scene change) — the idle
   // slow-orbit only kicks in once the camera has been still for a beat.
   const lastCameraInteractRef = useRef<number>(0);
+  // When a programmatic fly-to is running, deck animates it internally. Writing
+  // its interpolated view state back to us (without the transition props) would
+  // CANCEL the flight — which silently killed every camera move in production
+  // builds. We record when the flight should end and ignore deck's echo until
+  // then, unless the user grabs the camera.
+  const flightUntilRef = useRef<number>(0);
   const [commandText, setCommandText] = useState('');
   const [statusText, setStatusText] = useState('Peer ranking ready');
   const [pipeline, setPipeline] = useState('Text/voice -> intent -> map action');
@@ -2048,6 +2065,7 @@ export default function TangaDeckWorkbench() {
 
   const flyTo = useCallback((mode: WorkbenchMode, bearingOverride?: number) => {
     const target = VIEW_STATES[mode];
+    flightUntilRef.current = performance.now() + 2400 + 120;
     setViewState({
       ...target,
       bearing: bearingOverride ?? target.bearing,
@@ -2118,6 +2136,7 @@ export default function TangaDeckWorkbench() {
     }
 
     const nextBearing = (viewState.bearing + 90) % 360;
+    flightUntilRef.current = performance.now() + 1500 + 120;
     setViewState({
       ...viewState,
       bearing: nextBearing,
@@ -2161,6 +2180,7 @@ export default function TangaDeckWorkbench() {
       return;
     }
 
+    flightUntilRef.current = performance.now() + 1500 + 120;
     setViewState((current) => {
       const next: DeckViewState = {
         ...current,
@@ -2997,13 +3017,13 @@ export default function TangaDeckWorkbench() {
         // a crisp bright core outline so it reads as the hero of the slide, not
         // a faint thin line lost on the terrain.
         getFillColor: (feature) => isProjectLayer(feature)
-          ? [240, 152, 72, activeMode === 'project' ? 64 : 44]
+          ? [240, 152, 72, activeMode === 'project' ? 58 : 40]
           : [250, 204, 21, 8],
-        getLineColor: (feature) => isProjectLayer(feature) ? [255, 236, 205, 255] : [255, 236, 179, 220],
-        getLineWidth: (feature) => isProjectLayer(feature) ? 3.4 : 2,
+        getLineColor: (feature) => isProjectLayer(feature) ? [255, 244, 224, 255] : [255, 236, 179, 220],
+        getLineWidth: (feature) => isProjectLayer(feature) ? 4.6 : 2,
         lineWidthUnits: 'pixels' as any,
-        lineWidthMinPixels: 2,
-        lineWidthMaxPixels: 5,
+        lineWidthMinPixels: 3,
+        lineWidthMaxPixels: 7,
         parameters: {depthTest: false} as any,
       }),
       // Layer 4: the area label — "6.4 sq km · 100% owned" at the polygon
@@ -3425,10 +3445,10 @@ export default function TangaDeckWorkbench() {
           name: ROUTE_TARGETS[routeTarget].label,
         }],
         getPath: (item: any) => item.path,
-        getColor: routeTarget === 'power' ? [250, 204, 21, 245] : routeTarget === 'rail' ? [168, 85, 247, 245] : [0, 212, 255, 245],
-        getWidth: 210,
+        getColor: routeTarget === 'power' ? [250, 204, 21, 245] : routeTarget === 'rail' ? [168, 85, 247, 245] : [94, 234, 212, 250],
+        getWidth: 260,
         widthUnits: 'meters',
-        widthMinPixels: 4,
+        widthMinPixels: 6,
         jointRounded: true,
         capRounded: true,
         parameters: {depthTest: false} as any,
@@ -3718,10 +3738,12 @@ export default function TangaDeckWorkbench() {
       push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
     }
     if (activeMode === 'accessibility') {
+      // Only the two ends of the corridor. The power nodes are already covered by
+      // the "Hale + New Pangani" callout AND the panel rows — pinning them too
+      // put six labels inside a ~200px cluster.
       push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
-      POWER_GRID_NODES.forEach((node) => push(`power-${node.id}`, `${node.shortName} · ${node.distanceKm.toFixed(1)} km`, node.lon, node.lat, 300, '#e0a94f'));
       const target = ROUTE_TARGETS[routeTarget];
-      push('route-target', `${target.label} · ${routeProfile.distanceLabel}`, target.lon, target.lat, 300, '#c7551b');
+      push('route-target', `${target.label} · ${routeProfile.distanceLabel}`, target.lon, target.lat, 300, '#5eead4');
     }
     return out;
   }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel]);
@@ -4172,10 +4194,23 @@ export default function TangaDeckWorkbench() {
           effects={[TANGA_LIGHTING]}
           useDevicePixels={1}
           onViewStateChange={({viewState: nextViewState, interactionState}: any) => {
-            // A real user gesture pauses the idle orbit; it resumes after settle.
-            if (interactionState && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)) {
+            const userGesture = Boolean(
+              interactionState
+              && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)
+            );
+            // A real user gesture pauses the idle orbit; it resumes after settle,
+            // and it always wins over an in-flight camera move.
+            if (userGesture) {
               lastCameraInteractRef.current = performance.now();
+              flightUntilRef.current = 0;
+              setViewState(nextViewState as DeckViewState);
+              return;
             }
+            // Otherwise this is deck echoing its own interpolated fly-to. Writing
+            // it back strips the transition props and CANCELS the flight (this
+            // silently broke every camera move in production builds), so ignore
+            // it until the flight window closes.
+            if (interactionState?.inTransition || performance.now() < flightUntilRef.current) return;
             setViewState(nextViewState as DeckViewState);
           }}
           onClick={handleDeckClick}

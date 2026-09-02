@@ -122,26 +122,59 @@ export default function TangaInfoSlide({id, onContinue}: {id: InfoSlideId; onCon
           <>
             <motion.div className="tanga-info__eyebrow" {...rise(0.05)}>The Value · Metallurgy testwork</motion.div>
             <motion.h2 className="tanga-info__title" {...rise(0.1)}>Coarse flake, &gt;97% carbon</motion.h2>
-            <motion.p className="tanga-info__sub" {...rise(0.15)}>Eight flotation composites — share of flake coarser than 150&nbsp;µm.</motion.p>
-            <motion.div className="tanga-info__purity" {...rise(0.2)}>
-              <span className="big">97–99%</span><span className="cap">TC concentrate purity</span>
+            <motion.p className="tanga-info__sub" {...rise(0.15)}>Conventional flotation lifts pit ore to a high-purity concentrate — and most of that flake stays coarse.</motion.p>
+
+            {/* Recovery flowsheet — feed → flotation → concentrate */}
+            <motion.div className="tanga-met__flow" {...rise(0.2)}>
+              <div className="tanga-met__node">
+                <span>Feed</span><strong>5.70% TGC</strong><small>Optimum pit ore</small>
+              </div>
+              <i className="tanga-met__arrow" aria-hidden="true" />
+              <div className="tanga-met__node">
+                <span>Flotation recovery</span><strong>93.0% / 94.4%</strong><small>Oxide / fresh</small>
+              </div>
+              <i className="tanga-met__arrow" aria-hidden="true" />
+              <div className="tanga-met__node is-out">
+                <span>Concentrate</span><strong>&gt;97% TC</strong><small>97–99% across composites</small>
+              </div>
             </motion.div>
-            <div className="tanga-info__bars">
+
+            {/* Flake-size distribution — coarse share per composite */}
+            <motion.div className="tanga-met__dist-head" {...rise(0.26)}>
+              <span>Flake size · share coarser than 150 µm</span>
+              <em>8 variability composites</em>
+            </motion.div>
+            <div className="tanga-met__bars">
               {FLAKE.map((b, i) => (
                 <motion.div
-                  className="tanga-info__bar"
+                  className={`tanga-met__bar${b.id === 'T8' ? ' is-best' : ''}${b.id === 'T1' ? ' is-low' : ''}`}
                   key={b.id}
-                  initial={reduce ? {opacity: 0} : {opacity: 0, scaleY: 0}}
-                  animate={{opacity: 1, scaleY: 1}}
-                  transition={{duration: reduce ? 0.2 : 0.45, ease: EASE, delay: reduce ? 0 : 0.28 + i * 0.05}}
+                  initial={reduce ? {opacity: 0} : {opacity: 0, y: 8}}
+                  animate={{opacity: 1, y: 0}}
+                  transition={{duration: reduce ? 0.2 : 0.4, ease: EASE, delay: reduce ? 0 : 0.32 + i * 0.05}}
                 >
-                  <span className="v">{b.v}</span>
-                  <i className="col" style={{height: `${b.v}%`, ...(b.id === 'T8' ? {background: 'linear-gradient(180deg,#5eead4,rgba(94,234,212,.4))'} : {})}} />
+                  <span className="pct">{b.v}%</span>
+                  <div className="track" title={`${b.v}% coarse (+150 µm) · ${100 - b.v}% fines`}>
+                    <i className="coarse" style={{height: `${b.v}%`}} />
+                  </div>
                   <span className="id">{b.id}</span>
                 </motion.div>
               ))}
             </div>
-            <div className="tanga-info__src">AMC MRE Table II · flake size vs TC grade · best sample TDM008 73%</div>
+
+            <motion.div className="tanga-met__key" {...rise(0.5)}>
+              <span><i className="sw sw--coarse" />+150&nbsp;µm coarse flake</span>
+              <span><i className="sw sw--fine" />−150&nbsp;µm fines — still &gt;95% TC, sold as anode feedstock</span>
+            </motion.div>
+
+            <motion.div className="tanga-met__stats" {...rise(0.56)}>
+              <div><span>Weakest</span><strong>35%</strong></div>
+              <div><span>Median</span><strong>61%</strong></div>
+              <div className="is-best"><span>Best · TDM008</span><strong>73%</strong></div>
+              <div className="is-warn"><span>TDM004 recovery</span><strong>75.8%</strong></div>
+            </motion.div>
+
+            <div className="tanga-info__src">AMC MRE Table II · 8 variability composites · recoveries from optimisation testwork · TDM004 is a carbonate-rich recovery outlier</div>
           </>
         )}
 

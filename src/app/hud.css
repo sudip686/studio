@@ -1172,3 +1172,208 @@ html, body { overflow-x: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .tanga-deck__portal-transition::after { animation: none !important; opacity: 0 !important; }
 }
+
+/* ===========================================================================
+   PHASE 27 - metallurgy KPI strip. The 4 recovery/purity stat cards were
+   right-docked at the same coordinates as the SOURCE DATA panel, so ~254px of
+   them (oxide + fresh recovery, the TDM004 outlier) sat hidden behind it.
+   Re-lay them as a bottom KPI strip, clear of the pager, drill legend and HUD.
+   =========================================================================== */
+.tanga-three__metallurgy,
+.tanga-three.is-metallurgy .tanga-three__metallurgy {
+  top: auto !important;
+  bottom: clamp(14px, 2.2vh, 22px) !important;
+  right: clamp(20px, 2vw, 28px) !important;
+  left: clamp(348px, 28vw, 380px) !important;
+  width: auto !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+.tanga-three__metallurgy div {
+  min-height: 0 !important;
+  padding: 9px 12px 12px !important;
+  gap: 2px !important;
+}
+.tanga-three__metallurgy strong { font-size: clamp(18px, 1.6vw, 23px) !important; }
+.tanga-three__metallurgy small { font-size: 10px !important; }
+
+/* Below the width where a 4-across strip would crush, drop to two rows. */
+@media (max-width: 1120px) {
+  .tanga-three__metallurgy,
+  .tanga-three.is-metallurgy .tanga-three__metallurgy {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    left: auto !important;
+    width: min(360px, 34vw) !important;
+  }
+}
+
+/* ===========================================================================
+   PHASE 28 - metallurgy story: a recovery flowsheet (feed -> flotation ->
+   concentrate) and a flake-size distribution (coarse +150um share across the 8
+   variability composites, with the fines shown as the remainder of each bar).
+   =========================================================================== */
+.tanga-met__flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: stretch;
+  gap: 10px;
+  margin: 4px 0 18px;
+}
+.tanga-met__node {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--hud-line, rgba(148,197,255,0.16));
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(14, 21, 28, 0.72), rgba(8, 13, 18, 0.86));
+}
+.tanga-met__node.is-out {
+  border-color: rgba(94, 234, 212, 0.42);
+  box-shadow: 0 0 22px rgba(94, 234, 212, 0.14);
+}
+.tanga-met__node > span {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(var(--hud-cyan, 94, 234, 212), 0.9);
+}
+.tanga-met__node > strong {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: clamp(17px, 1.7vw, 22px);
+  font-weight: 700;
+  color: #f2f7fc;
+  line-height: 1.1;
+}
+.tanga-met__node > small { font-size: 10.5px; color: rgba(190, 208, 226, 0.72); }
+.tanga-met__arrow {
+  align-self: center;
+  width: 22px;
+  height: 1px;
+  position: relative;
+  background: linear-gradient(90deg, rgba(148,197,255,0.15), rgba(94,234,212,0.75));
+}
+.tanga-met__arrow::after {
+  content: "";
+  position: absolute;
+  right: -1px; top: -3px;
+  border: 3.5px solid transparent;
+  border-left-color: rgba(94, 234, 212, 0.85);
+}
+
+.tanga-met__dist-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.tanga-met__dist-head > span { color: rgba(var(--hud-cyan, 94, 234, 212), 0.92); }
+.tanga-met__dist-head > em { font-style: normal; color: rgba(180, 199, 219, 0.6); }
+
+.tanga-met__bars {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+  height: 150px;
+  margin-bottom: 10px;
+}
+.tanga-met__bar {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 5px;
+  justify-items: center;
+  min-width: 0;
+}
+.tanga-met__bar .pct {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(226, 238, 250, 0.9);
+}
+.tanga-met__bar .track {
+  position: relative;
+  width: 100%;
+  max-width: 34px;
+  height: 100%;
+  border-radius: 5px;
+  /* the track itself IS the fines fraction */
+  background: repeating-linear-gradient(-45deg, rgba(148,197,255,0.14) 0 4px, rgba(148,197,255,0.06) 4px 8px);
+  border: 1px solid rgba(148, 197, 255, 0.16);
+  overflow: hidden;
+}
+.tanga-met__bar .coarse {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(180deg, #5eead4, rgba(94, 234, 212, 0.45));
+}
+.tanga-met__bar.is-best .coarse {
+  background: linear-gradient(180deg, #a7f3d0, #5eead4);
+  box-shadow: 0 0 16px rgba(94, 234, 212, 0.5);
+}
+.tanga-met__bar.is-low .coarse {
+  background: linear-gradient(180deg, rgba(224, 169, 79, 0.9), rgba(224, 169, 79, 0.4));
+}
+.tanga-met__bar .id {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9.5px;
+  color: rgba(170, 190, 212, 0.7);
+}
+
+.tanga-met__key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 12px;
+  font-size: 10.5px;
+  color: rgba(190, 208, 226, 0.76);
+}
+.tanga-met__key span { display: inline-flex; align-items: center; gap: 6px; }
+.tanga-met__key .sw { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.tanga-met__key .sw--coarse { background: linear-gradient(180deg, #5eead4, rgba(94,234,212,0.45)); }
+.tanga-met__key .sw--fine {
+  background: repeating-linear-gradient(-45deg, rgba(148,197,255,0.3) 0 3px, rgba(148,197,255,0.1) 3px 6px);
+  border: 1px solid rgba(148, 197, 255, 0.24);
+}
+
+.tanga-met__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.tanga-met__stats > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--hud-line, rgba(148,197,255,0.16));
+  border-radius: 8px;
+  background: rgba(8, 13, 18, 0.6);
+}
+.tanga-met__stats span {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(170, 190, 212, 0.72);
+}
+.tanga-met__stats strong {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 16px;
+  color: #eef5fb;
+}
+.tanga-met__stats .is-best { border-color: rgba(94, 234, 212, 0.4); }
+.tanga-met__stats .is-best strong { color: #5eead4; }
+.tanga-met__stats .is-warn { border-color: rgba(239, 68, 68, 0.34); }
+.tanga-met__stats .is-warn strong { color: #f8a09a; }
+
+@media (max-width: 860px) {
+  .tanga-met__flow { grid-template-columns: 1fr; }
+  .tanga-met__arrow { display: none; }
+  .tanga-met__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
