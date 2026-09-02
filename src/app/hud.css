@@ -964,3 +964,33 @@ html, body { overflow-x: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .tanga-deck__pager-play.is-ticking::after { animation: none; --autoplay-angle: 360deg; }
 }
+
+/* ===========================================================================
+   PHASE 22 - panel reveal sheen. A single, very subtle light sweep across a
+   panel as it docks in (VRIFY/keynote reveal). Uses animated background-position
+   so it stays clipped to the panel and leaves no lingering overlay.
+   =========================================================================== */
+/* The deck panels are already position:absolute (docked), so they are a valid
+   containing block for ::after — do NOT add position:relative here or it breaks
+   their docking. Scope the sheen to those confirmed-positioned panels. */
+.tanga-deck__data-panel::after,
+.tanga-deck__insight-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.07) 50%, transparent 60%);
+  background-size: 300% 100%;
+  background-position: 160% 0;
+  animation: panel-sheen 1.2s var(--ease-hud, ease) 0.2s both;
+}
+@keyframes panel-sheen {
+  from { background-position: 160% 0; }
+  to   { background-position: -60% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__data-panel::after,
+  .tanga-deck__insight-panel::after { animation: none; background: none; }
+}
