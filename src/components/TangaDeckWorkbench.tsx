@@ -4,7 +4,7 @@ import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'reac
 import dynamic from 'next/dynamic';
 import {DeckGL} from '@deck.gl/react';
 import {ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
-import {FlyToInterpolator} from '@deck.gl/core';
+import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map} from 'react-map-gl/maplibre';
@@ -82,7 +82,13 @@ type DeckViewState = {
   bearing: number;
   transitionDuration?: number;
   transitionInterpolator?: unknown;
+  transitionEasing?: (t: number) => number;
 };
+
+// Cinematic ease-in-out cubic — camera flights glide in and settle out (a calm,
+// geolibre-style move) instead of a linear snap.
+const cinematicEase = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const CINEMATIC_FLY = () => new FlyToInterpolator({curve: 1.55});
 
 type GeoJsonFeature = {
   type: 'Feature';
@@ -147,6 +153,9 @@ type SceneTransitionState = {
   fromMode: WorkbenchMode;
   toMode: WorkbenchMode;
   direction: 'forward' | 'back' | 'jump';
+  // Semantic travel: descending into the 3D model, pulling back out to the map,
+  // or moving sideways between two scenes of the same kind.
+  travel: 'dive' | 'surface' | 'lateral';
   label: string;
   detail: string;
 };
@@ -428,16 +437,16 @@ const MODE_NARRATIVE_SOURCE: Record<WorkbenchMode, string> = {
 
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   ranking: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
-  tanzania: {longitude: 35.8, latitude: -6.1, zoom: 4.15, pitch: 8, bearing: 0},
-  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 42, bearing: 20},
-  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 50, bearing: 26},
-  accessibility: {longitude: 38.94, latitude: -4.94, zoom: 8.45, pitch: 18, bearing: 0},
+  tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.35, pitch: 32, bearing: -12},
+  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
+  topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
+  accessibility: {longitude: 38.78, latitude: -4.98, zoom: 8.3, pitch: 38, bearing: -14},
   drillholes: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 62, bearing: 24},
   subsurface: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.55, pitch: 74, bearing: 38},
   resource: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.45, pitch: 68, bearing: 38},
   mine_planning: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.5, pitch: 70, bearing: 40},
   metallurgy: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 66, bearing: 42},
-  comparison: {longitude: 38.5, latitude: -8.1, zoom: 3.25, pitch: 0, bearing: 0},
+  comparison: {longitude: 38.5, latitude: -8.1, zoom: 3.4, pitch: 26, bearing: -8},
 };
 
 const COMMON_PROMPTS: PromptChip[] = [
@@ -580,6 +589,7 @@ const MODE_PROMPT_HINTS: Record<WorkbenchMode, string[]> = {
 // resource model, the metallurgy testwork before the metallurgy reveal, and the
 // battery-anode value story before the closing peer comparison.
 const INFO_BEFORE: Partial<Record<WorkbenchMode, InfoSlideId>> = {
+  drillholes: 'cross-section',
   resource: 'resource-breakdown',
   metallurgy: 'flake-purity',
   comparison: 'battery-value',
@@ -600,11 +610,11 @@ const STORY_STEPS: StoryStep[] = [
 
 // ── Three-act story structure — gives the deck a narrative arc so every
 // scene visibly advances toward the investment case. ─────────────────────
-type StoryAct = {id: string; label: string; theme: string};
+type StoryAct = {id: string; label: string; theme: string; numeral: string; thesis: string};
 const STORY_ACTS: StoryAct[] = [
-  {id: 'opportunity', label: 'The Opportunity', theme: '#8fb4d6'},
-  {id: 'asset', label: 'The Asset', theme: '#d96a2a'},
-  {id: 'value', label: 'The Value', theme: '#e0a94f'},
+  {id: 'opportunity', label: 'The Opportunity', theme: '#8fb4d6', numeral: 'I', thesis: 'A large flake-graphite asset in a proven province.'},
+  {id: 'asset', label: 'The Asset', theme: '#d96a2a', numeral: 'II', thesis: 'Drill-defined, JORC-compliant, and fully owned.'},
+  {id: 'value', label: 'The Value', theme: '#e0a94f', numeral: 'III', thesis: 'Coarse flake, low strip, and a route to market.'},
 ];
 const MODE_ACT: Record<WorkbenchMode, string> = {
   ranking: 'opportunity',
@@ -687,6 +697,16 @@ function storyStepForMode(mode: WorkbenchMode) {
   return STORY_STEPS[storyIndexForMode(mode)] ?? STORY_STEPS[0];
 }
 
+// Scenes rendered by the Three.js model rather than the deck/map.
+const MODEL_MODES = new Set<WorkbenchMode>(['drillholes', 'subsurface', 'resource', 'mine_planning', 'metallurgy']);
+function storyTravel(fromMode: WorkbenchMode, toMode: WorkbenchMode): SceneTransitionState['travel'] {
+  const fromModel = MODEL_MODES.has(fromMode);
+  const toModel = MODEL_MODES.has(toMode);
+  if (!fromModel && toModel) return 'dive';
+  if (fromModel && !toModel) return 'surface';
+  return 'lateral';
+}
+
 function storyTransitionDirection(fromMode: WorkbenchMode, toMode: WorkbenchMode): SceneTransitionState['direction'] {
   const fromIndex = storyIndexForMode(fromMode);
   const toIndex = storyIndexForMode(toMode);
@@ -730,6 +750,24 @@ function peerComparisonNote(project: string) {
   return 'Public graphite peer';
 }
 
+// Shared atmospheric horizon haze (geolibre look). MapLibre's sky spec blends a
+// deep upper sky → a lit horizon band → a hazy fog layer near the ground, so
+// distant terrain recedes into atmosphere instead of ending on a hard edge.
+// Tuned cool-blue with a touch of warmth to sit under the golden-hour sun rig.
+// (Older maplibre versions simply ignore the keys they don't know — harmless.)
+const SKY_HAZE = {
+  'sky-color': '#0a1a2e',
+  'sky-horizon-blend': 0.55,
+  'horizon-color': '#2a4256',
+  'horizon-fog-blend': 0.6,
+  'fog-color': '#5d7182',
+  'fog-ground-blend': 0.78,
+};
+
+// Warm, low golden-hour map light shared by every style, matched to the deck.gl
+// sun rig so maplibre's own 3D shading and the deck overlay agree.
+const MAP_LIGHT = {anchor: 'map' as const, color: '#ffe8c8', intensity: 0.4, position: [1.35, 135, 60] as [number, number, number]};
+
 const BASE_MAP_STYLE = {
   version: 8,
   projection: {type: 'globe'},
@@ -765,6 +803,7 @@ const BASE_MAP_STYLE = {
     },
   ],
   sky: {
+    ...SKY_HAZE,
     'atmosphere-blend': [
       'interpolate',
       ['linear'],
@@ -777,12 +816,44 @@ const BASE_MAP_STYLE = {
       0,
     ],
   },
-  light: {
-    anchor: 'map',
-    color: '#ffffff',
-    intensity: 0.38,
-    position: [1.35, 105, 72],
+  light: MAP_LIGHT,
+};
+
+// Sentinel-2 cloudless (EOX) — free, uniform, cloud-free 10 m mosaic (CC-BY-4.0,
+// attribution required). Used only on the WIDE scenes (country / closing) where a
+// clean uniform planet reads better than patchy sub-metre tiles; the zoomed-in
+// project scenes keep Esri (sub-metre) for detail.
+const SENTINEL_MAP_STYLE = {
+  version: 8,
+  projection: {type: 'globe'},
+  sources: {
+    s2cloudless: {
+      type: 'raster',
+      tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg'],
+      tileSize: 256,
+      maxzoom: 15,
+      attribution: 'Sentinel-2 cloudless (s2maps.eu) by EOX IT Services GmbH',
+    },
   },
+  layers: [
+    {id: 's2-background', type: 'background', paint: {'background-color': '#050a14'}},
+    {
+      id: 's2-imagery',
+      type: 'raster',
+      source: 's2cloudless',
+      paint: {
+        'raster-brightness-min': 0,
+        'raster-brightness-max': 0.98,
+        'raster-contrast': 0.1,
+        'raster-saturation': 0.1,
+      },
+    },
+  ],
+  sky: {
+    ...SKY_HAZE,
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 8, 0],
+  },
+  light: MAP_LIGHT,
 };
 
 const PEER_MAP_STYLE = {
@@ -790,13 +861,14 @@ const PEER_MAP_STYLE = {
   projection: {type: 'globe'},
   sources: {
     countryBase: {
+      // Sentinel-2 cloudless satellite mosaic — turns the intro globe into a
+      // real lit planet (geolibre / Google-Earth look) instead of a muddy
+      // desaturated street basemap. Crisp continents make the peer dots pop.
       type: 'raster',
-      tiles: [
-        'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-      ],
+      tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg'],
       tileSize: 256,
-      maxzoom: 19,
-      attribution: 'CARTO Voyager basemap',
+      maxzoom: 15,
+      attribution: 'Sentinel-2 cloudless (s2maps.eu) by EOX IT Services GmbH',
     },
   },
   layers: [
@@ -804,7 +876,10 @@ const PEER_MAP_STYLE = {
       id: 'peer-map-background',
       type: 'background',
       paint: {
-        'background-color': '#0b0b0b',
+        // Deep space navy (geolibre-style) so the globe's atmosphere rim reads
+        // as a lit planet in space, not a disc on black. The starfield overlay
+        // adds stars on top of this.
+        'background-color': '#050a14',
       },
     },
     {
@@ -812,22 +887,24 @@ const PEER_MAP_STYLE = {
       type: 'raster',
       source: 'countryBase',
       paint: {
-        'raster-brightness-min': 0.04,
-        'raster-brightness-max': 0.82,
-        'raster-contrast': 0.18,
-        'raster-saturation': -0.18,
+        'raster-brightness-min': 0.02,
+        'raster-brightness-max': 0.96,
+        'raster-contrast': 0.12,
+        'raster-saturation': 0.08,
       },
     },
   ],
   sky: {
+    ...SKY_HAZE,
+    // Full atmosphere halo on the globe overview (geolibre-style planet glow).
     'atmosphere-blend': [
       'interpolate',
       ['linear'],
       ['zoom'],
       0,
-      0.8,
+      1,
       4,
-      0.62,
+      0.9,
       7,
       0,
     ],
@@ -900,6 +977,87 @@ const TERRAIN_HYPSO_STOPS: Array<[number, [number, number, number]]> = [
   [900, [234, 216, 188]], // high peaks — pale
 ];
 
+// ── Golden-hour sun rig (geolibre / VRIFY look) ──────────────────────────────
+// A single warm, low-angle key light. Azimuth is measured clockwise from north
+// (315° = light from the NW, the classic cartographic hillshade convention so
+// relief reads correctly to the eye); altitude is the sun's height above the
+// horizon (low = long, dramatic shading). These drive BOTH the analytical
+// hillshade baked into the terrain colours below AND the deck.gl LightingEffect
+// that lights the extruded props, so the whole scene shares one light source.
+const SUN_AZIMUTH_DEG = 315;
+const SUN_ALTITUDE_DEG = 34;
+// Vertical exaggeration applied to the DEM gradient *for shading only* — the
+// real relief here is gentle, so without this the hillshade would be a flat
+// wash. It sculpts the slopes without touching the actual cell geometry.
+const RELIEF_SHADE_EXAG = 4.2;
+// Warm key / cool sky-fill tints (0–1 multipliers per channel). Lit slopes pick
+// up golden-hour amber; shadowed slopes fall into a cool blue ambient — the
+// single biggest "cinematic" lever.
+const SUN_WARM_TINT = [1.06, 1.0, 0.9];
+const SKY_COOL_TINT = [0.9, 0.96, 1.08];
+
+const SUN_DIR = (() => {
+  const az = (SUN_AZIMUTH_DEG * Math.PI) / 180;
+  const alt = (SUN_ALTITUDE_DEG * Math.PI) / 180;
+  const horiz = Math.cos(alt);
+  // x = east, y = north, z = up
+  return [horiz * Math.sin(az), horiz * Math.cos(az), Math.sin(alt)] as const;
+})();
+
+// deck.gl lighting rig matching the sun above: a warm golden-hour key light
+// (direction = the ray FROM the sun toward the ground = -SUN_DIR) over a cool
+// sky-blue ambient fill. This lights the extruded props (buildings, mine
+// facilities, columns) so they share the terrain's single light source. No
+// shadow pass — the terrain is a flat depth-test-off surface that could not
+// receive shadows anyway, and the analytical hillshade already carries relief.
+const TANGA_LIGHTING = new LightingEffect({
+  ambient: new AmbientLight({color: [176, 202, 230], intensity: 0.95}),
+  sun: new DirectionalLight({
+    color: [255, 236, 205],
+    intensity: 1.15,
+    direction: [-SUN_DIR[0], -SUN_DIR[1], -SUN_DIR[2]],
+  }),
+  fill: new DirectionalLight({
+    color: [150, 190, 230],
+    intensity: 0.4,
+    direction: [SUN_DIR[0], SUN_DIR[1], -0.5],
+  }),
+});
+
+// Analytical hillshade for one DEM cell from its four corner elevations.
+// Returns a shade factor in ~[ambient, 1]: 1 = fully lit slope facing the sun,
+// ambient = slope in shadow. dxMeters/dyMeters are the cell's ground size.
+function cellHillshade(
+  sw: number, se: number, ne: number, nw: number,
+  dxMeters: number, dyMeters: number
+): number {
+  const dzdx = (((se - sw) + (ne - nw)) / (2 * dxMeters)) * RELIEF_SHADE_EXAG;
+  const dzdy = (((nw - sw) + (ne - se)) / (2 * dyMeters)) * RELIEF_SHADE_EXAG;
+  // Surface normal = normalize(-dzdx, -dzdy, 1)
+  const len = Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1) || 1;
+  const nx = -dzdx / len;
+  const ny = -dzdy / len;
+  const nz = 1 / len;
+  const dot = nx * SUN_DIR[0] + ny * SUN_DIR[1] + nz * SUN_DIR[2];
+  // Ambient floor so shadowed faces stay readable, then a soft-ish knee.
+  return clamp(0.55 + 0.62 * dot, 0.42, 1.18);
+}
+
+// Apply a hillshade factor to an RGB colour, blending in a warm (lit) or cool
+// (shadowed) tint so the terrain reads as lit by a golden-hour sun.
+function shadeTerrainColor(
+  rgb: [number, number, number],
+  shade: number
+): [number, number, number] {
+  const warm = shade >= 1 ? (shade - 1) : 0;          // extra light → warm
+  const cool = shade < 0.85 ? (0.85 - shade) : 0;     // in shadow → cool
+  return [
+    clamp(rgb[0] * shade * (1 + warm * (SUN_WARM_TINT[0] - 1) + cool * (SKY_COOL_TINT[0] - 1)), 0, 255),
+    clamp(rgb[1] * shade * (1 + warm * (SUN_WARM_TINT[1] - 1) + cool * (SKY_COOL_TINT[1] - 1)), 0, 255),
+    clamp(rgb[2] * shade * (1 + warm * (SUN_WARM_TINT[2] - 1) + cool * (SKY_COOL_TINT[2] - 1)), 0, 255),
+  ].map(Math.round) as [number, number, number];
+}
+
 function terrainColor(elevation: number): [number, number, number, number] {
   // Smooth continuous hypsometric tint (interpolated, not banded) so the DEM
   // reads as a real elevation surface rather than 5 flat colour steps.
@@ -958,11 +1116,15 @@ function localTerrainCells(heightAt: (lon: number, lat: number) => number, mode:
       const nw = terrainPresentationElevation(heightAt, west, north, mode);
       const elevation = (sw + se + ne + nw) / 4;
       const edgeFade = clamp((1.05 - radial) * 1.55, 0.1, 1);
-      const color = terrainColor(elevation);
+      const base = terrainColor(elevation);
+      // Bake analytical golden-hour hillshade into the cell colour so the flat
+      // (non-extruded) DEM surface reads as a lit, sculpted relief.
+      const shade = cellHillshade(sw, se, ne, nw, dx * METERS_PER_DEGREE_LON, dy * METERS_PER_DEGREE_LAT);
+      const [r, g, b] = shadeTerrainColor([base[0], base[1], base[2]], shade);
       cells.push({
         polygon: [[west, south, sw], [east, south, se], [east, north, ne], [west, north, nw]],
         elevation,
-        color: [color[0], color[1], color[2], Math.round(color[3] * edgeFade)] as [number, number, number, number],
+        color: [r, g, b, Math.round(base[3] * edgeFade)] as [number, number, number, number],
         label: `DEM cell ${row + 1}-${column + 1}`,
       });
     }
@@ -1652,6 +1814,9 @@ export default function TangaDeckWorkbench() {
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
   const [resourceFocus, setResourceFocus] = useState<ResourceFocus>('Indicated');
   const [viewState, setViewState] = useState<DeckViewState>(VIEW_STATES[DEFAULT_MODE]);
+  // Timestamp of the last user camera gesture (or scene change) — the idle
+  // slow-orbit only kicks in once the camera has been still for a beat.
+  const lastCameraInteractRef = useRef<number>(0);
   const [commandText, setCommandText] = useState('');
   const [statusText, setStatusText] = useState('Peer ranking ready');
   const [pipeline, setPipeline] = useState('Text/voice -> intent -> map action');
@@ -1687,6 +1852,7 @@ export default function TangaDeckWorkbench() {
     fromMode: DEFAULT_MODE,
     toMode: DEFAULT_MODE,
     direction: 'jump',
+    travel: 'lateral',
     label: MODE_LABELS[DEFAULT_MODE],
     detail: 'Presentation scene ready',
   });
@@ -1885,8 +2051,9 @@ export default function TangaDeckWorkbench() {
     setViewState({
       ...target,
       bearing: bearingOverride ?? target.bearing,
-      transitionDuration: 1500,
-      transitionInterpolator: new FlyToInterpolator(),
+      transitionDuration: 2400,
+      transitionInterpolator: CINEMATIC_FLY(),
+      transitionEasing: cinematicEase,
     });
   }, []);
 
@@ -1954,8 +2121,9 @@ export default function TangaDeckWorkbench() {
     setViewState({
       ...viewState,
       bearing: nextBearing,
-      transitionDuration: 900,
-      transitionInterpolator: new FlyToInterpolator(),
+      transitionDuration: 1500,
+      transitionInterpolator: CINEMATIC_FLY(),
+      transitionEasing: cinematicEase,
     });
     setStatusText(`Rotated view to ${Math.round(nextBearing)} degrees`);
   }, [isThreeMode, issueThreeCameraCommand, viewState]);
@@ -1996,8 +2164,9 @@ export default function TangaDeckWorkbench() {
     setViewState((current) => {
       const next: DeckViewState = {
         ...current,
-        transitionDuration: 900,
-        transitionInterpolator: new FlyToInterpolator(),
+        transitionDuration: 1500,
+        transitionInterpolator: CINEMATIC_FLY(),
+        transitionEasing: cinematicEase,
       };
 
       if (action === 'zoomIn') next.zoom = clamp(current.zoom + 1.15, 2.2, 15.2);
@@ -2583,7 +2752,13 @@ export default function TangaDeckWorkbench() {
   // Native MapLibre terrain and external DEM hillshade tiles make this globe path
   // slower and have triggered terrain-depth shader errors, so relief is carried by
   // the DeckGL elevated project mesh over a lightweight globe basemap.
-  const mapStyle = useMemo(() => activeMode === 'ranking' ? PEER_MAP_STYLE : BASE_MAP_STYLE, [activeMode]);
+  const mapStyle = useMemo(() => {
+    if (activeMode === 'ranking') return PEER_MAP_STYLE;
+    // Wide regional / closing views get the clean uniform Sentinel-2 mosaic;
+    // the zoomed-in project scenes keep Esri sub-metre imagery.
+    if (activeMode === 'tanzania' || activeMode === 'comparison') return SENTINEL_MAP_STYLE;
+    return BASE_MAP_STYLE;
+  }, [activeMode]);
   const disableNativeTerrain = useCallback((event: any) => {
     const map = event?.target;
     if (!map?.setTerrain) return;
@@ -2702,6 +2877,7 @@ export default function TangaDeckWorkbench() {
       fromMode: previousMode,
       toMode: activeMode,
       direction: storyTransitionDirection(previousMode, activeMode),
+      travel: storyTravel(previousMode, activeMode),
       label: `${targetStep.act} / ${targetStep.label}`,
       detail: modeSummary(activeMode, routeTarget, resourceFocus, resourceHasBeenShown),
     });
@@ -2832,7 +3008,8 @@ export default function TangaDeckWorkbench() {
       }),
       // Layer 4: the area label — "6.4 sq km · 100% owned" at the polygon
       // centroid. Only shown when we're actively looking at the license.
-      showLocalContext && (activeMode === 'project' || activeMode === 'topography') && new TextLayer({
+      // Replaced by the pinned map-label overlay (fixed screen slot + pointer).
+      false && new TextLayer({
         id: 'project-boundary-label',
         data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'TANGA LICENSE · 6.4 sq km · 100% OWNED'}],
         getPosition: (d: any) => d.position,
@@ -2929,7 +3106,7 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      showMineInfrastructure && activeMode !== 'accessibility' && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'hypothetical-mine-labels',
         data: mineLabels,
         getPosition: (item) => [item.lon, item.lat, heightAt(item.lon, item.lat) + 95],
@@ -3013,7 +3190,7 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      showPowerGrid && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'power-grid-labels',
         data: POWER_GRID_NODES,
         getPosition: (node) => [node.lon, node.lat, heightAt(node.lon, node.lat) + (activeMode === 'accessibility' ? 1220 : 820)],
@@ -3064,7 +3241,7 @@ export default function TangaDeckWorkbench() {
       // regional views). On the local project & topography scenes the licence
       // badge + glowing boundary already mark it, so the extra label just
       // overlapped the badge — dropped there.
-      (activeMode === 'tanzania' || activeMode === 'accessibility') && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'project-marker-label',
         data: [{lon: PROJECT_CENTER.lon, lat: PROJECT_CENTER.lat, z: heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + (activeMode === 'tanzania' ? 112000 : 620), label: 'Tanga project'}],
         getPosition: (item) => [item.lon, item.lat, item.z],
@@ -3201,7 +3378,7 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      showVillageLabels && new TextLayer<GeoJsonFeature>({
+      false && new TextLayer<GeoJsonFeature>({
         id: 'village-labels',
         data: villages.length ? villages : labels,
         getPosition: (feature) => featurePoint(feature, 70, heightAt),
@@ -3256,7 +3433,7 @@ export default function TangaDeckWorkbench() {
         capRounded: true,
         parameters: {depthTest: false} as any,
       }),
-      showRoute && new TextLayer<any>({
+      false && new TextLayer<any>({
         id: 'access-route-labels',
         data: [
           {
@@ -3505,6 +3682,116 @@ export default function TangaDeckWorkbench() {
       };
     });
   }, [heightAt, sceneCallouts, stageSize.height, stageSize.width, viewState.bearing, viewState.latitude, viewState.longitude, viewState.pitch, viewState.zoom]);
+
+  // ── Pinned map labels ──────────────────────────────────────────────────────
+  // The map's place labels (licence, marker, mine facilities, villages, power,
+  // route) used to be geo-anchored deck.gl TextLayers, so they swam across the
+  // screen on every zoom/pan. Instead we pin each label to a FIXED screen slot
+  // (its position projected at the scene's canonical view) and draw a pointer
+  // line to the live-projected anchor — so the text holds still and only the
+  // pointer tracks the location. Same idea as the titled callouts.
+  const mapLabelSources = useMemo(() => {
+    const out: Array<{id: string; text: string; lon: number; lat: number; z: number; tone: string}> = [];
+    const push = (id: string, text: string, lon: number, lat: number, lift: number, tone: string) => {
+      if (!text) return;
+      out.push({id, text, lon, lat, z: heightAt(lon, lat) + lift, tone});
+    };
+    if (activeMode === 'project' || activeMode === 'topography') {
+      push('lbl-license', 'TANGA LICENSE · 6.4 sq km · 100% OWNED', PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, 260, '#f0b64a');
+    }
+    if (activeMode === 'project') {
+      // Keep to a couple of spread-out facilities, with concise labels so the
+      // pinned chips stay narrow and don't crowd the panel.
+      const MINE_SHORT: Record<string, string> = {'process-plant': 'Processing plant', 'product-stockpile': 'Product stockpile'};
+      const picks = [
+        ...locatedMineFacilities().filter((i) => ['process-plant'].includes(i.id)),
+        ...locatedMinePoints().filter((i) => ['product-stockpile'].includes(i.id)),
+      ];
+      picks.forEach((i: any) => push(`mine-${i.id}`, MINE_SHORT[i.id] ?? i.name, i.lon, i.lat, 95, '#8fb4d6'));
+      (villages.length ? villages : labels).slice(0, 6).forEach((feature, idx) => {
+        const name = String(feature.properties?.name ?? '');
+        const point = featurePoint(feature, 70, heightAt);
+        if (name) out.push({id: `village-${idx}`, text: name, lon: point[0], lat: point[1], z: point[2], tone: '#a7c0d8'});
+      });
+    }
+    if (activeMode === 'tanzania') {
+      push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
+    }
+    if (activeMode === 'accessibility') {
+      push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
+      POWER_GRID_NODES.forEach((node) => push(`power-${node.id}`, `${node.shortName} · ${node.distanceKm.toFixed(1)} km`, node.lon, node.lat, 300, '#e0a94f'));
+      const target = ROUTE_TARGETS[routeTarget];
+      push('route-target', `${target.label} · ${routeProfile.distanceLabel}`, target.lon, target.lat, 300, '#c7551b');
+    }
+    return out;
+  }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel]);
+
+  const pinnedMapLabels = useMemo(() => {
+    if (!mapLabelSources.length || stageSize.width === 0) return [];
+    const canon = (VIEW_STATES as any)[activeMode] ?? viewState;
+    const canonVp = new WebMercatorViewport({
+      width: stageSize.width, height: stageSize.height,
+      longitude: canon.longitude, latitude: canon.latitude, zoom: canon.zoom, pitch: canon.pitch, bearing: canon.bearing,
+    });
+    const liveVp = new WebMercatorViewport({
+      width: stageSize.width, height: stageSize.height,
+      longitude: viewState.longitude, latitude: viewState.latitude, zoom: viewState.zoom, pitch: viewState.pitch, bearing: viewState.bearing,
+    });
+    const positioned = mapLabelSources.map((source) => {
+      let boxPixelX = stageSize.width / 2;
+      let boxPixelY = stageSize.height / 2;
+      try {
+        const p = canonVp.project([source.lon, source.lat, source.z]);
+        if (Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+          boxPixelX = clamp(p[0], 96, stageSize.width - 96);
+          boxPixelY = clamp(p[1], 96, stageSize.height - 60);
+        }
+      } catch { /* keep centre fallback */ }
+      let anchorPixelX: number | null = null;
+      let anchorPixelY: number | null = null;
+      try {
+        const p = liveVp.project([source.lon, source.lat, source.z]);
+        if (Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+          anchorPixelX = clamp(p[0], 8, stageSize.width - 8);
+          anchorPixelY = clamp(p[1], 70, stageSize.height - 24);
+        }
+      } catch { /* no pointer */ }
+      return {...source, boxPixelX, boxPixelY, anchorPixelX, anchorPixelY};
+    });
+
+    // Keep chips clear of the chrome: the top bar / act ribbon, the bottom pager,
+    // and the docked right-hand data panel — so no label is hidden behind a panel.
+    const W = stageSize.width;
+    const H = stageSize.height;
+    // The docked right-hand data/insight panel starts at ~70% of the stage width
+    // across viewports, so keep chip centres within the left 60% — their right
+    // edge (≈ +95px) then always clears the panel. Left edge stays off the logo.
+    const safeL = W * 0.05;
+    const safeR = W * 0.6;
+    const safeT = 104;       // below the top bar + act ribbon
+    const safeB = H - 104;   // above the pager
+    positioned.forEach((label) => {
+      label.boxPixelX = clamp(label.boxPixelX, safeL, safeR);
+      label.boxPixelY = clamp(label.boxPixelY, safeT, safeB);
+    });
+    // Greedy vertical de-collision: chips near each other in X are pushed apart
+    // in Y so two labels never overlap. Process top-to-bottom, only push down.
+    const MIN_GAP = 28;
+    const X_PROX = 150;
+    const placed: typeof positioned = [];
+    positioned.slice().sort((a, b) => a.boxPixelY - b.boxPixelY).forEach((label) => {
+      let y = label.boxPixelY;
+      placed.forEach((other) => {
+        if (Math.abs(other.boxPixelX - label.boxPixelX) < X_PROX && Math.abs(other.boxPixelY - y) < MIN_GAP) {
+          y = other.boxPixelY + MIN_GAP;
+        }
+      });
+      label.boxPixelY = clamp(y, safeT, safeB);
+      placed.push(label);
+    });
+    return positioned;
+  }, [mapLabelSources, activeMode, stageSize.width, stageSize.height, viewState.longitude, viewState.latitude, viewState.zoom, viewState.pitch, viewState.bearing]);
+
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
   const isFirstStory = activeStoryIndex <= 0;
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1;
@@ -3531,6 +3818,10 @@ export default function TangaDeckWorkbench() {
   // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
   // the ranking underneath (it does NOT advance — scene 1 is the peer field).
   const [coverDismissed, setCoverDismissed] = useState(false);
+  // Act interstitial — a brief chapter card when the story crosses into a new
+  // act (Opportunity → Asset → Value). Never on first mount or behind the cover.
+  const [actCard, setActCard] = useState<StoryAct | null>(null);
+  const lastActRef = useRef<string | null>(null);
   const showCover = activeStoryIndex === 0 && !coverDismissed;
   const isCoverScene = showCover;
   // Scenes without a source-data table still get a panel — key insight chips
@@ -3548,14 +3839,15 @@ export default function TangaDeckWorkbench() {
     return () => window.clearInterval(id);
   }, []);
 
-  // ── URL deep-link + resume ────────────────────────────────────────────
-  // On mount: restore scene from #hash, or fall back to last stored scene.
+  // ── URL deep-link ─────────────────────────────────────────────────────
+  // On mount: jump to the scene named in the #hash, if any. A bare URL (no
+  // hash) always starts from the beginning — we intentionally do NOT silently
+  // resume the last-seen scene from localStorage, which surprised the user.
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
-    const hashScene = readHashScene();
-    const stored = hashScene || readStoredScene();
+    const stored = readHashScene();
     if (!stored) return;
     const targetIndex = STORY_STEPS.findIndex((s) => s.mode === stored);
     if (targetIndex >= 0 && targetIndex !== activeStoryIndex) {
@@ -3666,6 +3958,65 @@ export default function TangaDeckWorkbench() {
     const timer = window.setTimeout(handleNextStory, autoplaySec * 1000);
     return () => window.clearTimeout(timer);
   }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, autoplaySec]);
+
+  // Idle slow-orbit: once an immersive scene has flown in and settled, gently
+  // rotate the camera bearing (geolibre / VRIFY "never frozen" feel). Cancels
+  // the instant the user grabs the camera and resumes after a short settle.
+  // Off for reduced-motion, the cover, the globe overview, and 3D scenes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (threeVisible || isCoverScene) return;
+    const ORBIT_MODES = new Set<WorkbenchMode>(['project', 'topography', 'accessibility', 'mine_planning', 'drillholes', 'resource', 'metallurgy']);
+    if (!ORBIT_MODES.has(activeMode)) return;
+
+    const SETTLE_MS = 3600;   // clear the fly-in (≤2.4s) + a beat before orbiting
+    const SPEED = 1.5;        // degrees per second — a calm, barely-there drift
+    lastCameraInteractRef.current = performance.now();
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      if (now - lastCameraInteractRef.current < SETTLE_MS) return;
+      setViewState((cur) => {
+        // Strip any leftover flyTo props so the bearing nudge applies instantly
+        // (no per-frame transition) — the SETTLE window already cleared the fly-in.
+        const {transitionInterpolator, transitionEasing, transitionDuration, ...rest} = cur as any;
+        return {...rest, bearing: (((rest.bearing ?? 0) + SPEED * dt) % 360)};
+      });
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [activeMode, threeVisible, isCoverScene]);
+
+  // Fire the act interstitial on an act crossing. It overlays the incoming
+  // scene while its camera flies in, then dissolves. Always skippable.
+  useEffect(() => {
+    const act = MODE_ACT[activeMode];
+    const previous = lastActRef.current;
+    lastActRef.current = act;
+    if (previous === null || previous === act) return;   // first mount / same act
+    if (showCover) return;
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const next = STORY_ACTS.find((a) => a.id === act) ?? null;
+    setActCard(next);
+    const timer = window.setTimeout(() => setActCard(null), reduce ? 700 : 1900);
+    return () => window.clearTimeout(timer);
+  }, [activeMode, showCover]);
+
+  // Any click or key dismisses the act card immediately.
+  useEffect(() => {
+    if (!actCard) return;
+    const dismiss = () => setActCard(null);
+    window.addEventListener('keydown', dismiss);
+    window.addEventListener('pointerdown', dismiss);
+    return () => {
+      window.removeEventListener('keydown', dismiss);
+      window.removeEventListener('pointerdown', dismiss);
+    };
+  }, [actCard]);
 
   const toggleAutoplay = useCallback(() => setIsAutoplay((prev) => !prev), []);
   const toggleBlackout = useCallback(() => setIsBlackout((prev) => !prev), []);
@@ -3818,8 +4169,15 @@ export default function TangaDeckWorkbench() {
           viewState={viewState as any}
           controller
           layers={layers}
+          effects={[TANGA_LIGHTING]}
           useDevicePixels={1}
-          onViewStateChange={({viewState: nextViewState}: any) => setViewState(nextViewState as DeckViewState)}
+          onViewStateChange={({viewState: nextViewState, interactionState}: any) => {
+            // A real user gesture pauses the idle orbit; it resumes after settle.
+            if (interactionState && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)) {
+              lastCameraInteractRef.current = performance.now();
+            }
+            setViewState(nextViewState as DeckViewState);
+          }}
           onClick={handleDeckClick}
           getTooltip={getTooltip}
         >
@@ -3852,6 +4210,36 @@ export default function TangaDeckWorkbench() {
 
       {/* HUD command-center frame: viewport-corner reticles + edge vignette.
           Pure decoration, non-interactive. Styled in hud.css (Phase 3). */}
+      {/* Geolibre-style starfield behind the globe (CSS-gated to the globe
+          overview scenes; screen-blended so it only shows in the dark space). */}
+      <div className="tanga-starfield" aria-hidden="true" />
+
+      {/* Geospatial locator instrument (geolibre-style): a stylised globe with a
+          pulsing Tanga marker + live lat/lon/zoom readout. Map scenes only. */}
+      {!threeVisible && !isCoverScene && (
+        <div className="tanga-deck__locator">
+          <svg className="tanga-deck__locator-globe" viewBox="0 0 60 60" aria-hidden="true">
+            <defs>
+              <radialGradient id="loc-ocean" cx="38%" cy="34%" r="75%">
+                <stop offset="0" stopColor="#17364e" /><stop offset="1" stopColor="#071320" />
+              </radialGradient>
+            </defs>
+            <circle cx="30" cy="30" r="26" fill="url(#loc-ocean)" stroke="rgba(94,234,212,.4)" strokeWidth="1" />
+            <ellipse cx="30" cy="30" rx="26" ry="10" fill="none" stroke="rgba(148,197,255,.18)" strokeWidth=".6" />
+            <ellipse cx="30" cy="30" rx="26" ry="19" fill="none" stroke="rgba(148,197,255,.12)" strokeWidth=".6" />
+            <ellipse cx="30" cy="30" rx="10" ry="26" fill="none" stroke="rgba(148,197,255,.13)" strokeWidth=".6" />
+            <line x1="4" y1="30" x2="56" y2="30" stroke="rgba(148,197,255,.15)" strokeWidth=".6" />
+            <circle className="tanga-deck__locator-pulse" cx="38" cy="34" r="3" fill="rgba(94,234,212,.55)" />
+            <circle cx="38" cy="34" r="2" fill="#5eead4" stroke="#ffffff" strokeWidth=".7" />
+          </svg>
+          <div className="tanga-deck__locator-readout" aria-label="Map position">
+            <span>{Math.abs(viewState.latitude).toFixed(2)}°{viewState.latitude >= 0 ? 'N' : 'S'}</span>
+            <span>{Math.abs(viewState.longitude).toFixed(2)}°{viewState.longitude >= 0 ? 'E' : 'W'}</span>
+            <span>Z{viewState.zoom.toFixed(1)}</span>
+          </div>
+        </div>
+      )}
+
       <div className="hud-frame" aria-hidden="true" />
 
       {/* Info interstitial — an editorial data card shown between scenes. */}
@@ -3879,7 +4267,8 @@ export default function TangaDeckWorkbench() {
           className={classNames(
             'tanga-deck__portal-transition',
             sceneTransition.target === 'model' ? 'is-model' : 'is-map',
-            `is-${sceneTransition.direction}`
+            `is-${sceneTransition.direction}`,
+            `is-travel-${sceneTransition.travel}`
           )}
           aria-hidden="true"
         >
@@ -3894,7 +4283,7 @@ export default function TangaDeckWorkbench() {
         </div>
       )}
 
-      {annotationsOn && !threeVisible && projectedSceneCallouts.length > 0 && !(activeMode === 'ranking' && selectedPeerProject) && (
+      {annotationsOn && !threeVisible && !showCover && projectedSceneCallouts.length > 0 && !(activeMode === 'ranking' && selectedPeerProject) && (
         <section className="tanga-deck__callout-layer" aria-label="Scene callouts">
           <svg className="tanga-deck__leader-svg" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
             {projectedSceneCallouts.map((callout) => callout.anchorPixelX !== null && callout.anchorPixelY !== null && (
@@ -3915,7 +4304,7 @@ export default function TangaDeckWorkbench() {
               </g>
             ))}
           </svg>
-          {projectedSceneCallouts.map((callout) => (
+          {projectedSceneCallouts.map((callout, index) => (
             <div
               key={callout.id}
               className={classNames('tanga-deck__callout', `is-${callout.side ?? 'right'}`)}
@@ -3923,6 +4312,7 @@ export default function TangaDeckWorkbench() {
                 '--callout-x': `${callout.boxPixelX}px`,
                 '--callout-y': `${callout.boxPixelY}px`,
                 '--callout-tone': callout.tone,
+                '--reveal-i': index,
               } as any}
             >
               <span>{callout.label}</span>
@@ -3932,16 +4322,35 @@ export default function TangaDeckWorkbench() {
         </section>
       )}
 
+      {annotationsOn && !threeVisible && !showCover && pinnedMapLabels.length > 0 && (
+        <section className="tanga-deck__map-labels" aria-label="Map place labels">
+          <svg className="tanga-deck__leader-svg tanga-deck__leader-svg--pin" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
+            {pinnedMapLabels.map((label) => label.anchorPixelX !== null && label.anchorPixelY !== null && (
+              <g key={`pin-leader-${label.id}`}>
+                <line x1={label.anchorPixelX} y1={label.anchorPixelY} x2={label.boxPixelX} y2={label.boxPixelY} style={{color: label.tone, stroke: label.tone}} />
+                <circle cx={label.anchorPixelX} cy={label.anchorPixelY} r="3" style={{color: label.tone, fill: label.tone, stroke: '#ffffff'}} />
+              </g>
+            ))}
+          </svg>
+          {pinnedMapLabels.map((label, index) => (
+            <div
+              key={label.id}
+              className="tanga-deck__pin-label"
+              style={{'--pin-x': `${label.boxPixelX}px`, '--pin-y': `${label.boxPixelY}px`, '--pin-tone': label.tone, '--reveal-i': index} as any}
+            >
+              {label.text}
+            </div>
+          ))}
+        </section>
+      )}
+
       <section className="tanga-deck__geo-overlay" aria-label="Map legend compass and scale">
-        <div className="tanga-deck__compass" aria-label={`Bearing ${Math.round(compassBearing)} degrees`}>
-          <div className="tanga-deck__compass-ring" style={{transform: `rotate(${-compassBearing}deg)`}}>
-            <span>N</span>
-            <span>E</span>
-            <span>S</span>
-            <span>W</span>
+        <div className="tanga-deck__compass tanga-compass" aria-label={`Bearing ${Math.round(compassBearing)} degrees`}>
+          <div className="tanga-compass__rose" style={{transform: `rotate(${-compassBearing}deg)`}}>
+            <i className="tanga-compass__arrow" />
+            <span className="tanga-compass__n">N</span>
           </div>
-          <div className="tanga-deck__compass-needle" />
-          <small>{Math.round(compassBearing)} deg</small>
+          <small className="tanga-compass__deg">{Math.round(compassBearing)}°</small>
         </div>
 
         <div className="tanga-deck__legend">
@@ -4116,6 +4525,23 @@ export default function TangaDeckWorkbench() {
         </div>
       )}
 
+      {actCard && (
+        <section
+          className="tanga-deck__act-card"
+          style={{'--act-theme': actCard.theme} as any}
+          role="status"
+          aria-live="polite"
+          aria-label={`Act ${actCard.numeral}: ${actCard.label}`}
+        >
+          <div className="tanga-deck__act-card-inner">
+            <span className="tanga-deck__act-card-numeral" aria-hidden="true">{actCard.numeral}</span>
+            <strong className="tanga-deck__act-card-label">{actCard.label}</strong>
+            <span className="tanga-deck__act-card-rule" aria-hidden="true" />
+            <p className="tanga-deck__act-card-thesis">{actCard.thesis}</p>
+          </div>
+        </section>
+      )}
+
       {/* Closing CTA card — on the final scene. */}
       {isClosingScene && (
         <aside className="tanga-deck__closing" aria-label="Investment summary">
@@ -4189,7 +4615,12 @@ export default function TangaDeckWorkbench() {
           <strong className="tanga-deck__pager-count">
             {String(activeStoryIndex + 1).padStart(2, '0')} / {String(STORY_STEPS.length).padStart(2, '0')}
           </strong>
-          <div className="tanga-deck__pager-dots" role="tablist" aria-label="Jump to scene">
+          <div
+            className="tanga-deck__pager-dots"
+            role="tablist"
+            aria-label="Jump to scene"
+            style={{'--pager-progress': STORY_STEPS.length > 1 ? activeStoryIndex / (STORY_STEPS.length - 1) : 0} as any}
+          >
             {STORY_STEPS.map((step, i) => (
               <button
                 key={step.mode}

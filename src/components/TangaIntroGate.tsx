@@ -13,6 +13,12 @@ const INTRO_VIDEO_SRC_LOCAL = VIDEO_KEY + '?v=intro-opt-1080-20260819';
 const INTRO_POSTER_SRC = asset(POSTER_KEY) + '?v=full-bleed-bright-20260625';
 const ERROR_FALLBACK_MS = 2000;
 
+// The pristine URL hash, captured once at module load — BEFORE the workbench
+// mounts and starts syncing the hash to the current scene. If the page was
+// opened on a deep link (e.g. #tanzania), we skip the cinematic intro and drop
+// the viewer straight onto that scene instead of replaying "the beginning".
+const DEEP_LINK_HASH = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+
 type IntroState = 'checking' | 'playing' | 'blocked' | 'finishing' | 'done';
 
 type TangaIntroGateProps = {
@@ -37,6 +43,11 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   };
 
   useEffect(() => {
+    // Deep link present → skip the intro and reveal the deck immediately.
+    if (DEEP_LINK_HASH) {
+      setIntroState('done');
+      return;
+    }
     setIntroState('playing');
   }, []);
 

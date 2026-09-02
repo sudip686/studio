@@ -9,7 +9,7 @@ import {motion, useReducedMotion} from 'framer-motion';
 // editorial layout (table / chart / value story) so no two consecutive slides
 // look alike. Shown via the pending-info gate in TangaDeckWorkbench.
 
-export type InfoSlideId = 'resource-breakdown' | 'flake-purity' | 'battery-value';
+export type InfoSlideId = 'cross-section' | 'resource-breakdown' | 'flake-purity' | 'battery-value';
 
 const RESOURCE_ROWS = [
   {domain: 'Oxide', ind: '22', inf: '5', tgc: '5.36', w: 12.6, color: '#d96a2a'},
@@ -55,6 +55,48 @@ export default function TangaInfoSlide({id, onContinue}: {id: InfoSlideId; onCon
       onClick={onContinue}
     >
       <div className="tanga-info__card" onClick={(e) => e.stopPropagation()}>
+        {id === 'cross-section' && (
+          <>
+            <motion.div className="tanga-info__eyebrow" {...rise(0.05)}>The Asset · Deposit geometry</motion.div>
+            <motion.h2 className="tanga-info__title" {...rise(0.1)}>A slice through the deposit</motion.h2>
+            <motion.p className="tanga-info__sub" {...rise(0.15)}>A cross-section is a thin vertical slice. The graphitic schist band carries the grade — drilled from surface down through oxide, transition and fresh rock.</motion.p>
+            <motion.div className="tanga-info__section" {...rise(0.22)}>
+              <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Schematic geological cross-section of the graphitic schist deposit">
+                <defs>
+                  <linearGradient id="tgcGrade" x1="0" y1="0" x2="1" y2="0.4">
+                    <stop offset="0" stopColor="#4fd6c0" /><stop offset="0.5" stopColor="#f0b64a" /><stop offset="1" stopColor="#f4634e" />
+                  </linearGradient>
+                </defs>
+                {/* ground body */}
+                <path d="M0,88 80,80 160,92 240,74 320,84 400,70 480,86 560,78 640,90 720,82 L720,300 L0,300 Z" fill="rgba(18,26,34,.85)" stroke="none" />
+                {/* weathering boundaries */}
+                <path d="M0,112 80,104 160,116 240,98 320,108 400,94 480,110 560,102 640,114 720,106" fill="none" stroke="rgba(148,197,255,.28)" strokeWidth="1" strokeDasharray="4 4" />
+                <path d="M0,150 80,142 160,154 240,136 320,146 400,132 480,148 560,140 640,152 720,144" fill="none" stroke="rgba(148,197,255,.2)" strokeWidth="1" strokeDasharray="4 4" />
+                {/* dipping graphitic schist band (mineralised) */}
+                <path d="M96,150 610,214 610,244 96,180 Z" fill="url(#tgcGrade)" opacity="0.9" />
+                <path d="M96,150 610,214" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1" />
+                <path d="M96,180 610,244" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="1" />
+                {/* terrain surface line */}
+                <path d="M0,88 80,80 160,92 240,74 320,84 400,70 480,86 560,78 640,90 720,82" fill="none" stroke="rgba(94,234,212,.85)" strokeWidth="1.6" />
+                {/* drillholes */}
+                {[[200,79],[320,84],[440,79],[540,80]].map(([x,y],i)=>(
+                  <g key={i}>
+                    <line x1={x} y1={y} x2={x+22} y2={y+150} stroke="rgba(226,240,250,.7)" strokeWidth="1.3" />
+                    <circle cx={x} cy={y} r="3.4" fill="#5eead4" stroke="#fff" strokeWidth="1" />
+                  </g>
+                ))}
+                {/* labels */}
+                <text x="10" y="104" fill="rgba(183,201,222,.85)" fontSize="9" fontFamily="ui-monospace,monospace">OXIDE</text>
+                <text x="10" y="140" fill="rgba(183,201,222,.75)" fontSize="9" fontFamily="ui-monospace,monospace">TRANSITION</text>
+                <text x="10" y="186" fill="rgba(183,201,222,.65)" fontSize="9" fontFamily="ui-monospace,monospace">FRESH</text>
+                <text x="330" y="205" fill="#fff" fontSize="10.5" fontFamily="ui-monospace,monospace" fontWeight="600">GRAPHITIC SCHIST</text>
+                <text x="596" y="262" fill="rgba(94,234,212,.9)" fontSize="9" fontFamily="ui-monospace,monospace" textAnchor="end">≥3% TGC</text>
+              </svg>
+            </motion.div>
+            <div className="tanga-info__src">Schematic after the AMC MRE geological model · graphitic schist · 3% TGC cut-off · ordinary kriging</div>
+          </>
+        )}
+
         {id === 'resource-breakdown' && (
           <>
             <motion.div className="tanga-info__eyebrow" {...rise(0.05)}>The Asset · Mineral Resource</motion.div>

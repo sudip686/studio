@@ -284,13 +284,24 @@
     var(--tick) 1px, 1px var(--tick),
     var(--tick) 1px, 1px var(--tick);
 }
-/* Vignette layer — separate fixed pseudo so it never fights the reticle bg. */
+/* Vignette layer — separate fixed pseudo so it never fights the reticle bg.
+   A cinematic grade: a radial corner vignette to focus the eye on the deposit,
+   plus faint top/bottom gradients that seat the HUD chrome into the scene so it
+   never floats on a hard rectangle. Deliberately subtle — depth, not darkness. */
 .hud-frame::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(120% 90% at 50% 46%, transparent 58%, rgba(3, 7, 12, 0.42) 100%);
+  background:
+    radial-gradient(125% 92% at 50% 44%, transparent 56%, rgba(3, 7, 12, 0.46) 100%),
+    linear-gradient(180deg, rgba(3, 7, 12, 0.28) 0%, transparent 14%),
+    linear-gradient(0deg, rgba(3, 7, 12, 0.30) 0%, transparent 16%);
+}
+/* On the globe overview the vignette would eat the atmosphere rim — ease it. */
+.tanga-deck--ranking .hud-frame::after,
+.tanga-deck--comparison .hud-frame::after {
+  background: radial-gradient(130% 100% at 50% 46%, transparent 66%, rgba(3, 7, 12, 0.34) 100%);
 }
 
 /* 3.2 — the single "live" element (autoplay while ticking) gets a soft warm
@@ -639,6 +650,13 @@ html, body { overflow-x: hidden; }
 .tanga-info__chip .val { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 1.05rem; color: var(--hud-text); margin-top: 4px; }
 .tanga-info__chip.is-hero { border-color: rgba(94,234,212,.5); background: rgba(94,234,212,.08); }
 .tanga-info__chip.is-hero .val { color: rgba(var(--hud-cyan), 0.98); }
+/* cross-section svg */
+.tanga-info__section { margin-top: 4px; }
+.tanga-info__section svg {
+  width: 100%; height: auto; display: block;
+  border: 1px solid var(--hud-line); border-radius: 8px;
+  background: linear-gradient(180deg, rgba(8,13,18,.55), rgba(10,16,22,.35));
+}
 /* continue */
 .tanga-info__continue {
   margin-top: 22px; display: inline-flex; align-items: center; gap: 8px;
@@ -650,3 +668,507 @@ html, body { overflow-x: hidden; }
 }
 .tanga-info__continue:hover, .tanga-info__continue:focus-visible { background: rgba(94, 234, 212, 0.2); border-color: rgba(var(--hud-cyan), 0.8); outline: none; }
 @media (prefers-reduced-motion: reduce) { .tanga-info, .tanga-info__card * { animation: none !important; } }
+
+/* ===========================================================================
+   PHASE 14 — geolibre-style globe. A starfield in the dark space around the
+   globe (the ranking + peer-compare overview scenes) so the globe reads as a
+   lit planet in space. Screen-blended so stars only show on the dark backdrop
+   and vanish over the bright globe; gated to the globe scenes only.
+   =========================================================================== */
+.tanga-starfield { display: none; }
+.tanga-deck--ranking .tanga-starfield,
+.tanga-deck--comparison .tanga-starfield {
+  display: block;
+  position: fixed; inset: 0; z-index: 2; pointer-events: none;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 3.5px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.9));
+  background-image:
+    radial-gradient(1.6px 1.6px at 8% 14%, rgba(255,255,255,.95), transparent 60%),
+    radial-gradient(1.2px 1.2px at 15% 42%, rgba(203,222,255,.85), transparent 60%),
+    radial-gradient(1px 1px at 22% 22%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(1.8px 1.8px at 31% 68%, rgba(255,255,255,.95), transparent 60%),
+    radial-gradient(1px 1px at 6% 74%, rgba(210,226,255,.7), transparent 60%),
+    radial-gradient(1.3px 1.3px at 12% 88%, rgba(255,255,255,.8), transparent 60%),
+    radial-gradient(1px 1px at 40% 12%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 47% 84%, rgba(230,240,255,.9), transparent 60%),
+    radial-gradient(1px 1px at 55% 30%, rgba(255,255,255,.65), transparent 60%),
+    radial-gradient(1.7px 1.7px at 63% 58%, rgba(255,255,255,.95), transparent 60%),
+    radial-gradient(1px 1px at 68% 16%, rgba(210,226,255,.7), transparent 60%),
+    radial-gradient(1.2px 1.2px at 74% 78%, rgba(255,255,255,.8), transparent 60%),
+    radial-gradient(1.9px 1.9px at 82% 34%, rgba(255,255,255,.95), transparent 60%),
+    radial-gradient(1px 1px at 88% 62%, rgba(226,236,255,.7), transparent 60%),
+    radial-gradient(1.4px 1.4px at 92% 20%, rgba(255,255,255,.85), transparent 60%),
+    radial-gradient(1px 1px at 95% 82%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(1.2px 1.2px at 34% 46%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1px 1px at 58% 92%, rgba(210,226,255,.65), transparent 60%),
+    radial-gradient(1.5px 1.5px at 79% 8%, rgba(255,255,255,.9), transparent 60%),
+    radial-gradient(1px 1px at 3% 34%, rgba(255,255,255,.6), transparent 60%);
+  animation: tanga-twinkle 7s ease-in-out infinite alternate;
+}
+/* A second, denser fine-dust layer so the field reads as depth, not a few dots. */
+.tanga-deck--ranking .tanga-starfield::after,
+.tanga-deck--comparison .tanga-starfield::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(1px 1px at 18% 30%, rgba(255,255,255,.75), transparent 62%),
+    radial-gradient(1px 1px at 44% 24%, rgba(210,226,255,.6), transparent 62%),
+    radial-gradient(1px 1px at 52% 66%, rgba(255,255,255,.7), transparent 62%),
+    radial-gradient(1px 1px at 70% 44%, rgba(255,255,255,.6), transparent 62%),
+    radial-gradient(1px 1px at 86% 76%, rgba(226,236,255,.65), transparent 62%),
+    radial-gradient(1px 1px at 24% 82%, rgba(255,255,255,.6), transparent 62%),
+    radial-gradient(1px 1px at 62% 12%, rgba(255,255,255,.7), transparent 62%),
+    radial-gradient(1px 1px at 90% 40%, rgba(255,255,255,.55), transparent 62%);
+}
+@keyframes tanga-twinkle { from { opacity: 0.8; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck--ranking .tanga-starfield,
+  .tanga-deck--comparison .tanga-starfield { animation: none; opacity: 0.95; }
+}
+
+/* ===========================================================================
+   PHASE 15 — geospatial locator instrument (geolibre-inspired premium detail):
+   a stylised globe with a pulsing Tanga marker + a live lat/lon/zoom readout.
+   Map scenes only; non-interactive.
+   =========================================================================== */
+.tanga-deck__locator {
+  position: fixed; right: clamp(16px, 1.6vw, 28px); bottom: 96px; z-index: 12;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px 7px 7px; border-radius: 12px;
+  border: 1px solid var(--hud-line);
+  background: linear-gradient(180deg, rgba(12,19,27,.8), rgba(6,11,18,.72));
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: var(--glass-glow);
+  pointer-events: none;
+}
+.tanga-deck__locator-globe { width: 42px; height: 42px; display: block; flex: 0 0 auto; }
+.tanga-deck__locator-pulse { transform-box: fill-box; transform-origin: center; animation: tanga-loc-pulse 2.4s ease-out infinite; }
+@keyframes tanga-loc-pulse {
+  0% { transform: scale(.55); opacity: .9; }
+  70% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.tanga-deck__locator-readout { display: flex; flex-direction: column; gap: 1px; font-family: var(--font-mono); }
+.tanga-deck__locator-readout span { font-size: .64rem; letter-spacing: .03em; color: rgba(203,222,240,.82); font-variant-numeric: tabular-nums; line-height: 1.35; }
+.tanga-deck__locator-readout span:last-child { color: rgba(94,234,212,.92); }
+@media (prefers-reduced-motion: reduce) { .tanga-deck__locator-pulse { animation: none; } }
+
+/* ===========================================================================
+   PHASE 16 — premium compass instrument (replaces the busy 4-letter dial with
+   a clean ticked bezel + a single north arrow). New markup: .tanga-compass.
+   =========================================================================== */
+.tanga-deck__compass.tanga-compass {
+  position: relative; width: 62px !important; height: 62px !important;
+  display: grid; place-items: center; border-radius: 999px !important;
+  border: 1px solid var(--hud-line-strong) !important;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(94,234,212,.10), transparent 60%),
+    linear-gradient(180deg, rgba(12,19,27,.84), rgba(6,11,18,.76)) !important;
+  box-shadow: var(--glass-glow) !important;
+  overflow: visible !important;
+}
+/* fixed bezel ring */
+.tanga-deck__compass.tanga-compass::before {
+  content: ""; position: absolute; inset: 6px; border-radius: 999px;
+  border: 1px solid rgba(94,234,212,.22) !important;
+  box-shadow: none !important;
+}
+/* fixed N/E/S/W tick marks on the rim */
+.tanga-deck__compass.tanga-compass::after {
+  content: ""; position: absolute; inset: 2px; border-radius: 999px; pointer-events: none;
+  background: conic-gradient(
+    rgba(148,197,255,.5) 0 2deg, transparent 2deg 88deg,
+    rgba(148,197,255,.4) 90deg 92deg, transparent 92deg 178deg,
+    rgba(148,197,255,.4) 180deg 182deg, transparent 182deg 268deg,
+    rgba(148,197,255,.4) 270deg 272deg, transparent 272deg 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 22px, #000 22px 27px, transparent 27px);
+  mask: radial-gradient(circle, transparent 0 22px, #000 22px 27px, transparent 27px);
+}
+.tanga-compass__rose { position: absolute; inset: 0; transition: transform 520ms var(--ease-hud); }
+/* north arrow (triangle) pointing up = true north */
+.tanga-compass__arrow {
+  position: absolute; left: 50%; top: 7px; transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 15px solid rgba(94,234,212,.98);
+  filter: drop-shadow(0 0 4px rgba(94,234,212,.55));
+}
+.tanga-compass__n {
+  position: absolute; left: 50%; top: 15px; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 8px; font-weight: 800; color: #06121a; line-height: 1;
+}
+.tanga-compass__deg {
+  position: absolute !important; bottom: -7px !important; left: 50% !important; right: auto !important;
+  transform: translateX(-50%);
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--hud-line) !important;
+  background: rgba(6,11,18,.92) !important;
+  font-family: var(--font-mono) !important; font-size: 8.5px !important; letter-spacing: .02em;
+  color: rgba(148,197,255,.92) !important;
+}
+
+/* ===========================================================================
+   PHASE 17 — scale-bar polish: a clean bracketed scale rule to match the
+   redesigned compass (crisp end-ticks, cyan glow, mono label).
+   =========================================================================== */
+.tanga-deck__scale.tanga-deck__scale { padding: 8px 12px; }
+.tanga-deck__scale.tanga-deck__scale > div { align-items: flex-end; gap: 9px; }
+.tanga-deck__scale.tanga-deck__scale span {
+  height: 7px !important; border-top: none !important;
+  border-left: 2px solid rgba(220,238,248,.92) !important;
+  border-right: 2px solid rgba(220,238,248,.92) !important;
+  border-bottom: 2px solid rgba(220,238,248,.92) !important;
+  box-shadow: 0 0 10px rgba(94,234,212,.28) !important;
+}
+.tanga-deck__scale.tanga-deck__scale span::before { display: none !important; }
+.tanga-deck__scale.tanga-deck__scale em {
+  font-family: var(--font-mono) !important; color: rgba(233,242,252,.95) !important;
+  font-size: 11px !important; font-weight: 600 !important;
+}
+
+/* ===========================================================================
+   PHASE 18 - pinned map labels. The map's place labels (licence, marker, mine
+   facilities, villages, power, route) are HTML chips pinned to a fixed screen
+   slot with a pointer line to the live-projected anchor, so the text holds
+   still on zoom/pan and only the pointer tracks the location.
+   =========================================================================== */
+.tanga-deck__map-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+.tanga-deck__leader-svg--pin line {
+  stroke-width: 1.1px !important;
+  stroke-dasharray: 3 4 !important;
+  opacity: 0.6 !important;
+  filter: drop-shadow(0 0 5px currentColor) !important;
+}
+.tanga-deck__leader-svg--pin circle {
+  stroke-width: 1.2px !important;
+  filter: drop-shadow(0 0 6px currentColor) !important;
+}
+.tanga-deck__pin-label {
+  position: absolute;
+  left: var(--pin-x);
+  top: var(--pin-y);
+  transform: translate(-50%, -50%);
+  max-width: 190px;
+  padding: 4px 9px;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(233, 242, 252, 0.96);
+  background: linear-gradient(180deg, rgba(6, 12, 20, 0.82), rgba(3, 7, 14, 0.7));
+  border: 1px solid color-mix(in srgb, var(--pin-tone, #8fb4d6) 52%, rgba(255, 255, 255, 0.14));
+  border-radius: 5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  animation: hud-panel-in var(--dur-med, 0.4s) var(--ease-hud, ease) both;
+}
+
+/* ===========================================================================
+   PHASE 19 - VRIFY-style pager progress rail. A thin connected track behind the
+   scene dots, filled up to the current scene in the act tint - so the deck
+   reads as a story with a clear "where am I" progress, not just loose dots.
+   =========================================================================== */
+.tanga-deck__pager-dots {
+  position: relative;
+}
+.tanga-deck__pager-dots::before,
+.tanga-deck__pager-dots::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: calc(50% + 1.5px);
+  height: 2px;
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 0;
+}
+.tanga-deck__pager-dots::before {
+  right: 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.tanga-deck__pager-dots::after {
+  width: calc((100% - 8px) * var(--pager-progress, 0));
+  background: linear-gradient(90deg,
+    rgba(var(--act, 217, 106, 42), 0.55),
+    rgba(var(--act, 217, 106, 42), 0.95));
+  box-shadow: 0 0 8px rgba(var(--act, 217, 106, 42), 0.5);
+  transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tanga-deck__pager-dot {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__pager-dots::after { transition: none; }
+}
+
+/* ===========================================================================
+   PHASE 20 - fine polish: a focus glow on the command bar (geolibre input feel)
+   and an act-tinted accent tick before the data-panel eyebrow (HUD label marker).
+   =========================================================================== */
+.tanga-deck__command.tanga-deck__command:focus-within {
+  border-color: rgba(var(--hud-cyan), 0.6) !important;
+  box-shadow: 0 0 0 1px rgba(var(--hud-cyan), 0.22), 0 0 22px rgba(var(--hud-cyan), 0.16) !important;
+}
+.tanga-deck__data-panel-eyebrow {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+}
+.tanga-deck__data-panel-eyebrow::before {
+  content: "";
+  width: 3px;
+  height: 10px;
+  border-radius: 1px;
+  background: rgba(var(--act, 94, 234, 212), 0.92);
+  box-shadow: 0 0 6px rgba(var(--act, 94, 234, 212), 0.5);
+}
+
+/* ===========================================================================
+   PHASE 21 - VRIFY-style autoplay countdown ring. While autoplay ticks, a thin
+   arc fills around the play button over the dwell time, so you can see the next
+   slide coming. Warm tint (autoplay is the single "live" warm signal). The
+   button remounts per scene, so the ring restarts each slide.
+   =========================================================================== */
+@property --autoplay-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.tanga-deck__pager-play { position: relative; }
+.tanga-deck__pager-play.is-ticking::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg,
+    rgba(var(--deck-accent, 224, 150, 70), 0.95) var(--autoplay-angle),
+    rgba(255, 255, 255, 0.12) 0);
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 61%);
+  mask: radial-gradient(circle, transparent 58%, #000 61%);
+  animation: autoplay-dwell var(--autoplay-dwell, 10s) linear both;
+  pointer-events: none;
+}
+@keyframes autoplay-dwell {
+  from { --autoplay-angle: 0deg; }
+  to   { --autoplay-angle: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__pager-play.is-ticking::after { animation: none; --autoplay-angle: 360deg; }
+}
+
+/* ===========================================================================
+   PHASE 22 - panel reveal sheen. A single, very subtle light sweep across a
+   panel as it docks in (VRIFY/keynote reveal). Uses animated background-position
+   so it stays clipped to the panel and leaves no lingering overlay.
+   =========================================================================== */
+/* The deck panels are already position:absolute (docked), so they are a valid
+   containing block for ::after — do NOT add position:relative here or it breaks
+   their docking. Scope the sheen to those confirmed-positioned panels. */
+.tanga-deck__data-panel::after,
+.tanga-deck__insight-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.07) 50%, transparent 60%);
+  background-size: 300% 100%;
+  background-position: 160% 0;
+  animation: panel-sheen 1.2s var(--ease-hud, ease) 0.2s both;
+}
+@keyframes panel-sheen {
+  from { background-position: 160% 0; }
+  to   { background-position: -60% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__data-panel::after,
+  .tanga-deck__insight-panel::after { animation: none; background: none; }
+}
+
+/* ===========================================================================
+   PHASE 23 - VRIFY-style legend cross-highlight. Hovering a TGC grade in the
+   resource legend isolates that grade's blocks in the 3D model (handled in the
+   Three scene); here we give the legend rows the matching interactive feedback.
+   =========================================================================== */
+.tanga-three__grade-item {
+  cursor: pointer;
+  transition: opacity 180ms var(--ease-hud, ease), transform 180ms var(--ease-hud, ease);
+}
+.tanga-three__grade-item.is-dim {
+  opacity: 0.34;
+}
+.tanga-three__grade-item.is-hovered {
+  transform: translateX(3px);
+}
+.tanga-three__grade-item.is-hovered strong {
+  color: #ffffff;
+}
+.tanga-three__grade-item.is-hovered i {
+  transform: scale(1.18);
+}
+.tanga-three__grade-item i {
+  transition: transform 180ms var(--ease-hud, ease);
+}
+
+/* The grade legend must accept hover (its parent overlay is pointer-events:none
+   so 3D orbit works). Re-enable it so the cross-highlight is interactive. */
+.tanga-three__grade-legend { pointer-events: auto; }
+
+/* The drillhole legend rows that carry a grade key are interactive too. */
+.tanga-three__drill-legend { pointer-events: auto; }
+
+/* Locked grade (click-to-lock) keeps a persistent cyan ring so it reads as a
+   held filter rather than a transient hover. */
+.tanga-three__grade-item.is-locked {
+  box-shadow: inset 0 0 0 1px rgba(var(--hud-cyan), 0.55);
+  border-radius: 6px;
+}
+.tanga-three__grade-item.is-locked strong::after {
+  content: " ·";
+  color: rgba(var(--hud-cyan), 0.9);
+}
+
+/* ===========================================================================
+   PHASE 24 - act interstitial. A brief chapter card when the story crosses into
+   a new act (Opportunity -> Asset -> Value): big numeral, act label, a thin
+   act-tinted rule that draws in, and a one-line thesis. Skippable, auto-clears.
+   =========================================================================== */
+.tanga-deck__act-card {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 50%, rgba(3, 7, 12, 0.72), rgba(3, 7, 12, 0.88));
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: act-card-in 300ms var(--ease-hud, ease) both;
+}
+.tanga-deck__act-card-inner {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 0 24px;
+}
+.tanga-deck__act-card-numeral {
+  font-family: var(--font-display, "Poppins", sans-serif);
+  font-size: clamp(56px, 8vw, 104px);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: 0.04em;
+  color: var(--act-theme, #d96a2a);
+  text-shadow: 0 0 40px color-mix(in srgb, var(--act-theme, #d96a2a) 55%, transparent);
+  animation: act-card-rise 520ms var(--ease-hud, ease) 60ms both;
+}
+.tanga-deck__act-card-label {
+  font-family: var(--font-display, "Poppins", sans-serif);
+  font-size: clamp(18px, 2.2vw, 28px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(245, 250, 255, 0.96);
+  animation: act-card-rise 520ms var(--ease-hud, ease) 140ms both;
+}
+.tanga-deck__act-card-rule {
+  width: min(320px, 52vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--act-theme, #d96a2a), transparent);
+  transform-origin: center;
+  animation: act-card-rule 620ms var(--ease-hud, ease) 200ms both;
+}
+.tanga-deck__act-card-thesis {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(12px, 1.2vw, 15px);
+  color: rgba(198, 214, 232, 0.86);
+  animation: act-card-rise 520ms var(--ease-hud, ease) 260ms both;
+}
+@keyframes act-card-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes act-card-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes act-card-rule { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__act-card,
+  .tanga-deck__act-card-numeral,
+  .tanga-deck__act-card-label,
+  .tanga-deck__act-card-rule,
+  .tanga-deck__act-card-thesis { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+}
+
+/* ===========================================================================
+   PHASE 25 - staged scene reveal. On arrival the overlay choreographs instead
+   of popping: the docked panel lands first, then the pinned place labels, then
+   the callout cards, with their leader lines drawn in last.
+   =========================================================================== */
+.tanga-deck__pin-label {
+  animation-delay: calc(180ms + var(--reveal-i, 0) * 55ms) !important;
+}
+.tanga-deck__callout {
+  animation-delay: calc(340ms + var(--reveal-i, 0) * 80ms) !important;
+}
+.tanga-deck__leader-svg {
+  animation: hud-reveal-fade 420ms var(--ease-hud, ease) 520ms both;
+}
+.tanga-deck__leader-svg--pin {
+  animation: hud-reveal-fade 380ms var(--ease-hud, ease) 300ms both;
+}
+@keyframes hud-reveal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__pin-label,
+  .tanga-deck__callout { animation-delay: 0ms !important; }
+  .tanga-deck__leader-svg,
+  .tanga-deck__leader-svg--pin { animation: none; }
+}
+
+/* ===========================================================================
+   PHASE 26 - semantic scene transitions. Travel now means something: descending
+   into the 3D model sweeps DOWN, pulling back out to the map sweeps UP, and a
+   move between two scenes of the same kind stays a neutral dissolve. Additive
+   pseudo-element sweep, so the existing portal animation is untouched.
+   =========================================================================== */
+.tanga-deck__portal-transition::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    transparent 42%,
+    rgba(var(--hud-cyan), 0.16) 50%,
+    transparent 58%);
+  background-size: 100% 300%;
+  opacity: 0;
+}
+.tanga-deck__portal-transition.is-travel-dive::after {
+  opacity: 1;
+  animation: travel-sweep-down 900ms var(--ease-hud, ease) both;
+}
+.tanga-deck__portal-transition.is-travel-surface::after {
+  opacity: 1;
+  animation: travel-sweep-up 900ms var(--ease-hud, ease) both;
+}
+@keyframes travel-sweep-down {
+  from { background-position: 0 -100%; }
+  to   { background-position: 0 200%; }
+}
+@keyframes travel-sweep-up {
+  from { background-position: 0 200%; }
+  to   { background-position: 0 -100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__portal-transition::after { animation: none !important; opacity: 0 !important; }
+}

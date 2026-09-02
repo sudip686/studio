@@ -4,6 +4,10 @@ import {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import proj4 from 'proj4';
 import {LITHOLOGY_COLOR_MAP} from '@/lib/boreholes/colors';
 
@@ -71,6 +75,9 @@ type ThreeLegendItem = {
   label: string;
   detail: string;
   tone: string;
+  // When set, hovering this legend row cross-highlights that grade population
+  // in the 3D model (matches the `assay-<key>` / `resource-grade-<key>` meshes).
+  binKey?: string;
 };
 
 type SurfaceCameraView = 'default' | 'top' | 'bottom';
@@ -692,15 +699,15 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
   }
   if (mode === 'subsurface') {
     return [
-      {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff'},
+      {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff', binKey: 'very-high'},
       {label: 'GRSC lithology', detail: 'Host-unit sleeve around traces', tone: '#2dd4bf'},
       {label: 'Collars', detail: 'One collar per drillhole on surface', tone: '#eaffff'},
     ];
   }
   return [
-    {label: '>8% TGC', detail: 'Very high assay interval', tone: '#9d00ff'},
-    {label: '6-8% TGC', detail: 'High assay interval', tone: '#ff1616'},
-    {label: '3-6% TGC', detail: 'Mineralised assay interval', tone: '#ff9f0a'},
+    {label: '>8% TGC', detail: 'Very high assay interval', tone: '#9d00ff', binKey: 'very-high'},
+    {label: '6-8% TGC', detail: 'High assay interval', tone: '#ff1616', binKey: 'high'},
+    {label: '3-6% TGC', detail: 'Mineralised assay interval', tone: '#ff9f0a', binKey: 'medium'},
     {label: 'Collars', detail: 'Surface start points', tone: '#eaffff'},
   ];
 }
@@ -1250,10 +1257,19 @@ export default function TangaThreeGeologyScene({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
+  // Terrain surface materials, shared with the legend cross-highlight so the
+  // ground can fade back ("x-ray") and reveal the isolated subsurface grade.
+  const terrainMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const rotationKeyRef = useRef(rotationKey);
   const cameraCommandRef = useRef<ThreeCameraCommand | null>(cameraCommand ?? null);
   const cameraCommandHandlerRef = useRef<((command: ThreeCameraCommand) => void) | null>(null);
   const consumedCameraCommandIdRef = useRef(0);
+  // VRIFY-style legend cross-highlight: hovering a TGC grade isolates that
+  // grade in the model; clicking LOCKS the isolation so you can orbit with one
+  // population shown. Hover previews over an active lock.
+  const [hoveredGrade, setHoveredGrade] = useState<string | null>(null);
+  const [lockedGrade, setLockedGrade] = useState<string | null>(null);
+  const activeGrade = hoveredGrade ?? lockedGrade;
   const [status, setStatus] = useState('Preparing geology scene');
   const [projectedFrame, setProjectedFrame] = useState<ProjectedCalloutFrame>({width: 0, height: 0, items: []});
   const [navInstrument, setNavInstrument] = useState<ThreeNavInstrument>(DEFAULT_NAV_INSTRUMENT);
@@ -1421,6 +1437,7 @@ export default function TangaThreeGeologyScene({
     const calloutsForProjection = threeCallouts(mode, resourceFocus);
     const calloutAnchors = new Map<string, THREE.Vector3>();
     const terrainSurfaceMaterials: THREE.MeshStandardMaterial[] = [];
+    terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
       const opacity = terrainOpacityForView(mode, surfaceCameraView);
@@ -2488,11 +2505,34 @@ export default function TangaThreeGeologyScene({
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
+    // ── Bloom (VRIFY-style emissive glow) ────────────────────────────────────
+    // The high-grade assay drillholes, collars and block-model cells already
+    // carry strong emissive materials; a high-threshold UnrealBloom pass makes
+    // only those bright elements glow, leaving the terrain/imagery untouched.
+    // Kept cheap: threshold 0.82 (few pixels qualify), modest strength/radius,
+    // and OutputPass carries the ACES tonemapping + sRGB the direct render did.
+    const composer = new EffectComposer(renderer);
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(host.clientWidth, host.clientHeight);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(host.clientWidth, host.clientHeight),
+      0.34, // strength — a soft halo, not a blob
+      0.4,  // radius — tight so glow hugs the source
+      0.92  // threshold — only the very brightest emissive cores bloom
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
     const resize = () => {
       if (!hostRef.current) return;
-      camera.aspect = hostRef.current.clientWidth / hostRef.current.clientHeight;
+      const w = hostRef.current.clientWidth;
+      const h = hostRef.current.clientHeight;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(hostRef.current.clientWidth, hostRef.current.clientHeight);
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
+      bloomPass.setSize(w, h);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -2744,7 +2784,7 @@ export default function TangaThreeGeologyScene({
         projectCallouts();
         updateNavInstruments();
       }
-      renderer.render(scene, camera);
+      composer.render();
       frame = requestAnimationFrame(animate);
     };
     animate();
@@ -2758,6 +2798,7 @@ export default function TangaThreeGeologyScene({
       controls.removeEventListener('start', onControlStart);
       controls.removeEventListener('end', onControlEnd);
       controls.dispose();
+      composer.dispose();
       disposeObject(scene);
       renderer.dispose();
       renderer.domElement.remove();
@@ -2768,6 +2809,58 @@ export default function TangaThreeGeologyScene({
       }
     };
   }, [assetQuality, cameraDropKey, mode, onLoadState, resourceFocus, visible]);
+
+  // Apply the legend cross-highlight: fade every grade block that isn't the
+  // hovered TGC grade back, so the hovered population stands alone in the model.
+  // The animate loop renders continuously, so opacity changes show immediately.
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    const DIM = 0.045;
+    group.traverse((obj) => {
+      const name = (obj as THREE.Object3D).name || '';
+      // Grade blocks AND drillhole assay intervals share the grade keys, so both
+      // isolate on hover — whichever the current camera can see reacts.
+      if (!name.startsWith('resource-grade-') && !name.startsWith('assay-')) return;
+      const mesh = obj as THREE.Mesh;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const key = name.replace('resource-grade-', '').replace('assay-', '').replace('-wire', '');
+      materials.forEach((raw) => {
+        const material = raw as THREE.Material & {opacity: number};
+        if (material.userData.baseOpacity === undefined) material.userData.baseOpacity = material.opacity;
+        const base = material.userData.baseOpacity as number;
+        material.transparent = true;
+        material.opacity = !activeGrade || key === activeGrade ? base : Math.min(base, DIM);
+      });
+    });
+
+    // "X-ray": fade the ground back while a grade is isolated so the subsurface
+    // population actually reads, then restore the surface exactly as it was.
+    terrainMaterialsRef.current.forEach((material) => {
+      if (material.userData.baseTerrain === undefined) {
+        material.userData.baseTerrain = {opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite};
+      }
+      const base = material.userData.baseTerrain as {opacity: number; transparent: boolean; depthWrite: boolean};
+      if (activeGrade) {
+        // Ghost, don't erase: keep enough surface for spatial context while the
+        // subsurface population reads through it.
+        material.transparent = true;
+        material.opacity = 0.24;
+        material.depthWrite = false;
+      } else {
+        material.transparent = base.transparent;
+        material.opacity = base.opacity;
+        material.depthWrite = base.depthWrite;
+      }
+      material.needsUpdate = true;
+    });
+  }, [activeGrade]);
+
+  // Clear any isolation when the scene changes, so a lock never leaks between scenes.
+  useEffect(() => {
+    setHoveredGrade(null);
+    setLockedGrade(null);
+  }, [mode, resourceFocus]);
 
   const callouts = threeCallouts(mode, resourceFocus);
   const legendItems = drillholeLegend(mode);
@@ -2905,7 +2998,19 @@ export default function TangaThreeGeologyScene({
             )}
             <ol>
               {legendItems.map((item) => (
-                <li key={`${item.label}-${item.detail}`}>
+                <li
+                  key={`${item.label}-${item.detail}`}
+                  className={classNames(
+                    item.binKey && 'tanga-three__grade-item',
+                    item.binKey && activeGrade === item.binKey && 'is-hovered',
+                    item.binKey && lockedGrade === item.binKey && 'is-locked',
+                    item.binKey && activeGrade && activeGrade !== item.binKey && 'is-dim'
+                  )}
+                  title={item.binKey ? 'Click to lock this grade' : undefined}
+                  onPointerEnter={item.binKey ? () => setHoveredGrade(item.binKey!) : undefined}
+                  onPointerLeave={item.binKey ? () => setHoveredGrade((current) => (current === item.binKey ? null : current)) : undefined}
+                  onClick={item.binKey ? () => setLockedGrade((current) => (current === item.binKey ? null : item.binKey!)) : undefined}
+                >
                   <i style={{backgroundColor: item.tone, boxShadow: `0 0 18px ${item.tone}`}} />
                   <span>
                     <strong>{item.label}</strong>
@@ -2948,9 +3053,21 @@ export default function TangaThreeGeologyScene({
             <strong>{resourceFocusLabel(resourceFocus)} view</strong>
           </div>
           <div className="tanga-three__grade-ramp" aria-hidden="true" />
-          <ol>
+          <ol className="tanga-three__grade-list">
             {TGC_GRADE_BINS.map((bin) => (
-              <li key={bin.label}>
+              <li
+                key={bin.label}
+                className={classNames(
+                  'tanga-three__grade-item',
+                  activeGrade === bin.key && 'is-hovered',
+                  lockedGrade === bin.key && 'is-locked',
+                  activeGrade && activeGrade !== bin.key && 'is-dim'
+                )}
+                title="Click to lock this grade"
+                onPointerEnter={() => setHoveredGrade(bin.key)}
+                onPointerLeave={() => setHoveredGrade((current) => (current === bin.key ? null : current))}
+                onClick={() => setLockedGrade((current) => (current === bin.key ? null : bin.key))}
+              >
                 <i style={{backgroundColor: bin.color, boxShadow: `0 0 20px ${bin.color}`}} />
                 <span>
                   <strong>{bin.label}</strong>
