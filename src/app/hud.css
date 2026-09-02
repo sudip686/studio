@@ -1172,3 +1172,37 @@ html, body { overflow-x: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .tanga-deck__portal-transition::after { animation: none !important; opacity: 0 !important; }
 }
+
+/* ===========================================================================
+   PHASE 27 - metallurgy KPI strip. The 4 recovery/purity stat cards were
+   right-docked at the same coordinates as the SOURCE DATA panel, so ~254px of
+   them (oxide + fresh recovery, the TDM004 outlier) sat hidden behind it.
+   Re-lay them as a bottom KPI strip, clear of the pager, drill legend and HUD.
+   =========================================================================== */
+.tanga-three__metallurgy,
+.tanga-three.is-metallurgy .tanga-three__metallurgy {
+  top: auto !important;
+  bottom: clamp(14px, 2.2vh, 22px) !important;
+  right: clamp(20px, 2vw, 28px) !important;
+  left: clamp(348px, 28vw, 380px) !important;
+  width: auto !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+.tanga-three__metallurgy div {
+  min-height: 0 !important;
+  padding: 9px 12px 12px !important;
+  gap: 2px !important;
+}
+.tanga-three__metallurgy strong { font-size: clamp(18px, 1.6vw, 23px) !important; }
+.tanga-three__metallurgy small { font-size: 10px !important; }
+
+/* Below the width where a 4-across strip would crush, drop to two rows. */
+@media (max-width: 1120px) {
+  .tanga-three__metallurgy,
+  .tanga-three.is-metallurgy .tanga-three__metallurgy {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    left: auto !important;
+    width: min(360px, 34vw) !important;
+  }
+}
