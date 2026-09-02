@@ -1817,6 +1817,12 @@ export default function TangaDeckWorkbench() {
   // Timestamp of the last user camera gesture (or scene change) — the idle
   // slow-orbit only kicks in once the camera has been still for a beat.
   const lastCameraInteractRef = useRef<number>(0);
+  // When a programmatic fly-to is running, deck animates it internally. Writing
+  // its interpolated view state back to us (without the transition props) would
+  // CANCEL the flight — which silently killed every camera move in production
+  // builds. We record when the flight should end and ignore deck's echo until
+  // then, unless the user grabs the camera.
+  const flightUntilRef = useRef<number>(0);
   const [commandText, setCommandText] = useState('');
   const [statusText, setStatusText] = useState('Peer ranking ready');
   const [pipeline, setPipeline] = useState('Text/voice -> intent -> map action');
@@ -2048,6 +2054,7 @@ export default function TangaDeckWorkbench() {
 
   const flyTo = useCallback((mode: WorkbenchMode, bearingOverride?: number) => {
     const target = VIEW_STATES[mode];
+    flightUntilRef.current = performance.now() + 2400 + 120;
     setViewState({
       ...target,
       bearing: bearingOverride ?? target.bearing,
@@ -2118,6 +2125,7 @@ export default function TangaDeckWorkbench() {
     }
 
     const nextBearing = (viewState.bearing + 90) % 360;
+    flightUntilRef.current = performance.now() + 1500 + 120;
     setViewState({
       ...viewState,
       bearing: nextBearing,
@@ -2161,6 +2169,7 @@ export default function TangaDeckWorkbench() {
       return;
     }
 
+    flightUntilRef.current = performance.now() + 1500 + 120;
     setViewState((current) => {
       const next: DeckViewState = {
         ...current,
@@ -4172,10 +4181,23 @@ export default function TangaDeckWorkbench() {
           effects={[TANGA_LIGHTING]}
           useDevicePixels={1}
           onViewStateChange={({viewState: nextViewState, interactionState}: any) => {
-            // A real user gesture pauses the idle orbit; it resumes after settle.
-            if (interactionState && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)) {
+            const userGesture = Boolean(
+              interactionState
+              && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)
+            );
+            // A real user gesture pauses the idle orbit; it resumes after settle,
+            // and it always wins over an in-flight camera move.
+            if (userGesture) {
               lastCameraInteractRef.current = performance.now();
+              flightUntilRef.current = 0;
+              setViewState(nextViewState as DeckViewState);
+              return;
             }
+            // Otherwise this is deck echoing its own interpolated fly-to. Writing
+            // it back strips the transition props and CANCELS the flight (this
+            // silently broke every camera move in production builds), so ignore
+            // it until the flight window closes.
+            if (interactionState?.inTransition || performance.now() < flightUntilRef.current) return;
             setViewState(nextViewState as DeckViewState);
           }}
           onClick={handleDeckClick}
