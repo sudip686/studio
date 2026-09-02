@@ -1037,3 +1037,72 @@ html, body { overflow-x: hidden; }
   content: " ·";
   color: rgba(var(--hud-cyan), 0.9);
 }
+
+/* ===========================================================================
+   PHASE 24 - act interstitial. A brief chapter card when the story crosses into
+   a new act (Opportunity -> Asset -> Value): big numeral, act label, a thin
+   act-tinted rule that draws in, and a one-line thesis. Skippable, auto-clears.
+   =========================================================================== */
+.tanga-deck__act-card {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 50%, rgba(3, 7, 12, 0.72), rgba(3, 7, 12, 0.88));
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: act-card-in 300ms var(--ease-hud, ease) both;
+}
+.tanga-deck__act-card-inner {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 0 24px;
+}
+.tanga-deck__act-card-numeral {
+  font-family: var(--font-display, "Poppins", sans-serif);
+  font-size: clamp(56px, 8vw, 104px);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: 0.04em;
+  color: var(--act-theme, #d96a2a);
+  text-shadow: 0 0 40px color-mix(in srgb, var(--act-theme, #d96a2a) 55%, transparent);
+  animation: act-card-rise 520ms var(--ease-hud, ease) 60ms both;
+}
+.tanga-deck__act-card-label {
+  font-family: var(--font-display, "Poppins", sans-serif);
+  font-size: clamp(18px, 2.2vw, 28px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(245, 250, 255, 0.96);
+  animation: act-card-rise 520ms var(--ease-hud, ease) 140ms both;
+}
+.tanga-deck__act-card-rule {
+  width: min(320px, 52vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--act-theme, #d96a2a), transparent);
+  transform-origin: center;
+  animation: act-card-rule 620ms var(--ease-hud, ease) 200ms both;
+}
+.tanga-deck__act-card-thesis {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(12px, 1.2vw, 15px);
+  color: rgba(198, 214, 232, 0.86);
+  animation: act-card-rise 520ms var(--ease-hud, ease) 260ms both;
+}
+@keyframes act-card-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes act-card-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes act-card-rule { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__act-card,
+  .tanga-deck__act-card-numeral,
+  .tanga-deck__act-card-label,
+  .tanga-deck__act-card-rule,
+  .tanga-deck__act-card-thesis { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+}

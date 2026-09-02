@@ -607,11 +607,11 @@ const STORY_STEPS: StoryStep[] = [
 
 // ── Three-act story structure — gives the deck a narrative arc so every
 // scene visibly advances toward the investment case. ─────────────────────
-type StoryAct = {id: string; label: string; theme: string};
+type StoryAct = {id: string; label: string; theme: string; numeral: string; thesis: string};
 const STORY_ACTS: StoryAct[] = [
-  {id: 'opportunity', label: 'The Opportunity', theme: '#8fb4d6'},
-  {id: 'asset', label: 'The Asset', theme: '#d96a2a'},
-  {id: 'value', label: 'The Value', theme: '#e0a94f'},
+  {id: 'opportunity', label: 'The Opportunity', theme: '#8fb4d6', numeral: 'I', thesis: 'A large flake-graphite asset in a proven province.'},
+  {id: 'asset', label: 'The Asset', theme: '#d96a2a', numeral: 'II', thesis: 'Drill-defined, JORC-compliant, and fully owned.'},
+  {id: 'value', label: 'The Value', theme: '#e0a94f', numeral: 'III', thesis: 'Coarse flake, low strip, and a route to market.'},
 ];
 const MODE_ACT: Record<WorkbenchMode, string> = {
   ranking: 'opportunity',
@@ -3803,6 +3803,10 @@ export default function TangaDeckWorkbench() {
   // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
   // the ranking underneath (it does NOT advance — scene 1 is the peer field).
   const [coverDismissed, setCoverDismissed] = useState(false);
+  // Act interstitial — a brief chapter card when the story crosses into a new
+  // act (Opportunity → Asset → Value). Never on first mount or behind the cover.
+  const [actCard, setActCard] = useState<StoryAct | null>(null);
+  const lastActRef = useRef<string | null>(null);
   const showCover = activeStoryIndex === 0 && !coverDismissed;
   const isCoverScene = showCover;
   // Scenes without a source-data table still get a panel — key insight chips
@@ -3971,6 +3975,33 @@ export default function TangaDeckWorkbench() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [activeMode, threeVisible, isCoverScene]);
+
+  // Fire the act interstitial on an act crossing. It overlays the incoming
+  // scene while its camera flies in, then dissolves. Always skippable.
+  useEffect(() => {
+    const act = MODE_ACT[activeMode];
+    const previous = lastActRef.current;
+    lastActRef.current = act;
+    if (previous === null || previous === act) return;   // first mount / same act
+    if (showCover) return;
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const next = STORY_ACTS.find((a) => a.id === act) ?? null;
+    setActCard(next);
+    const timer = window.setTimeout(() => setActCard(null), reduce ? 700 : 1900);
+    return () => window.clearTimeout(timer);
+  }, [activeMode, showCover]);
+
+  // Any click or key dismisses the act card immediately.
+  useEffect(() => {
+    if (!actCard) return;
+    const dismiss = () => setActCard(null);
+    window.addEventListener('keydown', dismiss);
+    window.addEventListener('pointerdown', dismiss);
+    return () => {
+      window.removeEventListener('keydown', dismiss);
+      window.removeEventListener('pointerdown', dismiss);
+    };
+  }, [actCard]);
 
   const toggleAutoplay = useCallback(() => setIsAutoplay((prev) => !prev), []);
   const toggleBlackout = useCallback(() => setIsBlackout((prev) => !prev), []);
@@ -4475,6 +4506,23 @@ export default function TangaDeckWorkbench() {
             <span className="tanga-deck__cover-hint">Press &rarr; or click to begin</span>
           </div>
         </div>
+      )}
+
+      {actCard && (
+        <section
+          className="tanga-deck__act-card"
+          style={{'--act-theme': actCard.theme} as any}
+          role="status"
+          aria-live="polite"
+          aria-label={`Act ${actCard.numeral}: ${actCard.label}`}
+        >
+          <div className="tanga-deck__act-card-inner">
+            <span className="tanga-deck__act-card-numeral" aria-hidden="true">{actCard.numeral}</span>
+            <strong className="tanga-deck__act-card-label">{actCard.label}</strong>
+            <span className="tanga-deck__act-card-rule" aria-hidden="true" />
+            <p className="tanga-deck__act-card-thesis">{actCard.thesis}</p>
+          </div>
+        </section>
       )}
 
       {/* Closing CTA card — on the final scene. */}
