@@ -994,3 +994,32 @@ html, body { overflow-x: hidden; }
   .tanga-deck__data-panel::after,
   .tanga-deck__insight-panel::after { animation: none; background: none; }
 }
+
+/* ===========================================================================
+   PHASE 23 - VRIFY-style legend cross-highlight. Hovering a TGC grade in the
+   resource legend isolates that grade's blocks in the 3D model (handled in the
+   Three scene); here we give the legend rows the matching interactive feedback.
+   =========================================================================== */
+.tanga-three__grade-item {
+  cursor: pointer;
+  transition: opacity 180ms var(--ease-hud, ease), transform 180ms var(--ease-hud, ease);
+}
+.tanga-three__grade-item.is-dim {
+  opacity: 0.34;
+}
+.tanga-three__grade-item.is-hovered {
+  transform: translateX(3px);
+}
+.tanga-three__grade-item.is-hovered strong {
+  color: #ffffff;
+}
+.tanga-three__grade-item.is-hovered i {
+  transform: scale(1.18);
+}
+.tanga-three__grade-item i {
+  transition: transform 180ms var(--ease-hud, ease);
+}
+
+/* The grade legend must accept hover (its parent overlay is pointer-events:none
+   so 3D orbit works). Re-enable it so the cross-highlight is interactive. */
+.tanga-three__grade-legend { pointer-events: auto; }

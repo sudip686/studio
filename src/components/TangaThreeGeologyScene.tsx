@@ -1258,6 +1258,9 @@ export default function TangaThreeGeologyScene({
   const cameraCommandRef = useRef<ThreeCameraCommand | null>(cameraCommand ?? null);
   const cameraCommandHandlerRef = useRef<((command: ThreeCameraCommand) => void) | null>(null);
   const consumedCameraCommandIdRef = useRef(0);
+  // VRIFY-style legend cross-highlight: hovering a TGC grade in the legend
+  // isolates that grade's blocks in the model (others fade back).
+  const [hoveredGrade, setHoveredGrade] = useState<string | null>(null);
   const [status, setStatus] = useState('Preparing geology scene');
   const [projectedFrame, setProjectedFrame] = useState<ProjectedCalloutFrame>({width: 0, height: 0, items: []});
   const [navInstrument, setNavInstrument] = useState<ThreeNavInstrument>(DEFAULT_NAV_INSTRUMENT);
@@ -2797,6 +2800,31 @@ export default function TangaThreeGeologyScene({
     };
   }, [assetQuality, cameraDropKey, mode, onLoadState, resourceFocus, visible]);
 
+  // Apply the legend cross-highlight: fade every grade block that isn't the
+  // hovered TGC grade back, so the hovered population stands alone in the model.
+  // The animate loop renders continuously, so opacity changes show immediately.
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    const DIM = 0.045;
+    group.traverse((obj) => {
+      const name = (obj as THREE.Object3D).name || '';
+      // Grade blocks AND drillhole assay intervals share the grade keys, so both
+      // isolate on hover — whichever the current camera can see reacts.
+      if (!name.startsWith('resource-grade-') && !name.startsWith('assay-')) return;
+      const mesh = obj as THREE.Mesh;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const key = name.replace('resource-grade-', '').replace('assay-', '').replace('-wire', '');
+      materials.forEach((raw) => {
+        const material = raw as THREE.Material & {opacity: number};
+        if (material.userData.baseOpacity === undefined) material.userData.baseOpacity = material.opacity;
+        const base = material.userData.baseOpacity as number;
+        material.transparent = true;
+        material.opacity = !hoveredGrade || key === hoveredGrade ? base : Math.min(base, DIM);
+      });
+    });
+  }, [hoveredGrade]);
+
   const callouts = threeCallouts(mode, resourceFocus);
   const legendItems = drillholeLegend(mode);
   const compassBearing = navInstrument.northAngleDeg;
@@ -2976,9 +3004,18 @@ export default function TangaThreeGeologyScene({
             <strong>{resourceFocusLabel(resourceFocus)} view</strong>
           </div>
           <div className="tanga-three__grade-ramp" aria-hidden="true" />
-          <ol>
+          <ol className="tanga-three__grade-list">
             {TGC_GRADE_BINS.map((bin) => (
-              <li key={bin.label}>
+              <li
+                key={bin.label}
+                className={classNames(
+                  'tanga-three__grade-item',
+                  hoveredGrade === bin.key && 'is-hovered',
+                  hoveredGrade && hoveredGrade !== bin.key && 'is-dim'
+                )}
+                onPointerEnter={() => setHoveredGrade(bin.key)}
+                onPointerLeave={() => setHoveredGrade((current) => (current === bin.key ? null : current))}
+              >
                 <i style={{backgroundColor: bin.color, boxShadow: `0 0 20px ${bin.color}`}} />
                 <span>
                   <strong>{bin.label}</strong>
