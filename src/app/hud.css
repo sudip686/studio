@@ -1026,3 +1026,14 @@ html, body { overflow-x: hidden; }
 
 /* The drillhole legend rows that carry a grade key are interactive too. */
 .tanga-three__drill-legend { pointer-events: auto; }
+
+/* Locked grade (click-to-lock) keeps a persistent cyan ring so it reads as a
+   held filter rather than a transient hover. */
+.tanga-three__grade-item.is-locked {
+  box-shadow: inset 0 0 0 1px rgba(var(--hud-cyan), 0.55);
+  border-radius: 6px;
+}
+.tanga-three__grade-item.is-locked strong::after {
+  content: " ·";
+  color: rgba(var(--hud-cyan), 0.9);
+}

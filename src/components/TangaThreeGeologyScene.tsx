@@ -1257,13 +1257,19 @@ export default function TangaThreeGeologyScene({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
+  // Terrain surface materials, shared with the legend cross-highlight so the
+  // ground can fade back ("x-ray") and reveal the isolated subsurface grade.
+  const terrainMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const rotationKeyRef = useRef(rotationKey);
   const cameraCommandRef = useRef<ThreeCameraCommand | null>(cameraCommand ?? null);
   const cameraCommandHandlerRef = useRef<((command: ThreeCameraCommand) => void) | null>(null);
   const consumedCameraCommandIdRef = useRef(0);
-  // VRIFY-style legend cross-highlight: hovering a TGC grade in the legend
-  // isolates that grade's blocks in the model (others fade back).
+  // VRIFY-style legend cross-highlight: hovering a TGC grade isolates that
+  // grade in the model; clicking LOCKS the isolation so you can orbit with one
+  // population shown. Hover previews over an active lock.
   const [hoveredGrade, setHoveredGrade] = useState<string | null>(null);
+  const [lockedGrade, setLockedGrade] = useState<string | null>(null);
+  const activeGrade = hoveredGrade ?? lockedGrade;
   const [status, setStatus] = useState('Preparing geology scene');
   const [projectedFrame, setProjectedFrame] = useState<ProjectedCalloutFrame>({width: 0, height: 0, items: []});
   const [navInstrument, setNavInstrument] = useState<ThreeNavInstrument>(DEFAULT_NAV_INSTRUMENT);
@@ -1431,6 +1437,7 @@ export default function TangaThreeGeologyScene({
     const calloutsForProjection = threeCallouts(mode, resourceFocus);
     const calloutAnchors = new Map<string, THREE.Vector3>();
     const terrainSurfaceMaterials: THREE.MeshStandardMaterial[] = [];
+    terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
       const opacity = terrainOpacityForView(mode, surfaceCameraView);
@@ -2823,10 +2830,37 @@ export default function TangaThreeGeologyScene({
         if (material.userData.baseOpacity === undefined) material.userData.baseOpacity = material.opacity;
         const base = material.userData.baseOpacity as number;
         material.transparent = true;
-        material.opacity = !hoveredGrade || key === hoveredGrade ? base : Math.min(base, DIM);
+        material.opacity = !activeGrade || key === activeGrade ? base : Math.min(base, DIM);
       });
     });
-  }, [hoveredGrade]);
+
+    // "X-ray": fade the ground back while a grade is isolated so the subsurface
+    // population actually reads, then restore the surface exactly as it was.
+    terrainMaterialsRef.current.forEach((material) => {
+      if (material.userData.baseTerrain === undefined) {
+        material.userData.baseTerrain = {opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite};
+      }
+      const base = material.userData.baseTerrain as {opacity: number; transparent: boolean; depthWrite: boolean};
+      if (activeGrade) {
+        // Ghost, don't erase: keep enough surface for spatial context while the
+        // subsurface population reads through it.
+        material.transparent = true;
+        material.opacity = 0.24;
+        material.depthWrite = false;
+      } else {
+        material.transparent = base.transparent;
+        material.opacity = base.opacity;
+        material.depthWrite = base.depthWrite;
+      }
+      material.needsUpdate = true;
+    });
+  }, [activeGrade]);
+
+  // Clear any isolation when the scene changes, so a lock never leaks between scenes.
+  useEffect(() => {
+    setHoveredGrade(null);
+    setLockedGrade(null);
+  }, [mode, resourceFocus]);
 
   const callouts = threeCallouts(mode, resourceFocus);
   const legendItems = drillholeLegend(mode);
@@ -2968,11 +3002,14 @@ export default function TangaThreeGeologyScene({
                   key={`${item.label}-${item.detail}`}
                   className={classNames(
                     item.binKey && 'tanga-three__grade-item',
-                    item.binKey && hoveredGrade === item.binKey && 'is-hovered',
-                    item.binKey && hoveredGrade && hoveredGrade !== item.binKey && 'is-dim'
+                    item.binKey && activeGrade === item.binKey && 'is-hovered',
+                    item.binKey && lockedGrade === item.binKey && 'is-locked',
+                    item.binKey && activeGrade && activeGrade !== item.binKey && 'is-dim'
                   )}
+                  title={item.binKey ? 'Click to lock this grade' : undefined}
                   onPointerEnter={item.binKey ? () => setHoveredGrade(item.binKey!) : undefined}
                   onPointerLeave={item.binKey ? () => setHoveredGrade((current) => (current === item.binKey ? null : current)) : undefined}
+                  onClick={item.binKey ? () => setLockedGrade((current) => (current === item.binKey ? null : item.binKey!)) : undefined}
                 >
                   <i style={{backgroundColor: item.tone, boxShadow: `0 0 18px ${item.tone}`}} />
                   <span>
@@ -3022,11 +3059,14 @@ export default function TangaThreeGeologyScene({
                 key={bin.label}
                 className={classNames(
                   'tanga-three__grade-item',
-                  hoveredGrade === bin.key && 'is-hovered',
-                  hoveredGrade && hoveredGrade !== bin.key && 'is-dim'
+                  activeGrade === bin.key && 'is-hovered',
+                  lockedGrade === bin.key && 'is-locked',
+                  activeGrade && activeGrade !== bin.key && 'is-dim'
                 )}
+                title="Click to lock this grade"
                 onPointerEnter={() => setHoveredGrade(bin.key)}
                 onPointerLeave={() => setHoveredGrade((current) => (current === bin.key ? null : current))}
+                onClick={() => setLockedGrade((current) => (current === bin.key ? null : bin.key))}
               >
                 <i style={{backgroundColor: bin.color, boxShadow: `0 0 20px ${bin.color}`}} />
                 <span>
