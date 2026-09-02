@@ -931,3 +931,36 @@ html, body { overflow-x: hidden; }
   background: rgba(var(--act, 94, 234, 212), 0.92);
   box-shadow: 0 0 6px rgba(var(--act, 94, 234, 212), 0.5);
 }
+
+/* ===========================================================================
+   PHASE 21 - VRIFY-style autoplay countdown ring. While autoplay ticks, a thin
+   arc fills around the play button over the dwell time, so you can see the next
+   slide coming. Warm tint (autoplay is the single "live" warm signal). The
+   button remounts per scene, so the ring restarts each slide.
+   =========================================================================== */
+@property --autoplay-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.tanga-deck__pager-play { position: relative; }
+.tanga-deck__pager-play.is-ticking::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg,
+    rgba(var(--deck-accent, 224, 150, 70), 0.95) var(--autoplay-angle),
+    rgba(255, 255, 255, 0.12) 0);
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 61%);
+  mask: radial-gradient(circle, transparent 58%, #000 61%);
+  animation: autoplay-dwell var(--autoplay-dwell, 10s) linear both;
+  pointer-events: none;
+}
+@keyframes autoplay-dwell {
+  from { --autoplay-angle: 0deg; }
+  to   { --autoplay-angle: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__pager-play.is-ticking::after { animation: none; --autoplay-angle: 360deg; }
+}
