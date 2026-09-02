@@ -968,14 +968,22 @@ function deckHeightAt(lon: number, lat: number) {
   return reliefHeightAt(lon, lat);
 }
 
+// Desaturated, luminance-led elevation ramp. The old saturated teal/green stops
+// laid a murky colour film over the satellite imagery and fought the analytical
+// hillshade; this reads as elevation *shading* — cool deep valleys through
+// neutral mid-slopes to warm ivory ridges — and lets the imagery and relief
+// carry the detail underneath.
 const TERRAIN_HYPSO_STOPS: Array<[number, [number, number, number]]> = [
-  [32, [38, 86, 116]],    // valleys — cool slate
-  [200, [44, 128, 118]],  // teal lowland
-  [340, [92, 150, 92]],   // green foothills
-  [500, [168, 148, 92]],  // tan slopes
-  [680, [204, 168, 112]], // warm ridges
-  [900, [234, 216, 188]], // high peaks — pale
+  [32, [72, 92, 112]],    // valleys — cool grey-blue
+  [200, [104, 120, 128]], // lowland
+  [340, [140, 146, 142]], // neutral mid-slope
+  [500, [180, 172, 156]], // warm stone
+  [680, [214, 200, 176]], // light ridge
+  [900, [244, 236, 220]], // crest — ivory
 ];
+// The tint is a *shading* layer, not a paint layer — keep it light enough that
+// the satellite imagery and the hillshade below stay legible.
+const TERRAIN_TINT_ALPHA = 104;
 
 // ── Golden-hour sun rig (geolibre / VRIFY look) ──────────────────────────────
 // A single warm, low-angle key light. Azimuth is measured clockwise from north
@@ -1073,11 +1081,11 @@ function terrainColor(elevation: number): [number, number, number, number] {
         Math.round(c0[0] + (c1[0] - c0[0]) * t),
         Math.round(c0[1] + (c1[1] - c0[1]) * t),
         Math.round(c0[2] + (c1[2] - c0[2]) * t),
-        150,
+        TERRAIN_TINT_ALPHA,
       ];
     }
   }
-  return [last[1][0], last[1][1], last[1][2], 150];
+  return [last[1][0], last[1][1], last[1][2], TERRAIN_TINT_ALPHA];
 }
 
 function terrainPresentationElevation(
@@ -3006,13 +3014,13 @@ export default function TangaDeckWorkbench() {
         // a crisp bright core outline so it reads as the hero of the slide, not
         // a faint thin line lost on the terrain.
         getFillColor: (feature) => isProjectLayer(feature)
-          ? [240, 152, 72, activeMode === 'project' ? 64 : 44]
+          ? [240, 152, 72, activeMode === 'project' ? 58 : 40]
           : [250, 204, 21, 8],
-        getLineColor: (feature) => isProjectLayer(feature) ? [255, 236, 205, 255] : [255, 236, 179, 220],
-        getLineWidth: (feature) => isProjectLayer(feature) ? 3.4 : 2,
+        getLineColor: (feature) => isProjectLayer(feature) ? [255, 244, 224, 255] : [255, 236, 179, 220],
+        getLineWidth: (feature) => isProjectLayer(feature) ? 4.6 : 2,
         lineWidthUnits: 'pixels' as any,
-        lineWidthMinPixels: 2,
-        lineWidthMaxPixels: 5,
+        lineWidthMinPixels: 3,
+        lineWidthMaxPixels: 7,
         parameters: {depthTest: false} as any,
       }),
       // Layer 4: the area label — "6.4 sq km · 100% owned" at the polygon
