@@ -1023,3 +1023,6 @@ html, body { overflow-x: hidden; }
 /* The grade legend must accept hover (its parent overlay is pointer-events:none
    so 3D orbit works). Re-enable it so the cross-highlight is interactive. */
 .tanga-three__grade-legend { pointer-events: auto; }
+
+/* The drillhole legend rows that carry a grade key are interactive too. */
+.tanga-three__drill-legend { pointer-events: auto; }

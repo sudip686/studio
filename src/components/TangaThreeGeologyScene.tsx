@@ -75,6 +75,9 @@ type ThreeLegendItem = {
   label: string;
   detail: string;
   tone: string;
+  // When set, hovering this legend row cross-highlights that grade population
+  // in the 3D model (matches the `assay-<key>` / `resource-grade-<key>` meshes).
+  binKey?: string;
 };
 
 type SurfaceCameraView = 'default' | 'top' | 'bottom';
@@ -696,15 +699,15 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
   }
   if (mode === 'subsurface') {
     return [
-      {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff'},
+      {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff', binKey: 'very-high'},
       {label: 'GRSC lithology', detail: 'Host-unit sleeve around traces', tone: '#2dd4bf'},
       {label: 'Collars', detail: 'One collar per drillhole on surface', tone: '#eaffff'},
     ];
   }
   return [
-    {label: '>8% TGC', detail: 'Very high assay interval', tone: '#9d00ff'},
-    {label: '6-8% TGC', detail: 'High assay interval', tone: '#ff1616'},
-    {label: '3-6% TGC', detail: 'Mineralised assay interval', tone: '#ff9f0a'},
+    {label: '>8% TGC', detail: 'Very high assay interval', tone: '#9d00ff', binKey: 'very-high'},
+    {label: '6-8% TGC', detail: 'High assay interval', tone: '#ff1616', binKey: 'high'},
+    {label: '3-6% TGC', detail: 'Mineralised assay interval', tone: '#ff9f0a', binKey: 'medium'},
     {label: 'Collars', detail: 'Surface start points', tone: '#eaffff'},
   ];
 }
@@ -2961,7 +2964,16 @@ export default function TangaThreeGeologyScene({
             )}
             <ol>
               {legendItems.map((item) => (
-                <li key={`${item.label}-${item.detail}`}>
+                <li
+                  key={`${item.label}-${item.detail}`}
+                  className={classNames(
+                    item.binKey && 'tanga-three__grade-item',
+                    item.binKey && hoveredGrade === item.binKey && 'is-hovered',
+                    item.binKey && hoveredGrade && hoveredGrade !== item.binKey && 'is-dim'
+                  )}
+                  onPointerEnter={item.binKey ? () => setHoveredGrade(item.binKey!) : undefined}
+                  onPointerLeave={item.binKey ? () => setHoveredGrade((current) => (current === item.binKey ? null : current)) : undefined}
+                >
                   <i style={{backgroundColor: item.tone, boxShadow: `0 0 18px ${item.tone}`}} />
                   <span>
                     <strong>{item.label}</strong>
