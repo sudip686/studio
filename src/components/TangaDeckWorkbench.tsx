@@ -153,6 +153,9 @@ type SceneTransitionState = {
   fromMode: WorkbenchMode;
   toMode: WorkbenchMode;
   direction: 'forward' | 'back' | 'jump';
+  // Semantic travel: descending into the 3D model, pulling back out to the map,
+  // or moving sideways between two scenes of the same kind.
+  travel: 'dive' | 'surface' | 'lateral';
   label: string;
   detail: string;
 };
@@ -692,6 +695,16 @@ function storyIndexForMode(mode: WorkbenchMode) {
 
 function storyStepForMode(mode: WorkbenchMode) {
   return STORY_STEPS[storyIndexForMode(mode)] ?? STORY_STEPS[0];
+}
+
+// Scenes rendered by the Three.js model rather than the deck/map.
+const MODEL_MODES = new Set<WorkbenchMode>(['drillholes', 'subsurface', 'resource', 'mine_planning', 'metallurgy']);
+function storyTravel(fromMode: WorkbenchMode, toMode: WorkbenchMode): SceneTransitionState['travel'] {
+  const fromModel = MODEL_MODES.has(fromMode);
+  const toModel = MODEL_MODES.has(toMode);
+  if (!fromModel && toModel) return 'dive';
+  if (fromModel && !toModel) return 'surface';
+  return 'lateral';
 }
 
 function storyTransitionDirection(fromMode: WorkbenchMode, toMode: WorkbenchMode): SceneTransitionState['direction'] {
@@ -1839,6 +1852,7 @@ export default function TangaDeckWorkbench() {
     fromMode: DEFAULT_MODE,
     toMode: DEFAULT_MODE,
     direction: 'jump',
+    travel: 'lateral',
     label: MODE_LABELS[DEFAULT_MODE],
     detail: 'Presentation scene ready',
   });
@@ -2863,6 +2877,7 @@ export default function TangaDeckWorkbench() {
       fromMode: previousMode,
       toMode: activeMode,
       direction: storyTransitionDirection(previousMode, activeMode),
+      travel: storyTravel(previousMode, activeMode),
       label: `${targetStep.act} / ${targetStep.label}`,
       detail: modeSummary(activeMode, routeTarget, resourceFocus, resourceHasBeenShown),
     });
@@ -4252,7 +4267,8 @@ export default function TangaDeckWorkbench() {
           className={classNames(
             'tanga-deck__portal-transition',
             sceneTransition.target === 'model' ? 'is-model' : 'is-map',
-            `is-${sceneTransition.direction}`
+            `is-${sceneTransition.direction}`,
+            `is-travel-${sceneTransition.travel}`
           )}
           aria-hidden="true"
         >

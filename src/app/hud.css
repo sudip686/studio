@@ -1134,3 +1134,41 @@ html, body { overflow-x: hidden; }
   .tanga-deck__leader-svg,
   .tanga-deck__leader-svg--pin { animation: none; }
 }
+
+/* ===========================================================================
+   PHASE 26 - semantic scene transitions. Travel now means something: descending
+   into the 3D model sweeps DOWN, pulling back out to the map sweeps UP, and a
+   move between two scenes of the same kind stays a neutral dissolve. Additive
+   pseudo-element sweep, so the existing portal animation is untouched.
+   =========================================================================== */
+.tanga-deck__portal-transition::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    transparent 42%,
+    rgba(var(--hud-cyan), 0.16) 50%,
+    transparent 58%);
+  background-size: 100% 300%;
+  opacity: 0;
+}
+.tanga-deck__portal-transition.is-travel-dive::after {
+  opacity: 1;
+  animation: travel-sweep-down 900ms var(--ease-hud, ease) both;
+}
+.tanga-deck__portal-transition.is-travel-surface::after {
+  opacity: 1;
+  animation: travel-sweep-up 900ms var(--ease-hud, ease) both;
+}
+@keyframes travel-sweep-down {
+  from { background-position: 0 -100%; }
+  to   { background-position: 0 200%; }
+}
+@keyframes travel-sweep-up {
+  from { background-position: 0 200%; }
+  to   { background-position: 0 -100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__portal-transition::after { animation: none !important; opacity: 0 !important; }
+}
