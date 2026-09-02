@@ -4288,7 +4288,7 @@ export default function TangaDeckWorkbench() {
               </g>
             ))}
           </svg>
-          {projectedSceneCallouts.map((callout) => (
+          {projectedSceneCallouts.map((callout, index) => (
             <div
               key={callout.id}
               className={classNames('tanga-deck__callout', `is-${callout.side ?? 'right'}`)}
@@ -4296,6 +4296,7 @@ export default function TangaDeckWorkbench() {
                 '--callout-x': `${callout.boxPixelX}px`,
                 '--callout-y': `${callout.boxPixelY}px`,
                 '--callout-tone': callout.tone,
+                '--reveal-i': index,
               } as any}
             >
               <span>{callout.label}</span>
@@ -4315,11 +4316,11 @@ export default function TangaDeckWorkbench() {
               </g>
             ))}
           </svg>
-          {pinnedMapLabels.map((label) => (
+          {pinnedMapLabels.map((label, index) => (
             <div
               key={label.id}
               className="tanga-deck__pin-label"
-              style={{'--pin-x': `${label.boxPixelX}px`, '--pin-y': `${label.boxPixelY}px`, '--pin-tone': label.tone} as any}
+              style={{'--pin-x': `${label.boxPixelX}px`, '--pin-y': `${label.boxPixelY}px`, '--pin-tone': label.tone, '--reveal-i': index} as any}
             >
               {label.text}
             </div>

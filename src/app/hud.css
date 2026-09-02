@@ -1106,3 +1106,31 @@ html, body { overflow-x: hidden; }
   .tanga-deck__act-card-rule,
   .tanga-deck__act-card-thesis { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 }
+
+/* ===========================================================================
+   PHASE 25 - staged scene reveal. On arrival the overlay choreographs instead
+   of popping: the docked panel lands first, then the pinned place labels, then
+   the callout cards, with their leader lines drawn in last.
+   =========================================================================== */
+.tanga-deck__pin-label {
+  animation-delay: calc(180ms + var(--reveal-i, 0) * 55ms) !important;
+}
+.tanga-deck__callout {
+  animation-delay: calc(340ms + var(--reveal-i, 0) * 80ms) !important;
+}
+.tanga-deck__leader-svg {
+  animation: hud-reveal-fade 420ms var(--ease-hud, ease) 520ms both;
+}
+.tanga-deck__leader-svg--pin {
+  animation: hud-reveal-fade 380ms var(--ease-hud, ease) 300ms both;
+}
+@keyframes hud-reveal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__pin-label,
+  .tanga-deck__callout { animation-delay: 0ms !important; }
+  .tanga-deck__leader-svg,
+  .tanga-deck__leader-svg--pin { animation: none; }
+}
