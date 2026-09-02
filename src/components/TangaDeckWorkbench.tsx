@@ -440,7 +440,10 @@ const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.35, pitch: 32, bearing: -12},
   project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
   topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
-  accessibility: {longitude: 38.78, latitude: -4.98, zoom: 8.3, pitch: 38, bearing: -14},
+  // Framed on the story: project (38.79,-4.81) -> Tanga Port (39.105,-5.064).
+  // The old 8.3 zoom sat NW of the corridor and left it as a small cluster in a
+  // frame of irrelevant inland Tanzania.
+  accessibility: {longitude: 38.95, latitude: -4.98, zoom: 9.55, pitch: 44, bearing: -16},
   drillholes: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 62, bearing: 24},
   subsurface: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.55, pitch: 74, bearing: 38},
   resource: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.45, pitch: 68, bearing: 38},
@@ -3442,10 +3445,10 @@ export default function TangaDeckWorkbench() {
           name: ROUTE_TARGETS[routeTarget].label,
         }],
         getPath: (item: any) => item.path,
-        getColor: routeTarget === 'power' ? [250, 204, 21, 245] : routeTarget === 'rail' ? [168, 85, 247, 245] : [0, 212, 255, 245],
-        getWidth: 210,
+        getColor: routeTarget === 'power' ? [250, 204, 21, 245] : routeTarget === 'rail' ? [168, 85, 247, 245] : [94, 234, 212, 250],
+        getWidth: 260,
         widthUnits: 'meters',
-        widthMinPixels: 4,
+        widthMinPixels: 6,
         jointRounded: true,
         capRounded: true,
         parameters: {depthTest: false} as any,
@@ -3735,10 +3738,12 @@ export default function TangaDeckWorkbench() {
       push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
     }
     if (activeMode === 'accessibility') {
+      // Only the two ends of the corridor. The power nodes are already covered by
+      // the "Hale + New Pangani" callout AND the panel rows — pinning them too
+      // put six labels inside a ~200px cluster.
       push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
-      POWER_GRID_NODES.forEach((node) => push(`power-${node.id}`, `${node.shortName} · ${node.distanceKm.toFixed(1)} km`, node.lon, node.lat, 300, '#e0a94f'));
       const target = ROUTE_TARGETS[routeTarget];
-      push('route-target', `${target.label} · ${routeProfile.distanceLabel}`, target.lon, target.lat, 300, '#c7551b');
+      push('route-target', `${target.label} · ${routeProfile.distanceLabel}`, target.lon, target.lat, 300, '#5eead4');
     }
     return out;
   }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel]);
