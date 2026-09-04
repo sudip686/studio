@@ -7857,7 +7857,7 @@ body {
 
 .tanga-three__instrument-row {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-columns: 62px minmax(0, 1fr);
   gap: 9px;
   align-items: end;
 }
@@ -8576,7 +8576,7 @@ body {
 }
 
 .tanga-three__instrument-row {
-  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-columns: 62px minmax(0, 1fr);
   gap: 7px;
 }
 
@@ -9483,7 +9483,7 @@ h3 {
 }
 
 .tanga-three__instrument-row {
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 62px minmax(0, 1fr);
 }
 
 .tanga-three__mini-compass {
@@ -10725,7 +10725,7 @@ h3 {
 }
 
 .tanga-three__instrument-row {
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: 62px minmax(0, 1fr);
   gap: var(--hm-space-3);
 }
 
@@ -11981,7 +11981,12 @@ h3 {
 }
 /* Hide legend + scale by default entirely (compass shows only) */
 .tanga-deck__legend,
-.tanga-deck__scale {
+/* Scoped to the map overlay. Unscoped, this hid every .tanga-deck__scale with
+   !important and revealed it only on .tanga-deck__geo-overlay:hover — so the 3D
+   scenes, which now share this scale markup, rendered a permanently invisible
+   scale bar. The reveal-on-hover behaviour belongs to the overlay it was
+   written for, not to the class. */
+.tanga-deck__geo-overlay .tanga-deck__scale {
   opacity: 0 !important;
   max-width: 0 !important;
   max-height: 0 !important;
@@ -13352,4 +13357,24 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
     width: min(460px, 38vw);
     min-width: 380px;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Shared instruments inside the 3D nav cluster.
+   The compass and scale markup is shared with the map scenes, but the map
+   places them with named grid areas ("compass" / "scale") from
+   .tanga-deck__geo-overlay’s own template. Inherited into the 3D instrument row
+   those names resolve against a template that does not define them, which
+   collapsed its columns to `62px 0 0 202px` and stacked the two instruments on
+   top of each other. Reset the placement so they flow into this row’s columns.
+   ------------------------------------------------------------------------ */
+.tanga-three__instrument-row {
+  grid-template-areas: none;
+}
+
+.tanga-three__instrument-row > .tanga-deck__compass,
+.tanga-three__instrument-row > .tanga-deck__scale {
+  grid-area: auto;
+  position: relative;
+  inset: auto;
 }

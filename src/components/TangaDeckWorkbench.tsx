@@ -159,13 +159,6 @@ type RouteInfo = {
   source: 'osrm' | 'fallback';
 };
 
-type TerrainCell = {
-  polygon: Array<[number, number, number]>;
-  elevation: number;
-  color: [number, number, number, number];
-  label: string;
-};
-
 type StoryStep = {
   mode: WorkbenchMode;
   act: string;
@@ -1175,59 +1168,6 @@ function terrainColor(elevation: number): [number, number, number, number] {
   return [last[1][0], last[1][1], last[1][2], TERRAIN_TINT_ALPHA];
 }
 
-function terrainPresentationElevation(
-  heightAt: (lon: number, lat: number) => number,
-  lon: number,
-  lat: number,
-  mode: WorkbenchMode
-) {
-  return clamp(heightAt(lon, lat) + 260, 32, mode === 'topography' ? 980 : 560);
-}
-
-function localTerrainCells(heightAt: (lon: number, lat: number) => number, mode: WorkbenchMode): TerrainCell[] {
-  const [minLon, minLat, maxLon, maxLat] = TOPO_BOUNDS;
-  // Higher cell density on the topography scene → smoother, less-blocky relief.
-  const columns = mode === 'topography' ? 44 : 22;
-  const rows = mode === 'topography' ? 34 : 16;
-  const dx = (maxLon - minLon) / columns;
-  const dy = (maxLat - minLat) / rows;
-  const cells: TerrainCell[] = [];
-
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const west = minLon + column * dx;
-      const east = west + dx;
-      const south = minLat + row * dy;
-      const north = south + dy;
-      const lon = west + dx * 0.5;
-      const lat = south + dy * 0.5;
-      const eastMeters = (lon - PROJECT_CENTER.lon) * METERS_PER_DEGREE_LON;
-      const northMeters = (lat - PROJECT_CENTER.lat) * METERS_PER_DEGREE_LAT;
-      const radial = Math.sqrt((eastMeters / 12_000) ** 2 + (northMeters / 9_000) ** 2);
-      if (radial > 1.05) continue;
-      const sw = terrainPresentationElevation(heightAt, west, south, mode);
-      const se = terrainPresentationElevation(heightAt, east, south, mode);
-      const ne = terrainPresentationElevation(heightAt, east, north, mode);
-      const nw = terrainPresentationElevation(heightAt, west, north, mode);
-      const elevation = (sw + se + ne + nw) / 4;
-      const edgeFade = clamp((1.05 - radial) * 1.55, 0.1, 1);
-      const base = terrainColor(elevation);
-      // Bake analytical golden-hour hillshade into the cell colour so the flat
-      // (non-extruded) DEM surface reads as a lit, sculpted relief.
-      const shade = cellHillshade(sw, se, ne, nw, dx * METERS_PER_DEGREE_LON, dy * METERS_PER_DEGREE_LAT);
-      const [r, g, b] = shadeTerrainColor([base[0], base[1], base[2]], shade);
-      cells.push({
-        polygon: [[west, south, sw], [east, south, se], [east, north, ne], [west, north, nw]],
-        elevation,
-        color: [r, g, b, Math.round(base[3] * edgeFade)] as [number, number, number, number],
-        label: `DEM cell ${row + 1}-${column + 1}`,
-      });
-    }
-  }
-
-  return cells;
-}
-
 function resourceFocusLabel(focus: ResourceFocus) {
   const labels: Record<ResourceFocus, string> = {
     Indicated: 'Indicated',
@@ -1583,7 +1523,10 @@ function sceneCalloutsForMode(
     // Two callouts — the route and the grid. (Dropped the redundant "Tanga
     // project" origin box; the project is obvious as the route's start.)
     return [
-      {id: 'route', label: `${routeProfile.distanceLabel} / ${routeProfile.durationLabel}`, detail: `${routeProfile.source === 'osrm' ? 'Road geometry' : 'Indicative route'} to ${routeProfile.targetLabel}`, boxX: 52, boxY: 61, tone: targetTone, anchor: {...ROUTE_TARGETS[routeTarget], elevationOffset: 420}},
+      // Anchored on the middle of the corridor rather than its destination.
+      // The destination is where the port and rail pins already sit, so a
+      // callout anchored there landed on top of both of them.
+      {id: 'route', label: `${routeProfile.distanceLabel} / ${routeProfile.durationLabel}`, detail: `${routeProfile.source === 'osrm' ? 'Road geometry' : 'Indicative route'} to ${routeProfile.targetLabel}`, boxX: 38, boxY: 43, tone: targetTone, anchor: {...routeCorridorMidpoint(routeTarget), elevationOffset: 420}},
       {id: 'power', label: 'Hale + New Pangani', detail: powerGridDistanceSummary(), boxX: 66, boxY: 49, tone: '#41200e', anchor: {lon: 38.636, lat: -5.326, elevationOffset: 440}, offset: {x: 118, y: -84}},
     ];
   }
@@ -1621,6 +1564,21 @@ function colorForCarbon(value: unknown): [number, number, number, number] {
   if (carbon >= 4) return [250, 204, 21, 230];
   if (carbon >= 1) return [45, 212, 191, 220];
   return [125, 211, 252, 190];
+}
+
+/**
+ * Waypoint roughly halfway along each corridor — the same bend `routePath`
+ * uses. Callouts describing a route anchor here rather than at its
+ * destination, where the port and rail pins already sit.
+ */
+const ROUTE_MIDPOINTS: Record<RouteTarget, {lon: number; lat: number}> = {
+  port: {lon: 38.93, lat: -4.94},
+  rail: {lon: 38.94, lat: -4.96},
+  power: {lon: 38.71, lat: -5.05},
+};
+
+function routeCorridorMidpoint(target: RouteTarget) {
+  return ROUTE_MIDPOINTS[target];
 }
 
 function routePath(target: RouteTarget, heightAt: (lon: number, lat: number) => number) {
@@ -3922,6 +3880,36 @@ export default function TangaDeckWorkbench() {
         stroked: true,
         parameters: {depthTest: false} as any,
       }),
+      // Rail corridor and terminal, always drawn. Both the route line and the
+      // endpoint marker key off the *active* route target, so with the deck on
+      // its default port view the railway had no dot and no connection — one of
+      // the three infrastructure legs this slide claims was simply not on the
+      // map. Drawn thinner and dimmer than the live route so it reads as
+      // standing context rather than competing with the selected corridor.
+      showRoute && routeTarget !== 'rail' && new PathLayer({
+        id: 'rail-corridor',
+        data: [{path: routePath('rail', heightAt)}],
+        getPath: (item: any) => item.path,
+        getColor: [168, 85, 247, 140],
+        getWidth: 150,
+        widthUnits: 'meters',
+        widthMinPixels: 3,
+        jointRounded: true,
+        capRounded: true,
+        parameters: {depthTest: false} as any,
+      }),
+      showRoute && routeTarget !== 'rail' && new ScatterplotLayer({
+        id: 'rail-endpoint',
+        data: [{position: [ROUTE_TARGETS.rail.lon, ROUTE_TARGETS.rail.lat, heightAt(ROUTE_TARGETS.rail.lon, ROUTE_TARGETS.rail.lat) + 70]}],
+        getPosition: (item: any) => item.position,
+        getRadius: 1900,
+        radiusUnits: 'meters',
+        getFillColor: [168, 85, 247, 215],
+        getLineColor: [255, 255, 255, 215],
+        lineWidthMinPixels: 2,
+        stroked: true,
+        parameters: {depthTest: false} as any,
+      }),
       showCutaway && new GeoJsonLayer<any>({
         id: 'cutaway-window',
         data: {
@@ -4204,7 +4192,18 @@ export default function TangaDeckWorkbench() {
       // put six labels inside a ~200px cluster.
       push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
       const target = ROUTE_TARGETS[routeTarget];
-      push('route-target', `${target.label} · ${routeProfile.distanceLabel}`, target.lon, target.lat, 300, '#5eead4');
+      // Label only: the route callout already states the distance and drive
+      // time, so repeating it on the pin was duplication in a tight cluster.
+      push('route-target', target.label, target.lon, target.lat, 300, '#5eead4');
+
+      // The rail terminal is pinned whatever the active route is. It used to
+      // appear only when someone switched the route toggle to rail, so on the
+      // default port view the railway — one of the three infrastructure legs
+      // this slide exists to prove — was simply absent from the map.
+      if (routeTarget !== 'rail') {
+        const rail = ROUTE_TARGETS.rail;
+        push('rail-terminal', rail.label, rail.lon, rail.lat, 280, '#a855f7');
+      }
     }
     return out;
   }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel]);
@@ -4304,7 +4303,9 @@ export default function TangaDeckWorkbench() {
 
     // Same greedy vertical de-collision the pinned map labels use: sort down
     // the stage, push each chip below any neighbour it would otherwise touch.
-    const MIN_GAP = 26;
+    // Must exceed the rendered label height (34px), or stacked chips always
+    // clip: at 26 every adjacent pair overlapped by 8px.
+    const MIN_GAP = 40;
     const X_PROX = 190;
     const placed: typeof positioned = [];
     positioned
