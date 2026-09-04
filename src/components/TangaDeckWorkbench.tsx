@@ -1553,8 +1553,12 @@ function sceneCalloutsForMode(
 ): SceneCallout[] {
   if (mode === 'tanzania') {
     return [
-      {id: 'country', label: 'Tanzania highlighted', detail: 'Regional position before the project dive', boxX: 42, boxY: 40, tone: '#a89c94', anchor: {lon: 35.2, lat: -6.2, elevationOffset: 160000}, offset: {x: -260, y: -120}},
-      {id: 'project', label: 'Tanga graphite', detail: 'Northeast Tanzania, coastal access corridor', boxX: 55, boxY: 56, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 90000}, offset: {x: 88, y: -96}},
+      // "Tanzania highlighted / regional position before the project dive" was
+      // stage direction — it described where the deck was in its own sequence
+      // rather than telling the viewer anything about the country. Both now
+      // answer the question this scene exists to answer: why Tanzania.
+      {id: 'country', label: 'A graphite country', detail: 'Four ranked graphite projects sit in Tanzania, including Tanga', boxX: 42, boxY: 40, tone: '#a89c94', anchor: {lon: 35.2, lat: -6.2, elevationOffset: 160000}, offset: {x: -260, y: -120}},
+      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 80 km from deep-water port at Tanga', boxX: 55, boxY: 56, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 90000}, offset: {x: 88, y: -96}},
     ];
   }
   if (mode === 'project') {
@@ -2072,6 +2076,11 @@ export default function TangaDeckWorkbench() {
   // Drill collars for the licence scene: 100 dots inside the boundary are the
   // most direct answer to "is this ground actually tested?".
   const [drillCollars, setDrillCollars] = useState<DrillCollar[]>([]);
+  // Bumped as the MapLibre camera moves. Labels that project through the map
+  // have to follow its camera, not React's `viewState`: during a fly-to the two
+  // are not in step, so without this the peer labels sit in the wrong place for
+  // the whole flight and only snap correct on the next unrelated re-render.
+  const [mapCameraTick, setMapCameraTick] = useState(0);
   // Relief cells for the topography scene, sampled from the real DEM.
   const [reliefRaster, setReliefRaster] = useState<ReliefRaster | null>(null);
   const [contextLoadState, setContextLoadState] = useState<SceneLoadState>('idle');
@@ -3138,6 +3147,33 @@ export default function TangaDeckWorkbench() {
     };
   }, [activeMode, reliefRaster]);
 
+  // Follow the map camera while it moves, coalesced to one update per frame so
+  // a fly-to does not push a state change per event.
+  useEffect(() => {
+    const map = mapInstance as any;
+    if (!map?.on) return;
+
+    let frame = 0;
+    let pending = false;
+    const onMove = () => {
+      if (pending) return;
+      pending = true;
+      frame = requestAnimationFrame(() => {
+        pending = false;
+        setMapCameraTick((tick) => tick + 1);
+      });
+    };
+
+    map.on('move', onMove);
+    map.on('moveend', onMove);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      map.off?.('move', onMove);
+      map.off?.('moveend', onMove);
+    };
+  }, [mapInstance]);
+
   const handleMapError = useCallback(() => {
     setMapLoadState('degraded');
     console.info('[Tanga telemetry] map entered degraded state; DeckGL overlays remain available');
@@ -3327,6 +3363,36 @@ export default function TangaDeckWorkbench() {
       // tiling, and it is only drawn on the topography scene: on the licence
       // and access scenes the satellite imagery carries the landform better
       // than a translucent overlay does.
+      // Tanzania, highlighted on the country scene. Built the way the reference
+      // deck makes its orebody read: one saturated shape against an otherwise
+      // desaturated surround, with a clean bright edge — rather than a label
+      // asserting a highlight that was never drawn, which is what this scene
+      // had before. Three passes, matching the licence boundary's treatment:
+      // a soft halo, a solid edge, then a low-alpha fill so the imagery and the
+      // peer projects inside it stay readable.
+      activeMode === 'tanzania' && new GeoJsonLayer<any>({
+        id: 'tanzania-highlight-halo',
+        data: '/tanzania.geojson',
+        stroked: true,
+        filled: false,
+        getLineColor: [199, 85, 27, 60],
+        getLineWidth: 9,
+        lineWidthUnits: 'pixels',
+        lineWidthMinPixels: 6,
+        parameters: {depthTest: false} as any,
+      }),
+      activeMode === 'tanzania' && new GeoJsonLayer<any>({
+        id: 'tanzania-highlight-fill',
+        data: '/tanzania.geojson',
+        stroked: true,
+        filled: true,
+        getFillColor: [199, 85, 27, 34],
+        getLineColor: [244, 186, 122, 235],
+        getLineWidth: 2,
+        lineWidthUnits: 'pixels',
+        lineWidthMinPixels: 1.4,
+        parameters: {depthTest: false} as any,
+      }),
       activeMode === 'topography' && reliefRaster && new BitmapLayer({
         id: 'local-dem-relief-surface',
         image: reliefRaster.image,
@@ -4158,7 +4224,13 @@ export default function TangaDeckWorkbench() {
    * rather than trusted.
    */
   const peerGlobeLabels = useMemo(() => {
-    if (activeMode !== 'ranking' || stageSize.width === 0) return [];
+    // Two scenes use these labels for different arguments. The peer field shows
+    // the global set, to place Tanga in it. The country scene shows only the
+    // Tanzanian projects, because "why Tanzania" is best answered by the fact
+    // that four ranked graphite projects — Mahenge, Epanko, Bunyu and Tanga —
+    // sit in the same country, which the deck's own peer data already proves.
+    const isCountryScene = activeMode === 'tanzania';
+    if ((activeMode !== 'ranking' && !isCountryScene) || stageSize.width === 0) return [];
     const map = mapInstance;
     if (!map) return [];
 
@@ -4178,12 +4250,14 @@ export default function TangaDeckWorkbench() {
     const positioned = graphiteRows
       .filter((project) => Number.isFinite(project.lon) && Number.isFinite(project.lat))
       .filter((project) => arcFromCentre(project.lon, project.lat) < 78)
+      .filter((project) => !isCountryScene || project.country === 'Tanzania')
       // The peers cluster tightly in south-east Africa, so labelling every one
       // of them turns the region into a stack. Keep the largest — and Tanga
-      // whatever its size, since it is the subject of the slide.
+      // whatever its size, since it is the subject of the slide. The country
+      // scene has only four to show, so it keeps them all.
       .slice()
       .sort((a, b) => (b.containedGraphiteMt || 0) - (a.containedGraphiteMt || 0))
-      .filter((project, index) => index < 5 || project.isTanga)
+      .filter((project, index) => isCountryScene || index < 5 || project.isTanga)
       .map((project) => {
         let point: {x: number; y: number} | null = null;
         try {
@@ -4217,7 +4291,9 @@ export default function TangaDeckWorkbench() {
     const safeL = 108;
     // The trimmed ranking panel starts at about 0.65 of the stage width, so
     // 0.60 keeps even the widest chip clear of it.
-    const safeR = stageSize.width * 0.60;
+    // The country scene docks a narrower panel than the ranking table, so its
+    // labels can run further right before they would reach it.
+    const safeR = stageSize.width * (isCountryScene ? 0.72 : 0.60);
     const safeT = 118;
     const safeB = stageSize.height - 120;
     positioned.forEach((label) => {
@@ -4249,7 +4325,7 @@ export default function TangaDeckWorkbench() {
     // `mapLoadState` is a dependency because `mapRef` is not reactive: without
     // it this memo would evaluate once while the map was still null and never
     // recompute, leaving the globe permanently unlabelled.
-  }, [activeMode, graphiteRows, stageSize.width, stageSize.height, viewState, activePeerKey, mapInstance]);
+  }, [activeMode, graphiteRows, stageSize.width, stageSize.height, viewState, activePeerKey, mapInstance, mapCameraTick]);
 
   const pinnedMapLabels = useMemo(() => {
     if (!mapLabelSources.length || stageSize.width === 0) return [];
