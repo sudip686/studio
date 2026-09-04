@@ -5001,7 +5001,14 @@ body {
   width: 100vw;
   min-width: 1180px;
   height: 100vh;
+  /* `hidden` still makes this a scroll container, just without visible bars —
+     so focusing the command input let the browser scroll the whole stage
+     sideways to reveal it, leaving the map shifted ~420px off the left edge
+     with dead space on the right. `clip` creates no scroll container at all,
+     so nothing (focus, anchor jumps, scrollIntoView) can displace the stage.
+     `hidden` stays first as the fallback for engines without `clip`. */
   overflow: hidden;
+  overflow: clip;
   background: #03060a;
   color: #f8fafc;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
@@ -6066,6 +6073,166 @@ body {
   font-size: 12px;
   font-weight: 720;
   line-height: 1.28;
+}
+
+/* ---------------------------------------------------------------------------
+   Intercept labels
+   Derived drill results anchored in the scene. Deliberately quieter and
+   tighter than the authored story callouts: there can be many of them at the
+   "all" density tier, so they read as a data layer over the model rather than
+   competing with the slide's own point. The hole id is set in the mono stack
+   because it is an identifier, and the grade quote gets tabular figures so
+   stacked labels align on the decimal.
+   ------------------------------------------------------------------------ */
+.tanga-three__callout--intercept {
+  width: 178px;
+  gap: 2px;
+  padding: 6px 9px 7px;
+  border-radius: 6px;
+  border-color: color-mix(in srgb, var(--callout-tone, #2dd4bf) 42%, rgba(255, 255, 255, 0.22));
+  background: rgba(3, 4, 7, 0.8);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.tanga-three__callout--intercept span {
+  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.tanga-three__callout--intercept strong {
+  font-size: 11px;
+  font-weight: 640;
+  line-height: 1.22;
+  color: rgba(255, 255, 255, 0.82);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tighten further where the stage is short on room. */
+@media (max-width: 1100px) {
+  .tanga-three__callout--intercept {
+    width: 156px;
+    padding: 5px 7px 6px;
+  }
+
+  .tanga-three__callout--intercept strong {
+    font-size: 10px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Headline intercepts panel
+   The three strongest drill results, docked top-left under the scene title.
+   Anchored 3D labels measure this panel from the DOM and route around it, so
+   it can be repositioned here without touching anything in the scene.
+   ------------------------------------------------------------------------ */
+.tanga-deck__intercepts {
+  position: absolute;
+  top: 11%;
+  left: 22px;
+  z-index: 7;
+  display: grid;
+  gap: 7px;
+  width: 244px;
+  padding: 10px 12px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  background: rgba(3, 4, 7, 0.76);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  /* Its own keyframes, not tangaCalloutIn: that animation ends on
+     translate(-50%, -50%) because it is written for boxes centred on an
+     anchor point, and it would drag this docked panel off the left edge. */
+  animation: tangaInterceptsIn 520ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+}
+
+@keyframes tangaInterceptsIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tanga-deck__intercepts-head {
+  display: grid;
+  gap: 2px;
+}
+
+.tanga-deck__intercepts-head span {
+  color: var(--color-primary, #c7551b);
+  font-size: 10px;
+  font-weight: 840;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.tanga-deck__intercepts-head strong {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.tanga-deck__intercepts ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: intercept;
+}
+
+.tanga-deck__intercepts li {
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.tanga-deck__intercepts li i {
+  border-radius: 999px;
+}
+
+.tanga-deck__intercepts li span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tanga-deck__intercepts li strong {
+  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.94);
+  letter-spacing: 0.04em;
+}
+
+.tanga-deck__intercepts li small {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.68);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) {
+  .tanga-deck__intercepts {
+    width: 208px;
+    left: 14px;
+    padding: 8px 10px 9px;
+  }
+
+  .tanga-deck__intercepts li small {
+    font-size: 9.5px;
+  }
 }
 
 .tanga-deck__story-rail {
@@ -11263,8 +11430,30 @@ h3 {
   margin: 0 2px;
 }
 .tanga-deck__pager-btn--tool {
+  position: relative;
   width: 40px;
   height: 40px;
+}
+
+/* Count badge on the annotations button at the "all data labels" tier, so the
+   presenter can see the density state without opening the tooltip. */
+.tanga-deck__tool-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #0b0d12;
+  border: 1px solid color-mix(in srgb, var(--color-primary, #c7551b) 70%, #ffffff);
+  color: #ffffff;
+  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
 }
 .tanga-deck__pager-btn.is-active {
   background: var(--color-primary, #c7551b);
@@ -11812,6 +12001,97 @@ h3 {
   max-height: 400px !important;
   padding: 8px !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Depth bracket
+   A dimension line, drawn the way a section drawing draws one: a hairline rule
+   with perpendicular end caps, spanning the depth it measures, with the value
+   set beside its midpoint. The earlier version was a small bordered chip with
+   a rounded half-box, which read as a stray UI control rather than as a
+   measurement of the deposit. Nothing here has a panel background — a
+   dimension line belongs on the scene, not in a card.
+   ------------------------------------------------------------------------ */
+.tanga-deck__depth-scale {
+  position: absolute;
+  /* Sits in the open scene just clear of the instrument cluster, not on an
+     edge: both edges of this stage are taken by docked panels, so an
+     edge-anchored rail (the way the reference deck does it, on a stage with
+     almost no chrome) would land on top of them. Measured occupancy at
+     1600x900: left column holds the intercepts panel and the compass/scale/
+     legend cluster, right column the data panel and grade legend. */
+  top: 50%;
+  left: 356px;
+  transform: translateY(-50%);
+  z-index: 7;
+  display: grid;
+  grid-template-columns: 12px auto;
+  gap: 10px;
+  align-items: center;
+  /* Tall enough to read as spanning the deposit, not labelling a point. */
+  height: 26vh;
+  min-height: 170px;
+  max-height: 260px;
+  pointer-events: none;
+}
+
+/* The vertical rule. Caps are pseudo-elements so the whole mark is one
+   element and always stays square to the stage. */
+.tanga-deck__depth-scale i {
+  position: relative;
+  align-self: stretch;
+  justify-self: end;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.85);
+}
+
+.tanga-deck__depth-scale i::before,
+.tanga-deck__depth-scale i::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  width: 11px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.85);
+}
+
+.tanga-deck__depth-scale i::before { top: 0; }
+.tanga-deck__depth-scale i::after { bottom: 0; }
+
+.tanga-deck__depth-scale span {
+  display: grid;
+  gap: 2px;
+}
+
+.tanga-deck__depth-scale em {
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.97);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
+}
+
+.tanga-deck__depth-scale small {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.9);
+}
+
+@media (max-width: 1100px) {
+  /* The panels reflow inward at this width and close the gap this sits in,
+     so the bracket is dropped rather than squeezed on top of them. Each
+     result’s own depth is still stated in the intercepts panel. */
+  .tanga-deck__depth-scale {
+    display: none;
+  }
+}
+
 /* Hide geo-overlay while notes panel is open (both live top-right) */
 body:has(.tanga-deck__notes) .tanga-deck__geo-overlay {
   opacity: 0;
@@ -13037,3 +13317,39 @@ body:has(.tanga-deck__inspector) .tanga-deck__insight-panel {
   color: rgba(196, 205, 219, 0.6);
 }
 @media (prefers-reduced-motion: reduce) { .tanga-deck__disclaimer-overlay { animation: none; } }
+
+/* ===========================================================================
+   Ranking panel — trimmed.
+   The peer table was ~690px of a 1600px stage (43%), covering the half of the
+   globe where the African peer cluster actually sits, so the "global peer
+   field" was mostly hidden behind the list describing it. Narrowing it gives
+   the globe back about 170px and lets the anchored peer labels sit near their
+   projects instead of being pushed off them.
+
+   Declared last on purpose: `.tanga-deck__ranking` is defined five times in
+   this file, and this needs to win over all of them.
+   =========================================================================== */
+/* Tighter rows so the same ten projects still fit the shorter measure. */
+.tanga-deck--ranking .tanga-deck__ranking-list li {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.tanga-deck--ranking .tanga-deck__rank-main strong {
+  font-size: 12.5px;
+}
+
+.tanga-deck--ranking .tanga-deck__rank-main small {
+  font-size: 10px;
+}
+
+.tanga-deck--ranking .tanga-deck__rank-figure strong {
+  font-size: 17px;
+}
+
+@media (max-width: 1400px) {
+  .tanga-deck--ranking .tanga-deck__ranking {
+    width: min(460px, 38vw);
+    min-width: 380px;
+  }
+}

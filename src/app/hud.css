@@ -390,10 +390,13 @@
 .tanga-deck__ranking.tanga-deck__ranking,
 .tanga-deck--ranking .tanga-deck__ranking.tanga-deck__ranking {
   right: clamp(20px, 2vw, 32px) !important;
-  /* Keep the content width (≈690) so the MT columns never clip; only the right
-     offset changes, docking it flush-right so the globe owns the left half. */
-  width: min(690px, calc(100vw - 700px)) !important;
-  min-width: 560px !important;
+  /* Trimmed from ~690px. At that measure the panel covered the half of the
+     globe where the African peer cluster actually sits, so the list hid the
+     very field it describes — and the anchored peer labels had to be pushed
+     off their projects to stay clear of it. The tighter row typography in
+     globals.css keeps the MT column from clipping at this narrower width. */
+  width: min(520px, calc(100vw - 900px)) !important;
+  min-width: 440px !important;
   border-color: var(--hud-line) !important;
 }
 
@@ -1376,4 +1379,74 @@ html, body { overflow-x: hidden; }
   .tanga-met__flow { grid-template-columns: 1fr; }
   .tanga-met__arrow { display: none; }
   .tanga-met__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ===========================================================================
+   Peer labels on the ranking globe.
+   The slide used to assert a "global peer field" beside a globe carrying only
+   unlabelled dots. These name each project and its contained graphite, and
+   cross-highlight with the ranking table so the two halves of the slide read
+   as one picture. Inactive labels sit back so the globe stays calm; hovering a
+   table row brings its label forward.
+   =========================================================================== */
+/* Pinned labels are centred on their anchor by `transform: translate(-50%,-50%)`
+   in the base rule, but they also run `hud-panel-in`, whose final keyframe is
+   `transform: none` with `both` fill — so the animation permanently overrode the
+   centring and every pinned label sat down-and-right of the point it labels.
+   This keyframe carries the centring through the reveal. */
+@keyframes hud-pin-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 6px)); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.tanga-deck__pin-label {
+  animation-name: hud-pin-in;
+}
+
+.tanga-deck__peer-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.tanga-deck__peer-label {
+  /* Clickable: picking a label flies the globe to that project, so the chip
+     has to take pointer events back from its pointer-events:none parent. */
+  pointer-events: auto;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  opacity: 0.62;
+  transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease;
+}
+
+.tanga-deck__peer-label.is-tanga {
+  opacity: 0.95;
+  font-weight: 750;
+  color: #fff3df;
+}
+
+/* The hovered or selected project, from either the table or the globe. */
+.tanga-deck__peer-label.is-active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.06);
+  border-color: color-mix(in srgb, var(--pin-tone, #8fb4d6) 88%, #ffffff);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55), 0 0 0 1px color-mix(in srgb, var(--pin-tone, #8fb4d6) 40%, transparent);
+}
+
+/* Reciprocal highlight: pointing at the globe label's project lifts its row. */
+.tanga-deck__ranking-list li.is-hovered {
+  background: color-mix(in srgb, var(--color-primary, #c7551b) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary, #c7551b) 46%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck__peer-label {
+    transition: none;
+  }
+
+  .tanga-deck__peer-label.is-active {
+    transform: translate(-50%, -50%);
+  }
 }

@@ -10,8 +10,128 @@ import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import proj4 from 'proj4';
 import {LITHOLOGY_COLOR_MAP} from '@/lib/boreholes/colors';
+import {
+  bestPerHole,
+  computeIntercepts,
+  formatIntercept,
+  interceptTone,
+  summariseIntercepts,
+  type Intercept,
+} from '@/lib/assay/intercepts';
+import {placeLabels, type LabelCandidate, type Rect} from '@/lib/labels/declutter';
 
 type GeologyMode = 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
+/**
+ * Ground palette. The reference decks keep the earth desaturated and warm so
+ * the orebody's saturated grade colours are the only vivid thing on screen.
+ */
+const TERRAIN_GROUND_COLOR = 0x9a8267;   // untextured fallback surface
+const TERRAIN_TEXTURE_TINT = 0xcbb9a4;   // multiplier over the satellite map
+/** Flat neutral sky, kept dark enough that the deck's HUD still reads over it. */
+const SKY_COLOR = 0x2b2723;
+
+export type LabelDensity = 'off' | 'key' | 'all';
+
+/** Intercept labels drawn at each density tier. */
+const INTERCEPT_LABEL_BUDGET: Record<LabelDensity, number> = {
+  off: 0,
+  key: 3,
+  all: 18,
+};
+
+/**
+ * Nominal label footprints for collision checks, measured from the rendered
+ * boxes rather than guessed: a story callout lays out at 192x82 and a compact
+ * intercept label at 178x56 once its grade quote wraps to two lines. These are
+ * rounded up, because over-reserving only leaves extra air between labels
+ * whereas under-reserving lets them overlap.
+ */
+const STORY_LABEL_SIZE = {width: 200, height: 88} as const;
+const INTERCEPT_LABEL_SIZE = {width: 184, height: 62} as const;
+
+/**
+ * The part of the canvas host actually on screen, in host-local pixels.
+ *
+ * The host is sized by the deck stage and can extend past the window — a label
+ * placed legitimately inside the host would then sit off the right edge, out
+ * of the viewer's sight. Labels are laid out against this instead.
+ */
+function visibleStage(
+  host: HTMLElement | null,
+  width: number,
+  height: number
+): {width: number; height: number} {
+  if (!host || typeof window === 'undefined') return {width, height};
+
+  const box = host.getBoundingClientRect();
+  // How much of the host lies within the window, measured from its own origin.
+  const usableWidth = Math.min(width, window.innerWidth - box.left);
+  const usableHeight = Math.min(height, window.innerHeight - box.top);
+
+  return {
+    // Never collapse to nothing: a degenerate stage would drop every label.
+    width: Math.max(240, usableWidth),
+    height: Math.max(200, usableHeight),
+  };
+}
+
+/**
+ * Panels and instruments that anchored labels must not cover. Selectors span
+ * both this scene's own chrome and the deck chrome layered over it.
+ */
+const CHROME_SELECTORS = [
+  '.tanga-three__scene-title',
+  '.tanga-three__story-strip',
+  '.tanga-three__nav-cluster',
+  '.tanga-three__panel',
+  '.tanga-three__legend',
+  '.tanga-deck__intercepts',
+  '.tanga-deck__depth-scale',
+  '.tanga-deck__legend',
+  '.tanga-deck__compass',
+  '.tanga-deck__pager',
+  '.tanga-deck__caption',
+  '.tanga-deck__act-rail',
+  '.tanga-deck__voice',
+] as const;
+
+/**
+ * Regions labels must avoid, measured from the live DOM rather than guessed as
+ * fractions of the stage. Guessed rectangles drift the moment a panel is
+ * restyled or reflows at a breakpoint — and drift silently, as labels sliding
+ * under a panel. Measuring costs a handful of reads at 10Hz and is always
+ * right.
+ */
+function chromeKeepOutRects(host: HTMLElement | null, width: number, height: number): Rect[] {
+  // The stage edges are still worth reserving: nothing should be flush to them.
+  const rects: Rect[] = [
+    {x: 0, y: 0, width, height: 56},
+    {x: 0, y: height - 56, width, height: 56},
+  ];
+
+  if (!host) return rects;
+
+  const origin = host.getBoundingClientRect();
+
+  for (const selector of CHROME_SELECTORS) {
+    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+      const box = element.getBoundingClientRect();
+      // Skip anything collapsed or faded out — several of these panels are
+      // hidden per scene, and reserving space for them would waste the stage.
+      if (box.width <= 0 || box.height <= 0) continue;
+      if (Number(getComputedStyle(element).opacity) < 0.05) continue;
+
+      rects.push({
+        x: box.left - origin.left,
+        y: box.top - origin.top,
+        width: box.width,
+        height: box.height,
+      });
+    }
+  }
+
+  return rects;
+}
 type ResourceFocus = 'Indicated' | 'Inferred' | 'All' | 'HighTGC' | 'LowTGC' | 'LowUncertainty' | 'HighFlake';
 type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
@@ -29,6 +149,13 @@ type TangaThreeGeologySceneProps = {
   cameraDropKey: number;
   cameraCommand?: ThreeCameraCommand | null;
   assetQuality?: AssetQuality;
+  /**
+   * How many data labels the scene may draw. `key` keeps the deck calm for a
+   * presenter; `all` gives the dense drilling look for detailed questions.
+   */
+  labelDensity?: LabelDensity;
+  /** Lifts the derived headline numbers out for the deck chrome to reuse. */
+  onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
     scene: SceneLoadState;
     terrain: SceneLoadState;
@@ -69,6 +196,14 @@ type ThreeCallout = {
   tone: string;
   anchor: [number, number, number];
   side?: 'left' | 'right' | 'top' | 'bottom';
+  /**
+   * `story` callouts are the hand-authored scene narration and always place
+   * first; `intercept` callouts are derived from assay data and yield to them
+   * when space is short.
+   */
+  kind?: 'story' | 'intercept';
+  /** Higher wins when two callouts compete for the same pixels. */
+  priority?: number;
 };
 
 type ThreeLegendItem = {
@@ -508,24 +643,40 @@ function materialsForObject(object: THREE.Object3D) {
   return Array.from(materials);
 }
 
+/**
+ * How opaque the ground is for a given scene and camera position.
+ *
+ * The reference decks make their strongest slide by letting you see the
+ * orebody *inside* the rock. Every branch of this function used to return 1,
+ * so the "subsurface cutaway" never opened the surface and the only way below
+ * ground was to fly the camera under it. These values restore the intent:
+ * ground stays solid where it is the subject, and turns to glass where the
+ * subject is what lies beneath it.
+ *
+ * Never returns 0 — a fully invisible surface loses the horizon, and with it
+ * any sense of where "ground level" is, which is the reference decks' whole
+ * trick for making depth legible.
+ */
 function terrainOpacityForView(mode: GeologyMode, view: SurfaceCameraView) {
+  // Looking up from beneath: the surface becomes a ceiling. Keep it faint so
+  // it reads as the roof of the deposit without hiding the model.
   if (view === 'bottom') {
-    if (mode === 'subsurface') return 1;
-    if (mode === 'resource') return 1;
-    if (mode === 'metallurgy') return 1;
-    return 1;
+    if (mode === 'subsurface') return 0.16;
+    if (mode === 'resource') return 0.2;
+    if (mode === 'mine_planning') return 0.24;
+    return 0.3;
   }
 
+  // Plan view: the ground is the subject again, so keep it solid.
   if (view === 'top') {
-    if (mode === 'subsurface') return 1;
-    if (mode === 'resource') return 1;
-    if (mode === 'metallurgy') return 1;
+    if (mode === 'subsurface') return 0.55;
     return 1;
   }
 
-  if (mode === 'subsurface') return 1;
-  if (mode === 'resource') return 1;
-  if (mode === 'metallurgy') return 1;
+  // The default three-quarter view, where most of the deck is presented.
+  if (mode === 'subsurface') return 0.28;
+  if (mode === 'resource') return 0.62;
+  if (mode === 'mine_planning') return 0.7;
   return 1;
 }
 
@@ -648,23 +799,157 @@ function projectedCalloutPlacement(
   } as const;
 }
 
-function threeCallouts(mode: GeologyMode, focus: ResourceFocus): ThreeCallout[] {
+/**
+ * Headline numbers derived once from the loaded assay intervals, so scene
+ * labels can quote real drill results instead of describing the rendering.
+ */
+export type AssayFacts = {
+  best: Intercept | null;
+  /** Best intercept per hole, ranked by grade x thickness. */
+  ranked: Intercept[];
+  interceptCount: number;
+  holeCount: number;
+  cutoffLabel: string;
+  bestGradePct: number;
+  /** Deepest below-collar extent of any reportable intercept, in metres. */
+  deepestOreM: number;
+};
+
+/** Adapt the scene's own segment shape to the shared intercept compositor. */
+function assayFactsFromSegments(segments: DrillSegment[]): AssayFacts | null {
+  if (!Array.isArray(segments) || segments.length === 0) return null;
+
+  const intercepts = computeIntercepts(
+    segments.map((segment) => ({
+      hole_id: segment.holeId,
+      depth_from: segment.depthFrom,
+      depth_to: segment.depthTo,
+      graphitic_carbon: segment.carbon,
+      lon: Number(segment.from?.[0]),
+      lat: Number(segment.from?.[1]),
+      elevation: Number(segment.from?.[2] ?? 0),
+      feature: null,
+    }))
+  );
+
+  if (intercepts.length === 0) return null;
+
+  const summary = summariseIntercepts(intercepts);
+  return {
+    best: intercepts[0] ?? null,
+    ranked: bestPerHole(intercepts),
+    interceptCount: summary.count,
+    holeCount: summary.holeCount,
+    cutoffLabel: summary.cutoffLabel,
+    bestGradePct: summary.bestGradePct,
+    deepestOreM: intercepts.reduce((max, i) => Math.max(max, i.toM), 0),
+  };
+}
+
+/**
+ * Turn the top-ranked intercepts into anchored scene labels — the device the
+ * reference deck leans on hardest. One label per hole, so a single deep hole
+ * cannot monopolise the view, and capped by tier so the scene stays readable.
+ */
+function interceptCallouts(
+  facts: AssayFacts | null,
+  maxLabels: number,
+  /** Hole already quoted by a story callout — labelling it twice says nothing new. */
+  excludeHoleId?: string | null
+): Array<{callout: ThreeCallout; intercept: Intercept}> {
+  if (!facts || maxLabels <= 0) return [];
+
+  return facts.ranked
+    .filter((intercept) => intercept.holeId !== excludeHoleId)
+    .slice(0, maxLabels)
+    .map((intercept, index) => {
+      const {headline, sub} = formatIntercept(intercept, {includeSubRun: false});
+      return {
+        intercept,
+        callout: {
+          id: `intercept-${intercept.holeId}-${intercept.fromM}`,
+          label: headline,
+          detail: sub,
+          // Percentages are unused once declutter places the box, but keep a
+          // sane fallback in case placement is skipped.
+          x: 50,
+          y: 50,
+          tone: interceptTone(intercept.gradePct),
+          anchor: [0, 0, 0] as [number, number, number],
+          kind: 'intercept' as const,
+          // Rank order becomes priority, so the strongest survive crowding.
+          priority: facts.ranked.length - index,
+        },
+      };
+    });
+}
+
+/**
+ * Scene narration. These labels state what the drilling found, not how the
+ * renderer draws it — a viewer can read a grade off the screen without the
+ * presenter having to say it. `detail` strings that quote assay numbers are
+ * filled in from the derived intercepts, never typed in by hand, so they
+ * cannot drift from `assay_data.geojson`.
+ */
+function threeCallouts(
+  mode: GeologyMode,
+  focus: ResourceFocus,
+  assayFacts: AssayFacts | null
+): ThreeCallout[] {
+  const best = assayFacts?.best;
+  const bestQuote = best ? `${best.holeId} · ${formatIntercept(best).sub}` : null;
+  const coverage = assayFacts
+    ? `${assayFacts.interceptCount} intercepts above ${assayFacts.cutoffLabel} across ${assayFacts.holeCount} holes`
+    : null;
+
   if (mode === 'drillholes') {
     return [
-      {id: 'collars', label: 'Drillhole collars', detail: 'Surface control points feeding the 3D assay trace', x: 47, y: 28, tone: '#facc15', anchor: [-820, 30, 540], side: 'right'},
-      {id: 'assays', label: 'Carbon intervals', detail: 'Red-yellow traces mark the stronger TGC intervals', x: 61, y: 52, tone: '#ef4444', anchor: [280, -230, -120], side: 'left'},
+      {
+        id: 'collars',
+        label: assayFacts ? `${assayFacts.holeCount} holes drilled` : 'Drillhole collars',
+        detail: coverage ?? 'Surface control points feeding the 3D assay trace',
+        x: 47, y: 28, tone: '#facc15', anchor: [-820, 30, 540], side: 'right', kind: 'story',
+      },
+      {
+        id: 'assays',
+        label: best ? 'Best intercept' : 'Carbon intervals',
+        detail: bestQuote ?? 'Red-yellow traces mark the stronger TGC intervals',
+        x: 61, y: 52, tone: '#ef4444', anchor: [280, -230, -120], side: 'left', kind: 'story',
+      },
     ];
   }
   if (mode === 'subsurface') {
     return [
-      {id: 'cutaway', label: 'Transparent surface', detail: 'Glass terrain stays above the opened subsurface view', x: 40, y: 31, tone: '#7dd3fc', anchor: [-780, 36, -650], side: 'right'},
-      {id: 'volume', label: 'Geology volume', detail: 'Drillholes remain spatially registered below surface', x: 64, y: 58, tone: '#2dd4bf', anchor: [360, -300, 190], side: 'left'},
+      {
+        id: 'cutaway',
+        label: assayFacts ? `${assayFacts.cutoffLabel} cut-off` : 'Transparent surface',
+        detail: coverage ?? 'Glass terrain stays above the opened subsurface view',
+        x: 40, y: 31, tone: '#7dd3fc', anchor: [-780, 36, -650], side: 'right', kind: 'story',
+      },
+      {
+        id: 'volume',
+        label: assayFacts ? `Deepest ore to ${Math.round(assayFacts.deepestOreM)}m` : 'Geology volume',
+        detail: bestQuote ?? 'Drillholes remain spatially registered below surface',
+        x: 64, y: 58, tone: '#2dd4bf', anchor: [360, -300, 190], side: 'left', kind: 'story',
+      },
     ];
   }
   if (mode === 'resource') {
     return [
-      {id: 'blocks', label: `${resourceFocusLabel(focus)} blocks`, detail: 'Only the requested resource population is emphasized', x: 57, y: 35, tone: '#ef4444', anchor: [420, -165, 420], side: 'left'},
-      {id: 'grade', label: 'TGC color ramp', detail: 'Every block is shaded by graphite grade', x: 36, y: 62, tone: '#facc15', anchor: [-520, -140, 700], side: 'right'},
+      {
+        id: 'blocks',
+        label: `${resourceFocusLabel(focus)} blocks`,
+        detail: 'Only the requested resource population is emphasized',
+        x: 57, y: 35, tone: '#ef4444', anchor: [420, -165, 420], side: 'left', kind: 'story',
+      },
+      {
+        id: 'grade',
+        label: assayFacts
+          ? `${assayFacts.cutoffLabel} to ${assayFacts.bestGradePct.toFixed(1)}% TGC`
+          : 'TGC color ramp',
+        detail: coverage ?? 'Every block is shaded by graphite grade',
+        x: 36, y: 62, tone: '#facc15', anchor: [-520, -140, 700], side: 'right', kind: 'story',
+      },
     ];
   }
   if (mode === 'mine_planning') {
@@ -672,13 +957,13 @@ function threeCallouts(mode: GeologyMode, focus: ResourceFocus): ThreeCallout[] 
     // upper-left over the terrain — clear of both the right-docked Pit &
     // Financial panel and the bottom-left drillhole legend.
     return [
-      {id: 'pit', label: 'Pit shell', detail: 'Optimised shell over the graphite resource, staged in phased benches', x: 33, y: 34, tone: '#f59e0b', anchor: [-620, -60, 300], side: 'right'},
+      {id: 'pit', label: 'Optimised pit shell', detail: '95 Mt @ 5.70% TGC inside the shell · US$0.58 Bn pit NPV', x: 33, y: 34, tone: '#f59e0b', anchor: [-620, -60, 300], side: 'right', kind: 'story'},
     ];
   }
   // metallurgy (default)
   return [
-    {id: 'samples', label: 'Sample transfer', detail: 'Selected drill intervals pulse into the lab circuit', x: 44, y: 36, tone: '#d96b2b', anchor: [940, 520, -1130], side: 'right'},
-    {id: 'recoveries', label: 'Data reveal', detail: '>97% TC concentrate with recovery metrics', x: 62, y: 58, tone: '#b9954b', anchor: [1540, 350, -1120], side: 'left'},
+    {id: 'samples', label: '8 variability composites', detail: 'Oxide, transition and fresh material tested through flotation', x: 44, y: 36, tone: '#d96b2b', anchor: [940, 520, -1130], side: 'right', kind: 'story'},
+    {id: 'recoveries', label: '93.0% / 94.4% recovery', detail: 'Oxide and fresh optimisation runs, both above 97% TC concentrate', x: 62, y: 58, tone: '#b9954b', anchor: [1540, 350, -1120], side: 'left', kind: 'story'},
   ];
 }
 
@@ -1253,6 +1538,8 @@ export default function TangaThreeGeologyScene({
   cameraCommand,
   assetQuality = 'preview',
   onLoadState,
+  labelDensity = 'key',
+  onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -1274,6 +1561,25 @@ export default function TangaThreeGeologyScene({
   const [projectedFrame, setProjectedFrame] = useState<ProjectedCalloutFrame>({width: 0, height: 0, items: []});
   const [navInstrument, setNavInstrument] = useState<ThreeNavInstrument>(DEFAULT_NAV_INSTRUMENT);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
+  // Derived drill results, kept in state so the narration callouts and the
+  // headline panel quote the same numbers the scene labels do.
+  const [assayFacts, setAssayFacts] = useState<AssayFacts | null>(null);
+  // Read inside the scene effect without making label density a dependency —
+  // changing tiers must not tear down and rebuild the whole WebGL scene.
+  const labelDensityRef = useRef<LabelDensity>(labelDensity);
+  // Lets a density change re-place labels immediately rather than waiting for
+  // the next animation frame, which matters when the render loop is idling on
+  // a static camera (or throttled by the browser).
+  const projectCalloutsRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    labelDensityRef.current = labelDensity;
+    projectCalloutsRef.current?.();
+  }, [labelDensity]);
+  // Same reason: a new callback identity from the parent must not remount the scene.
+  const onAssayFactsRef = useRef(onAssayFacts);
+  useEffect(() => {
+    onAssayFactsRef.current = onAssayFacts;
+  }, [onAssayFacts]);
 
   useEffect(() => {
     rotationKeyRef.current = rotationKey;
@@ -1311,8 +1617,16 @@ export default function TangaThreeGeologyScene({
     setHoverTooltip(null);
     const host = hostRef.current;
     const scene = new THREE.Scene();
-    scene.background = null;
-    scene.fog = new THREE.Fog(0x15202c, 4600, 12000);
+    // A horizon, not a void. The reference decks put a flat, slightly warm sky
+    // behind the ground so there is a visible horizon line — that line is what
+    // makes "above ground" and "below ground" legible, and it is the thing that
+    // makes a subsurface view read as a deposit rather than as floating shapes.
+    // Left transparent (background = null) would show the page's black through,
+    // which is what flattened the scene before.
+    scene.background = new THREE.Color(SKY_COLOR);
+    // Fog tinted to the sky so distant ground fades into the horizon instead of
+    // ending on a hard cut.
+    scene.fog = new THREE.Fog(SKY_COLOR, 4600, 12000);
 
     const depthGridGroup = new THREE.Group();
     depthGridGroup.name = 'depth-grid';
@@ -1434,19 +1748,31 @@ export default function TangaThreeGeologyScene({
 
     const lowCamera = cameraDropKey > 0 || cameraCommandRef.current?.action === 'bottomView';
     const cameraShot = cameraShotForMode(mode, lowCamera);
-    const calloutsForProjection = threeCallouts(mode, resourceFocus);
+    let calloutsForProjection = threeCallouts(mode, resourceFocus, null);
     const calloutAnchors = new Map<string, THREE.Vector3>();
     const terrainSurfaceMaterials: THREE.MeshStandardMaterial[] = [];
+    // Depth-only twins of the terrain; hidden while the surface is glass.
+    const terrainOccluders: THREE.Mesh[] = [];
     terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
       const opacity = terrainOpacityForView(mode, surfaceCameraView);
+      const isGlass = opacity < 1;
       terrainSurfaceMaterials.forEach((material) => {
         material.visible = true;
         material.opacity = opacity;
-        material.transparent = false;
-        material.depthWrite = true;
+        material.transparent = isGlass;
+        // Depth writing has to go with transparency: a see-through surface that
+        // still writes depth occludes everything behind it, which is what made
+        // the cutaway impossible even at low opacity.
+        material.depthWrite = !isGlass;
         material.needsUpdate = true;
+      });
+      // The terrain also carries depth-only twins (colorWrite off, depthWrite
+      // on) whose entire job is to hide what is underground. They have to step
+      // aside for the cutaway, or the surface turns to glass and still occludes.
+      terrainOccluders.forEach((occluder) => {
+        occluder.visible = !isGlass;
       });
     };
     const registerTerrainSurfaceMaterial = (material: THREE.MeshStandardMaterial) => {
@@ -1704,18 +2030,24 @@ export default function TangaThreeGeologyScene({
       const terrain = new THREE.Mesh(
         terrainGeometry,
         new THREE.MeshStandardMaterial({
-          color: 0xf5f2dd,
-          roughness: mode === 'drillholes' || mode === 'subsurface' ? 0.76 : 0.66,
-          metalness: 0.01,
-          transparent: false,
+          // Warm mineral brown rather than the old near-white cream. The
+          // reference decks keep the ground low-chroma so the orebody's
+          // saturated grades are the only vivid thing on screen; a pale
+          // surface competes with the data and washes the whole frame out.
+          color: TERRAIN_GROUND_COLOR,
+          roughness: mode === 'drillholes' || mode === 'subsurface' ? 0.88 : 0.8,
+          metalness: 0.0,
+          transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
           opacity: terrainOpacityForView(mode, surfaceCameraView),
           alphaMap: undefined,
           alphaTest: 0,
           side: THREE.DoubleSide,
           vertexColors: true,
-          emissive: new THREE.Color('#1b2f20'),
-          emissiveIntensity: 0.18,
-          depthWrite: true,
+          // Barely-there warm bounce. The old dark-green emissive at 0.18 was
+          // lifting the whole surface toward white under the environment map.
+          emissive: new THREE.Color('#241a12'),
+          emissiveIntensity: 0.06,
+          depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
           depthTest: true,
           polygonOffset: true,
           polygonOffsetFactor: 2,
@@ -1731,7 +2063,9 @@ export default function TangaThreeGeologyScene({
         new THREE.MeshBasicMaterial({ color: 0x000000, depthWrite: true, depthTest: true, colorWrite: false, side: THREE.DoubleSide })
       );
       terrainOccluder.renderOrder = 21;
+      terrainOccluders.push(terrainOccluder);
       terrainLayer.add(terrainOccluder);
+      applyTerrainSurfaceView();
     };
     addProceduralTerrain();
     let terrainResources: TangaTerrainResources | null = null;
@@ -1760,22 +2094,24 @@ export default function TangaThreeGeologyScene({
           terrainGeometry,
           new THREE.MeshStandardMaterial({
             map: terrainTexture,
-            // Slight warm bias lifts the satellite imagery out of dull-gray.
-            color: 0xfff4e2,
-            // Lower roughness + IBL env map = the bright, faintly-glossy VRIFY
-            // terrain look. Hair-thin metalness lets sunlit slopes catch a
-            // touch of specular so ridges read three-dimensional.
-            roughness: 0.62,
-            metalness: 0.05,
-            envMapIntensity: 1.15,
-            transparent: false,
+            // Neutral-warm multiplier, not a near-white one. The old 0xfff4e2
+            // combined with a bright IBL and 1.15 env intensity was blowing the
+            // satellite imagery out to a pale glow — the ground lost its rock
+            // colour and stopped separating from the white drill collars.
+            color: TERRAIN_TEXTURE_TINT,
+            // Matte ground. The specular sheen read as wet plastic at this
+            // scale and added to the wash.
+            roughness: 0.88,
+            metalness: 0.0,
+            envMapIntensity: 0.55,
+            transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
             opacity: terrainOpacityForView(mode, surfaceCameraView),
-            emissive: new THREE.Color('#0d1420'),
-            emissiveIntensity: mode === 'subsurface' ? 0.16 : 0.04,
+            emissive: new THREE.Color('#120d09'),
+            emissiveIntensity: 0.03,
             alphaMap: undefined,
             alphaTest: 0,
             side: THREE.DoubleSide,
-            depthWrite: true,
+            depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
             depthTest: true,
             polygonOffset: true,
             polygonOffsetFactor: 2,
@@ -1791,7 +2127,9 @@ export default function TangaThreeGeologyScene({
           new THREE.MeshBasicMaterial({ color: 0x000000, depthWrite: true, depthTest: true, colorWrite: false, side: THREE.DoubleSide })
         );
         texturedOccluder.renderOrder = 21;
+        terrainOccluders.push(texturedOccluder);
         terrainLayer.add(texturedOccluder);
+        applyTerrainSurfaceView();
         reportLoadState('loading', 'ready', quality, `${quality} terrain ready`);
         return resources;
       } catch {
@@ -1860,6 +2198,55 @@ export default function TangaThreeGeologyScene({
       const shownDrillholes = drillSegmentsForMode(drillholes, mode);
       const shownHoleCount = drillholeCount(shownDrillholes);
       const drillSurfaceOffsets = drillSurfaceOffsetByHole(shownDrillholes, terrainResources);
+
+      // Composite intercepts from the FULL assay table, never from
+      // `shownDrillholes` — that set is subsampled for draw performance, and
+      // compositing a sampled hole would report a grade over a length that
+      // was never continuously assayed.
+      const assayFacts = assayFactsFromSegments(drillholes);
+      setAssayFacts(assayFacts);
+      onAssayFactsRef.current?.(assayFacts);
+
+      // Rebuild the narration now that real numbers are available, and anchor
+      // one intercept label per hole to the middle of its own ore run.
+      const visibleHoles = new Set(shownDrillholes.map((segment) => segment.holeId));
+      const anchorableFacts: AssayFacts | null = assayFacts
+        ? {...assayFacts, ranked: assayFacts.ranked.filter((i) => visibleHoles.has(i.holeId))}
+        : null;
+
+      const segmentsByHole = new Map<string, DrillSegment[]>();
+      shownDrillholes.forEach((segment) => {
+        segmentsByHole.set(segment.holeId, [...(segmentsByHole.get(segment.holeId) ?? []), segment]);
+      });
+
+      // Build the full label set once; the density tier is applied per frame
+      // in `projectCallouts`, so switching tiers never rebuilds the scene.
+      // The best hole is skipped here because the story callout already
+      // quotes it — two identical labels would just cost space.
+      const storyCallouts = threeCallouts(mode, resourceFocus, assayFacts);
+      const anchoredInterceptLabels = interceptCallouts(
+        anchorableFacts,
+        INTERCEPT_LABEL_BUDGET.all,
+        assayFacts?.best?.holeId ?? null
+      )
+        .filter(({callout, intercept}) => {
+          // Anchor the label at the middle of the hole's own ore run, so the
+          // leader line lands on the geometry the numbers describe.
+          const midDepth = (intercept.fromM + intercept.toM) / 2;
+          const holeSegments = segmentsByHole.get(intercept.holeId) ?? [];
+          const host = holeSegments.find(
+            (segment) => segment.depthFrom <= midDepth && segment.depthTo >= midDepth
+          ) ?? holeSegments[0];
+          if (!host) return false;
+
+          const start = registeredDrillPoint(host, 'from', terrainResources, drillSurfaceOffsets);
+          const end = registeredDrillPoint(host, 'to', terrainResources, drillSurfaceOffsets);
+          calloutAnchors.set(callout.id, start.clone().lerp(end, 0.5));
+          return true;
+        })
+        .map(({callout}) => callout);
+
+      calloutsForProjection = [...storyCallouts, ...anchoredInterceptLabels];
       if (shownDrillholes.length) {
         const highCarbonSegment = shownDrillholes.reduce((best, segment) => (
           segment.carbon > best.carbon ? segment : best
@@ -1983,15 +2370,18 @@ export default function TangaThreeGeologyScene({
       if (collarAnchorSegment) {
         calloutAnchors.set('collars', collarSurfacePoint(collarAnchorSegment, terrainResources, 18));
       }
-      const collarGeometry = new THREE.SphereGeometry(mode === 'resource' ? 5.2 : 7.8, 12, 10);
+      // Collars are reference points, not the subject. At r=7.8 with a bright
+      // emissive they bloomed into blobs that covered the drill traces and the
+      // ground — the traces are the evidence, so the collars give way to them.
+      const collarGeometry = new THREE.SphereGeometry(mode === 'resource' ? 3.4 : 4.6, 12, 10);
       const collarMaterial = new THREE.MeshStandardMaterial({
-        color: 0xf8ffff,
-        emissive: 0x7dd3fc,
-        emissiveIntensity: 0.44,
-        roughness: 0.22,
-        metalness: 0.08,
+        color: 0xe8e2d6,
+        emissive: 0x8899a6,
+        emissiveIntensity: 0.12,
+        roughness: 0.55,
+        metalness: 0.04,
         transparent: true,
-        opacity: mode === 'resource' ? 0.62 : 0.96,
+        opacity: mode === 'resource' ? 0.5 : 0.82,
       });
       const collars = new THREE.InstancedMesh(collarGeometry, collarMaterial, collarSegments.length);
       collars.castShadow = true;
@@ -2045,7 +2435,15 @@ export default function TangaThreeGeologyScene({
           opacity: mode === 'resource' ? 0.18 : 0.3,
           depthWrite: false,
         });
-        const collarLabelLimit = mode === 'resource' ? 28 : 42;
+        // These float a bare hole id on a tall leader above every collar. On the
+        // scenes that now carry anchored intercept labels, they say strictly
+        // less than those labels do — an id with no grade — while adding 28-42
+        // competing marks that the DOM declutter pass cannot even see, because
+        // they are drawn in WebGL. The data labels win; these stand down.
+        // Zero everywhere: on the drilling and resource scenes the anchored
+        // intercept labels say strictly more, and on the metallurgy and
+        // mine-plan scenes a floating hole id is not what the slide is about.
+        const collarLabelLimit = 0;
         const collarLabelSegments = collarSegments.slice(0, collarLabelLimit);
         collarLabelSegments.forEach((segment, index) => {
           const point = collarSurfacePoint(segment, terrainResources, 15);
@@ -2549,8 +2947,32 @@ export default function TangaThreeGeologyScene({
       if (!width || !height) return;
 
       stage.updateMatrixWorld(true);
-      const items: ProjectedThreeCallout[] = [];
-      calloutsForProjection.forEach((callout) => {
+
+      const density = labelDensityRef.current;
+      if (density === 'off') {
+        setProjectedFrame({width, height, items: []});
+        return;
+      }
+
+      // Project every anchor first, then let the declutter pass decide which
+      // labels actually fit. Anchoring alone is what makes the reference decks
+      // read well; placing without collision checks is what makes their
+      // busiest slides unreadable.
+      // Trim to the tier's budget before placing, so the declutter pass is not
+      // spending space on labels we would immediately discard.
+      const interceptBudget = INTERCEPT_LABEL_BUDGET[density] ?? 0;
+      let interceptsTaken = 0;
+      const visible = calloutsForProjection.filter((callout) => {
+        if (callout.kind !== 'intercept') return true;
+        if (interceptsTaken >= interceptBudget) return false;
+        interceptsTaken += 1;
+        return true;
+      });
+
+      const candidates: LabelCandidate[] = [];
+      const byId = new Map<string, {callout: ThreeCallout; anchorPixelX: number; anchorPixelY: number}>();
+
+      visible.forEach((callout) => {
         const anchorWorld = (calloutAnchors.get(callout.id) ?? new THREE.Vector3(...callout.anchor)).clone();
         stage.localToWorld(anchorWorld);
         const projected = anchorWorld.project(camera);
@@ -2571,17 +2993,47 @@ export default function TangaThreeGeologyScene({
 
         const anchorPixelX = clamp(rawAnchorX, 34, width - 34);
         const anchorPixelY = clamp(rawAnchorY, 86, height - 44);
-        const placement = projectedCalloutPlacement(callout, anchorPixelX, anchorPixelY, width, height);
+        const isIntercept = callout.kind === 'intercept';
+        const size = isIntercept ? INTERCEPT_LABEL_SIZE : STORY_LABEL_SIZE;
 
-        items.push({
-          ...callout,
-          side: placement.side,
-          anchorPixelX,
-          anchorPixelY,
-          boxPixelX: placement.boxPixelX,
-          boxPixelY: placement.boxPixelY,
+        byId.set(callout.id, {callout, anchorPixelX, anchorPixelY});
+        candidates.push({
+          id: callout.id,
+          anchorPx: {x: anchorPixelX, y: anchorPixelY},
+          width: size.width,
+          height: size.height,
+          // Story narration outranks every derived label, so the authored
+          // point of the slide is never crowded out by a drill result.
+          priority: isIntercept ? (callout.priority ?? 0) : 10_000,
         });
       });
+
+      // The canvas host can be wider than the window, so placing against its
+      // own size alone would push labels past the right edge of the screen.
+      // Confine them to the part of the host the viewer can actually see.
+      const stageBounds = visibleStage(hostRef.current, width, height);
+
+      const {placed} = placeLabels(candidates, stageBounds, {
+        padding: 10,
+        keepOutRects: chromeKeepOutRects(hostRef.current, width, height),
+      });
+
+      const items: ProjectedThreeCallout[] = [];
+
+      for (const label of placed) {
+        const entry = byId.get(label.id);
+        if (!entry) continue;
+
+        items.push({
+          ...entry.callout,
+          side: label.side,
+          anchorPixelX: entry.anchorPixelX,
+          anchorPixelY: entry.anchorPixelY,
+          boxPixelX: label.boxPx.x,
+          boxPixelY: label.boxPx.y,
+        });
+      }
+
       setProjectedFrame({width, height, items});
     };
     const projectToScreen = (point: THREE.Vector3, width: number, height: number) => {
@@ -2658,6 +3110,7 @@ export default function TangaThreeGeologyScene({
         return next;
       });
     };
+    projectCalloutsRef.current = projectCallouts;
     projectCallouts();
     updateNavInstruments();
 
@@ -2791,6 +3244,9 @@ export default function TangaThreeGeologyScene({
 
     return () => {
       cancelled = true;
+      // Drop the projection hook before teardown so a density change cannot
+      // reach into a scene whose renderer is already disposed.
+      projectCalloutsRef.current = null;
       cancelAnimationFrame(frame);
       observer.disconnect();
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
@@ -2862,7 +3318,7 @@ export default function TangaThreeGeologyScene({
     setLockedGrade(null);
   }, [mode, resourceFocus]);
 
-  const callouts = threeCallouts(mode, resourceFocus);
+  const callouts = threeCallouts(mode, resourceFocus, assayFacts);
   const legendItems = drillholeLegend(mode);
   const compassBearing = navInstrument.northAngleDeg;
   const hasProjectedCallouts = projectedFrame.width > 0 && projectedFrame.items.length > 0;
@@ -2908,7 +3364,12 @@ export default function TangaThreeGeologyScene({
           </div>
         </>
       )}
-      {!minimalViewerChrome && (
+      {/* The drillhole and resource scenes drop the decorative title and story
+          strip, but they keep this layer: its labels now quote real intercepts
+          rather than describing the rendering, which is the reason the layer
+          was worth hiding on these scenes before. Density is governed by
+          `labelDensity` — at the "off" tier the projection yields no items. */}
+      {visible && (!minimalViewerChrome || hasProjectedCallouts) && (
         <section className="tanga-three__callout-layer" aria-label="Geology callouts">
           {hasProjectedCallouts && (
             <svg className="tanga-three__leader-svg" viewBox={`0 0 ${projectedFrame.width} ${projectedFrame.height}`} aria-hidden="true">
@@ -2934,7 +3395,11 @@ export default function TangaThreeGeologyScene({
           {(hasProjectedCallouts ? projectedCallouts : callouts).map((callout) => (
             <div
               key={callout.id}
-              className={classNames('tanga-three__callout', `is-${callout.side ?? 'right'}`)}
+              className={classNames(
+                'tanga-three__callout',
+                `is-${callout.side ?? 'right'}`,
+                callout.kind === 'intercept' && 'tanga-three__callout--intercept'
+              )}
               style={{
                 '--callout-x': hasProjectedCallouts ? `${(callout as ProjectedThreeCallout).boxPixelX}px` : `${callout.x}%`,
                 '--callout-y': hasProjectedCallouts ? `${(callout as ProjectedThreeCallout).boxPixelY}px` : `${callout.y}%`,
