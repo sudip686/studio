@@ -3,13 +3,15 @@
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {DeckGL} from '@deck.gl/react';
-import {ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
+import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
+import proj4 from 'proj4';
 import {formatIntercept, interceptTone} from '@/lib/assay/intercepts';
+import {loadHiresDem, type HiresDem} from '@/lib/terrain/hires-dem';
 import {
   FALLBACK_RELIEF,
   formatReliefWindow,
@@ -376,7 +378,10 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
       {cells: ['Min elevation', '≈300 m', '']},
       {cells: ['Relief range', '≈640 m', ''], emphasis: true},
       {cells: ['Setting', 'Maramba village', '']},
-      {cells: ['Terrain', 'Low-relief foothills', '']},
+      // "Low-relief foothills" sat directly under a relief range of ~800 m in
+      // the same panel, which is a contradiction a reader will catch. The
+      // descriptor now matches the measured numbers above it.
+      {cells: ['Terrain', 'Dissected hill country', '']},
     ],
   },
   accessibility: {
@@ -1708,6 +1713,90 @@ function locateMineItem<T extends {east: number; north: number; detail: string; 
 
 export type DrillCollar = {holeId: string; lon: number; lat: number};
 
+export type ReliefRaster = {
+  image: HTMLCanvasElement;
+  /** [west, south, east, north] in degrees. */
+  bounds: [number, number, number, number];
+};
+
+/**
+ * Hillshade raster for the topography scene, rendered from the hi-res DEM.
+ *
+ * Drawn as a single image rather than a polygon mesh. The previous version of
+ * this laid down thousands of flat-shaded quads, which read as a visible grid
+ * however fine the cells got — the same failure the old procedural version had,
+ * just at a smaller pitch. A raster is what a GIS would use for relief: it
+ * stays smooth at any zoom and costs one draw call.
+ *
+ * Shading is a standard surface-normal hillshade from a north-west sun, tinted
+ * by elevation, so ridges and drainage read the way they do on a topo sheet.
+ */
+function buildHillshadeRaster(dem: HiresDem): ReliefRaster | null {
+  if (typeof document === 'undefined') return null;
+
+  const SIZE = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  const [westLon, southLat] = proj4('EPSG:32737', 'WGS84', [dem.minX, dem.minY]) as [number, number];
+  const [eastLon, northLat] = proj4('EPSG:32737', 'WGS84', [dem.maxX, dem.maxY]) as [number, number];
+
+  const image = context.createImageData(SIZE, SIZE);
+  const span = Math.max(1, dem.maxElevation - dem.minElevation);
+  // Ground distance between samples, for a slope that is not exaggerated.
+  const metresPerStep = (dem.maxX - dem.minX) / SIZE;
+  // Sun from the north-west, the cartographic convention.
+  const sun = {x: -0.6, y: 0.6, z: 0.53};
+
+  for (let row = 0; row < SIZE; row += 1) {
+    const lat = northLat - ((row + 0.5) / SIZE) * (northLat - southLat);
+    for (let column = 0; column < SIZE; column += 1) {
+      const lon = westLon + ((column + 0.5) / SIZE) * (eastLon - westLon);
+      const index = (row * SIZE + column) * 4;
+
+      const here = dem.sample(lon, lat);
+      if (here === null) {
+        image.data[index + 3] = 0;
+        continue;
+      }
+
+      // Central differences give the surface normal.
+      const stepLon = (eastLon - westLon) / SIZE;
+      const stepLat = (northLat - southLat) / SIZE;
+      const east = dem.sample(lon + stepLon, lat) ?? here;
+      const west = dem.sample(lon - stepLon, lat) ?? here;
+      const north = dem.sample(lon, lat + stepLat) ?? here;
+      const south = dem.sample(lon, lat - stepLat) ?? here;
+
+      const dzdx = (east - west) / (2 * metresPerStep);
+      const dzdy = (north - south) / (2 * metresPerStep);
+      const length = Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1);
+      const light = clamp(((-dzdx * sun.x - dzdy * sun.y + sun.z) / length + 0.15) / 1.1, 0, 1);
+
+      const tint = terrainColor(here);
+      // Keep the shading gentle: this is context under the licence outline, not
+      // the subject of the frame.
+      const shade = 0.55 + light * 0.62;
+
+      image.data[index] = Math.min(255, Math.round(tint[0] * shade));
+      image.data[index + 1] = Math.min(255, Math.round(tint[1] * shade));
+      image.data[index + 2] = Math.min(255, Math.round(tint[2] * shade));
+
+      // Feather the rectangle so the raster dissolves into the imagery around
+      // it rather than ending on a hard tile edge.
+      const edgeU = Math.min(column, SIZE - 1 - column) / (SIZE * 0.5);
+      const edgeV = Math.min(row, SIZE - 1 - row) / (SIZE * 0.5);
+      image.data[index + 3] = Math.round(170 * clamp(Math.min(edgeU, edgeV) * 3.6, 0, 1));
+    }
+  }
+
+  context.putImageData(image, 0, 0);
+  return {image: canvas, bounds: [westLon, southLat, eastLon, northLat]};
+}
+
 let drillCollarPromise: Promise<DrillCollar[]> | null = null;
 
 /**
@@ -1983,6 +2072,8 @@ export default function TangaDeckWorkbench() {
   // Drill collars for the licence scene: 100 dots inside the boundary are the
   // most direct answer to "is this ground actually tested?".
   const [drillCollars, setDrillCollars] = useState<DrillCollar[]>([]);
+  // Relief cells for the topography scene, sampled from the real DEM.
+  const [reliefRaster, setReliefRaster] = useState<ReliefRaster | null>(null);
   const [contextLoadState, setContextLoadState] = useState<SceneLoadState>('idle');
   const [routeLoadState, setRouteLoadState] = useState<SceneLoadState>('idle');
   const [threeLoadReport, setThreeLoadReport] = useState<ThreeLoadReport>(DEFAULT_THREE_LOAD_REPORT);
@@ -3031,6 +3122,22 @@ export default function TangaDeckWorkbench() {
     };
   }, [activeMode, drillCollars.length]);
 
+  // Sampled once the topography scene is reached. Without it that slide has
+  // no relief at all — which is its entire subject.
+  useEffect(() => {
+    if (activeMode !== 'topography' || reliefRaster) return;
+
+    let cancelled = false;
+    loadHiresDem().then((dem) => {
+      if (cancelled || !dem) return;
+      setReliefRaster(buildHillshadeRaster(dem));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMode, reliefRaster]);
+
   const handleMapError = useCallback(() => {
     setMapLoadState('degraded');
     console.info('[Tanga telemetry] map entered degraded state; DeckGL overlays remain available');
@@ -3170,7 +3277,6 @@ export default function TangaDeckWorkbench() {
     const showGraphitePeers = activeMode === 'ranking' || activeMode === 'comparison';
     const showLocalContext = localContextMode;
     const showRoads = showLocalContext && contextReady && roadFeatures.length > 0;
-    const showFastLocalSurface = localContextMode;
     const showRoute = activeMode === 'accessibility';
     const showDrillholes = false;
     const showCutaway = false;
@@ -3213,13 +3319,21 @@ export default function TangaDeckWorkbench() {
       : [];
 
     return [
-      // The flat-shaded relief grid that used to cover the project, topography
-      // and access scenes is gone. It laid a 22x16 mesh of ~2 km quads over the
-      // map — visible as a coarse tiled grid across three slides — and its
-      // colours came from `reliefHeightAt`, which synthesises elevation from
-      // noise rather than reading the terrain raster. So it was a grid of
-      // invented relief painted on top of real satellite imagery. The imagery
-      // underneath carries the landform truthfully on its own.
+      // Real relief, on the one scene whose subject it is. The old version of
+      // this layer covered three scenes with a 22x16 mesh of ~2 km quads —
+      // visible as a coarse tiled grid — coloured from `reliefHeightAt`, which
+      // synthesises elevation from noise. This samples the actual project DEM
+      // at 96x96 (~75 m cells), fine enough to read as shading rather than
+      // tiling, and it is only drawn on the topography scene: on the licence
+      // and access scenes the satellite imagery carries the landform better
+      // than a translucent overlay does.
+      activeMode === 'topography' && reliefRaster && new BitmapLayer({
+        id: 'local-dem-relief-surface',
+        image: reliefRaster.image,
+        bounds: reliefRaster.bounds,
+        opacity: 1,
+        parameters: {depthTest: false} as any,
+      }),
       // VRIFY-style license boundary: three-layer glow that reads bright and
       // premium at any zoom. Uses the brand copper (matches the deck palette)
       // instead of the older teal chrome noise.
@@ -3796,7 +3910,7 @@ export default function TangaDeckWorkbench() {
         lineWidthMinPixels: 2,
       }),
     ].filter(Boolean) as any[];
-  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, tangaRankingInserted, vegetation, villages]);
+  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, reliefRaster, tangaRankingInserted, vegetation, villages]);
 
   const currentSummary = modeSummary(activeMode, routeTarget, resourceFocus, tangaRankingInserted);
   const currentFacts = factsForMode(activeMode, resourceFocus);
