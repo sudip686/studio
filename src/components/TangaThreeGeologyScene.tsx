@@ -265,6 +265,8 @@ type DrillPickInfo = {
 
 type MetallurgyPulse = {
   curve: THREE.CatmullRomCurve3;
+  /** Composite id this sample represents, e.g. "TDM004". */
+  label: string;
   delay: number;
   phase: number;
   speed: number;
@@ -393,12 +395,44 @@ const TERRAIN_TEXTURE_PATHS: Record<AssetQuality, string> = {
 };
 const TERRAIN_PATCH_WIDTH = 7200;
 const TERRAIN_PATCH_DEPTH = 6800;
-const METALLURGY_REVEAL_TARGETS = [
-  new THREE.Vector3(980, 430, -1040),
-  new THREE.Vector3(1280, 500, -1185),
-  new THREE.Vector3(1580, 450, -1070),
-] as const;
+/**
+ * The flotation lab. Deliberately a single abstract node rather than three
+ * scattered ones: the slide is one process — material leaves the ground, goes
+ * to a lab, a result comes back — and three targets made it read as ambient
+ * motion with no destination. Sited off the deposit's north-east shoulder and
+ * above the terrain so the arcs stay legible against the sky rather than
+ * crossing the model.
+ */
+const METALLURGY_LAB_POSITION = new THREE.Vector3(760, 330, -980);
+/** Seconds one sample takes to travel from its hole to the lab. */
+/** Haul trucks on the pit-to-ROM ramp. Enough to read as traffic, not a convoy. */
+const HAUL_TRUCK_COUNT = 5;
+/** Seconds for one truck to run the ramp end to end. */
+const HAUL_LAP_SECONDS = 9;
+
+const METALLURGY_TRAVEL_SECONDS = 2.6;
+/** Gap between consecutive departures, so the eight read as a sequence. */
+const METALLURGY_SAMPLE_STAGGER = 0.42;
 const METALLURGY_REVEAL_COLORS = ['#d96b2b', '#b9954b', '#facc15'] as const;
+
+/**
+ * The eight flotation variability composites, with the results stated in the
+ * AMC testwork summary (see `product_quality` in src/data/deck.ts).
+ *
+ * Sending these — named, each carrying its own outcome — rather than ninety
+ * anonymous particles is the point: a viewer sees that real, identified
+ * material was tested, and the scene reads as a process instead of weather.
+ */
+const METALLURGY_COMPOSITES: ReadonlyArray<{id: string; result: string}> = [
+  {id: 'TDM001', result: '34.8% +150 µm'},
+  {id: 'TDM002', result: '42.5% +150 µm'},
+  {id: 'TDM003', result: '>61% +150 µm'},
+  {id: 'TDM004', result: '75.8% recovery'},
+  {id: 'TDM005', result: '>61% +150 µm'},
+  {id: 'TDM006', result: '>97% TC concentrate'},
+  {id: 'TDM007', result: '>97% TC concentrate'},
+  {id: 'TDM008', result: '73% +150 µm · best flake'},
+];
 const DEFAULT_NAV_INSTRUMENT: ThreeNavInstrument = {
   northAngleDeg: 0,
   scaleLabel: '500 m',
@@ -885,6 +919,99 @@ function interceptCallouts(
 }
 
 /**
+ * A miniature process plant: pad, shed, tanks, stack and a short conveyor.
+ *
+ * Both the metallurgy lab and the mine-plan plant used to be a glowing torus
+ * with a sphere in the middle — a circle floating in the air, which read as a
+ * marker rather than as a place material goes to. This builds something small
+ * that is recognisably a plant, so the arcs and haul routes terminate at an
+ * object with a purpose.
+ *
+ * Returned centred on the origin with its base at y=0, so the caller can drop
+ * it straight onto the terrain surface.
+ */
+function buildMiniPlant(options: {
+  scale?: number;
+  tone?: THREE.ColorRepresentation;
+  accent?: THREE.ColorRepresentation;
+  tankCount?: number;
+}): THREE.Group {
+  const {scale = 1, tone = 0xb9b3a6, accent = 0xd96b2b, tankCount = 3} = options;
+  const group = new THREE.Group();
+
+  const shellMaterial = new THREE.MeshStandardMaterial({
+    color: tone,
+    roughness: 0.62,
+    metalness: 0.18,
+  });
+  const accentMaterial = new THREE.MeshStandardMaterial({
+    color: accent,
+    roughness: 0.5,
+    metalness: 0.12,
+    emissive: new THREE.Color(accent),
+    emissiveIntensity: 0.22,
+  });
+  const padMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4a4238,
+    roughness: 0.95,
+    metalness: 0,
+  });
+
+  // Pad the plant stands on, so it reads as sited rather than dropped.
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(150 * scale, 3 * scale, 104 * scale), padMaterial);
+  pad.position.y = 1.5 * scale;
+  pad.receiveShadow = true;
+  group.add(pad);
+
+  // Main shed.
+  const shed = new THREE.Mesh(new THREE.BoxGeometry(74 * scale, 30 * scale, 44 * scale), shellMaterial);
+  shed.position.set(-24 * scale, 18 * scale, 0);
+  shed.castShadow = true;
+  group.add(shed);
+
+  // Pitched roof, so the silhouette is not a plain block.
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(30 * scale, 14 * scale, 4), accentMaterial);
+  roof.position.set(-24 * scale, 40 * scale, 0);
+  roof.rotation.y = Math.PI / 4;
+  group.add(roof);
+
+  // Process tanks in a row.
+  for (let i = 0; i < tankCount; i += 1) {
+    const tank = new THREE.Mesh(
+      new THREE.CylinderGeometry(11 * scale, 11 * scale, 34 * scale, 16),
+      shellMaterial
+    );
+    tank.position.set((22 + i * 27) * scale, 20 * scale, -10 * scale);
+    tank.castShadow = true;
+    group.add(tank);
+
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(12 * scale, 12 * scale, 3 * scale, 16),
+      accentMaterial
+    );
+    cap.position.set((22 + i * 27) * scale, 38 * scale, -10 * scale);
+    group.add(cap);
+  }
+
+  // Stack, the tallest thing on site — reads as "plant" from a distance.
+  const stack = new THREE.Mesh(
+    new THREE.CylinderGeometry(4.5 * scale, 6 * scale, 62 * scale, 12),
+    shellMaterial
+  );
+  stack.position.set(4 * scale, 34 * scale, 18 * scale);
+  stack.castShadow = true;
+  group.add(stack);
+
+  // Conveyor running into the shed.
+  const conveyor = new THREE.Mesh(new THREE.BoxGeometry(58 * scale, 3 * scale, 8 * scale), accentMaterial);
+  conveyor.position.set(-70 * scale, 26 * scale, 16 * scale);
+  conveyor.rotation.z = -0.22;
+  group.add(conveyor);
+
+  return group;
+}
+
+/**
  * Scene narration. These labels state what the drilling found, not how the
  * renderer draws it — a viewer can read a grade off the screen without the
  * presenter having to say it. `detail` strings that quote assay numbers are
@@ -962,8 +1089,10 @@ function threeCallouts(
   }
   // metallurgy (default)
   return [
-    {id: 'samples', label: '8 variability composites', detail: 'Oxide, transition and fresh material tested through flotation', x: 44, y: 36, tone: '#d96b2b', anchor: [940, 520, -1130], side: 'right', kind: 'story'},
-    {id: 'recoveries', label: '93.0% / 94.4% recovery', detail: 'Oxide and fresh optimisation runs, both above 97% TC concentrate', x: 62, y: 58, tone: '#b9954b', anchor: [1540, 350, -1120], side: 'left', kind: 'story'},
+    // Anchored at the two ends of the story the scene now tells: material
+    // leaving identified holes, and the lab it arrives at.
+    {id: 'samples', label: '8 variability composites', detail: 'Oxide, transition and fresh material leaving the drilled holes', x: 30, y: 40, tone: '#d96b2b', anchor: [-360, 120, 220], side: 'right', kind: 'story'},
+    {id: 'recoveries', label: 'Flotation testwork', detail: '93.0% oxide and 94.4% fresh recovery, both above 97% TC concentrate', x: 62, y: 52, tone: '#b9954b', anchor: [METALLURGY_LAB_POSITION.x, METALLURGY_LAB_POSITION.y, METALLURGY_LAB_POSITION.z], side: 'left', kind: 'story'},
   ];
 }
 
@@ -1744,7 +1873,13 @@ export default function TangaThreeGeologyScene({
         makeSprite(label, new THREE.Vector3(xMax + 36, posY, zMax), elevated ? 74 : 66, 70, 42, 'center');
       });
     };
-    addDepthGrid();
+    // Depth grid intentionally not drawn. It boxed every 3D scene in measured
+    // wireframe with elevation ticks, which read as a modelling viewport rather
+    // than a presentation. The scale bar, compass and depth bracket carry the
+    // same measurement information without wrapping the deposit in a cage.
+    // ( is kept for now in case the measured view is wanted as an
+    // explicit toggle later.)
+    void addDepthGrid;
 
     const lowCamera = cameraDropKey > 0 || cameraCommandRef.current?.action === 'bottomView';
     const cameraShot = cameraShotForMode(mode, lowCamera);
@@ -1753,6 +1888,9 @@ export default function TangaThreeGeologyScene({
     const terrainSurfaceMaterials: THREE.MeshStandardMaterial[] = [];
     // Depth-only twins of the terrain; hidden while the surface is glass.
     const terrainOccluders: THREE.Mesh[] = [];
+    // The terrain surfaces themselves, so the mine plan can carve a pit into
+    // their height field rather than float a shell over unbroken ground.
+    const terrainMeshes: THREE.Mesh[] = [];
     terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
@@ -2003,18 +2141,12 @@ export default function TangaThreeGeologyScene({
     groupRef.current = stage;
     scene.add(stage);
 
-    // Ground reference grid — anchors the block model / pit in space so the
-    // subsurface reads as a real 3D model rather than floating voxels.
-    if (mode === 'resource' || mode === 'mine_planning' || mode === 'subsurface') {
-      const grid = new THREE.GridHelper(3800, 19, 0x4a5a6e, 0x2a3644);
-      grid.position.set(0, -440, -60);
-      const gm = grid.material as THREE.Material;
-      gm.transparent = true;
-      gm.opacity = 0.28;
-      gm.depthWrite = false;
-      grid.renderOrder = 1;
-      stage.add(grid);
-    }
+    // The ground reference grid that used to sit under the block model is gone.
+    // Its job — "anchor the model in space so the subsurface reads as a real 3D
+    // model rather than floating voxels" — is now done by the terrain itself:
+    // there is a horizon, an opaque ground the pit is carved into, and a depth
+    // bracket giving the vertical scale. A wireframe floor on top of all that
+    // reads as CAD scaffolding and undercuts the realism it was compensating for.
 
     cameraCommandHandlerRef.current = consumeCameraCommand;
     const pendingCameraCommand = cameraCommandRef.current;
@@ -2063,6 +2195,7 @@ export default function TangaThreeGeologyScene({
         new THREE.MeshBasicMaterial({ color: 0x000000, depthWrite: true, depthTest: true, colorWrite: false, side: THREE.DoubleSide })
       );
       terrainOccluder.renderOrder = 21;
+      terrainMeshes.push(terrain);
       terrainOccluders.push(terrainOccluder);
       terrainLayer.add(terrainOccluder);
       applyTerrainSurfaceView();
@@ -2127,6 +2260,7 @@ export default function TangaThreeGeologyScene({
           new THREE.MeshBasicMaterial({ color: 0x000000, depthWrite: true, depthTest: true, colorWrite: false, side: THREE.DoubleSide })
         );
         texturedOccluder.renderOrder = 21;
+        terrainMeshes.push(texturedTerrain);
         terrainOccluders.push(texturedOccluder);
         terrainLayer.add(texturedOccluder);
         applyTerrainSurfaceView();
@@ -2143,6 +2277,9 @@ export default function TangaThreeGeologyScene({
     }
 
     let samplePulseMesh: THREE.InstancedMesh | null = null;
+    let haulTrucks: THREE.InstancedMesh | null = null;
+    let haulRoute: THREE.CatmullRomCurve3 | null = null;
+    const haulDummy = new THREE.Object3D();
     let samplePulseCurves: MetallurgyPulse[] = [];
     let samplePulseTrailMaterials: THREE.LineBasicMaterial[] = [];
     const revealItems: SceneRevealItem[] = [];
@@ -2468,17 +2605,50 @@ export default function TangaThreeGeologyScene({
       }
 
       if (mode === 'metallurgy') {
-        const pulseSource = shownDrillholes
-          .filter((segment, index) => segment.carbon >= 4.2 || index % 18 === 0)
-          .slice(0, 90);
+        // One departure per composite, from the strongest hole available, so
+        // each arc leaves real drilled ground rather than an arbitrary point.
+        // Eight travelling samples instead of ninety: the slide is making a
+        // point about provenance, not throughput, and ninety particles read as
+        // weather.
+        // The lab itself: a small plant standing on the ground, not a ring in
+        // mid-air. Built first so the sample arcs can terminate on its roof.
+        // `labAnchor` is a local clone — the module constant stays untouched so
+        // repeated scene rebuilds do not walk the lab up into the sky.
+        const labGround = terrainSurfaceY(
+          terrainResources,
+          METALLURGY_LAB_POSITION.x,
+          -METALLURGY_LAB_POSITION.z
+        );
+        const labPlant = buildMiniPlant({scale: 2.4, accent: METALLURGY_REVEAL_COLORS[0]});
+        labPlant.position.set(METALLURGY_LAB_POSITION.x, labGround, METALLURGY_LAB_POSITION.z);
+        stage.add(labPlant);
+        registerReveal(labPlant, 0.2, 1.3, 0.9);
+
+        const labAnchor = new THREE.Vector3(
+          METALLURGY_LAB_POSITION.x,
+          labGround + 118,
+          METALLURGY_LAB_POSITION.z
+        );
+
+        const byGrade = [...shownDrillholes].sort((a, b) => b.carbon - a.carbon);
+        const seenHoles = new Set<string>();
+        const pulseSource = byGrade
+          .filter((segment) => {
+            if (seenHoles.has(segment.holeId)) return false;
+            seenHoles.add(segment.holeId);
+            return true;
+          })
+          .slice(0, METALLURGY_COMPOSITES.length);
 
         samplePulseCurves = pulseSource.map((segment, index) => {
+          const composite = METALLURGY_COMPOSITES[index % METALLURGY_COMPOSITES.length];
           const start = registeredDrillPoint(segment, 'to', terrainResources, drillSurfaceOffsets);
-          const targetBase = METALLURGY_REVEAL_TARGETS[index % METALLURGY_REVEAL_TARGETS.length];
-          const target = targetBase.clone().add(new THREE.Vector3(
-            Math.sin(index * 1.31) * 42,
-            Math.cos(index * 1.7) * 46,
-            Math.cos(index * 0.93) * 58
+          // Fan the arrivals slightly so eight arcs terminating on one node stay
+          // separable, without losing the single-destination reading.
+          const target = labAnchor.clone().add(new THREE.Vector3(
+            Math.sin(index * 1.31) * 30,
+            Math.cos(index * 1.7) * 22,
+            Math.cos(index * 0.93) * 34
           ));
           const midpoint = start.clone().lerp(target, 0.5);
           midpoint.y += 340 + (index % 5) * 42;
@@ -2491,25 +2661,28 @@ export default function TangaThreeGeologyScene({
             fog: false,
             blending: THREE.AdditiveBlending,
           });
-          if (index < 64) {
-            samplePulseTrailMaterials.push(trailMaterial);
-            const trail = new THREE.Line(
-              new THREE.BufferGeometry().setFromPoints(curve.getPoints(56)),
-              trailMaterial
-            );
-            trail.renderOrder = 9;
-            stage.add(trail);
-          }
+          samplePulseTrailMaterials.push(trailMaterial);
+          const trail = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(curve.getPoints(56)),
+            trailMaterial
+          );
+          trail.renderOrder = 9;
+          stage.add(trail);
+
           return {
             curve,
-            delay: (index % 30) * 0.05,
-            phase: (index % 17) / 17,
-            speed: 0.15 + (index % 5) * 0.014,
+            label: composite.id,
+            // Beat two: the samples leave in a staggered line rather than all
+            // at once, so the eye can follow individual departures.
+            delay: index * METALLURGY_SAMPLE_STAGGER,
+            phase: 0,
+            speed: 1 / METALLURGY_TRAVEL_SECONDS,
           };
         });
 
-        METALLURGY_REVEAL_TARGETS.forEach((target, index) => {
-          const targetColor = new THREE.Color(METALLURGY_REVEAL_COLORS[index % METALLURGY_REVEAL_COLORS.length]);
+        // A ground halo at the pad keeps the arrival readable at a distance.
+        [labAnchor].forEach((target, index) => {
+          const targetColor = new THREE.Color(METALLURGY_REVEAL_COLORS[0]);
           const ringMaterial = new THREE.MeshBasicMaterial({
             color: targetColor,
             transparent: true,
@@ -2830,6 +3003,179 @@ export default function TangaThreeGeologyScene({
           pitGroup.add(floor);
 
           stage.add(pitGroup);
+
+          // ── Carve the pit into the ground ───────────────────────────────
+          // A shell drawn over unbroken terrain never reads as a hole; the eye
+          // needs the ground itself to fall away. Rather than a CSG boolean
+          // (expensive, fragile on a 230k-vertex mesh), this displaces the
+          // terrain height field: every vertex inside the crest is pushed down
+          // along the batter angle until it reaches the floor.
+          //
+          // The pit is convex, so its radius can be looked up by bearing —
+          // which makes the whole carve a per-vertex constant-time operation.
+          const rimSamples = hull
+            .map(([x, z]) => ({
+              angle: Math.atan2(z - centroidZ, x - centroidX),
+              radius: Math.hypot(x - centroidX, z - centroidZ),
+            }))
+            .sort((a, b) => a.angle - b.angle);
+
+          const crestRadiusAt = (angle: number) => {
+            if (rimSamples.length === 0) return 0;
+            // Bracket the bearing between two hull vertices and interpolate,
+            // wrapping at the seam so there is no discontinuity due north.
+            let previous = rimSamples[rimSamples.length - 1];
+            for (const sample of rimSamples) {
+              if (angle <= sample.angle) {
+                const span = sample.angle - previous.angle;
+                const t = span <= 0 ? 0 : (angle - previous.angle) / span;
+                return previous.radius + (sample.radius - previous.radius) * t;
+              }
+              previous = sample;
+            }
+            return rimSamples[rimSamples.length - 1].radius;
+          };
+
+          // Batter angles the panel already quotes: 50 degrees in fresh rock,
+          // 44 in the weathered oxide near surface. Using the shallower angle
+          // for the upper third is what gives the profile its slight flare.
+          const tanFresh = Math.tan((50 * Math.PI) / 180);
+          const tanOxide = Math.tan((44 * Math.PI) / 180);
+          const oxideDepth = depth * 0.32;
+          const floorY = surfaceY - depth;
+          // Soften the last few metres to the crest so the rim is a lip rather
+          // than a knife edge cut across the hillside.
+          const CREST_FEATHER = 46;
+
+          for (const mesh of terrainMeshes) {
+            const position = mesh.geometry.getAttribute('position');
+            if (!position) continue;
+
+            for (let i = 0; i < position.count; i += 1) {
+              const x = position.getX(i);
+              const z = position.getZ(i);
+              const dx = x - centroidX;
+              const dz = z - centroidZ;
+              const radius = Math.hypot(dx, dz);
+              const crest = crestRadiusAt(Math.atan2(dz, dx));
+              if (crest <= 0 || radius >= crest) continue;
+
+              // Distance inward from the crest drives how deep this point sits.
+              const inward = crest - radius;
+              const oxideRun = oxideDepth / tanOxide;
+              const cut =
+                inward <= oxideRun
+                  ? inward * tanOxide
+                  : oxideDepth + (inward - oxideRun) * tanFresh;
+
+              const feather = clamp(inward / CREST_FEATHER, 0, 1);
+              const targetY = Math.max(floorY, surfaceY - cut);
+              const current = position.getY(i);
+              // Only ever cut down — never lift ground that was already lower
+              // than the pit profile at that point.
+              position.setY(i, Math.min(current, current + (targetY - current) * feather));
+            }
+
+            position.needsUpdate = true;
+            mesh.geometry.computeVertexNormals();
+          }
+
+          // The bench walls would now z-fight the carved ground they sit in, so
+          // the shell keeps only its crest lines — the carve is the pit, the
+          // amber rings just annotate the bench elevations.
+          pitGroup.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) child.visible = false;
+          });
+
+          // ── Surface infrastructure ──────────────────────────────────────
+          // Sited off the pit rather than at fixed coordinates: the plant sits
+          // clear of the crest on the shallow side, with the ROM pad between
+          // the two so the haul route is short. That ordering — pit, ROM,
+          // plant, product — is what makes the slide legible as a mine plan
+          // rather than a shape floating on terrain.
+          const hullRadius = hull.reduce(
+            (max, [x, z]) => Math.max(max, Math.hypot(x - centroidX, z - centroidZ)),
+            0
+          );
+          const siteBearing = -0.6; // radians, east-north-east of the pit
+          const atBearing = (distance: number, bearing = siteBearing) => {
+            const x = centroidX + Math.cos(bearing) * distance;
+            const z = centroidZ + Math.sin(bearing) * distance;
+            return new THREE.Vector3(x, terrainSurfaceY(terrainResources, x, -z), z);
+          };
+
+          // Distances are kept tight to the crest deliberately. The block-model
+          // hull is well over a kilometre across, so offsets in the hundreds of
+            // metres beyond it push the plant clean out of the camera frustum —
+          // which is exactly what happened at +620.
+          const romPad = atBearing(hullRadius + 120);
+          const plantSite = atBearing(hullRadius + 300);
+          const productPad = atBearing(hullRadius + 430, siteBearing + 0.4);
+
+          const minePlant = buildMiniPlant({scale: 3.2, accent: 0xf59e0b});
+          minePlant.position.copy(plantSite);
+          stage.add(minePlant);
+          registerReveal(minePlant, 1.1, 1.3, 0.9);
+
+          // Stockpiles, as cones — the universal shorthand for bulk material.
+          const stockpile = (at: THREE.Vector3, radius: number, height: number, color: number) => {
+            const pile = new THREE.Mesh(
+              new THREE.ConeGeometry(radius, height, 22),
+              new THREE.MeshStandardMaterial({color, roughness: 0.98, metalness: 0})
+            );
+            pile.position.set(at.x, at.y + height / 2, at.z);
+            pile.castShadow = true;
+            pile.receiveShadow = true;
+            return pile;
+          };
+
+          const romPile = stockpile(romPad, 78, 46, 0x6b5a45);
+          stage.add(romPile);
+          registerReveal(romPile, 0.9, 1.2, 0.86);
+
+          const productPile = stockpile(productPad, 54, 34, 0x8b8175);
+          stage.add(productPile);
+          registerReveal(productPile, 1.3, 1.2, 0.86);
+
+          // ── Haulage ─────────────────────────────────────────────────────
+          // A ramp out of the pit to the ROM pad, with trucks running it on a
+          // loop. Haulage is the one thing that makes a pit read as *operating*
+          // rather than as a surveyed hole, and it is the cheapest possible
+          // animation: a handful of boxes on a curve.
+          const rampFoot = new THREE.Vector3(centroidX, surfaceY - depth + 12, centroidZ);
+          const rampCrest = atBearing(hullRadius + 40);
+          const haulCurve = new THREE.CatmullRomCurve3([
+            rampFoot,
+            new THREE.Vector3(
+              (rampFoot.x + rampCrest.x) / 2,
+              (rampFoot.y + rampCrest.y) / 2 + 8,
+              (rampFoot.z + rampCrest.z) / 2
+            ),
+            rampCrest,
+            new THREE.Vector3(romPad.x, romPad.y + 18, romPad.z),
+          ]);
+
+          // The route itself, drawn faintly so it reads even when no truck is
+          // on that stretch.
+          const haulLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(haulCurve.getPoints(72)),
+            new THREE.LineBasicMaterial({color: 0xffb56b, transparent: true, opacity: 0.3})
+          );
+          haulLine.renderOrder = 8;
+          stage.add(haulLine);
+
+          const truckGeometry = new THREE.BoxGeometry(26, 14, 16);
+          const truckMaterial = new THREE.MeshStandardMaterial({
+            color: 0xf5d9a8,
+            roughness: 0.5,
+            metalness: 0.2,
+            emissive: new THREE.Color(0xf59e0b),
+            emissiveIntensity: 0.16,
+          });
+          haulTrucks = new THREE.InstancedMesh(truckGeometry, truckMaterial, HAUL_TRUCK_COUNT);
+          haulTrucks.renderOrder = 9;
+          stage.add(haulTrucks);
+          haulRoute = haulCurve;
           } // end of "hull.length >= 4" guard
         }
 
@@ -3212,25 +3558,60 @@ export default function TangaThreeGeologyScene({
       }
       if (samplePulseMesh) {
         const revealStart = cameraShot.flySeconds * 0.36;
+        // Each sample travels its curve once and stops at the lab. The old
+        // version wrapped the position with `% 1`, so samples looped from the
+        // lab back to their holes forever — which is what made this read as a
+        // screensaver rather than as material being sent away and tested.
         samplePulseCurves.forEach((sample, index) => {
           const localTime = elapsed - revealStart - sample.delay;
-          const reveal = clamp(localTime / 0.75, 0, 1);
-          const pulse = localTime > 0 ? (localTime * sample.speed + sample.phase) % 1 : 0;
-          const position = sample.curve.getPoint(pulse);
-          const arrival = clamp((pulse - 0.74) / 0.2, 0, 1);
-          const breathe = Math.max(0.25, Math.sin(pulse * Math.PI));
-          const scale = reveal * (0.28 + breathe * 1.06 + arrival * 0.72);
+
+          // Beat one: the sample lifts out of the hole before it sets off.
+          const emerge = clamp(localTime / 0.55, 0, 1);
+          // Beat two: travel, easing out so arrival settles rather than stops dead.
+          const travelRaw = clamp(localTime * sample.speed, 0, 1);
+          const travel = 1 - Math.pow(1 - travelRaw, 3);
+
+          const position = sample.curve.getPoint(travel);
+          // Beat three: a brief swell on arrival, then it rests at the lab.
+          const arrival = clamp((travelRaw - 0.82) / 0.18, 0, 1);
+          const scale = emerge * (0.9 + arrival * 0.85);
+
           samplePulseDummy.position.copy(position);
           samplePulseDummy.scale.setScalar(Math.max(0.01, scale));
           samplePulseDummy.updateMatrix();
           samplePulseMesh?.setMatrixAt(index, samplePulseDummy.matrix);
         });
         samplePulseMesh.instanceMatrix.needsUpdate = true;
+
+        // Trails draw in behind their own sample and then hold, so the finished
+        // state is a readable set of eight paths from ground to lab that a
+        // presenter can talk over.
         samplePulseTrailMaterials.forEach((material, index) => {
-          const reveal = clamp((elapsed - revealStart - index * 0.018) / 1.4, 0, 1);
-          material.opacity = reveal * (0.032 + Math.sin(elapsed * 0.82 + index * 0.3) * 0.01);
+          const localTime = elapsed - revealStart - index * METALLURGY_SAMPLE_STAGGER;
+          const drawn = clamp(localTime * (1 / METALLURGY_TRAVEL_SECONDS), 0, 1);
+          material.opacity = drawn * 0.09;
         });
       }
+      // Haulage runs on a continuous loop, unlike the metallurgy samples which
+      // tell a one-shot story. An operating pit should never look finished.
+      if (haulTrucks && haulRoute) {
+        for (let i = 0; i < HAUL_TRUCK_COUNT; i += 1) {
+          const offset = i / HAUL_TRUCK_COUNT;
+          const t = ((elapsed / HAUL_LAP_SECONDS) + offset) % 1;
+          const position = haulRoute.getPoint(t);
+          // Face along the route so the boxes read as vehicles, not cargo.
+          const ahead = haulRoute.getPoint(Math.min(1, t + 0.02));
+          haulDummy.position.copy(position);
+          haulDummy.lookAt(ahead);
+          // Fade in and out at the ends so trucks do not pop when they wrap.
+          const edge = Math.min(t, 1 - t);
+          haulDummy.scale.setScalar(clamp(edge / 0.06, 0, 1));
+          haulDummy.updateMatrix();
+          haulTrucks.setMatrixAt(i, haulDummy.matrix);
+        }
+        haulTrucks.instanceMatrix.needsUpdate = true;
+      }
+
       const projectionTick = Math.floor(elapsed * 10);
       if (projectionTick !== lastProjectionTick) {
         lastProjectionTick = projectionTick;
