@@ -3,7 +3,7 @@
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {DeckGL} from '@deck.gl/react';
-import {ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
+import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
@@ -1713,79 +1713,88 @@ function locateMineItem<T extends {east: number; north: number; detail: string; 
 
 export type DrillCollar = {holeId: string; lon: number; lat: number};
 
-export type ReliefCell = {
-  polygon: [number, number][];
-  elevation: number;
-  color: [number, number, number, number];
+export type ReliefRaster = {
+  image: HTMLCanvasElement;
+  /** [west, south, east, north] in degrees. */
+  bounds: [number, number, number, number];
 };
 
 /**
- * Relief mesh for the topography scene, sampled from the hi-res DEM.
+ * Hillshade raster for the topography scene, rendered from the hi-res DEM.
  *
- * Replaces `localTerrainCells`, which built a 22 x 16 grid of ~2 km quads
- * coloured from procedural noise — coarse enough to read as a tiled grid, and
- * describing invented landform. This samples the real raster at 96 x 96 over
- * the project tile (roughly 75 m cells), which is fine enough to read as
- * shading rather than tiling, and is the same terrain the 3D scenes stand on.
+ * Drawn as a single image rather than a polygon mesh. The previous version of
+ * this laid down thousands of flat-shaded quads, which read as a visible grid
+ * however fine the cells got — the same failure the old procedural version had,
+ * just at a smaller pitch. A raster is what a GIS would use for relief: it
+ * stays smooth at any zoom and costs one draw call.
+ *
+ * Shading is a standard surface-normal hillshade from a north-west sun, tinted
+ * by elevation, so ridges and drainage read the way they do on a topo sheet.
  */
-function buildReliefCells(dem: HiresDem): ReliefCell[] {
-  const COLUMNS = 96;
-  const ROWS = 96;
+function buildHillshadeRaster(dem: HiresDem): ReliefRaster | null {
+  if (typeof document === 'undefined') return null;
 
-  // Tile corners in lon/lat, so the mesh covers exactly the raster's extent.
+  const SIZE = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
   const [westLon, southLat] = proj4('EPSG:32737', 'WGS84', [dem.minX, dem.minY]) as [number, number];
   const [eastLon, northLat] = proj4('EPSG:32737', 'WGS84', [dem.maxX, dem.maxY]) as [number, number];
 
-  const dx = (eastLon - westLon) / COLUMNS;
-  const dy = (northLat - southLat) / ROWS;
+  const image = context.createImageData(SIZE, SIZE);
   const span = Math.max(1, dem.maxElevation - dem.minElevation);
-  const cells: ReliefCell[] = [];
+  // Ground distance between samples, for a slope that is not exaggerated.
+  const metresPerStep = (dem.maxX - dem.minX) / SIZE;
+  // Sun from the north-west, the cartographic convention.
+  const sun = {x: -0.6, y: 0.6, z: 0.53};
 
-  for (let row = 0; row < ROWS; row += 1) {
-    for (let column = 0; column < COLUMNS; column += 1) {
-      const west = westLon + column * dx;
-      const east = west + dx;
-      const south = southLat + row * dy;
-      const north = south + dy;
+  for (let row = 0; row < SIZE; row += 1) {
+    const lat = northLat - ((row + 0.5) / SIZE) * (northLat - southLat);
+    for (let column = 0; column < SIZE; column += 1) {
+      const lon = westLon + ((column + 0.5) / SIZE) * (eastLon - westLon);
+      const index = (row * SIZE + column) * 4;
 
-      const elevation = dem.sample(west + dx * 0.5, south + dy * 0.5);
-      if (elevation === null) continue;
+      const here = dem.sample(lon, lat);
+      if (here === null) {
+        image.data[index + 3] = 0;
+        continue;
+      }
 
-      // Shade by elevation, and add a little east-west slope shading so ridges
-      // and valleys read as landform rather than as a flat colour ramp.
-      const eastNeighbour = dem.sample(east + dx * 0.5, south + dy * 0.5) ?? elevation;
-      const slope = clamp((elevation - eastNeighbour) / 40, -1, 1);
-      const t = clamp((elevation - dem.minElevation) / span, 0, 1);
-      const shade = clamp(0.62 + slope * 0.3, 0.32, 1);
+      // Central differences give the surface normal.
+      const stepLon = (eastLon - westLon) / SIZE;
+      const stepLat = (northLat - southLat) / SIZE;
+      const east = dem.sample(lon + stepLon, lat) ?? here;
+      const west = dem.sample(lon - stepLon, lat) ?? here;
+      const north = dem.sample(lon, lat + stepLat) ?? here;
+      const south = dem.sample(lon, lat - stepLat) ?? here;
 
-      // Feather the alpha toward the tile edge. The raster is a rectangle, and
-      // drawn at constant opacity it reads as a screenshot pasted onto the map;
-      // fading it out lets the relief dissolve into the surrounding imagery.
-      const edgeU = Math.min(column, COLUMNS - 1 - column) / (COLUMNS * 0.5);
-      const edgeV = Math.min(row, ROWS - 1 - row) / (ROWS * 0.5);
-      const edgeFade = clamp(Math.min(edgeU, edgeV) * 3.4, 0, 1);
-      if (edgeFade <= 0.02) continue;
+      const dzdx = (east - west) / (2 * metresPerStep);
+      const dzdy = (north - south) / (2 * metresPerStep);
+      const length = Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1);
+      const light = clamp(((-dzdx * sun.x - dzdy * sun.y + sun.z) / length + 0.15) / 1.1, 0, 1);
 
-      const base = terrainColor(dem.minElevation + t * span);
-      cells.push({
-        polygon: [
-          [west, south],
-          [east, south],
-          [east, north],
-          [west, north],
-        ],
-        elevation,
-        color: [
-          Math.round(base[0] * shade),
-          Math.round(base[1] * shade),
-          Math.round(base[2] * shade),
-          Math.round(165 * edgeFade),
-        ],
-      });
+      const tint = terrainColor(here);
+      // Keep the shading gentle: this is context under the licence outline, not
+      // the subject of the frame.
+      const shade = 0.55 + light * 0.62;
+
+      image.data[index] = Math.min(255, Math.round(tint[0] * shade));
+      image.data[index + 1] = Math.min(255, Math.round(tint[1] * shade));
+      image.data[index + 2] = Math.min(255, Math.round(tint[2] * shade));
+
+      // Feather the rectangle so the raster dissolves into the imagery around
+      // it rather than ending on a hard tile edge.
+      const edgeU = Math.min(column, SIZE - 1 - column) / (SIZE * 0.5);
+      const edgeV = Math.min(row, SIZE - 1 - row) / (SIZE * 0.5);
+      image.data[index + 3] = Math.round(170 * clamp(Math.min(edgeU, edgeV) * 3.6, 0, 1));
     }
   }
 
-  return cells;
+  context.putImageData(image, 0, 0);
+  return {image: canvas, bounds: [westLon, southLat, eastLon, northLat]};
 }
 
 let drillCollarPromise: Promise<DrillCollar[]> | null = null;
@@ -2064,7 +2073,7 @@ export default function TangaDeckWorkbench() {
   // most direct answer to "is this ground actually tested?".
   const [drillCollars, setDrillCollars] = useState<DrillCollar[]>([]);
   // Relief cells for the topography scene, sampled from the real DEM.
-  const [reliefCells, setReliefCells] = useState<ReliefCell[]>([]);
+  const [reliefRaster, setReliefRaster] = useState<ReliefRaster | null>(null);
   const [contextLoadState, setContextLoadState] = useState<SceneLoadState>('idle');
   const [routeLoadState, setRouteLoadState] = useState<SceneLoadState>('idle');
   const [threeLoadReport, setThreeLoadReport] = useState<ThreeLoadReport>(DEFAULT_THREE_LOAD_REPORT);
@@ -3116,18 +3125,18 @@ export default function TangaDeckWorkbench() {
   // Sampled once the topography scene is reached. Without it that slide has
   // no relief at all — which is its entire subject.
   useEffect(() => {
-    if (activeMode !== 'topography' || reliefCells.length > 0) return;
+    if (activeMode !== 'topography' || reliefRaster) return;
 
     let cancelled = false;
     loadHiresDem().then((dem) => {
       if (cancelled || !dem) return;
-      setReliefCells(buildReliefCells(dem));
+      setReliefRaster(buildHillshadeRaster(dem));
     });
 
     return () => {
       cancelled = true;
     };
-  }, [activeMode, reliefCells.length]);
+  }, [activeMode, reliefRaster]);
 
   const handleMapError = useCallback(() => {
     setMapLoadState('degraded');
@@ -3268,7 +3277,6 @@ export default function TangaDeckWorkbench() {
     const showGraphitePeers = activeMode === 'ranking' || activeMode === 'comparison';
     const showLocalContext = localContextMode;
     const showRoads = showLocalContext && contextReady && roadFeatures.length > 0;
-    const showFastLocalSurface = localContextMode;
     const showRoute = activeMode === 'accessibility';
     const showDrillholes = false;
     const showCutaway = false;
@@ -3319,15 +3327,11 @@ export default function TangaDeckWorkbench() {
       // tiling, and it is only drawn on the topography scene: on the licence
       // and access scenes the satellite imagery carries the landform better
       // than a translucent overlay does.
-      activeMode === 'topography' && reliefCells.length > 0 && new PolygonLayer<ReliefCell>({
+      activeMode === 'topography' && reliefRaster && new BitmapLayer({
         id: 'local-dem-relief-surface',
-        data: reliefCells,
-        pickable: false,
-        stroked: false,
-        filled: true,
-        extruded: false,
-        getPolygon: (cell) => cell.polygon,
-        getFillColor: (cell) => cell.color,
+        image: reliefRaster.image,
+        bounds: reliefRaster.bounds,
+        opacity: 1,
         parameters: {depthTest: false} as any,
       }),
       // VRIFY-style license boundary: three-layer glow that reads bright and
@@ -3906,7 +3910,7 @@ export default function TangaDeckWorkbench() {
         lineWidthMinPixels: 2,
       }),
     ].filter(Boolean) as any[];
-  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, reliefCells, tangaRankingInserted, vegetation, villages]);
+  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, reliefRaster, tangaRankingInserted, vegetation, villages]);
 
   const currentSummary = modeSummary(activeMode, routeTarget, resourceFocus, tangaRankingInserted);
   const currentFacts = factsForMode(activeMode, resourceFocus);
