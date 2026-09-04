@@ -7,8 +7,16 @@ import {ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, Te
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
-import {Map} from 'react-map-gl/maplibre';
+import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
+import {formatIntercept, interceptTone} from '@/lib/assay/intercepts';
+import {
+  FALLBACK_RELIEF,
+  formatReliefWindow,
+  loadProjectRelief,
+  reliefSourceLabel,
+  type ReliefStats,
+} from '@/lib/terrain/relief';
 import TangaStoryVideoHero from './TangaStoryVideoHero';
 import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {
@@ -27,6 +35,24 @@ import {
 // while the user is still on the early map scenes — the first 3D scene then
 // renders instantly instead of downloading on arrival.
 const loadThreeSceneModule = () => import('./TangaThreeGeologyScene');
+
+// Type-only, so importing these does not pull the Three.js chunk into the
+// initial bundle and undo the dynamic split above.
+type LabelDensity = import('./TangaThreeGeologyScene').LabelDensity;
+type SceneAssayFacts = import('./TangaThreeGeologyScene').AssayFacts;
+
+/** Scenes where the drilling is on screen, so an intercept panel makes sense. */
+const INTERCEPT_PANEL_MODES = new Set<WorkbenchMode>(['drillholes', 'subsurface', 'resource']);
+
+/** Scenes looking at the subsurface, where a depth bracket is meaningful. */
+const DEPTH_BRACKET_MODES = new Set<WorkbenchMode>(['subsurface', 'resource', 'mine_planning']);
+
+/** Button and tooltip copy for each annotation-density tier. */
+const LABEL_DENSITY_COPY: Record<LabelDensity, {label: string; title: string}> = {
+  key: {label: 'Key labels', title: 'Key labels — callouts + top 3 intercepts'},
+  all: {label: 'All data labels', title: 'All data labels — every strong intercept that fits'},
+  off: {label: 'Labels off', title: 'Labels off — clean stage'},
+};
 const TangaThreeGeologyScene = dynamic(loadThreeSceneModule, {
   ssr: false,
   loading: () => (
@@ -498,10 +524,28 @@ const DEFAULT_RECENT_COMMANDS: PromptChip[] = [
 // Animated count-up for headline figures. Parses a leading prefix (e.g. "US$"),
 // a number, and a suffix (e.g. " Bn"); animates the number 0 → target on mount.
 // Respects prefers-reduced-motion.
+//
+// The animation is driven by requestAnimationFrame, which browsers throttle or
+// suspend for background and offscreen tabs. Without a guarantee that it
+// finishes, a throttled frame loop leaves a *wrong* number on screen wearing
+// the authority of a data panel — observed showing "≈6 km" for a distance
+// whose real value is "≈80 km". Every exit path below therefore ends on the
+// true value: a settle timer that fires regardless of frame delivery, a
+// visibility handler for a tab coming back to the foreground, and cleanup on
+// unmount. The animation is decoration; the number is not.
+const COUNT_UP_PATTERN = /^([^\d.-]*)(-?[\d,]*\.?\d+)(.*)$/;
+
 function CountUp({value, duration = 1100}: {value: string; duration?: number}) {
-  const match = value.match(/^([^\d.-]*)(-?[\d,]*\.?\d+)(.*)$/);
-  const [display, setDisplay] = useState(match ? `${match[1]}0${match[3]}` : value);
+  const initial = value.match(COUNT_UP_PATTERN);
+  const [display, setDisplay] = useState(initial ? `${initial[1]}0${initial[3]}` : value);
   useEffect(() => {
+    // Matched inside the effect, not outside it. `String.match` returns a new
+    // array on every render, so passing it as a dependency re-ran this effect
+    // continuously — tearing down the animation and the settle timer before
+    // either could finish. That is why the closing slide's headline figures sat
+    // frozen at "1 Mt" and "#0" instead of "183 Mt" and "#5": the count never
+    // got a chance to converge. Deps are now only the values that matter.
+    const match = value.match(COUNT_UP_PATTERN);
     if (!match) { setDisplay(value); return; }
     const prefix = match[1];
     const target = parseFloat(match[2].replace(/,/g, ''));
@@ -509,21 +553,47 @@ function CountUp({value, duration = 1100}: {value: string; duration?: number}) {
     const decimals = (match[2].split('.')[1] ?? '').length;
     const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduce || !Number.isFinite(target)) { setDisplay(value); return; }
+
     let raf = 0;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      cancelAnimationFrame(raf);
+      setDisplay(value);
+    };
+
     const start = performance.now();
     const tick = (now: number) => {
+      if (settled) return;
       const t = Math.min(1, (now - start) / duration);
+      if (t >= 1) { settle(); return; }
       const eased = 1 - Math.pow(1 - t, 3);
       const current = target * eased;
       const formatted = decimals > 0
         ? current.toFixed(decimals)
         : Math.round(current).toLocaleString();
       setDisplay(`${prefix}${formatted}${suffix}`);
-      if (t < 1) raf = requestAnimationFrame(tick);
+      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value, duration, match]);
+
+    // Backstop: timers keep running when frames do not. The slack lets a
+    // healthy animation finish on its own so this never truncates it.
+    const settleTimer = window.setTimeout(settle, duration + 400);
+    // A tab returning to the foreground should show the number immediately
+    // rather than resuming a stale roll from wherever it froze.
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') settle();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(settleTimer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [value, duration]);
   return <>{display}</>;
 }
 
@@ -1464,7 +1534,8 @@ function sceneCalloutsForMode(
   mode: WorkbenchMode,
   routeTarget: RouteTarget,
   focus: ResourceFocus,
-  routeProfile: RouteProfile
+  routeProfile: RouteProfile,
+  relief: ReliefStats
 ): SceneCallout[] {
   if (mode === 'tanzania') {
     return [
@@ -1481,8 +1552,12 @@ function sceneCalloutsForMode(
   }
   if (mode === 'topography') {
     // One callout — the relief story. (The AOI outline is already drawn + labelled.)
+    //
+    // Reads the measured tile relief, NOT `routeProfile`: that profile samples
+    // `reliefHeightAt`, which synthesises relief from noise for the 2D map and
+    // then clamps it to 0..420, so its "range" was the clamp, not the ground.
     return [
-      {id: 'relief', label: 'Local DEM surface', detail: `${routeProfile.minElevation}-${routeProfile.maxElevation} m relief window under the project`, boxX: 50, boxY: 33, tone: '#a89c94', anchor: {...PROJECT_CENTER, elevationOffset: 130}},
+      {id: 'relief', label: 'Terrain relief', detail: `${formatReliefWindow(relief)} across the project tile`, boxX: 50, boxY: 33, tone: '#a89c94', anchor: {...PROJECT_CENTER, elevationOffset: 130}},
     ];
   }
   if (mode === 'accessibility') {
@@ -1844,6 +1919,13 @@ export default function TangaDeckWorkbench() {
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [mapLoadState, setMapLoadState] = useState<SceneLoadState>('loading');
+  // Bumped when the MapLibre instance becomes available, so memos that project
+  // through it recompute once it exists.
+  // The MapLibre instance itself, held in state rather than only in a ref.
+  // Memos that project lon/lat through the map must recompute when it becomes
+  // available, and assigning a ref does not trigger a render — which is why
+  // the globe's peer labels stayed empty until an unrelated camera nudge.
+  const [mapInstance, setMapInstance] = useState<MapRef['getMap'] extends () => infer M ? M | null : null>(null);
   const [contextLoadState, setContextLoadState] = useState<SceneLoadState>('idle');
   const [routeLoadState, setRouteLoadState] = useState<SceneLoadState>('idle');
   const [threeLoadReport, setThreeLoadReport] = useState<ThreeLoadReport>(DEFAULT_THREE_LOAD_REPORT);
@@ -1874,6 +1956,8 @@ export default function TangaDeckWorkbench() {
     detail: 'Presentation scene ready',
   });
   const stageRef = useRef<HTMLElement | null>(null);
+  const deckStageRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MapRef | null>(null);
   const previousModeRef = useRef<WorkbenchMode>(DEFAULT_MODE);
   const sceneTransitionKeyRef = useRef(0);
   const contextLoadRef = useRef<Promise<void> | null>(null);
@@ -1963,6 +2047,11 @@ export default function TangaDeckWorkbench() {
     [graphiteRows],
   );
   const selectedPeerKey = selectedPeerProject ? peerProjectKey(selectedPeerProject) : '';
+  // Hovering a ranking row lights up that project on the globe, and vice versa,
+  // so the table and the map read as one picture rather than two panels that
+  // happen to share a slide.
+  const [hoveredPeerKey, setHoveredPeerKey] = useState('');
+  const activePeerKey = hoveredPeerKey || selectedPeerKey;
   const comparisonRows = useMemo(() => (
     graphitePeerRows(true)
       .filter((project) => PEER_COMPARISON_PROJECTS.has(project.project))
@@ -2792,8 +2881,83 @@ export default function TangaDeckWorkbench() {
   const handleMapLoad = useCallback((event: any) => {
     disableNativeTerrain(event);
     setMapLoadState('ready');
+    // Force one recompute of anything that projects through the map instance.
+    // `mapRef` is a ref, so a memo that read it while it was still null would
+    // otherwise keep serving that empty result until some unrelated dependency
+    // happened to change — which is why the globe's peer labels only appeared
+    // after the first camera nudge.
+    setMapInstance(event?.target ?? null);
     console.info(`[Tanga telemetry] map ready in ${Math.round(performance.now() - appStartedAtRef.current)}ms`);
   }, [disableNativeTerrain]);
+  // The deck stage is mounted behind the intro gate and the cover, so the map
+  // initialises into a container with no measurable size. MapLibre then falls
+  // back to its 300x150 default backing store and, because nothing ever calls
+  // resize(), keeps it — the basemap and every deck.gl layer were being drawn
+  // at 300px and stretched across the full stage. That is what made the 2D
+  // terrain look soft and washed out; it was upscaled roughly five times.
+  //
+  // Watching the container rather than the window also covers the fullscreen
+  // toggle and the panel reflows, which resize the stage without a window event.
+  useEffect(() => {
+    const stage = deckStageRef.current;
+    if (!stage || typeof ResizeObserver === 'undefined') return;
+
+    let frame = 0;
+    const resizeMap = () => {
+      cancelAnimationFrame(frame);
+      // Wait a frame so the observer reads the settled size, not a mid-layout one.
+      frame = requestAnimationFrame(() => {
+        const {width, height} = stage.getBoundingClientRect();
+        if (width < 1 || height < 1) return;
+        try {
+          // deck.gl sizes the container that MapLibre lives inside, so it has
+          // to be told first — resizing the map alone cannot escape a 300px
+          // deck viewport. Both libraries listen for a window resize, which is
+          // the one nudge that reaches deck's internal viewport and the map.
+          window.dispatchEvent(new Event('resize'));
+          mapRef.current?.resize();
+        } catch {
+          // A map torn down between the frame request and this callback.
+        }
+      });
+    };
+
+    const observer = new ResizeObserver(resizeMap);
+    observer.observe(stage);
+    resizeMap();
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [mapLoadState]);
+
+  // Adopt the MapLibre instance as soon as it can project, by watching the ref
+  // rather than waiting on `onLoad`. That event is not dependable here — it
+  // does not fire on a warm reload where the style is already cached, and the
+  // basemap can take a very long time to come up on a cold one. Polling a ref
+  // twice a second costs nothing and survives both cases; it stops as soon as
+  // the instance is adopted.
+  useEffect(() => {
+    if (mapInstance) return;
+
+    const adopt = () => {
+      const candidate = (mapRef.current as any)?.getMap?.() ?? (mapRef.current as any);
+      if (candidate && typeof candidate.project === 'function') {
+        setMapInstance(candidate);
+        return true;
+      }
+      return false;
+    };
+
+    if (adopt()) return;
+    const timer = window.setInterval(() => {
+      if (adopt()) window.clearInterval(timer);
+    }, 400);
+
+    return () => window.clearInterval(timer);
+  }, [mapInstance]);
+
   const handleMapError = useCallback(() => {
     setMapLoadState('degraded');
     console.info('[Tanga telemetry] map entered degraded state; DeckGL overlays remain available');
@@ -2804,7 +2968,26 @@ export default function TangaDeckWorkbench() {
   const selectPeerProject = useCallback((project: GraphitePeerProjectRow) => {
     setSelectedPeerProject(project);
     setStatusText(`#${project.displayRank} ${project.project} selected`);
-    setPipeline('Peer marker -> investor detail popup');
+    setPipeline('Peer marker -> globe fly-to -> investor detail popup');
+
+    // Fly the globe to the project the viewer just picked. Selecting a row used
+    // to change only the popup, which left the reader to find the matching dot
+    // themselves — the table and the map stayed two separate things.
+    if (!Number.isFinite(project.lon) || !Number.isFinite(project.lat)) return;
+    const DURATION = 1600;
+    flightUntilRef.current = performance.now() + DURATION + 120;
+    setViewState((current) => ({
+      ...current,
+      longitude: project.lon,
+      latitude: project.lat,
+      // Close enough to place the project in its country, far enough that the
+      // peer field around it stays in frame — this scene is a comparison, so
+      // diving to project scale would lose the point of the slide.
+      zoom: Math.max(current.zoom, 3.4),
+      transitionDuration: DURATION,
+      transitionInterpolator: CINEMATIC_FLY(),
+      transitionEasing: cinematicEase,
+    }));
   }, []);
   const handleDeckClick = useCallback((info: any) => {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -3281,21 +3464,21 @@ export default function TangaDeckWorkbench() {
         id: 'graphite-peer-markers',
         data: graphiteRows,
         getPosition: (project) => [project.lon, project.lat, project.isTanga ? 90000 : 54000],
-        getRadius: (project) => peerMarkerRadius(project, peerProjectKey(project) === selectedPeerKey),
+        getRadius: (project) => peerMarkerRadius(project, peerProjectKey(project) === activePeerKey),
         radiusUnits: 'meters',
         getFillColor: (project) => {
-          const selected = peerProjectKey(project) === selectedPeerKey;
+          const selected = peerProjectKey(project) === activePeerKey;
           if (selected) return [217, 107, 43, 245];
           if (project.isTanga) return [217, 107, 43, 236];
           if (project.country === 'Tanzania') return [185, 149, 75, 222];
           return [245, 241, 235, 185];
         },
-        getLineColor: (project) => peerProjectKey(project) === selectedPeerKey
+        getLineColor: (project) => peerProjectKey(project) === activePeerKey
           ? [255, 255, 255, 255]
           : project.isTanga
             ? [255, 236, 204, 245]
             : [11, 11, 11, 220],
-        getLineWidth: (project) => peerProjectKey(project) === selectedPeerKey ? 5 : 2,
+        getLineWidth: (project) => peerProjectKey(project) === activePeerKey ? 5 : 2,
         lineWidthMinPixels: 1.5,
         stroked: true,
         filled: true,
@@ -3308,13 +3491,13 @@ export default function TangaDeckWorkbench() {
         getPosition: (project) => [project.lon, project.lat, project.isTanga ? 210000 : 146000],
         getText: (project) => `#${project.displayRank}`,
         getSize: (project) => project.isTanga ? 14 : 12,
-        getColor: (project) => peerProjectKey(project) === selectedPeerKey ? [11, 11, 11, 255] : [245, 241, 235, 245],
+        getColor: (project) => peerProjectKey(project) === activePeerKey ? [11, 11, 11, 255] : [245, 241, 235, 245],
         getTextAnchor: 'middle',
         getAlignmentBaseline: 'center',
         getPixelOffset: [0, -14],
         billboard: true,
         background: true,
-        getBackgroundColor: (project) => peerProjectKey(project) === selectedPeerKey
+        getBackgroundColor: (project) => peerProjectKey(project) === activePeerKey
           ? [245, 241, 235, 232]
           : project.isTanga
             ? [217, 107, 43, 218]
@@ -3529,7 +3712,7 @@ export default function TangaDeckWorkbench() {
         lineWidthMinPixels: 2,
       }),
     ].filter(Boolean) as any[];
-  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, selectedPeerKey, tangaRankingInserted, vegetation, villages]);
+  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, tangaRankingInserted, vegetation, villages]);
 
   const currentSummary = modeSummary(activeMode, routeTarget, resourceFocus, tangaRankingInserted);
   const currentFacts = factsForMode(activeMode, resourceFocus);
@@ -3652,7 +3835,25 @@ export default function TangaDeckWorkbench() {
     threeSceneRequested,
     voiceStageState,
   ]);
-  const sceneCallouts = sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile);
+  // Measured relief for the project tile. Both the topography panel and the
+  // terrain callout read from this, so the deck can only ever state one
+  // elevation range — previously they disagreed by a factor of two.
+  const [relief, setRelief] = useState<ReliefStats>(FALLBACK_RELIEF);
+  useEffect(() => {
+    let cancelled = false;
+    loadProjectRelief()
+      .then((stats) => {
+        if (!cancelled) setRelief(stats);
+      })
+      .catch(() => {
+        // loadProjectRelief already falls back; nothing further to do.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const sceneCallouts = sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile, relief);
   const projectedSceneCallouts = useMemo<ProjectedSceneCallout[]>(() => {
     const viewport = new WebMercatorViewport({
       width: stageSize.width,
@@ -3748,6 +3949,114 @@ export default function TangaDeckWorkbench() {
     return out;
   }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel]);
 
+  /**
+   * Peer-project labels drawn on the globe for the ranking scene.
+   *
+   * These project through MapLibre rather than a WebMercatorViewport: the
+   * ranking scene renders with MapLibre's globe projection, where mercator
+   * maths puts a label in the wrong place — badly so away from the view
+   * centre. `map.project` is the only projection that agrees with what is
+   * actually on screen.
+   *
+   * Only the near face of the globe is labelled. A point more than ~78 degrees
+   * of arc from the view centre is round the back, and MapLibre will still
+   * hand back screen coordinates for it, so it has to be culled by geometry
+   * rather than trusted.
+   */
+  const peerGlobeLabels = useMemo(() => {
+    if (activeMode !== 'ranking' || stageSize.width === 0) return [];
+    const map = mapInstance;
+    if (!map) return [];
+
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const centreLon = viewState.longitude;
+    const centreLat = viewState.latitude;
+
+    /** Great-circle separation from the view centre, in degrees. */
+    const arcFromCentre = (lon: number, lat: number) => {
+      const dLon = toRad(lon - centreLon);
+      const cosArc =
+        Math.sin(toRad(lat)) * Math.sin(toRad(centreLat)) +
+        Math.cos(toRad(lat)) * Math.cos(toRad(centreLat)) * Math.cos(dLon);
+      return (Math.acos(clamp(cosArc, -1, 1)) * 180) / Math.PI;
+    };
+
+    const positioned = graphiteRows
+      .filter((project) => Number.isFinite(project.lon) && Number.isFinite(project.lat))
+      .filter((project) => arcFromCentre(project.lon, project.lat) < 78)
+      // The peers cluster tightly in south-east Africa, so labelling every one
+      // of them turns the region into a stack. Keep the largest — and Tanga
+      // whatever its size, since it is the subject of the slide.
+      .slice()
+      .sort((a, b) => (b.containedGraphiteMt || 0) - (a.containedGraphiteMt || 0))
+      .filter((project, index) => index < 5 || project.isTanga)
+      .map((project) => {
+        let point: {x: number; y: number} | null = null;
+        try {
+          point = map.project([project.lon, project.lat] as any);
+        } catch {
+          point = null;
+        }
+        if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+
+        const key = peerProjectKey(project);
+        return {
+          key,
+          project,
+          isTanga: Boolean(project.isTanga),
+          active: key === activePeerKey,
+          text: `${project.project.split(' / ')[0]} · ${(project.containedGraphiteMt || 0).toFixed(1)} Mt`,
+          anchorPixelX: point.x,
+          anchorPixelY: point.y,
+          boxPixelX: point.x,
+          boxPixelY: point.y,
+        };
+      })
+      .filter((label): label is NonNullable<typeof label> => label !== null);
+
+    // Offset each chip from its own anchor rather than clamping everything to
+    // one column. Clamping to a fixed right edge stacked all seven labels at
+    // the same x, which turned them into a second ranking list that pointed at
+    // nothing — the failure this slide already had, reintroduced in label form.
+    // Chips on the right of the globe hang to the left so they stay clear of
+    // the ranking panel; chips on the left hang right.
+    const safeL = 108;
+    // The trimmed ranking panel starts at about 0.65 of the stage width, so
+    // 0.60 keeps even the widest chip clear of it.
+    const safeR = stageSize.width * 0.60;
+    const safeT = 118;
+    const safeB = stageSize.height - 120;
+    positioned.forEach((label) => {
+      const hangLeft = label.anchorPixelX > stageSize.width * 0.34;
+      label.boxPixelX = clamp(label.anchorPixelX + (hangLeft ? -34 : 34), safeL, safeR);
+      label.boxPixelY = clamp(label.anchorPixelY - 12, safeT, safeB);
+    });
+
+    // Same greedy vertical de-collision the pinned map labels use: sort down
+    // the stage, push each chip below any neighbour it would otherwise touch.
+    const MIN_GAP = 26;
+    const X_PROX = 190;
+    const placed: typeof positioned = [];
+    positioned
+      .slice()
+      .sort((a, b) => a.boxPixelY - b.boxPixelY)
+      .forEach((label) => {
+        let y = label.boxPixelY;
+        placed.forEach((other) => {
+          if (Math.abs(other.boxPixelX - label.boxPixelX) < X_PROX && Math.abs(other.boxPixelY - y) < MIN_GAP) {
+            y = other.boxPixelY + MIN_GAP;
+          }
+        });
+        label.boxPixelY = clamp(y, safeT, safeB);
+        placed.push(label);
+      });
+
+    return placed;
+    // `mapLoadState` is a dependency because `mapRef` is not reactive: without
+    // it this memo would evaluate once while the map was still null and never
+    // recompute, leaving the globe permanently unlabelled.
+  }, [activeMode, graphiteRows, stageSize.width, stageSize.height, viewState, activePeerKey, mapInstance]);
+
   const pinnedMapLabels = useMemo(() => {
     if (!mapLabelSources.length || stageSize.width === 0) return [];
     const canon = (VIEW_STATES as any)[activeMode] ?? viewState;
@@ -3834,7 +4143,23 @@ export default function TangaDeckWorkbench() {
       if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [activeStoryIndex, threeSceneRequested]);
-  const activeDataTable = MODE_DATA_TABLES[activeMode];
+  const activeDataTable = useMemo(() => {
+    const table = MODE_DATA_TABLES[activeMode];
+    if (!table || activeMode !== 'topography') return table;
+
+    // Substitute the measured values for the hardcoded ones.
+    return {
+      ...table,
+      source: reliefSourceLabel(relief),
+      rows: table.rows.map((row) => {
+        const metric = row.cells?.[0];
+        if (metric === 'Max elevation') return {...row, cells: [metric, `${relief.maxM} m`, '']};
+        if (metric === 'Min elevation') return {...row, cells: [metric, `${relief.minM} m`, '']};
+        if (metric === 'Relief range') return {...row, cells: [metric, `${relief.rangeM} m`, '']};
+        return row;
+      }),
+    };
+  }, [activeMode, relief]);
   const activeActIndex = actIndexForMode(activeMode);
   const isClosingScene = activeStoryIndex === STORY_STEPS.length - 1;
   // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
@@ -3904,10 +4229,41 @@ export default function TangaDeckWorkbench() {
   // VRIFY-style autoplay pacing — 5s / 10s / 15s options. 10s default (mid).
   const [autoplaySec, setAutoplaySec] = useState<5 | 10 | 15>(10);
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
-  // Annotations = scene callouts on the stage. Toggle to get a clean stage
-  // view for photography/screenshotting. Ctrl+A like VRIFY.
-  const [annotationsOn, setAnnotationsOn] = useState(true);
-  const toggleAnnotations = useCallback(() => setAnnotationsOn((prev) => !prev), []);
+  // Annotation density, cycled with Ctrl+A:
+  //   key → authored scene callouts plus the three strongest drill intercepts
+  //   all → the dense data-label view, for detailed questions
+  //   off → a clean stage for photography/screenshotting
+  // Three tiers rather than a boolean, because the useful density for a
+  // presenter mid-narration and for someone interrogating the drilling are
+  // not the same, and one label set cannot serve both.
+  const [labelDensity, setLabelDensity] = useState<LabelDensity>('key');
+  const annotationsOn = labelDensity !== 'off';
+  const cycleAnnotations = useCallback(() => {
+    setLabelDensity((prev) => (prev === 'key' ? 'all' : prev === 'all' ? 'off' : 'key'));
+  }, []);
+  // Derived drill results lifted out of the 3D scene so the deck chrome can
+  // quote the same numbers the in-scene labels do.
+  const [assayFacts, setAssayFacts] = useState<SceneAssayFacts | null>(null);
+  // Top three drill results, shown only where the drilling is actually on
+  // screen and only while labels are on, so the panel never contradicts a
+  // deliberately clean stage.
+  const headlineIntercepts = useMemo(() => {
+    if (!assayFacts || labelDensity === 'off') return [];
+    if (!INTERCEPT_PANEL_MODES.has(activeMode)) return [];
+    return assayFacts.ranked.slice(0, 3);
+  }, [assayFacts, labelDensity, activeMode]);
+
+  // Depth extent of the drilled ore, for the vertical scale bracket on the
+  // subsurface scenes.
+  const depthBracket = useMemo(() => {
+    if (!assayFacts || !DEPTH_BRACKET_MODES.has(activeMode)) return null;
+    const depth = assayFacts.deepestOreM;
+    if (!Number.isFinite(depth) || depth <= 0) return null;
+    return {
+      label: depth >= 1000 ? `${(depth / 1000).toFixed(1)} km` : `${Math.round(depth)} m`,
+      detail: 'ore drilled to',
+    } as const;
+  }, [assayFacts, activeMode]);
   // Investor inspector — plain-English "why this matters" overlay (Ctrl+I).
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const toggleInspector = useCallback(() => setIsInspectorOpen((prev) => !prev), []);
@@ -4063,7 +4419,7 @@ export default function TangaDeckWorkbench() {
       // a modifier goes to the browser so we don't fight shortcuts.
       if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
         event.preventDefault();
-        toggleAnnotations();
+        cycleAnnotations();
         return;
       }
       if ((event.ctrlKey || event.metaKey) && (event.key === 'i' || event.key === 'I')) {
@@ -4107,7 +4463,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, toggleAnnotations, toggleInspector, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
+  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -4186,7 +4542,7 @@ export default function TangaDeckWorkbench() {
       data-act={MODE_ACT[activeMode]}
       data-testid="tanga-deck-workbench"
     >
-      <div className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
+      <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
           viewState={viewState as any}
           controller
@@ -4217,6 +4573,7 @@ export default function TangaDeckWorkbench() {
           getTooltip={getTooltip}
         >
           <Map
+            ref={mapRef}
             mapStyle={mapStyle as any}
             attributionControl={false}
             maxPitch={85}
@@ -4238,6 +4595,8 @@ export default function TangaDeckWorkbench() {
           cameraCommand={threeCameraCommand}
           assetQuality={assetQuality}
           onLoadState={handleThreeLoadState}
+          labelDensity={labelDensity}
+          onAssayFacts={setAssayFacts}
         />
       )}
 
@@ -4357,6 +4716,63 @@ export default function TangaDeckWorkbench() {
         </section>
       )}
 
+      {/* Peer projects labelled on the globe, cross-highlighted with the
+          ranking table. Without these the slide asserted a "global peer field"
+          beside a globe showing nothing but unlabelled dots. */}
+      {annotationsOn && !threeVisible && !showCover && peerGlobeLabels.length > 0 && (
+        <section className="tanga-deck__peer-labels" aria-label="Peer projects on the globe">
+          <svg className="tanga-deck__leader-svg tanga-deck__leader-svg--pin" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
+            {peerGlobeLabels.map((label) => (
+              <g key={`peer-leader-${label.key}`}>
+                <line
+                  x1={label.anchorPixelX}
+                  y1={label.anchorPixelY}
+                  x2={label.boxPixelX}
+                  y2={label.boxPixelY}
+                  style={{stroke: label.isTanga ? '#f0b64a' : '#8fb4d6', opacity: label.active ? 0.95 : 0.4}}
+                />
+                <circle
+                  cx={label.anchorPixelX}
+                  cy={label.anchorPixelY}
+                  r={label.isTanga || label.active ? 4.5 : 3}
+                  style={{fill: label.isTanga ? '#f0b64a' : '#8fb4d6', stroke: '#ffffff', opacity: label.active ? 1 : 0.75}}
+                />
+              </g>
+            ))}
+          </svg>
+          {peerGlobeLabels.map((label, index) => (
+            <button
+              type="button"
+              key={label.key}
+              className={classNames(
+                'tanga-deck__pin-label',
+                'tanga-deck__peer-label',
+                label.isTanga && 'is-tanga',
+                label.active && 'is-active'
+              )}
+              style={{
+                '--pin-x': `${label.boxPixelX}px`,
+                '--pin-y': `${label.boxPixelY}px`,
+                '--pin-tone': label.isTanga ? '#f0b64a' : '#8fb4d6',
+                '--reveal-i': index,
+              } as any}
+              title={`Fly to ${label.project.project}`}
+              onPointerDown={markUiInteraction}
+              onPointerEnter={() => setHoveredPeerKey(label.key)}
+              onPointerLeave={() => setHoveredPeerKey('')}
+              onFocus={() => setHoveredPeerKey(label.key)}
+              onBlur={() => setHoveredPeerKey('')}
+              onClick={(event) => {
+                event.stopPropagation();
+                selectPeerProject(label.project);
+              }}
+            >
+              {label.text}
+            </button>
+          ))}
+        </section>
+      )}
+
       {annotationsOn && !threeVisible && !showCover && pinnedMapLabels.length > 0 && (
         <section className="tanga-deck__map-labels" aria-label="Map place labels">
           <svg className="tanga-deck__leader-svg tanga-deck__leader-svg--pin" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
@@ -4377,6 +4793,56 @@ export default function TangaDeckWorkbench() {
             </div>
           ))}
         </section>
+      )}
+
+      {/* Headline drill results. The single most persuasive fact in the
+          project is an 84m intercept at ~8% TGC starting near surface, and it
+          had no home in the deck before this. Shown only on the scenes where
+          the drilling itself is on screen, so it reads as a caption on the
+          geometry rather than a permanent scoreboard. */}
+      {headlineIntercepts.length > 0 && (
+        <section className="tanga-deck__intercepts" aria-label="Headline drill intercepts">
+          <div className="tanga-deck__intercepts-head">
+            <span>Best intercepts</span>
+            <strong>
+              {assayFacts?.interceptCount} above {assayFacts?.cutoffLabel} · {assayFacts?.holeCount} holes
+            </strong>
+          </div>
+          <ol>
+            {headlineIntercepts.map((intercept) => {
+              const {headline, sub} = formatIntercept(intercept);
+              return (
+                <li key={`${intercept.holeId}-${intercept.fromM}`}>
+                  <i style={{backgroundColor: interceptTone(intercept.gradePct)}} aria-hidden="true" />
+                  <span>
+                    <strong>{headline}</strong>
+                    <small>{sub}</small>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      {/* Vertical depth bracket. A horizontal scale bar says nothing about how
+          deep the system goes, which is the first thing anyone asks of a
+          subsurface view. Reads the deepest reportable intercept, so it
+          describes the ore rather than the arbitrary extent of the model box.
+          Deliberately a sibling of the geo-overlay, not a child: that overlay
+          is faded out on the 3D scenes, which are exactly the scenes where
+          this bracket has to be readable. */}
+      {depthBracket && (
+        <div
+          className="tanga-deck__depth-scale"
+          aria-label={`Ore drilled to ${depthBracket.label} below collar`}
+        >
+          <i aria-hidden="true" />
+          <span>
+            <em>{depthBracket.label}</em>
+            <small>{depthBracket.detail}</small>
+          </span>
+        </div>
       )}
 
       <section className="tanga-deck__geo-overlay" aria-label="Map legend compass and scale">
@@ -4413,6 +4879,7 @@ export default function TangaDeckWorkbench() {
           </div>
           <small>{scale.detail}</small>
         </div>
+
       </section>
 
       {/* Story-rail removed — the pager scene-dots + labels below now cover
@@ -4728,13 +5195,22 @@ export default function TangaDeckWorkbench() {
         </div>
         <button
           type="button"
-          className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool', annotationsOn && 'is-active')}
-          onClick={toggleAnnotations}
-          aria-label={annotationsOn ? 'Hide annotations' : 'Show annotations'}
+          className={classNames(
+            'tanga-deck__pager-btn tanga-deck__pager-btn--tool',
+            annotationsOn && 'is-active',
+            labelDensity === 'all' && 'is-dense'
+          )}
+          onClick={cycleAnnotations}
+          aria-label={`Annotation density: ${LABEL_DENSITY_COPY[labelDensity].label}. Activate to cycle.`}
           aria-pressed={annotationsOn}
-          title={`Annotations  (Ctrl+A) — currently ${annotationsOn ? 'ON' : 'OFF'}`}
+          title={`Annotations  (Ctrl+A) — ${LABEL_DENSITY_COPY[labelDensity].title}`}
         >
           <MessageSquare size={16} strokeWidth={2.2} />
+          {labelDensity === 'all' && (
+            <span className="tanga-deck__tool-badge" aria-hidden="true">
+              {assayFacts ? assayFacts.interceptCount : 'ALL'}
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -4823,7 +5299,7 @@ export default function TangaDeckWorkbench() {
             <dt><kbd>P</kbd> or <kbd>Space</kbd></dt><dd>Play / pause autoplay</dd>
             <dt><kbd>F</kbd></dt><dd>Fullscreen</dd>
             <dt><kbd>S</kbd></dt><dd>Speaker notes</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Toggle annotations</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Cycle labels: key &rarr; all data &rarr; off</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>I</kbd></dt><dd>Why this matters</dd>
             <dt><kbd>B</kbd></dt><dd>Blackout screen</dd>
             <dt><kbd>Esc</kbd></dt><dd>Close panel / exit fullscreen</dd>
@@ -4988,13 +5464,18 @@ export default function TangaDeckWorkbench() {
                 className={classNames(
                   project.isTanga && 'is-tanga',
                   project.shifted && 'is-shifted',
-                  selectedPeerKey === peerProjectKey(project) && 'is-selected'
+                  selectedPeerKey === peerProjectKey(project) && 'is-selected',
+                  hoveredPeerKey === peerProjectKey(project) && 'is-hovered'
                 )}
                 style={{'--rank-bar': `${Math.round(((project.containedGraphiteMt || 0) / maxContainedGraphite) * 100)}`} as any}
                 role="button"
                 tabIndex={0}
                 aria-pressed={selectedPeerKey === peerProjectKey(project)}
                 onPointerDown={markUiInteraction}
+                onPointerEnter={() => setHoveredPeerKey(peerProjectKey(project))}
+                onPointerLeave={() => setHoveredPeerKey('')}
+                onFocus={() => setHoveredPeerKey(peerProjectKey(project))}
+                onBlur={() => setHoveredPeerKey('')}
                 onClick={(event) => {
                   event.stopPropagation();
                   selectPeerProject(project);
