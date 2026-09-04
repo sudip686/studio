@@ -1229,6 +1229,125 @@ function loadBlocks() {
   return blockPromise;
 }
 
+let licenceBoundaryPromise: Promise<Array<[number, number]> | null> | null = null;
+
+/**
+ * The licence outline, as a lon/lat ring.
+ *
+ * Same source the 2D scenes draw from, so the boundary a viewer sees on the
+ * map and the one draped over the 3D terrain are the same polygon rather than
+ * two drawings that could drift apart.
+ */
+function loadLicenceBoundary(): Promise<Array<[number, number]> | null> {
+  if (licenceBoundaryPromise) return licenceBoundaryPromise;
+
+  licenceBoundaryPromise = fetchAsset('/generated/boundaries.geojson', {cache: 'force-cache'})
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      const features = Array.isArray(payload?.features) ? payload.features : [];
+      const boundary = features.find((feature: any) => feature?.properties?.layer === 'Project boundary');
+      const ring = boundary?.geometry?.coordinates?.[0];
+      if (!Array.isArray(ring) || ring.length < 3) return null;
+
+      return ring
+        .map((point: any) => [Number(point?.[0]), Number(point?.[1])] as [number, number])
+        .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+    })
+    .catch(() => null);
+
+  return licenceBoundaryPromise;
+}
+
+/**
+ * Drape the licence ring over the terrain.
+ *
+ * Each segment is subdivided before the terrain is sampled, so the line follows
+ * the ground across a ridge instead of cutting a straight chord through it —
+ * which is the difference between a boundary that looks surveyed onto the
+ * surface and one that looks like a floating wireframe.
+ */
+function buildDrapedBoundary(
+  ring: Array<[number, number]>,
+  resources: TangaTerrainResources | null,
+  lift: number
+): THREE.Vector3[] {
+  const SUBDIVISIONS = 24;
+  const points: THREE.Vector3[] = [];
+
+  for (let i = 0; i < ring.length; i += 1) {
+    const [lon0, lat0] = ring[i];
+    const [lon1, lat1] = ring[(i + 1) % ring.length];
+
+    for (let step = 0; step < SUBDIVISIONS; step += 1) {
+      const t = step / SUBDIVISIONS;
+      const lon = lon0 + (lon1 - lon0) * t;
+      const lat = lat0 + (lat1 - lat0) * t;
+      const flat = localPoint(lon, lat, 0);
+      points.push(new THREE.Vector3(
+        flat.x,
+        terrainSurfaceY(resources, flat.x, -flat.z, lift),
+        flat.z
+      ));
+    }
+  }
+
+  // Close the loop.
+  if (points.length > 0) points.push(points[0].clone());
+  return points;
+}
+
+type SurfaceRoad = {coordinates: Array<[number, number]>; highway: string};
+
+let surfaceRoadPromise: Promise<SurfaceRoad[]> | null = null;
+
+/**
+ * Real OSM roads and tracks across the project area.
+ *
+ * Draped on the terrain these do more work than their size suggests: a bare
+ * landform reads as a rendering, whereas the same landform with the roads
+ * people actually drive on reads as a place. They also give an unconscious
+ * sense of scale that a scale bar alone does not.
+ */
+function loadSurfaceRoads(): Promise<SurfaceRoad[]> {
+  if (surfaceRoadPromise) return surfaceRoadPromise;
+
+  surfaceRoadPromise = fetchAsset('/generated/roads.geojson', {cache: 'force-cache'})
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      const features = Array.isArray(payload?.features) ? payload.features : [];
+      const roads: SurfaceRoad[] = [];
+
+      for (const feature of features) {
+        if (feature?.geometry?.type !== 'LineString') continue;
+        const coordinates = (feature.geometry.coordinates ?? [])
+          .map((point: any) => [Number(point?.[0]), Number(point?.[1])] as [number, number])
+          .filter(([lon, lat]: [number, number]) => Number.isFinite(lon) && Number.isFinite(lat));
+        if (coordinates.length < 2) continue;
+
+        roads.push({coordinates, highway: String(feature?.properties?.highway ?? 'unclassified')});
+      }
+
+      return roads;
+    })
+    .catch(() => []);
+
+  return surfaceRoadPromise;
+}
+
+/** Drape an open line of lon/lat onto the terrain. */
+function drapeLine(
+  coordinates: Array<[number, number]>,
+  resources: TangaTerrainResources | null,
+  lift: number
+): THREE.Vector3[] {
+  // OSM ways are already finely digitised, so vertices are dense enough to
+  // follow the ground without subdividing further.
+  return coordinates.map(([lon, lat]) => {
+    const flat = localPoint(lon, lat, 0);
+    return new THREE.Vector3(flat.x, terrainSurfaceY(resources, flat.x, -flat.z, lift), flat.z);
+  });
+}
+
 function loadDrillholes() {
   if (!drillPromise) {
     drillPromise = Promise.all([
@@ -2323,6 +2442,81 @@ export default function TangaThreeGeologyScene({
       setStatus('Drawing preview terrain surface');
       const resources = await applyTexturedTerrain(assetQuality);
       if (cancelled) return;
+
+      // Licence boundary, surveyed onto the terrain. Every 3D scene shows data
+      // sitting in the ground without ever saying whose ground it is; the
+      // outline is the cheapest way to answer that, and it ties these scenes
+      // back to the licence slide. Drawn as a soft halo under a bright core so
+      // it reads over both dark rock and bright satellite drape.
+      const [licenceRing, surfaceRoads] = await Promise.all([
+        loadLicenceBoundary(),
+        loadSurfaceRoads(),
+      ]);
+      if (cancelled) return;
+
+      if (surfaceRoads.length > 0) {
+        const roadGroup = new THREE.Group();
+        roadGroup.name = 'surface-roads';
+
+        for (const road of surfaceRoads) {
+          // Tertiary roads are the through-routes and carry the eye; tracks and
+          // service ways sit back so they add texture without competing with
+          // the licence outline or the data.
+          const isThrough = road.highway === 'tertiary';
+          const line = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(drapeLine(road.coordinates, terrainResources, 16)),
+            new THREE.LineBasicMaterial({
+              color: isThrough ? 0xf5ead7 : 0xb9ab95,
+              transparent: true,
+              opacity: isThrough ? 0.5 : 0.28,
+              depthWrite: false,
+              fog: true,
+            })
+          );
+          line.renderOrder = 22;
+          roadGroup.add(line);
+        }
+
+        stage.add(roadGroup);
+        registerReveal(roadGroup, 0.3, 1.2, 0.98);
+      }
+
+      if (licenceRing && licenceRing.length >= 3) {
+        const boundaryGroup = new THREE.Group();
+        boundaryGroup.name = 'licence-boundary';
+
+        const halo = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(buildDrapedBoundary(licenceRing, terrainResources, 26)),
+          new THREE.LineBasicMaterial({
+            color: 0xffa860,
+            transparent: true,
+            opacity: 0.24,
+            depthWrite: false,
+            depthTest: false,
+            fog: false,
+            blending: THREE.AdditiveBlending,
+          })
+        );
+        halo.renderOrder = 24;
+        boundaryGroup.add(halo);
+
+        const core = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(buildDrapedBoundary(licenceRing, terrainResources, 30)),
+          new THREE.LineBasicMaterial({
+            color: 0xf0b64a,
+            transparent: true,
+            opacity: 0.92,
+            depthWrite: false,
+            depthTest: false,
+            fog: false,
+          })
+        );
+        core.renderOrder = 25;
+        boundaryGroup.add(core);
+
+        stage.add(boundaryGroup);
+        registerReveal(boundaryGroup, 0.42, 1.2, 0.97);
+      }
 
       setStatus(mode === 'resource' ? `Loading ${resourceFocusLabel(resourceFocus).toLowerCase()} resource blocks` : mode === 'mine_planning' ? 'Loading pit shell and resource blocks' : mode === 'metallurgy' ? 'Loading drillhole intervals for metallurgy reveal' : 'Loading drillhole traces');
       reportLoadState('loading', resources ? 'ready' : 'degraded', resources?.quality ?? assetQuality, 'Loading drillholes and resource data');
