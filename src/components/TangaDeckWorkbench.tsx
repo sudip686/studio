@@ -304,10 +304,14 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
     {label: 'District', value: 'Mkinga'},
     {label: 'Coast link', value: '~80 km to port'},
   ],
+  // This scene answers "what ground do we control", so it states tenure, not
+  // tonnage. The resource figures live on the resource scene, where the block
+  // model is on screen to back them up; repeating them here made the licence
+  // slide read as a second resource slide with a map behind it.
   project: [
-    {label: 'MRE', value: '183 Mt @ 4.86% TGC'},
-    {label: 'Classification', value: '148 Mt Indicated'},
-    {label: 'Cut-off', value: '3% TGC'},
+    {label: 'Licence', value: '6.4 sq km · 100% owned'},
+    {label: 'Tenure', value: 'Secure through 2030+'},
+    {label: 'Drilled', value: '100 DD holes, 2022-25'},
   ],
   topography: [
     {label: 'Terrain', value: 'Exaggerated local DEM'},
@@ -1547,7 +1551,7 @@ function sceneCalloutsForMode(
     // One bold callout only — the licence. (Was 2; the village-context box added
     // noise and repeated what the map already shows.)
     return [
-      {id: 'aoi', label: 'Sakariya project area', detail: 'Contiguous licence over the flake-graphite resource', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
+      {id: 'aoi', label: '6.4 sq km · 100% owned', detail: 'Contiguous licence, secure through 2030+, drilled on 100 holes', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
     ];
   }
   if (mode === 'topography') {
@@ -3101,14 +3105,18 @@ export default function TangaDeckWorkbench() {
     const showRoute = activeMode === 'accessibility';
     const showDrillholes = false;
     const showCutaway = false;
-    const showMineInfrastructure = activeMode === 'project' || activeMode === 'accessibility';
+    // Concept mine buildings are no longer drawn on the project scene. That
+    // slide answers 'what ground do we control', and a hypothetical plant and
+    // stockpile sitting inside the licence outline both crowded it and invited
+    // the question of whether any of it is approved. Slide 9 now tells the mine
+    // plan story properly, with a carved pit and a sited plant.
+    const showMineInfrastructure = activeMode === 'accessibility';
     const showDetailedLocalContext = activeMode === 'topography';
     // Power grid belongs to the access/infrastructure story only. It used to
     // also render on the project-focus scene, where the bright yellow corridor
     // beam dominated a slide that's about the licence area, not power.
     const showPowerGrid = activeMode === 'accessibility';
     const showVillageLabels = activeMode === 'project';
-    const terrainCells = showFastLocalSurface ? localTerrainCells(heightAt, activeMode) : [];
     const mineFacilities = showMineInfrastructure ? locatedMineFacilities() : [];
     const minePoints = showMineInfrastructure ? locatedMinePoints() : [];
     const mineLabels = activeMode === 'project'
@@ -3136,24 +3144,13 @@ export default function TangaDeckWorkbench() {
       : [];
 
     return [
-      showFastLocalSurface && new PolygonLayer<TerrainCell>({
-        id: 'local-dem-relief-surface',
-        data: terrainCells,
-        pickable: true,
-        stroked: false,
-        filled: true,
-        extruded: false,
-        wireframe: false,
-        getPolygon: (cell) => cell.polygon,
-        getFillColor: (cell) => cell.color,
-        material: {
-          ambient: 0.34,
-          diffuse: 0.62,
-          shininess: 18,
-          specularColor: [160, 218, 210],
-        },
-        parameters: {depthTest: false} as any,
-      }),
+      // The flat-shaded relief grid that used to cover the project, topography
+      // and access scenes is gone. It laid a 22x16 mesh of ~2 km quads over the
+      // map — visible as a coarse tiled grid across three slides — and its
+      // colours came from `reliefHeightAt`, which synthesises elevation from
+      // noise rather than reading the terrain raster. So it was a grid of
+      // invented relief painted on top of real satellite imagery. The imagery
+      // underneath carries the landform truthfully on its own.
       // VRIFY-style license boundary: three-layer glow that reads bright and
       // premium at any zoom. Uses the brand copper (matches the deck palette)
       // instead of the older teal chrome noise.
@@ -3921,14 +3918,10 @@ export default function TangaDeckWorkbench() {
       push('lbl-license', 'TANGA LICENSE · 6.4 sq km · 100% OWNED', PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, 260, '#f0b64a');
     }
     if (activeMode === 'project') {
-      // Keep to a couple of spread-out facilities, with concise labels so the
-      // pinned chips stay narrow and don't crowd the panel.
-      const MINE_SHORT: Record<string, string> = {'process-plant': 'Processing plant', 'product-stockpile': 'Product stockpile'};
-      const picks = [
-        ...locatedMineFacilities().filter((i) => ['process-plant'].includes(i.id)),
-        ...locatedMinePoints().filter((i) => ['product-stockpile'].includes(i.id)),
-      ];
-      picks.forEach((i: any) => push(`mine-${i.id}`, MINE_SHORT[i.id] ?? i.name, i.lon, i.lat, 95, '#8fb4d6'));
+      // Processing plant and product stockpile pins are gone from this scene:
+      // they are concept mine facilities, and this slide is about the licence.
+      // Villages stay — they are real, and the land setting is part of what
+      // "what we control" has to answer honestly.
       (villages.length ? villages : labels).slice(0, 6).forEach((feature, idx) => {
         const name = String(feature.properties?.name ?? '');
         const point = featurePoint(feature, 70, heightAt);
