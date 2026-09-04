@@ -453,8 +453,13 @@ const slideById: Record<string, DeckSlide> = Object.fromEntries(
 );
 const MODE_NARRATIVE_SOURCE: Record<WorkbenchMode, string> = {
   ranking: 'overview',              // "Where We Are" — macro opportunity
-  tanzania: 'licenses',             // "What We Control" — tenement + jurisdiction
-  project: 'topography',            // Local relief & AOI
+  // The country and project scenes were one slide out of step: `tanzania`
+  // (a regional locator) borrowed the tenement narrative, which pushed the
+  // licence scene onto the topography one — so the slide about the ground we
+  // own was headed "What We See" and carried relief copy. Each now points at
+  // the slide it actually is.
+  tanzania: 'overview',             // "Where We Are" — regional locator
+  project: 'licenses',              // "What We Control" — tenement + jurisdiction
   topography: 'topography',
   accessibility: 'accessibility',
   drillholes: 'drillholes',         // lead slide; also covers _lithology and _assay
