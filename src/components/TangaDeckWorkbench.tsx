@@ -1706,6 +1706,51 @@ function locateMineItem<T extends {east: number; north: number; detail: string; 
   };
 }
 
+export type DrillCollar = {holeId: string; lon: number; lat: number};
+
+let drillCollarPromise: Promise<DrillCollar[]> | null = null;
+
+/**
+ * Collar position for each of the 100 diamond holes, for the licence scene.
+ *
+ * Read from `feature.geometry.coordinates`, NOT from the `geometry.coordinates`
+ * field duplicated inside `properties`. Those two disagree: the geometry gives
+ * 100 distinct collars spanning 0.90 x 4.91 km around the project centre, which
+ * matches the licence outline, while the copy in `properties` smears the same
+ * holes across roughly 51 km of longitude. Plotting the properties version would
+ * scatter the drilling far outside the tenement it is meant to prove.
+ */
+function loadDrillCollars(): Promise<DrillCollar[]> {
+  if (drillCollarPromise) return drillCollarPromise;
+
+  drillCollarPromise = fetch('/assay_data.geojson', {cache: 'force-cache'})
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      const features = Array.isArray(payload?.features) ? payload.features : [];
+      // A plain record rather than a Map: `Map` is shadowed in this module by
+      // the react-map-gl component of the same name.
+      const byHole: Record<string, DrillCollar> = {};
+
+      for (const feature of features) {
+        const holeId = String(feature?.properties?.hole_id ?? '').trim();
+        if (!holeId || byHole[holeId]) continue;
+
+        const coordinate = feature?.geometry?.coordinates?.[0];
+        const lon = Number(coordinate?.[0]);
+        const lat = Number(coordinate?.[1]);
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+
+        byHole[holeId] = {holeId, lon, lat};
+      }
+
+      return Object.values(byHole);
+    })
+    // A licence outline with no collars is a weaker slide, not a broken one.
+    .catch(() => []);
+
+  return drillCollarPromise;
+}
+
 function locatedMineFacilities() {
   return HYPOTHETICAL_MINE_FACILITIES.map(locateMineItem);
 }
@@ -1935,6 +1980,9 @@ export default function TangaDeckWorkbench() {
   // available, and assigning a ref does not trigger a render — which is why
   // the globe's peer labels stayed empty until an unrelated camera nudge.
   const [mapInstance, setMapInstance] = useState<MapRef['getMap'] extends () => infer M ? M | null : null>(null);
+  // Drill collars for the licence scene: 100 dots inside the boundary are the
+  // most direct answer to "is this ground actually tested?".
+  const [drillCollars, setDrillCollars] = useState<DrillCollar[]>([]);
   const [contextLoadState, setContextLoadState] = useState<SceneLoadState>('idle');
   const [routeLoadState, setRouteLoadState] = useState<SceneLoadState>('idle');
   const [threeLoadReport, setThreeLoadReport] = useState<ThreeLoadReport>(DEFAULT_THREE_LOAD_REPORT);
@@ -2967,6 +3015,22 @@ export default function TangaDeckWorkbench() {
     return () => window.clearInterval(timer);
   }, [mapInstance]);
 
+  // Fetched only once the licence scene is reached, so the other scenes do not
+  // pay for it. The response is shared with the 3D scenes' own request, so on a
+  // normal run through the deck this comes from cache.
+  useEffect(() => {
+    if (activeMode !== 'project' || drillCollars.length > 0) return;
+
+    let cancelled = false;
+    loadDrillCollars().then((collars) => {
+      if (!cancelled) setDrillCollars(collars);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMode, drillCollars.length]);
+
   const handleMapError = useCallback(() => {
     setMapLoadState('degraded');
     console.info('[Tanga telemetry] map entered degraded state; DeckGL overlays remain available');
@@ -3704,6 +3768,24 @@ export default function TangaDeckWorkbench() {
         getLineWidth: 3,
         lineWidthMinPixels: 2,
       }),
+      // Drill collars on the licence scene. Collars only, not the 5,207 assay
+      // trace features — the point here is coverage across the tenement, and
+      // the traces are the drillhole scene's job.
+      activeMode === 'project' && drillCollars.length > 0 && new ScatterplotLayer<DrillCollar>({
+        id: 'licence-drill-collars',
+        data: drillCollars,
+        getPosition: (collar) => [collar.lon, collar.lat, heightAt(collar.lon, collar.lat) + 40],
+        getRadius: 46,
+        radiusUnits: 'meters',
+        radiusMinPixels: 2,
+        radiusMaxPixels: 7,
+        stroked: true,
+        filled: true,
+        getFillColor: [246, 233, 210, 225],
+        getLineColor: [24, 18, 12, 210],
+        lineWidthMinPixels: 1,
+        parameters: {depthTest: false} as any,
+      }),
       showDrillholes && new GeoJsonLayer<any>({
         id: 'drillholes',
         data: '/assay_data.geojson',
@@ -3714,7 +3796,7 @@ export default function TangaDeckWorkbench() {
         lineWidthMinPixels: 2,
       }),
     ].filter(Boolean) as any[];
-  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, tangaRankingInserted, vegetation, villages]);
+  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, tangaRankingInserted, vegetation, villages]);
 
   const currentSummary = modeSummary(activeMode, routeTarget, resourceFocus, tangaRankingInserted);
   const currentFacts = factsForMode(activeMode, resourceFocus);
