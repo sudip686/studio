@@ -9,7 +9,9 @@ import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
+import proj4 from 'proj4';
 import {formatIntercept, interceptTone} from '@/lib/assay/intercepts';
+import {loadHiresDem, type HiresDem} from '@/lib/terrain/hires-dem';
 import {
   FALLBACK_RELIEF,
   formatReliefWindow,
@@ -376,7 +378,10 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
       {cells: ['Min elevation', '≈300 m', '']},
       {cells: ['Relief range', '≈640 m', ''], emphasis: true},
       {cells: ['Setting', 'Maramba village', '']},
-      {cells: ['Terrain', 'Low-relief foothills', '']},
+      // "Low-relief foothills" sat directly under a relief range of ~800 m in
+      // the same panel, which is a contradiction a reader will catch. The
+      // descriptor now matches the measured numbers above it.
+      {cells: ['Terrain', 'Dissected hill country', '']},
     ],
   },
   accessibility: {
@@ -1708,6 +1713,81 @@ function locateMineItem<T extends {east: number; north: number; detail: string; 
 
 export type DrillCollar = {holeId: string; lon: number; lat: number};
 
+export type ReliefCell = {
+  polygon: [number, number][];
+  elevation: number;
+  color: [number, number, number, number];
+};
+
+/**
+ * Relief mesh for the topography scene, sampled from the hi-res DEM.
+ *
+ * Replaces `localTerrainCells`, which built a 22 x 16 grid of ~2 km quads
+ * coloured from procedural noise — coarse enough to read as a tiled grid, and
+ * describing invented landform. This samples the real raster at 96 x 96 over
+ * the project tile (roughly 75 m cells), which is fine enough to read as
+ * shading rather than tiling, and is the same terrain the 3D scenes stand on.
+ */
+function buildReliefCells(dem: HiresDem): ReliefCell[] {
+  const COLUMNS = 96;
+  const ROWS = 96;
+
+  // Tile corners in lon/lat, so the mesh covers exactly the raster's extent.
+  const [westLon, southLat] = proj4('EPSG:32737', 'WGS84', [dem.minX, dem.minY]) as [number, number];
+  const [eastLon, northLat] = proj4('EPSG:32737', 'WGS84', [dem.maxX, dem.maxY]) as [number, number];
+
+  const dx = (eastLon - westLon) / COLUMNS;
+  const dy = (northLat - southLat) / ROWS;
+  const span = Math.max(1, dem.maxElevation - dem.minElevation);
+  const cells: ReliefCell[] = [];
+
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let column = 0; column < COLUMNS; column += 1) {
+      const west = westLon + column * dx;
+      const east = west + dx;
+      const south = southLat + row * dy;
+      const north = south + dy;
+
+      const elevation = dem.sample(west + dx * 0.5, south + dy * 0.5);
+      if (elevation === null) continue;
+
+      // Shade by elevation, and add a little east-west slope shading so ridges
+      // and valleys read as landform rather than as a flat colour ramp.
+      const eastNeighbour = dem.sample(east + dx * 0.5, south + dy * 0.5) ?? elevation;
+      const slope = clamp((elevation - eastNeighbour) / 40, -1, 1);
+      const t = clamp((elevation - dem.minElevation) / span, 0, 1);
+      const shade = clamp(0.62 + slope * 0.3, 0.32, 1);
+
+      // Feather the alpha toward the tile edge. The raster is a rectangle, and
+      // drawn at constant opacity it reads as a screenshot pasted onto the map;
+      // fading it out lets the relief dissolve into the surrounding imagery.
+      const edgeU = Math.min(column, COLUMNS - 1 - column) / (COLUMNS * 0.5);
+      const edgeV = Math.min(row, ROWS - 1 - row) / (ROWS * 0.5);
+      const edgeFade = clamp(Math.min(edgeU, edgeV) * 3.4, 0, 1);
+      if (edgeFade <= 0.02) continue;
+
+      const base = terrainColor(dem.minElevation + t * span);
+      cells.push({
+        polygon: [
+          [west, south],
+          [east, south],
+          [east, north],
+          [west, north],
+        ],
+        elevation,
+        color: [
+          Math.round(base[0] * shade),
+          Math.round(base[1] * shade),
+          Math.round(base[2] * shade),
+          Math.round(165 * edgeFade),
+        ],
+      });
+    }
+  }
+
+  return cells;
+}
+
 let drillCollarPromise: Promise<DrillCollar[]> | null = null;
 
 /**
@@ -1983,6 +2063,8 @@ export default function TangaDeckWorkbench() {
   // Drill collars for the licence scene: 100 dots inside the boundary are the
   // most direct answer to "is this ground actually tested?".
   const [drillCollars, setDrillCollars] = useState<DrillCollar[]>([]);
+  // Relief cells for the topography scene, sampled from the real DEM.
+  const [reliefCells, setReliefCells] = useState<ReliefCell[]>([]);
   const [contextLoadState, setContextLoadState] = useState<SceneLoadState>('idle');
   const [routeLoadState, setRouteLoadState] = useState<SceneLoadState>('idle');
   const [threeLoadReport, setThreeLoadReport] = useState<ThreeLoadReport>(DEFAULT_THREE_LOAD_REPORT);
@@ -3031,6 +3113,22 @@ export default function TangaDeckWorkbench() {
     };
   }, [activeMode, drillCollars.length]);
 
+  // Sampled once the topography scene is reached. Without it that slide has
+  // no relief at all — which is its entire subject.
+  useEffect(() => {
+    if (activeMode !== 'topography' || reliefCells.length > 0) return;
+
+    let cancelled = false;
+    loadHiresDem().then((dem) => {
+      if (cancelled || !dem) return;
+      setReliefCells(buildReliefCells(dem));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMode, reliefCells.length]);
+
   const handleMapError = useCallback(() => {
     setMapLoadState('degraded');
     console.info('[Tanga telemetry] map entered degraded state; DeckGL overlays remain available');
@@ -3213,13 +3311,25 @@ export default function TangaDeckWorkbench() {
       : [];
 
     return [
-      // The flat-shaded relief grid that used to cover the project, topography
-      // and access scenes is gone. It laid a 22x16 mesh of ~2 km quads over the
-      // map — visible as a coarse tiled grid across three slides — and its
-      // colours came from `reliefHeightAt`, which synthesises elevation from
-      // noise rather than reading the terrain raster. So it was a grid of
-      // invented relief painted on top of real satellite imagery. The imagery
-      // underneath carries the landform truthfully on its own.
+      // Real relief, on the one scene whose subject it is. The old version of
+      // this layer covered three scenes with a 22x16 mesh of ~2 km quads —
+      // visible as a coarse tiled grid — coloured from `reliefHeightAt`, which
+      // synthesises elevation from noise. This samples the actual project DEM
+      // at 96x96 (~75 m cells), fine enough to read as shading rather than
+      // tiling, and it is only drawn on the topography scene: on the licence
+      // and access scenes the satellite imagery carries the landform better
+      // than a translucent overlay does.
+      activeMode === 'topography' && reliefCells.length > 0 && new PolygonLayer<ReliefCell>({
+        id: 'local-dem-relief-surface',
+        data: reliefCells,
+        pickable: false,
+        stroked: false,
+        filled: true,
+        extruded: false,
+        getPolygon: (cell) => cell.polygon,
+        getFillColor: (cell) => cell.color,
+        parameters: {depthTest: false} as any,
+      }),
       // VRIFY-style license boundary: three-layer glow that reads bright and
       // premium at any zoom. Uses the brand copper (matches the deck palette)
       // instead of the older teal chrome noise.
@@ -3796,7 +3906,7 @@ export default function TangaDeckWorkbench() {
         lineWidthMinPixels: 2,
       }),
     ].filter(Boolean) as any[];
-  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, tangaRankingInserted, vegetation, villages]);
+  }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, reliefCells, tangaRankingInserted, vegetation, villages]);
 
   const currentSummary = modeSummary(activeMode, routeTarget, resourceFocus, tangaRankingInserted);
   const currentFacts = factsForMode(activeMode, resourceFocus);
