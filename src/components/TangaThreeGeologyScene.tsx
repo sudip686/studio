@@ -90,6 +90,15 @@ const CHROME_SELECTORS = [
   '.tanga-deck__legend',
   '.tanga-deck__compass',
   '.tanga-deck__pager',
+  '.tanga-deck__scale',
+  // The right-hand stack was missing, so anchored labels were free to land
+  // on the source-data panel and the grade legend — which is how the
+  // resource scene ended up with a callout sitting 46% over its own panel.
+  '.tanga-deck__data-panel',
+  '.tanga-deck__insight-panel',
+  '.tanga-deck__ranking',
+  '.tanga-three__grade-legend',
+  '.tanga-three__drill-legend',
   '.tanga-deck__caption',
   '.tanga-deck__act-rail',
   '.tanga-deck__voice',
@@ -3914,9 +3923,11 @@ export default function TangaThreeGeologyScene({
       <div ref={hostRef} className="tanga-three__canvas" />
       {!minimalViewerChrome && (
         <>
-          <div key={`scene-title-${mode}-${resourceFocus}`} className="tanga-three__scene-title">
-            {sceneHeading}
-          </div>
+          {/* Scene title removed. It rendered bottom-centre, directly under
+              the pager (z-index 7 against the pager's 14), so it was 96%
+              occluded — and it repeated what the pager already states: the
+              pager reads "METALLURGY 08 / 10" beside a title reading
+              "Metallurgy reveal". */}
           <div className="tanga-three__story-strip" aria-label="3D geology scene sequence">
             {THREE_STORY_FLOW.map((step, index) => (
               <span
@@ -4005,20 +4016,25 @@ export default function TangaThreeGeologyScene({
       )}
       <section className={classNames('tanga-three__nav-cluster', legendItems.length === 0 && 'is-scale-only')} aria-label="Geology legend compass and scale">
         <div className="tanga-three__instrument-row">
-          <div className="tanga-three__mini-compass" aria-label={`Model bearing ${compassBearing} degrees`}>
-            <div className="tanga-three__mini-compass-ring" style={{transform: `rotate(${compassBearing}deg)`}}>
-              <span>N</span>
-              <span>E</span>
-              <span>S</span>
-              <span>W</span>
+          {/* The same compass and scale the map scenes use, rather than a second
+              design. The old 3D pair diverged three ways: a different rose,
+              degrees written "72 deg" instead of "72°", and — the real defect —
+              the ring and the needle were both rotated by +bearing, so the needle
+              never moved relative to the N/E/S/W letters and always pointed at N
+              whatever the camera did. The map compass also rotates by -bearing, so
+              north pointed opposite ways between 2D and 3D slides. Sharing the
+              markup makes both correct by construction. */}
+          <div className="tanga-deck__compass tanga-compass" aria-label={`Bearing ${Math.round(compassBearing)} degrees`}>
+            <div className="tanga-compass__rose" style={{transform: `rotate(${-compassBearing}deg)`}}>
+              <i className="tanga-compass__arrow" />
+              <span className="tanga-compass__n">N</span>
             </div>
-            <div className="tanga-three__mini-compass-needle" style={{transform: `rotate(${compassBearing}deg)`}} />
-            <small>{compassBearing} deg</small>
+            <small className="tanga-compass__deg">{Math.round(compassBearing)}°</small>
           </div>
-          <div className="tanga-three__mini-scale" aria-label="Local geology scale">
+          <div className="tanga-deck__scale" aria-label="Local geology scale">
             <div>
               <span style={{width: `${navInstrument.scaleWidth}px`}} />
-              <strong>{navInstrument.scaleLabel}</strong>
+              <em>{navInstrument.scaleLabel}</em>
             </div>
             <small>{navInstrument.scaleDetail}</small>
           </div>
