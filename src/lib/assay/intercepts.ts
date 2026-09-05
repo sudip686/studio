@@ -352,6 +352,11 @@ export interface FormatInterceptOptions {
    * there is room to read it.
    */
   includeSubRun?: boolean;
+  /**
+   * Include the "from Xm" collar depth. Off for labels floating over the 3D
+   * scene, where brevity is what makes the grade readable at a glance.
+   */
+  includeDepth?: boolean;
 }
 
 /**
@@ -362,18 +367,30 @@ export function formatIntercept(
   intercept: Intercept,
   options: FormatInterceptOptions = {}
 ): { headline: string; sub: string } {
-  const { includeSubRun = true } = options;
+  const { includeSubRun = true, includeDepth = true } = options;
 
   const grade = round(intercept.gradePct, 2).toFixed(2);
   const length = round(intercept.lengthM, 0).toFixed(0);
   const from = round(intercept.fromM, 0).toFixed(0);
 
-  let sub = `${grade}% TGC over ${length}m from ${from}m`;
+  // Grade and width only, joined by a slash — the industry's own shorthand and
+  // the form the reference deck uses ("6.15gpt / 8.3m"). The wordy version,
+  // "5.57% TGC over 82m from 0m", was twice the characters for the same two
+  // facts, and the filler words are what a reader's eye has to wade through
+  // before reaching the number. Depth is kept for the panel, where there is
+  // room to read a sentence.
+  let sub = includeDepth
+    ? `${grade}% TGC over ${length}m from ${from}m`
+    : `${grade}% TGC / ${length}m`;
 
   if (includeSubRun && intercept.includes) {
     const inclGrade = round(intercept.includes.gradePct, 2).toFixed(2);
     const inclLength = round(intercept.includes.lengthM, 0).toFixed(0);
-    sub += ` · incl ${inclGrade}% / ${inclLength}m`;
+    // Its own line rather than appended with a separator: the reference puts
+    // "incl" on a new line, which keeps every line a short, scannable figure
+    // instead of one long run-on.
+    sub += `
+incl ${inclGrade}% / ${inclLength}m`;
   }
 
   return { headline: intercept.holeId, sub };

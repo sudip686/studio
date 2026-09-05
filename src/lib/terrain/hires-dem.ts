@@ -1,13 +1,11 @@
 'use client';
 
 /**
- * Sampler for the hi-res project DEM (`height_hires.bin`, 2048 x 1940,
- * 204-1008 m over a 7.6 x 7.2 km tile).
+ * Sampler for the project elevation raster.
  *
  * Deliberately not `dem-sampler.ts`: that module points at `height.bin`, the
  * regional grid, which is 207 MB on disk — far too large to pull into a
- * browser deck. This one loads the 15.9 MB project tile, which is the extent
- * every scene actually looks at.
+ * browser deck.
  *
  * Exists because the topography scene had been drawing relief from
  * `reliefHeightAt`, a procedural noise function, rather than from the terrain
@@ -16,8 +14,37 @@
 
 import proj4 from 'proj4';
 
-const HIRES_META_URL = '/terrain_hires_meta.json';
-const HIRES_HEIGHT_URL = '/height_hires.bin';
+// Large rasters live on Cloudflare R2 in production (NEXT_PUBLIC_ASSET_BASE_URL)
+// and in /public locally. Both height rasters are gitignored, so a plain
+// same-origin fetch 404s on a deploy or a fresh clone and the relief silently
+// disappears. This mirrors the loader the 3D scene already uses.
+const RAW_ASSET_BASE = process.env.NEXT_PUBLIC_ASSET_BASE_URL || '';
+const ASSET_BASE_URL = RAW_ASSET_BASE.endsWith('/')
+  ? RAW_ASSET_BASE.slice(0, -1)
+  : RAW_ASSET_BASE;
+
+async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
+  if (ASSET_BASE_URL) {
+    try {
+      const remote = await fetch(`${ASSET_BASE_URL}${path}`, init);
+      if (remote.ok) return remote;
+    } catch {
+      // fall through to the local copy
+    }
+  }
+  return fetch(path, init);
+}
+
+/**
+ * Preferred source is the hi-res project tile. The 1024 preview is the fallback
+ * because it is the only elevation raster committed to the repo, so a clone
+ * with no R2 configured still renders relief instead of nothing.
+ */
+const RASTER_SOURCES = [
+  {meta: '/terrain_hires_meta.json', height: '/height_hires.bin'},
+  {meta: '/terrain_preview_meta.json', height: '/height_preview_1024.bin'},
+] as const;
+
 const UTM_37S = '+proj=utm +zone=37 +south +datum=WGS84 +units=m +no_defs';
 
 try {
@@ -44,16 +71,28 @@ export interface HiresDem {
 let demPromise: Promise<HiresDem | null> | null = null;
 
 /**
- * Load the project DEM once. Resolves to `null` rather than throwing if the
- * raster is unavailable, so callers degrade to no relief instead of no slide.
+ * Load the project DEM once. Resolves to `null` rather than throwing if no
+ * raster is reachable, so callers degrade to no relief instead of no slide.
  */
 export function loadHiresDem(): Promise<HiresDem | null> {
   if (demPromise) return demPromise;
 
   demPromise = (async () => {
+    for (const source of RASTER_SOURCES) {
+      const dem = await loadRaster(source.meta, source.height);
+      if (dem) return dem;
+    }
+    return null;
+  })().catch(() => null);
+
+  return demPromise;
+}
+
+async function loadRaster(metaUrl: string, heightUrl: string): Promise<HiresDem | null> {
+  try {
     const [metaResponse, binResponse] = await Promise.all([
-      fetch(HIRES_META_URL, {cache: 'force-cache'}),
-      fetch(HIRES_HEIGHT_URL, {cache: 'force-cache'}),
+      fetchAsset(metaUrl, {cache: 'force-cache'}),
+      fetchAsset(heightUrl, {cache: 'force-cache'}),
     ]);
     if (!metaResponse.ok || !binResponse.ok) return null;
 
@@ -102,7 +141,7 @@ export function loadHiresDem(): Promise<HiresDem | null> {
       maxElevation: Number(meta?.elevation_m?.max ?? 0),
       sample,
     };
-  })().catch(() => null);
-
-  return demPromise;
+  } catch {
+    return null;
+  }
 }
