@@ -18,6 +18,7 @@ import {
   summariseIntercepts,
   type Intercept,
 } from '@/lib/assay/intercepts';
+import {DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {placeLabels, type LabelCandidate, type Rect} from '@/lib/labels/declutter';
 
 type GeologyMode = 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
@@ -79,6 +80,50 @@ function visibleStage(
  * Panels and instruments that anchored labels must not cover. Selectors span
  * both this scene's own chrome and the deck chrome layered over it.
  */
+/**
+ * Presenter-facing layers.
+ *
+ * Borrowed from the GIS reference, where every layer has its own visibility
+ * and opacity: in a Q&A someone asks to "turn the blocks off and just show the
+ * holes", and switching scenes is too blunt an answer. Objects are tagged as
+ * they are built and this walks the stage applying the current settings.
+ */
+/** Mark an object (and everything under it) as belonging to a presenter layer. */
+function tagDeckLayer(object: THREE.Object3D, layer: DeckLayerId) {
+  object.userData.deckLayer = layer;
+}
+
+/**
+ * Apply visibility and opacity to every tagged object.
+ *
+ * Each material remembers the opacity it was built with, so repeated passes
+ * scale from that baseline rather than compounding — otherwise dragging a
+ * slider would ratchet a material darker on every frame it is applied.
+ */
+function applyDeckLayers(stage: THREE.Object3D, settings: DeckLayerSettings) {
+  stage.traverse((object) => {
+    const layer = object.userData?.deckLayer as DeckLayerId | undefined;
+    if (!layer) return;
+    const setting = settings[layer];
+    if (!setting) return;
+
+    object.visible = setting.visible;
+
+    for (const material of materialsForObject(object)) {
+      const m = material as THREE.Material & {opacity?: number; transparent?: boolean};
+      if (typeof m.opacity !== 'number') continue;
+      if (m.userData.deckBaseOpacity === undefined) m.userData.deckBaseOpacity = m.opacity;
+      const base = m.userData.deckBaseOpacity as number;
+      const next = base * setting.opacity;
+      m.opacity = next;
+      // Only force transparency on: a material built opaque must be allowed
+      // back to opaque, or the terrain loses its depth write at full opacity.
+      if (next < 1) m.transparent = true;
+      m.needsUpdate = true;
+    }
+  });
+}
+
 const CHROME_SELECTORS = [
   '.tanga-three__scene-title',
   '.tanga-three__story-strip',
@@ -163,6 +208,7 @@ type TangaThreeGeologySceneProps = {
    * presenter; `all` gives the dense drilling look for detailed questions.
    */
   labelDensity?: LabelDensity;
+  layerSettings?: DeckLayerSettings;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
@@ -906,7 +952,7 @@ function interceptCallouts(
     .filter((intercept) => intercept.holeId !== excludeHoleId)
     .slice(0, maxLabels)
     .map((intercept, index) => {
-      const {headline, sub} = formatIntercept(intercept, {includeSubRun: false});
+      const {headline, sub} = formatIntercept(intercept, {includeSubRun: true, includeDepth: false});
       return {
         intercept,
         callout: {
@@ -1796,6 +1842,7 @@ export default function TangaThreeGeologyScene({
   assetQuality = 'preview',
   onLoadState,
   labelDensity = 'key',
+  layerSettings = DEFAULT_LAYER_SETTINGS,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -1823,6 +1870,15 @@ export default function TangaThreeGeologyScene({
   const [assayFacts, setAssayFacts] = useState<AssayFacts | null>(null);
   // Read inside the scene effect without making label density a dependency —
   // changing tiers must not tear down and rebuild the whole WebGL scene.
+  // Presenter layer state. Kept in a ref so the scene effect never rebuilds
+  // just because a slider moved, and applied through a stage ref instead.
+  const layerSettingsRef = useRef<DeckLayerSettings>(layerSettings);
+  const stageRef = useRef<THREE.Object3D | null>(null);
+  useEffect(() => {
+    layerSettingsRef.current = layerSettings;
+    if (stageRef.current) applyDeckLayers(stageRef.current, layerSettings);
+  }, [layerSettings]);
+
   const labelDensityRef = useRef<LabelDensity>(labelDensity);
   // Lets a density change re-place labels immediately rather than waiting for
   // the next animation frame, which matters when the render loop is idling on
@@ -2267,6 +2323,7 @@ export default function TangaThreeGeologyScene({
 
     const stage = new THREE.Group();
     groupRef.current = stage;
+    stageRef.current = stage;
     scene.add(stage);
 
     // The ground reference grid that used to sit under the block model is gone.
@@ -2282,6 +2339,7 @@ export default function TangaThreeGeologyScene({
 
     const terrainLayer = new THREE.Group();
     terrainLayer.name = 'terrain-surface-layer';
+    tagDeckLayer(terrainLayer, 'terrain');
     stage.add(terrainLayer);
 
     const addProceduralTerrain = () => {
@@ -2486,6 +2544,7 @@ export default function TangaThreeGeologyScene({
           roadGroup.add(line);
         }
 
+        tagDeckLayer(roadGroup, 'context');
         stage.add(roadGroup);
         registerReveal(roadGroup, 0.3, 1.2, 0.98);
       }
@@ -2523,6 +2582,7 @@ export default function TangaThreeGeologyScene({
         core.renderOrder = 25;
         boundaryGroup.add(core);
 
+        tagDeckLayer(boundaryGroup, 'context');
         stage.add(boundaryGroup);
         registerReveal(boundaryGroup, 0.42, 1.2, 0.97);
       }
@@ -2619,6 +2679,7 @@ export default function TangaThreeGeologyScene({
       traceMesh.instanceMatrix.needsUpdate = true;
       traceMesh.renderOrder = 2;
       traceMesh.userData.tooltipItems = shownDrillholes.map((segment) => drillTooltip(segment, 'Drill trace', '#f8fafc'));
+      tagDeckLayer(traceMesh, 'drilling');
       stage.add(traceMesh);
       registerReveal(traceMesh, mode === 'metallurgy' ? 0.32 : 0.18, 1.05, 0.98);
       pickables.push(traceMesh);
@@ -2656,6 +2717,7 @@ export default function TangaThreeGeologyScene({
         });
         mesh.instanceMatrix.needsUpdate = true;
         mesh.userData.tooltipItems = segments.map((segment) => drillTooltip(segment, lithologyLabel(segment.lithology), baseColor.getStyle()));
+        tagDeckLayer(mesh, 'drilling');
         stage.add(mesh);
         registerReveal(mesh, mode === 'metallurgy' ? 0.78 : 0.48, 1.15, 0.96);
         pickables.push(mesh);
@@ -2695,6 +2757,7 @@ export default function TangaThreeGeologyScene({
         });
         mesh.instanceMatrix.needsUpdate = true;
         mesh.userData.tooltipItems = segments.map((segment) => drillTooltip(segment, bin.label, bin.color, [bin.detail]));
+        tagDeckLayer(mesh, 'drilling');
         stage.add(mesh);
         registerReveal(mesh, mode === 'metallurgy' ? 1.05 : 0.74, 1.22, 0.94);
         pickables.push(mesh);
@@ -2743,6 +2806,7 @@ export default function TangaThreeGeologyScene({
           `Lithology ${lithologyLabel(segment.lithology)}`,
         ],
       }));
+      tagDeckLayer(collars, 'drilling');
       stage.add(collars);
       registerReveal(collars, 0.08, 0.9, 0.72, 18);
       pickables.push(collars);
@@ -2766,6 +2830,7 @@ export default function TangaThreeGeologyScene({
         });
         collarRings.instanceMatrix.needsUpdate = true;
         collarRings.renderOrder = 7;
+        tagDeckLayer(collarRings, 'drilling');
         stage.add(collarRings);
         registerReveal(collarRings, 0.2, 0.95, 0.74, 15);
 
@@ -2797,11 +2862,13 @@ export default function TangaThreeGeologyScene({
             collarLeaderMaterial.clone()
           );
           leader.renderOrder = 13;
+          tagDeckLayer(leader, 'drilling');
           stage.add(leader);
 
           const sprite = makeCollarLabelSprite(segment.holeId, mode === 'resource' ? 0.42 : 0.62);
           if (sprite) {
             sprite.position.set(point.x, labelY, point.z);
+            tagDeckLayer(sprite, 'drilling');
             stage.add(sprite);
           }
         });
@@ -2824,6 +2891,7 @@ export default function TangaThreeGeologyScene({
         );
         const labPlant = buildMiniPlant({scale: 2.4, accent: METALLURGY_REVEAL_COLORS[0]});
         labPlant.position.set(METALLURGY_LAB_POSITION.x, labGround, METALLURGY_LAB_POSITION.z);
+        tagDeckLayer(labPlant, 'context');
         stage.add(labPlant);
         registerReveal(labPlant, 0.2, 1.3, 0.9);
 
@@ -3029,7 +3097,9 @@ export default function TangaThreeGeologyScene({
           mesh.instanceMatrix.needsUpdate = true;
           wireMesh.instanceMatrix.needsUpdate = true;
           mesh.userData.tooltipItems = gradeBlocks.map(blockTooltip);
+          tagDeckLayer(mesh, 'blocks');
           stage.add(mesh);
+          tagDeckLayer(wireMesh, 'blocks');
           stage.add(wireMesh);
           registerReveal(mesh, 0.46 + binIndex * 0.16, 1.24, 0.68, -76 + binIndex * 6);
           registerReveal(wireMesh, 0.62 + binIndex * 0.16, 1.16, 0.68, -76 + binIndex * 6);
@@ -3062,6 +3132,7 @@ export default function TangaThreeGeologyScene({
             flakeDummy.updateMatrix();
             flakes.setMatrixAt(index, flakeDummy.matrix);
           }
+          tagDeckLayer(flakes, 'blocks');
           stage.add(flakes);
           registerReveal(flakes, 1.28, 1.1, 0.62, 26);
         }
@@ -3205,6 +3276,7 @@ export default function TangaThreeGeologyScene({
           floor.receiveShadow = true;
           pitGroup.add(floor);
 
+          tagDeckLayer(pitGroup, 'blocks');
           stage.add(pitGroup);
 
           // ── Carve the pit into the ground ───────────────────────────────
@@ -3317,6 +3389,7 @@ export default function TangaThreeGeologyScene({
 
           const minePlant = buildMiniPlant({scale: 3.2, accent: 0xf59e0b});
           minePlant.position.copy(plantSite);
+          tagDeckLayer(minePlant, 'context');
           stage.add(minePlant);
           registerReveal(minePlant, 1.1, 1.3, 0.9);
 
@@ -3333,10 +3406,12 @@ export default function TangaThreeGeologyScene({
           };
 
           const romPile = stockpile(romPad, 78, 46, 0x6b5a45);
+          tagDeckLayer(romPile, 'context');
           stage.add(romPile);
           registerReveal(romPile, 0.9, 1.2, 0.86);
 
           const productPile = stockpile(productPad, 54, 34, 0x8b8175);
+          tagDeckLayer(productPile, 'context');
           stage.add(productPile);
           registerReveal(productPile, 1.3, 1.2, 0.86);
 
@@ -3365,6 +3440,7 @@ export default function TangaThreeGeologyScene({
             new THREE.LineBasicMaterial({color: 0xffb56b, transparent: true, opacity: 0.3})
           );
           haulLine.renderOrder = 8;
+          tagDeckLayer(haulLine, 'context');
           stage.add(haulLine);
 
           const truckGeometry = new THREE.BoxGeometry(26, 14, 16);
@@ -3377,6 +3453,7 @@ export default function TangaThreeGeologyScene({
           });
           haulTrucks = new THREE.InstancedMesh(truckGeometry, truckMaterial, HAUL_TRUCK_COUNT);
           haulTrucks.renderOrder = 9;
+          tagDeckLayer(haulTrucks, 'context');
           stage.add(haulTrucks);
           haulRoute = haulCurve;
           } // end of "hull.length >= 4" guard
@@ -3659,6 +3736,10 @@ export default function TangaThreeGeologyScene({
         return next;
       });
     };
+    // Objects are tagged as they are built, so apply the current layer state
+    // once construction is done — a scene rebuilt mid-presentation must come
+    // back with whatever the presenter had switched off.
+    applyDeckLayers(stage, layerSettingsRef.current);
     projectCalloutsRef.current = projectCallouts;
     projectCallouts();
     updateNavInstruments();
@@ -3736,12 +3817,16 @@ export default function TangaThreeGeologyScene({
       revealItems.forEach((item) => {
         const progress = clamp((elapsed - item.delay) / item.duration, 0, 1);
         const eased = ease(progress);
-        item.object.visible = progress > 0.001;
+        const layerId = item.object.userData?.deckLayer as DeckLayerId | undefined;
+        const layerState = layerId ? layerSettingsRef.current[layerId] : undefined;
+        const layerVisible = layerState ? layerState.visible : true;
+        const layerOpacity = layerState ? layerState.opacity : 1;
+        item.object.visible = layerVisible && progress > 0.001;
         item.object.scale.copy(item.baseScale).multiplyScalar(THREE.MathUtils.lerp(item.scaleFrom, 1, eased));
         item.object.position.copy(item.basePosition);
         item.object.position.y += item.yOffset * (1 - eased);
         item.materialStates.forEach(({material, opacity}) => {
-          material.opacity = opacity * eased;
+          material.opacity = opacity * eased * layerOpacity;
         });
       });
       if (metallurgyReceivers.length) {

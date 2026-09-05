@@ -6,7 +6,7 @@ import {DeckGL} from '@deck.gl/react';
 import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
-import {ArrowDown, ArrowUp, Box, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
+import {ArrowDown, ArrowUp, Box, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import proj4 from 'proj4';
@@ -21,6 +21,7 @@ import {
 } from '@/lib/terrain/relief';
 import TangaStoryVideoHero from './TangaStoryVideoHero';
 import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
+import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {
   type CameraAction,
   type CommandIntent,
@@ -4508,6 +4509,27 @@ export default function TangaDeckWorkbench() {
   // presenter mid-narration and for someone interrogating the drilling are
   // not the same, and one label set cannot serve both.
   const [labelDensity, setLabelDensity] = useState<LabelDensity>('key');
+  // Presenter layer controls, in the spirit of a GIS layers panel: in Q&A the
+  // ask is usually "drop the blocks and show me just the holes", and changing
+  // scene is too blunt an answer.
+  const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
+  const [isLayersOpen, setLayersOpen] = useState(false);
+  const toggleLayers = useCallback(() => setLayersOpen((open) => !open), []);
+  // Slide index. The reference deck keeps a permanent thumbnail rail down the
+  // left; this stage is far more panel-heavy than theirs, so the same job is
+  // done by an overlay that costs no width until it is asked for.
+  const [isIndexOpen, setIndexOpen] = useState(false);
+  const toggleIndex = useCallback(() => setIndexOpen((open) => !open), []);
+  const setLayerVisible = useCallback((id: DeckLayerId, visible: boolean) => {
+    setLayerSettings((current) => ({...current, [id]: {...current[id], visible}}));
+  }, []);
+  const setLayerOpacity = useCallback((id: DeckLayerId, opacity: number) => {
+    setLayerSettings((current) => ({...current, [id]: {...current[id], opacity}}));
+  }, []);
+  const resetLayers = useCallback(() => setLayerSettings(DEFAULT_LAYER_SETTINGS), []);
+  // Drives the toolbar dot, so a presenter can see at a glance that something
+  // is dialled down before they wonder why the scene looks wrong.
+  const layersModified = DECK_LAYERS.some(({id}) => !layerSettings[id].visible || layerSettings[id].opacity < 1);
   const annotationsOn = labelDensity !== 'off';
   const cycleAnnotations = useCallback(() => {
     setLabelDensity((prev) => (prev === 'key' ? 'all' : prev === 'all' ? 'off' : 'key'));
@@ -4721,10 +4743,13 @@ export default function TangaDeckWorkbench() {
       if (key === 'f' || key === 'F') { event.preventDefault(); toggleFullscreen(); return; }
       if (key === 'b' || key === 'B' || key === '.') { event.preventDefault(); toggleBlackout(); return; }
       if (key === 's' || key === 'S') { event.preventDefault(); toggleNotes(); return; }
+      if (key === 'l' || key === 'L') { event.preventDefault(); toggleLayers(); return; }
+      if (key === 'g' || key === 'G') { event.preventDefault(); toggleIndex(); return; }
       if (key === 'p' || key === 'P' || key === ' ') { event.preventDefault(); toggleAutoplay(); return; }
       if (key === '?' || key === '/') { event.preventDefault(); toggleShortcuts(); return; }
 
       if (key === 'Escape') {
+        if (isIndexOpen) { event.preventDefault(); setIndexOpen(false); return; }
         if (isDisclaimerOpen) { setIsDisclaimerOpen(false); return; }
         if (isShortcutsOpen) { setIsShortcutsOpen(false); return; }
         if (isNotesOpen)     { setIsNotesOpen(false); return; }
@@ -4734,7 +4759,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
+  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -4867,6 +4892,7 @@ export default function TangaDeckWorkbench() {
           assetQuality={assetQuality}
           onLoadState={handleThreeLoadState}
           labelDensity={labelDensity}
+          layerSettings={layerSettings}
           onAssayFacts={setAssayFacts}
         />
       )}
@@ -5385,9 +5411,16 @@ export default function TangaDeckWorkbench() {
         </button>
         <div className="tanga-deck__pager-status" aria-live="polite">
           <span className="tanga-deck__pager-label">{STORY_STEPS[activeStoryIndex]?.label ?? 'Scene'}</span>
-          <strong className="tanga-deck__pager-count">
+          <button
+            type="button"
+            className="tanga-deck__pager-count"
+            onClick={toggleIndex}
+            aria-expanded={isIndexOpen}
+            aria-label="Jump to a scene"
+            title="All scenes  (G)"
+          >
             {String(activeStoryIndex + 1).padStart(2, '0')} / {String(STORY_STEPS.length).padStart(2, '0')}
-          </strong>
+          </button>
           <div
             className="tanga-deck__pager-dots"
             role="tablist"
@@ -5466,6 +5499,17 @@ export default function TangaDeckWorkbench() {
         </div>
         <button
           type="button"
+          className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool', (isLayersOpen || layersModified) && 'is-active')}
+          onClick={toggleLayers}
+          aria-label={isLayersOpen ? 'Hide layer controls' : 'Show layer controls'}
+          aria-pressed={isLayersOpen}
+          title="Layers  (L)"
+        >
+          <Layers size={16} strokeWidth={2.2} />
+          {layersModified && <i className="tanga-deck__tool-dot" aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
           className={classNames(
             'tanga-deck__pager-btn tanga-deck__pager-btn--tool',
             annotationsOn && 'is-active',
@@ -5535,6 +5579,102 @@ export default function TangaDeckWorkbench() {
         />
       )}
 
+      {/* Scene index. Grouped by act so the running order stays legible —
+          a flat list of ten would lose the three-act shape the deck is built
+          on. Escape or a second press closes it. */}
+      {isIndexOpen && (
+        <div
+          className="tanga-deck__index-scrim"
+          role="presentation"
+          onClick={() => setIndexOpen(false)}
+        >
+          <section
+            className="tanga-deck__index"
+            aria-label="All scenes"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <span>All scenes</span>
+              <button type="button" onClick={() => setIndexOpen(false)} aria-label="Close scene index">
+                <X size={14} strokeWidth={2.2} />
+              </button>
+            </header>
+            {STORY_ACTS.map((act) => {
+              const steps = STORY_STEPS
+                .map((step, index) => ({step, index}))
+                .filter(({step}) => MODE_ACT[step.mode] === act.id);
+              if (steps.length === 0) return null;
+              return (
+                <div key={act.id} className="tanga-deck__index-act">
+                  <h4 style={{color: act.theme}}>
+                    <em>Act {act.numeral}</em> {act.label}
+                  </h4>
+                  <ol>
+                    {steps.map(({step, index}) => (
+                      <li key={step.mode}>
+                        <button
+                          type="button"
+                          className={classNames(index === activeStoryIndex && "is-current")
+                          }
+                          onClick={() => { goToStoryIndex(index); setIndexOpen(false); }}
+                          aria-current={index === activeStoryIndex}
+                        >
+                          <strong>{String(index + 1).padStart(2, "0")}</strong>
+                          <span>{step.label}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            })}
+          </section>
+        </div>
+      )}
+
+      {/* Layer controls. Only offered on the 3D scenes, which are the ones
+          with stacked geometry a presenter might want to peel back. */}
+      {isLayersOpen && threeVisible && (
+        <section className="tanga-deck__layers" aria-label="Layer controls">
+          <header className="tanga-deck__layers-head">
+            <span>Layers</span>
+            <button type="button" onClick={resetLayers} disabled={!layersModified}>Reset</button>
+          </header>
+          <ol>
+            {DECK_LAYERS.map((layer) => {
+              const state = layerSettings[layer.id];
+              return (
+                <li key={layer.id} className={classNames(!state.visible && "is-hidden")}>
+                  <button
+                    type="button"
+                    className="tanga-deck__layers-eye"
+                    onClick={() => setLayerVisible(layer.id, !state.visible)}
+                    aria-pressed={state.visible}
+                    aria-label={`${state.visible ? "Hide" : "Show"} ${layer.label}`}
+                  >
+                    {state.visible ? <Eye size={13} strokeWidth={2.4} /> : <EyeOff size={13} strokeWidth={2.4} />}
+                  </button>
+                  <span className="tanga-deck__layers-name">
+                    <strong>{layer.label}</strong>
+                    <small>{layer.detail}</small>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(state.opacity * 100)}
+                    onChange={(event) => setLayerOpacity(layer.id, Number(event.target.value) / 100)}
+                    aria-label={`${layer.label} opacity`}
+                    disabled={!state.visible}
+                  />
+                  <em>{Math.round(state.opacity * 100)}%</em>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
       {isDisclaimerOpen && (
         <div className="tanga-deck__disclaimer-overlay" role="dialog" aria-modal="true" aria-label="Important notice and disclaimer" onClick={() => setIsDisclaimerOpen(false)}>
           <div className="tanga-deck__disclaimer" onClick={(e) => e.stopPropagation()}>
@@ -5571,6 +5711,8 @@ export default function TangaDeckWorkbench() {
             <dt><kbd>F</kbd></dt><dd>Fullscreen</dd>
             <dt><kbd>S</kbd></dt><dd>Speaker notes</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Cycle labels: key &rarr; all data &rarr; off</dd>
+            <dt><kbd>L</kbd></dt><dd>Layer controls</dd>
+            <dt><kbd>G</kbd></dt><dd>All scenes</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>I</kbd></dt><dd>Why this matters</dd>
             <dt><kbd>B</kbd></dt><dd>Blackout screen</dd>
             <dt><kbd>Esc</kbd></dt><dd>Close panel / exit fullscreen</dd>
