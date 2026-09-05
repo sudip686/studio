@@ -13461,3 +13461,194 @@ button.tanga-deck__pager-count {
   font: inherit;
   color: inherit;
 }
+
+/* ═════ Cinematic shot + collision-safe HUD pass ═══════════════════════
+   Overlay panels occupy named screen regions instead of independently
+   claiming the same bottom-right corner. Layers is a top-right utility;
+   legends remain below it, while large scene evidence shifts inward only
+   while the utility is open. */
+.tanga-deck__layers {
+  top: 104px !important;
+  right: 24px !important;
+  bottom: auto !important;
+  max-height: min(314px, calc(100svh - 320px));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.tanga-deck__layers-search {
+  display: grid;
+  gap: 5px;
+}
+
+.tanga-deck__layers-search > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tanga-deck__layers-search input {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.94);
+  font: inherit;
+  font-size: 11px;
+}
+
+.tanga-deck__layers-search input::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.tanga-deck__layers-search input:focus-visible {
+  border-color: rgba(255, 220, 168, 0.78);
+  box-shadow: 0 0 0 2px rgba(217, 106, 42, 0.22);
+}
+
+.tanga-deck__layers-empty {
+  margin: 2px 0 0;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+}
+
+/* The resource legend begins below the layer drawer. The depth ruler and
+   metallurgy evidence share its former right edge, so they move inward while
+   Layers is open rather than being covered by it. */
+.tanga-deck--layers-open .tanga-three__grade-legend {
+  top: 438px !important;
+  right: 24px !important;
+}
+
+.tanga-deck--layers-open .tanga-three__depth-ruler {
+  right: 366px !important;
+}
+
+.tanga-deck--layers-open .tanga-deck__data-panel,
+.tanga-deck--layers-open .tanga-deck__insight-panel {
+  right: 366px !important;
+  max-height: calc(100svh - 410px) !important;
+}
+
+.tanga-deck--layers-open .tanga-three__metallurgy,
+.tanga-deck--layers-open .tanga-three.is-metallurgy .tanga-three__metallurgy {
+  right: 366px !important;
+  width: min(470px, calc(100vw - 760px)) !important;
+}
+
+/* The previous hover-to-expand legend changed its collision footprint after
+   labels had already been placed. A stable footprint lets the live declutter
+   pass reserve this entire instrument on every frame. */
+.tanga-three__drill-legend,
+.tanga-three__drill-legend:hover,
+.tanga-three__drill-legend:focus-within {
+  max-height: 220px !important;
+  overflow: visible;
+  opacity: 1;
+}
+
+.tanga-three__drill-legend ol {
+  opacity: 1;
+}
+
+/* With the full legend visible, dock the complete navigation instrument in the
+   lower-left lane. This clears the independent Best Intercepts evidence card
+   while remaining horizontally separate from the centred pager. */
+.tanga-three__nav-cluster {
+  bottom: 88px !important;
+}
+
+/* A longer shot label must not inflate the navigation capsule over adjacent
+   controls. It truncates while the numeric scene.shot indicator stays visible. */
+.tanga-deck__pager-label {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Scene handoff copy has its own lane above the persistent pager. Keeping the
+   gap explicit also protects the longer two-line summaries during travel. */
+.tanga-deck__portal-copy {
+  bottom: 210px;
+}
+
+@media (max-width: 1100px) {
+  .tanga-deck__layers {
+    top: 86px !important;
+    right: 12px !important;
+    width: 268px;
+    max-height: calc(100svh - 260px);
+  }
+
+  .tanga-deck--layers-open .tanga-three__grade-legend,
+  .tanga-deck--layers-open .tanga-three__depth-ruler {
+    right: 298px !important;
+  }
+
+  .tanga-deck--layers-open .tanga-deck__data-panel,
+  .tanga-deck--layers-open .tanga-deck__insight-panel {
+    right: 298px !important;
+    max-height: calc(100svh - 390px) !important;
+  }
+
+  .tanga-deck--layers-open .tanga-three__metallurgy,
+  .tanga-deck--layers-open .tanga-three.is-metallurgy .tanga-three__metallurgy {
+    right: 298px !important;
+    width: min(470px, calc(100vw - 650px)) !important;
+  }
+}
+
+@media (max-width: 820px) {
+  .tanga-deck__layers {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto;
+    max-height: 210px;
+  }
+
+  .tanga-deck__layers ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tanga-deck__layers li {
+    grid-template-columns: 22px minmax(0, 1fr) 54px 28px;
+  }
+
+  .tanga-deck--layers-open .tanga-three__grade-legend {
+    top: 318px !important;
+    right: 12px !important;
+    width: min(238px, calc(100vw - 24px)) !important;
+  }
+
+  .tanga-deck--layers-open .tanga-three__depth-ruler {
+    top: 318px !important;
+    right: 266px !important;
+  }
+
+  .tanga-deck--layers-open .tanga-three__metallurgy,
+  .tanga-deck--layers-open .tanga-three.is-metallurgy .tanga-three__metallurgy {
+    top: 318px !important;
+    right: 12px !important;
+    width: max(300px, calc(100vw - 360px)) !important;
+  }
+
+  .tanga-deck__pager-label {
+    max-width: 110px;
+  }
+
+  .tanga-three__nav-cluster {
+    bottom: 82px !important;
+  }
+
+  .tanga-deck__portal-copy {
+    bottom: 198px;
+    width: min(560px, calc(100vw - 32px));
+  }
+}

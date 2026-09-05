@@ -82,9 +82,11 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
+type ThreeCameraAction = 'resetView' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+
 type ThreeCameraCommand = {
   id: number;
-  action: 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: ThreeCameraAction;
   degrees?: 90 | 180 | 360;
 };
 
@@ -166,6 +168,14 @@ type StoryStep = {
   label: string;
   command: string;
   tone: string;
+};
+
+type StoryShot = {
+  id: string;
+  label: string;
+  detail: string;
+  view?: DeckViewState;
+  threeAction?: ThreeCameraAction;
 };
 
 type SceneTransitionState = {
@@ -688,6 +698,59 @@ const STORY_STEPS: StoryStep[] = [
   {mode: 'mine_planning', act: '09', label: 'Mine plan', command: 'show mine plan', tone: '#c7551b'},
   {mode: 'comparison', act: '10', label: 'Peer compare', command: 'compare Tanga with peers', tone: '#b9954b'},
 ];
+
+// Authored camera beats. A scene is the narrative chapter; a shot is a
+// deliberate camera/evidence composition inside that chapter. Advancing a
+// shot keeps the current map/Three.js scene mounted and preserves layer state.
+const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
+  ranking: [
+    {id: 'field', label: 'Global field', detail: 'Top public graphite projects in context', view: VIEW_STATES.ranking},
+    {id: 'east-africa', label: 'East Africa', detail: 'Bring the Tanzanian peer cluster forward', view: {...VIEW_STATES.ranking, longitude: 35.8, latitude: -8.2, zoom: 3.15, pitch: 24, bearing: -8}},
+  ],
+  tanzania: [
+    {id: 'country', label: 'Country overview', detail: 'Tanzania in the regional graphite belt', view: VIEW_STATES.tanzania},
+    {id: 'tanga', label: 'Tanga region', detail: 'Push toward the project and coastal corridor', view: {...VIEW_STATES.tanzania, longitude: 38.2, latitude: -5.4, zoom: 6.15, pitch: 42, bearing: -15}},
+  ],
+  project: [
+    {id: 'licence', label: 'Licence overview', detail: 'Frame the full controlled land position', view: VIEW_STATES.project},
+    {id: 'tested-ground', label: 'Tested ground', detail: 'Close on the boundary and drill coverage', view: {...VIEW_STATES.project, zoom: 13.35, pitch: 54, bearing: 28}},
+  ],
+  topography: [
+    {id: 'relief', label: 'Relief overview', detail: 'Read the full terrain envelope', view: VIEW_STATES.topography},
+    {id: 'raking-light', label: 'Raking relief', detail: 'Lower the view to reveal drainage and slope', view: {...VIEW_STATES.topography, zoom: 13.75, pitch: 68, bearing: 34}},
+  ],
+  accessibility: [
+    {id: 'corridor', label: 'Access corridor', detail: 'Project-to-port infrastructure context', view: VIEW_STATES.accessibility},
+    {id: 'coastal-link', label: 'Coastal link', detail: 'Follow the route toward Tanga Port', view: {...VIEW_STATES.accessibility, longitude: 39.02, latitude: -5.02, zoom: 10.3, pitch: 52, bearing: -20}},
+  ],
+  drillholes: [
+    {id: 'coverage', label: 'Coverage', detail: 'Full drill pattern along strike', threeAction: 'resetView'},
+    {id: 'section', label: 'Section angle', detail: 'Expose depth and drilling geometry', threeAction: 'projectAngle'},
+    {id: 'intercepts', label: 'Best intercepts', detail: 'Push into the strongest reported intervals', threeAction: 'zoomIn'},
+  ],
+  subsurface: [
+    {id: 'framework', label: 'Geology framework', detail: 'Full subsurface interpretation', threeAction: 'resetView'},
+    {id: 'section', label: 'Section angle', detail: 'Read contacts and structural continuity', threeAction: 'projectAngle'},
+  ],
+  resource: [
+    {id: 'resource', label: 'Resource overview', detail: 'Full classified model', threeAction: 'resetView'},
+    {id: 'grade', label: 'Grade architecture', detail: 'Move closer to the block distribution', threeAction: 'zoomIn'},
+    {id: 'below', label: 'Deposit underside', detail: 'Reveal thickness and vertical continuity', threeAction: 'bottomView'},
+  ],
+  metallurgy: [
+    {id: 'samples', label: 'Metallurgy overview', detail: 'Relate testwork to the deposit', threeAction: 'resetView'},
+    {id: 'evidence', label: 'Product evidence', detail: 'Focus the metallurgy evidence zone', threeAction: 'zoomIn'},
+  ],
+  mine_planning: [
+    {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'resetView'},
+    {id: 'operating-angle', label: 'Operating angle', detail: 'Read the shell against resource geometry', threeAction: 'projectAngle'},
+    {id: 'detail', label: 'Plan detail', detail: 'Push toward the selected planning volume', threeAction: 'zoomIn'},
+  ],
+  comparison: [
+    {id: 'peers', label: 'Peer comparison', detail: 'Tanga against the public peer field', view: VIEW_STATES.comparison},
+    {id: 'tanzania-peers', label: 'Regional peers', detail: 'Close on the East African comparison set', view: {...VIEW_STATES.comparison, longitude: 35.4, latitude: -8.6, zoom: 4.15, pitch: 34, bearing: -10}},
+  ],
+};
 
 // ── Three-act story structure — gives the deck a narrative arc so every
 // scene visibly advances toward the investment case. ─────────────────────
@@ -2003,6 +2066,7 @@ function buildingHeight(feature: any) {
 
 export default function TangaDeckWorkbench() {
   const [activeMode, setActiveMode] = useState<WorkbenchMode>(DEFAULT_MODE);
+  const [activeShotIndex, setActiveShotIndex] = useState(0);
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
   const [resourceFocus, setResourceFocus] = useState<ResourceFocus>('Indicated');
   const [viewState, setViewState] = useState<DeckViewState>(VIEW_STATES[DEFAULT_MODE]);
@@ -2291,6 +2355,7 @@ export default function TangaDeckWorkbench() {
     }
     if (overrides.routeTarget) setRouteTarget(overrides.routeTarget);
     if (overrides.resourceFocus) setResourceFocus(overrides.resourceFocus);
+    setActiveShotIndex(0);
     setActiveMode(mode);
     setStatusText(`Mode: ${MODE_LABELS[mode]}`);
     flyTo(mode, overrides.bearing);
@@ -2356,6 +2421,7 @@ export default function TangaDeckWorkbench() {
     if (!action) return;
 
     if (action === 'resetGlobe') {
+      setActiveShotIndex(0);
       setActiveMode('tanzania');
       flyTo('tanzania');
       setStatusText('Globe view restored');
@@ -4396,8 +4462,10 @@ export default function TangaDeckWorkbench() {
   }, [mapLabelSources, activeMode, stageSize.width, stageSize.height, viewState.longitude, viewState.latitude, viewState.zoom, viewState.pitch, viewState.bearing]);
 
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
-  const isFirstStory = activeStoryIndex <= 0;
-  const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1;
+  const activeShots = STORY_SHOTS[activeMode] ?? [];
+  const activeShot = activeShots[Math.min(activeShotIndex, Math.max(0, activeShots.length - 1))];
+  const isFirstStory = activeStoryIndex <= 0 && activeShotIndex <= 0;
+  const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1 && activeShotIndex >= activeShots.length - 1;
 
   // Prefetch the Three.js scene chunk once the user is a few scenes in (but
   // before the first 3D scene), so arriving at it is instant. Idle-scheduled so
@@ -4484,12 +4552,33 @@ export default function TangaDeckWorkbench() {
     const clamped = clamp(index, 0, STORY_STEPS.length - 1);
     const targetStep = STORY_STEPS[clamped];
     const defaults = storyStepDefaults(targetStep.mode);
+    setActiveShotIndex(0);
     setStatusText(`${targetStep.act}: ${targetStep.label}`);
     void activateMode(targetStep.mode, {
       routeTarget: defaults.routeTarget,
       resourceFocus: defaults.resourceFocus,
     });
   }, [activateMode]);
+
+  const applyStoryShot = useCallback((mode: WorkbenchMode, requestedIndex: number) => {
+    const shots = STORY_SHOTS[mode];
+    const nextIndex = clamp(requestedIndex, 0, Math.max(0, shots.length - 1));
+    const shot = shots[nextIndex];
+    setActiveShotIndex(nextIndex);
+    setStatusText(`${MODE_LABELS[mode]} · ${shot.label}`);
+
+    if (shot.view) {
+      flightUntilRef.current = performance.now() + 2220;
+      setViewState({
+        ...shot.view,
+        transitionDuration: 2100,
+        transitionInterpolator: CINEMATIC_FLY(),
+        transitionEasing: cinematicEase,
+      });
+    } else if (shot.threeAction) {
+      issueThreeCameraCommand(shot.threeAction);
+    }
+  }, [issueThreeCameraCommand]);
 
   // ── Presenter control layer ────────────────────────────────────────────
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -4514,7 +4603,7 @@ export default function TangaDeckWorkbench() {
   // scene is too blunt an answer.
   const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
   const [isLayersOpen, setLayersOpen] = useState(false);
-  const toggleLayers = useCallback(() => setLayersOpen((open) => !open), []);
+  const [layerQuery, setLayerQuery] = useState('');
   // Slide index. The reference deck keeps a permanent thumbnail rail down the
   // left; this stage is far more panel-heavy than theirs, so the same job is
   // done by an overlay that costs no width until it is asked for.
@@ -4527,6 +4616,11 @@ export default function TangaDeckWorkbench() {
     setLayerSettings((current) => ({...current, [id]: {...current[id], opacity}}));
   }, []);
   const resetLayers = useCallback(() => setLayerSettings(DEFAULT_LAYER_SETTINGS), []);
+  const filteredDeckLayers = useMemo(() => {
+    const query = layerQuery.trim().toLowerCase();
+    if (!query) return DECK_LAYERS;
+    return DECK_LAYERS.filter((layer) => `${layer.label} ${layer.detail}`.toLowerCase().includes(query));
+  }, [layerQuery]);
   // Drives the toolbar dot, so a presenter can see at a glance that something
   // is dialled down before they wonder why the scene looks wrong.
   const layersModified = DECK_LAYERS.some(({id}) => !layerSettings[id].visible || layerSettings[id].opacity < 1);
@@ -4534,6 +4628,9 @@ export default function TangaDeckWorkbench() {
   const cycleAnnotations = useCallback(() => {
     setLabelDensity((prev) => (prev === 'key' ? 'all' : prev === 'all' ? 'off' : 'key'));
   }, []);
+  useEffect(() => {
+    if (!threeVisible) setLayersOpen(false);
+  }, [threeVisible]);
   // Derived drill results lifted out of the 3D scene so the deck chrome can
   // quote the same numbers the in-scene labels do.
   const [assayFacts, setAssayFacts] = useState<SceneAssayFacts | null>(null);
@@ -4559,7 +4656,28 @@ export default function TangaDeckWorkbench() {
   }, [assayFacts, activeMode]);
   // Investor inspector — plain-English "why this matters" overlay (Ctrl+I).
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
-  const toggleInspector = useCallback(() => setIsInspectorOpen((prev) => !prev), []);
+  const toggleInspector = useCallback(() => setIsInspectorOpen((prev) => {
+    const opening = !prev;
+    if (opening) {
+      setLayersOpen(false);
+      setIsNotesOpen(false);
+      setIsShortcutsOpen(false);
+      setIsAutoplayMenuOpen(false);
+      setIndexOpen(false);
+    }
+    return opening;
+  }), []);
+  const toggleLayers = useCallback(() => setLayersOpen((open) => {
+    const opening = !open;
+    if (opening) {
+      setIsInspectorOpen(false);
+      setIsNotesOpen(false);
+      setIsShortcutsOpen(false);
+      setIsAutoplayMenuOpen(false);
+      setIndexOpen(false);
+    }
+    return opening;
+  }), []);
   // First-run coach marks — a one-time hint so a cold viewer knows the deck is
   // interactive. Dismisses on first navigation and never returns.
   const [showCoach, setShowCoach] = useState(false);
@@ -4583,16 +4701,18 @@ export default function TangaDeckWorkbench() {
   const handlePrevStory = useCallback(() => {
     // Back out of an info card without leaving the current scene.
     if (pendingInfo) { setPendingInfo(null); return; }
+    if (activeShotIndex > 0) { applyStoryShot(activeMode, activeShotIndex - 1); return; }
     goToStoryIndex(activeStoryIndex - 1);
-  }, [goToStoryIndex, activeStoryIndex, pendingInfo]);
+  }, [goToStoryIndex, activeStoryIndex, pendingInfo, activeShotIndex, activeMode, applyStoryShot]);
 
   const handleNextStory = useCallback(() => {
     if (pendingInfo) { setPendingInfo(null); goToStoryIndex(activeStoryIndex + 1); return; }
+    if (activeShotIndex < activeShots.length - 1) { applyStoryShot(activeMode, activeShotIndex + 1); return; }
     const nextMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
     const info = nextMode ? INFO_BEFORE[nextMode] : undefined;
     if (info) { setPendingInfo(info); return; }
     goToStoryIndex(activeStoryIndex + 1);
-  }, [goToStoryIndex, activeStoryIndex, pendingInfo]);
+  }, [goToStoryIndex, activeStoryIndex, pendingInfo, activeShotIndex, activeShots.length, activeMode, applyStoryShot]);
 
   // Explicit manual actions from the presenter — pause autoplay so nothing
   // auto-advances after they take the wheel.
@@ -4628,7 +4748,7 @@ export default function TangaDeckWorkbench() {
     if (isLastStory) { setIsAutoplay(false); return; }
     const timer = window.setTimeout(handleNextStory, autoplaySec * 1000);
     return () => window.clearTimeout(timer);
-  }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, autoplaySec]);
+  }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, activeShotIndex, autoplaySec]);
 
   // Idle slow-orbit: once an immersive scene has flown in and settled, gently
   // rotate the camera bearing (geolibre / VRIFY "never frozen" feel). Cancels
@@ -4691,7 +4811,17 @@ export default function TangaDeckWorkbench() {
 
   const toggleAutoplay = useCallback(() => setIsAutoplay((prev) => !prev), []);
   const toggleBlackout = useCallback(() => setIsBlackout((prev) => !prev), []);
-  const toggleNotes = useCallback(() => setIsNotesOpen((prev) => !prev), []);
+  const toggleNotes = useCallback(() => setIsNotesOpen((prev) => {
+    const opening = !prev;
+    if (opening) {
+      setLayersOpen(false);
+      setIsInspectorOpen(false);
+      setIsShortcutsOpen(false);
+      setIsAutoplayMenuOpen(false);
+      setIndexOpen(false);
+    }
+    return opening;
+  }), []);
   const toggleShortcuts = useCallback(() => setIsShortcutsOpen((prev) => !prev), []);
 
   // Extended keyboard map — familiar to anyone who's used Keynote/PowerPoint.
@@ -4832,6 +4962,7 @@ export default function TangaDeckWorkbench() {
         storyHeroVisible && 'tanga-deck--story-hero-active',
         activeMode === 'ranking' && 'tanga-deck--ranking',
         activeMode === 'comparison' && 'tanga-deck--comparison',
+        isLayersOpen && 'tanga-deck--layers-open',
         isCoverScene && 'tanga-deck--cover',
         isAutoplay && 'tanga-deck--autoplay'
       )}
@@ -5410,7 +5541,10 @@ export default function TangaDeckWorkbench() {
           <ChevronLeft size={20} strokeWidth={2.4} />
         </button>
         <div className="tanga-deck__pager-status" aria-live="polite">
-          <span className="tanga-deck__pager-label">{STORY_STEPS[activeStoryIndex]?.label ?? 'Scene'}</span>
+          <span className="tanga-deck__pager-label">
+            {STORY_STEPS[activeStoryIndex]?.label ?? 'Scene'}
+            {activeShot && activeShots.length > 1 ? ` · ${activeShot.label}` : ''}
+          </span>
           <button
             type="button"
             className="tanga-deck__pager-count"
@@ -5419,7 +5553,8 @@ export default function TangaDeckWorkbench() {
             aria-label="Jump to a scene"
             title="All scenes  (G)"
           >
-            {String(activeStoryIndex + 1).padStart(2, '0')} / {String(STORY_STEPS.length).padStart(2, '0')}
+            {String(activeStoryIndex + 1).padStart(2, '0')}
+            {activeShots.length > 1 ? `.${activeShotIndex + 1}` : ''} / {String(STORY_STEPS.length).padStart(2, '0')}
           </button>
           <div
             className="tanga-deck__pager-dots"
@@ -5497,17 +5632,30 @@ export default function TangaDeckWorkbench() {
             </div>
           )}
         </div>
-        <button
-          type="button"
-          className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool', (isLayersOpen || layersModified) && 'is-active')}
-          onClick={toggleLayers}
-          aria-label={isLayersOpen ? 'Hide layer controls' : 'Show layer controls'}
-          aria-pressed={isLayersOpen}
-          title="Layers  (L)"
-        >
-          <Layers size={16} strokeWidth={2.2} />
-          {layersModified && <i className="tanga-deck__tool-dot" aria-hidden="true" />}
-        </button>
+        {threeVisible && (
+          <button
+            type="button"
+            className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool', (isLayersOpen || layersModified) && 'is-active')}
+            onClick={toggleLayers}
+            aria-label={isLayersOpen ? 'Hide layer controls' : 'Show layer controls'}
+            aria-pressed={isLayersOpen}
+            title="Layers  (L)"
+          >
+            <Layers size={16} strokeWidth={2.2} />
+            {layersModified && <i className="tanga-deck__tool-dot" aria-hidden="true" />}
+          </button>
+        )}
+        {threeVisible && (
+          <button
+            type="button"
+            className="tanga-deck__pager-btn tanga-deck__pager-btn--tool"
+            onClick={() => { setIsAutoplay(false); applyStoryShot(activeMode, 0); }}
+            aria-label="Return to authored camera view"
+            title="Reset camera to authored view"
+          >
+            <Box size={16} strokeWidth={2.2} />
+          </button>
+        )}
         <button
           type="button"
           className={classNames(
@@ -5640,8 +5788,17 @@ export default function TangaDeckWorkbench() {
             <span>Layers</span>
             <button type="button" onClick={resetLayers} disabled={!layersModified}>Reset</button>
           </header>
+          <label className="tanga-deck__layers-search">
+            <span>Find a layer</span>
+            <input
+              type="search"
+              value={layerQuery}
+              onChange={(event) => setLayerQuery(event.target.value)}
+              placeholder="Search terrain, drilling…"
+            />
+          </label>
           <ol>
-            {DECK_LAYERS.map((layer) => {
+            {filteredDeckLayers.map((layer) => {
               const state = layerSettings[layer.id];
               return (
                 <li key={layer.id} className={classNames(!state.visible && "is-hidden")}>
@@ -5672,6 +5829,7 @@ export default function TangaDeckWorkbench() {
               );
             })}
           </ol>
+          {filteredDeckLayers.length === 0 && <p className="tanga-deck__layers-empty">No matching layers</p>}
         </section>
       )}
 

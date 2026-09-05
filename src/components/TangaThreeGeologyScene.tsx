@@ -146,6 +146,7 @@ const CHROME_SELECTORS = [
   '.tanga-three__drill-legend',
   '.tanga-deck__caption',
   '.tanga-deck__act-rail',
+  '.tanga-deck__act-ribbon',
   '.tanga-deck__voice',
 ] as const;
 
@@ -159,7 +160,10 @@ const CHROME_SELECTORS = [
 function chromeKeepOutRects(host: HTMLElement | null, width: number, height: number): Rect[] {
   // The stage edges are still worth reserving: nothing should be flush to them.
   const rects: Rect[] = [
-    {x: 0, y: 0, width, height: 56},
+    // The topbar and Act ribbon live outside the Three host in some layouts,
+    // so their DOM coordinates are not always expressed in the same local
+    // space. Reserve the authored top-chrome lane explicitly as a backstop.
+    {x: 0, y: 0, width, height: 150},
     {x: 0, y: height - 56, width, height: 56},
   ];
 
@@ -191,7 +195,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'resetView' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
 };
 
@@ -2200,6 +2204,14 @@ export default function TangaThreeGeologyScene({
       if (direction.lengthSq() < 1) direction.copy(cameraShot.to).sub(cameraShot.target);
       const currentDistance = clamp(direction.length(), controls.minDistance, controls.maxDistance);
       const normalizedDirection = direction.normalize();
+
+      if (command.action === 'resetView') {
+        surfaceCameraView = 'top';
+        applyTerrainSurfaceView();
+        scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 1.45, cameraShot.fov);
+        setStatus('Camera returned to the authored scene view');
+        return;
+      }
 
       if (command.action === 'zoomIn' || command.action === 'zoomOut') {
         const nextDistance = command.action === 'zoomIn'
