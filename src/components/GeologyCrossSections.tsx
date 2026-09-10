@@ -6,18 +6,20 @@ const path=(points:SectionPoint[],close=false)=>points.map(([x,y],i)=>`${i?'L':'
 const gradeColor=(grade:number)=>grade>=5?'#efa15b':grade>=3?'#55c3c8':'#d8e1e5';
 function ticks(low:number,high:number){const raw=(high-low)/7,power=10**Math.floor(Math.log10(raw||1)),step=[1,2,5,10].map(x=>x*power).find(x=>x>=raw)!;return Array.from({length:Math.floor(high/step)-Math.ceil(low/step)+1},(_,i)=>(Math.ceil(low/step)+i)*step);}
 
-export default function GeologyCrossSections({source,onView}:{source:SectionSource;onView:(section:SectionDefinition|null,flat:boolean)=>void}){
+export default function GeologyCrossSections({source,onView,loadSectionBlocks}:{source:SectionSource;onView:(section:SectionDefinition|null,flat:boolean)=>void;loadSectionBlocks?:()=>Promise<SectionSource['blocks']>}){
   const definitions=useMemo(()=>sectionDefinitions(source),[source]);
   const [selected,setSelected]=useState(0),[open,setOpen]=useState(false),[halfWidth,setHalfWidth]=useState(25);
   const [blocks,setBlocks]=useState(false),[pits,setPits]=useState(false),[zoom,setZoom]=useState(1),[pan,setPan]=useState<[number,number]>([0,0]);
   const [hole,setHole]=useState<string|null>(null);
+  const [loadedBlocks,setLoadedBlocks]=useState<SectionSource['blocks']|null>(null),[blockStatus,setBlockStatus]=useState('');
+  useEffect(()=>{if(!blocks||!loadSectionBlocks||loadedBlocks)return;let cancelled=false;setBlockStatus('Loading full grade cells on demand…');loadSectionBlocks().then(data=>{if(!cancelled){setLoadedBlocks(data);setBlockStatus('');}}).catch(()=>{if(!cancelled)setBlockStatus('Grade cells unavailable. Toggle off and on to retry. Geology remains available.');});return()=>{cancelled=true;};},[blocks,loadSectionBlocks,loadedBlocks]);
   const plotRef=useRef<HTMLDivElement>(null),drag=useRef<{x:number;y:number;pan:[number,number]}|null>(null);
   const [size,setSize]=useState({w:900,h:400});
   const section=definitions[selected]??definitions[0];
   const result=useMemo(()=>section?{
     units:source.units.map(u=>({...intersectUnit(u.geometry,section),name:u.name,color:u.color})),
-    terrain:sampleSectionTerrain(source,section),blocks:intersectBlocks(source.blocks,section),pits:sampleSectionPits(source,section),
-  }:null,[source,section]);
+    terrain:sampleSectionTerrain(source,section),blocks:intersectBlocks(loadedBlocks??source.blocks,section),pits:sampleSectionPits(source,section),
+  }:null,[source,section,loadedBlocks]);
   const drills=useMemo(()=>section?projectDrills(source.drills,section,halfWidth):[],[source,section,halfWidth]);
   useEffect(()=>{if(!open||!plotRef.current)return;const element=plotRef.current.querySelector('svg')!;const resize=()=>setSize({w:element.clientWidth,h:element.clientHeight});resize();const observer=new ResizeObserver(resize);observer.observe(element);return()=>observer.disconnect();},[open]);
   useEffect(()=>{setZoom(1);setPan([0,0]);setHole(null);},[selected]);
@@ -56,6 +58,7 @@ export default function GeologyCrossSections({source,onView}:{source:SectionSour
       <label>Drill projection ±{halfWidth} m<input aria-label="Drill projection half-width" type="range" min="0" max="100" step="5" value={halfWidth} onChange={e=>{setHalfWidth(Number(e.target.value));setHole(null);}}/></label>
       <small>Default ±25 m is a viewing window, not a geological thickness or drill-spacing criterion.</small>
       <label className="tanga-cross-check"><input type="checkbox" checked={blocks} onChange={e=>setBlocks(e.target.checked)}/> Plane-intersecting grade cells</label>
+      {blocks&&blockStatus&&<small role="status">{blockStatus}</small>}
       <label className="tanga-cross-check"><input type="checkbox" checked={pits} onChange={e=>setPits(e.target.checked)}/> Conceptual pit profiles</label>
       <div className="tanga-cross-section__zoom"><button onClick={()=>setZoom(z=>Math.min(4,z*1.5))} disabled={zoom>=4}>Zoom +</button><button onClick={()=>setZoom(z=>Math.max(1,z/1.5))} disabled={zoom<=1}>Zoom −</button><button onClick={()=>{setZoom(1);setPan([0,0]);}}>Fit</button></div>
       <small>Equal horizontal/vertical scale · drag to pan · {zoom.toFixed(1)}× view</small>
