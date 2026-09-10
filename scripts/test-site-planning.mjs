@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import {inside, contained, overlaps, rectangle, planSite, insetCrest, CONCEPT} from '../src/lib/deck/site-planning.ts';
+import fs from 'node:fs';
+
+const boundary = rectangle([0, 0], 2000, 2000);
+const inset = insetCrest(rectangle([0,0],100,80),10);
+assert.equal(inset.length,4);
+assert.ok(inset.every(([x,z]) => Math.abs(Math.abs(x)-40)<1e-6 && Math.abs(Math.abs(z)-30)<1e-6));
+assert.deepEqual(insetCrest(rectangle([0,0],100,80),60),[]);
+assert.ok(contained(inset,boundary));
+assert.equal(inside([0, 0], boundary), true);
+assert.equal(inside([1000, 0], boundary), true);
+assert.equal(inside([1001, 0], boundary), false);
+assert.equal(contained(rectangle([0, 0], 100, 100), boundary), true);
+assert.equal(contained(rectangle([999, 0], 100, 100), boundary), false);
+const notch = [[0,0],[10,0],[10,10],[6,10],[6,4],[4,4],[4,10],[0,10]];
+assert.equal(contained([[2,2],[8,2],[8,8],[2,8]], notch), false, 'Edges cannot bridge a concave exclusion');
+assert.equal(overlaps(rectangle([0,0],100,100), rectangle([80,0],100,100)), true);
+assert.equal(overlaps(rectangle([0,0],100,100), rectangle([200,0],100,100)), false);
+const blocks = [];
+for (const centre of [-300,300]) for(let x=0;x<3;x++) for(let z=0;z<3;z++) {
+  blocks.push({x:centre+x*25,y:-30,z:z*25,dx:25,dy:25,dz:10,carbon:5});
+}
+const plan = planSite(blocks, boundary, () => 0);
+assert.equal(plan.pits.length, 2, 'Disconnected clusters remain separate');
+assert.ok(plan.plant);
+assert.ok(plan.pits.every(p => contained(p.ring, boundary)));
+assert.ok(contained(rectangle(plan.plant,CONCEPT.plantWidth+40,CONCEPT.plantDepth+40), boundary));
+assert.ok(plan.pits.every(p => !overlaps(rectangle(plan.plant,CONCEPT.plantWidth+40,CONCEPT.plantDepth+40), p.ring)));
+const rejected = planSite(blocks, rectangle([0,0],600,100), () => 0);
+assert.equal(rejected.pits.length, 0, 'Do not draw uncontained crests');
+assert.equal(planSite([], [], () => 0).plant, null, 'Missing boundary fails closed');
+const reference=JSON.parse(fs.readFileSync('public/generated/orewaste-reference.json','utf8'));
+const local=(lon,lat)=>[(lon-38.785)*111320*Math.cos(-4.813*Math.PI/180),-(lat+4.813)*110540];
+const referenceBlocks=reference.blocks.map(([lon,lat,y,dx,dy,dz,carbon])=>{const [x,z]=local(lon,lat);return {x,z,y:y-700,dx,dy,dz,carbon};});
+const geo=JSON.parse(fs.readFileSync('public/generated/boundaries.geojson','utf8'));
+const referenceBoundary=geo.features.find(f=>f.properties.layer==='Project boundary').geometry.coordinates[0].map(p=>local(p[0],p[1]));
+const referencePlan=planSite(referenceBlocks,referenceBoundary,()=>80,'north-south');
+assert.equal(referencePlan.pits.length,2,'RF 1 reference supports two separate contained presentation envelopes');
+assert.ok(!overlaps(referencePlan.pits[0].ring,referencePlan.pits[1].ring));
+assert.ok(referencePlan.plant);
+assert.ok(contained(rectangle(referencePlan.plant,CONCEPT.plantWidth+40,CONCEPT.plantDepth+40),referenceBoundary));
+assert.ok(referencePlan.pits.every(p=>!overlaps(rectangle(referencePlan.plant,CONCEPT.plantWidth+40,CONCEPT.plantDepth+40),p.ring)));
+console.log('PASS: point/ring, concavity, overlap, separate pits, plant margin and fail-closed gates');

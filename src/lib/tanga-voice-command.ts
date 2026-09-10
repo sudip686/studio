@@ -48,10 +48,12 @@ export const STORY_SLIDE_MODES: WorkbenchMode[] = [
   'tanzania',
   'project',
   'topography',
-  'accessibility',
+  'subsurface',
   'drillholes',
   'resource',
+  'mine_planning',
   'metallurgy',
+  'accessibility',
   'comparison',
 ];
 
