@@ -117,18 +117,18 @@ const initialState: DataCache = {
 
 const resourceCandidates: Record<CacheResourceKey, string[]> = {
   lithology: [
-    '/lithology_data.geojson',
     REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/lithology_data.geojson` : '',
+    '/lithology_data.geojson',
     '/api/lithology-data',
   ].filter(Boolean),
   assay: [
-    '/assay_data.geojson',
     REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/assay_data.geojson` : '',
+    '/assay_data.geojson',
     '/api/assay-data',
   ].filter(Boolean),
   blockModel: [
-    '/BlockModel.geojson',
     REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/BlockModel.geojson` : '',
+    '/BlockModel.geojson',
     '/api/block-model',
   ].filter(Boolean),
 };

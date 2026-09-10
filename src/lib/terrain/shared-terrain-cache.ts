@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import proj4 from 'proj4';
 import { projectLonLat } from '@/lib/utils/three-helpers';
 import { ASSET_BASE_URL } from '@/lib/constants';
+import {assetUrl} from '@/lib/asset-url';
 
 export type TerrainModelCenter = { lon: number; lat: number };
 
@@ -127,7 +128,7 @@ async function loadTerrainMetaAndHeight() {
         }
         return response.json() as Promise<TerrainMeta>;
       }),
-      fetch('/height.bin', { cache: 'force-cache' }).then(async (response) => {
+      fetch(assetUrl('/height.bin'), { cache: 'force-cache' }).then(async (response) => {
         if (!response.ok) {
           throw new Error(`Failed to load terrain heights: ${response.statusText}`);
         }

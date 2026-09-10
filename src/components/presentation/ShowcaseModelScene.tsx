@@ -4,6 +4,7 @@ import { Suspense, useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Center, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import {assetUrl} from '@/lib/asset-url';
 
 export type ShowcaseModelVariant = 'flakes' | 'geology' | 'earth';
 export type AccentTone = 'amber' | 'teal' | 'sky';
@@ -81,7 +82,7 @@ function GLBAsset({
   fitScale: number;
   yOffset?: number;
 }) {
-  const { scene } = useGLTF(path);
+  const { scene } = useGLTF(assetUrl(path));
   const groupRef = useRef<THREE.Group | null>(null);
 
   const preparedScene = useMemo(() => {
@@ -145,5 +146,5 @@ export function ShowcaseModelScene({
   );
 }
 
-useGLTF.preload('/geologicalModel.glb');
-useGLTF.preload('/earth.glb');
+useGLTF.preload(assetUrl('/geologicalModel.glb'));
+useGLTF.preload(assetUrl('/earth.glb'));

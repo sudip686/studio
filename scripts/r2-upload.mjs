@@ -11,6 +11,7 @@
 //
 // Run:  node scripts/r2-upload.mjs           (uploads the app-referenced assets)
 //       node scripts/r2-upload.mjs --videos  (also uploads every file in public/media)
+//       node scripts/r2-upload.mjs --geology-only (repairs only the geology model)
 // ─────────────────────────────────────────────────────────────────────────────
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { createReadStream, statSync, existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -47,7 +48,9 @@ const s3 = new S3Client({
 });
 
 // Object keys mirror the /public paths the app fetches.
-const KEYS = [
+const geologyOnly = process.argv.includes('--geology-only');
+const KEYS = geologyOnly ? ['geologicalModel.glb'] : [
+  'geologicalModel.glb',
   'terrain_hires_meta.json',
   'height_hires.bin',
   'terrain_texture_hires.jpg',
@@ -63,7 +66,7 @@ const KEYS = [
   'media/tanga-first-slide-story-poster.jpg',
 ];
 
-if (process.argv.includes('--videos') && existsSync(join(PUBLIC, 'media'))) {
+if (!geologyOnly && process.argv.includes('--videos') && existsSync(join(PUBLIC, 'media'))) {
   for (const f of readdirSync(join(PUBLIC, 'media'))) {
     const abs = join(PUBLIC, 'media', f);
     if (!statSync(abs).isFile()) continue;          // skip subdirectories
@@ -79,6 +82,12 @@ async function upload(key) {
   const src = join(PUBLIC, ...key.split('/'));
   if (!existsSync(src)) { console.log(`  skip (missing): ${key}`); return; }
   const size = statSync(src).size;
+  if (key === 'geologicalModel.glb') {
+    const model = readFileSync(src);
+    if (model.length < 12 || model.toString('ascii', 0, 4) !== 'glTF' || model.readUInt32LE(4) !== 2 || model.readUInt32LE(8) !== model.length) {
+      throw new Error('Expected a complete GLB v2 file, not a Git LFS pointer or truncated model');
+    }
+  }
   process.stdout.write(`  ↑ ${key} (${mb(size)} MB) ... `);
   await s3.send(new PutObjectCommand({
     Bucket: BUCKET,
