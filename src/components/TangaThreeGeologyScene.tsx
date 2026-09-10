@@ -17,6 +17,7 @@ import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
 import MetallurgyVisualStory from './MetallurgyProcessExhibit';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import GeologyCrossSections from './GeologyCrossSections';
+import {cachedDeckAsset} from '@/lib/cached-deck-asset';
 import {sectionWorld,type SectionSource,type SectionDefinition} from '@/lib/deck/cross-section';
 import {LITHOLOGY_COLOR_MAP} from '@/lib/boreholes/colors';
 import {
@@ -445,11 +446,11 @@ const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_ASSET_BASE_URL || '').replace(/\
 async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
   if (ASSET_BASE_URL) {
     try {
-      const remote = await fetch(`${ASSET_BASE_URL}${path}`, init);
+      const remote = await cachedDeckAsset(`${ASSET_BASE_URL}${path}`, init);
       if (remote.ok) return remote;
     } catch { /* fall through to local */ }
   }
-  return fetch(path, init);
+  return cachedDeckAsset(path, init);
 }
 async function loadTextureWithFallback(path: string): Promise<THREE.Texture> {
   const loader = new THREE.TextureLoader();
@@ -1232,7 +1233,7 @@ dz: Number(props.dZ ?? 10),
 
 function loadBlocks() {
   if (!blockPromise) {
-    blockPromise = (ASSET_BASE_URL ? fetch(`${ASSET_BASE_URL}/BlockModel.geojson`,{cache:'force-cache'}).then(r=>r.ok?r:fetch('/api/block-model',{cache:'force-cache'})).catch(()=>fetch('/api/block-model',{cache:'force-cache'})) : fetch('/api/block-model', {cache: 'force-cache'}))
+    blockPromise = (ASSET_BASE_URL ? cachedDeckAsset(`${ASSET_BASE_URL}/BlockModel.geojson`,{cache:'force-cache'}).then(r=>r.ok?r:cachedDeckAsset('/api/block-model',{cache:'force-cache'})).catch(()=>cachedDeckAsset('/api/block-model',{cache:'force-cache'})) : cachedDeckAsset('/api/block-model', {cache: 'force-cache'}))
       .then(response => {if (!response.ok) throw new Error('Block model unavailable'); return response.json();})
       .then(parseBlockGeoJson)
       .then((blocks: ResourceBlock[]) => blocks.filter(b => b.carbon > 0 && Number.isFinite(b.y) && b.dx > 0 && b.dy > 0 && b.dz > 0))
@@ -2517,6 +2518,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
     };
 
     const build = async () => {
+      // Download independent geology inputs while terrain initialises. Capture
+      // failures immediately so an early rejection cannot become unhandled.
+      const earlyGeology=mode==='subsurface'?fetchAsset('/geologicalModel.glb',{cache:'force-cache'}).catch(()=>null):null;
+      const earlyDrills=loadDrillholes().then(data=>({data,error:null}),error=>({data:null,error}));
       setStatus('Drawing preview terrain surface');
       const resources = await applyTexturedTerrain(assetQuality);
       if (cancelled) return;
@@ -2601,8 +2606,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       setStatus(mode === 'resource' ? `Loading ${resourceFocusLabel(resourceFocus).toLowerCase()} resource blocks` : mode === 'mine_planning' ? 'Loading pit shell and resource blocks' : mode === 'metallurgy' ? 'Loading drillhole intervals for metallurgy reveal' : 'Loading drillhole traces');
       reportLoadState('loading', resources ? 'ready' : 'degraded', resources?.quality ?? assetQuality, 'Loading drillholes and resource data');
       const [drillholes, blocks] = await Promise.all([
-        loadDrillholes(),
-        (mode === 'resource' || mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface') ? loadBlocks() : Promise.resolve([]),
+        earlyDrills.then(result=>{if(result.error)throw result.error;return result.data!;}),
+        (mode === 'resource' || mode === 'mine_planning' || mode === 'metallurgy') ? loadBlocks() : Promise.resolve([]),
       ]);
       if (cancelled) return;
 
@@ -2622,8 +2627,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       }
       const shownDrillholes = drillSegmentsForMode(drillholes, mode);
       if (mode === 'subsurface') {
-        const response = await fetchAsset('/geologicalModel.glb', {cache: 'force-cache'});
-        if (!response.ok) throw new Error('Interpreted geology model unavailable');
+        const response = await earlyGeology;
+        if (!response?.ok) throw new Error('Interpreted geology model unavailable');
         const gltf = await new GLTFLoader().parseAsync(await response.arrayBuffer(), '');
         if (cancelled) {disposeObject(gltf.scene); return;}
         let unitCount = 0;
@@ -3998,7 +4003,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         <p>Copper: interpreted GRSC unit. Muted colours: surrounding units. Drill traces provide sampling context; interpreted contacts are not measured everywhere.</p>
         <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
       </section>}
-      {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} onView={(section,flat)=>crossViewRef.current?.(section,flat)}/>}
+      {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat)=>crossViewRef.current?.(section,flat)}/>}
       {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}
       {mode === 'metallurgy' && <section className="tanga-met-report" aria-label="Metallurgy testwork summary">
         <header><small>DECK SUMMARY · LAB REPORT VERIFICATION PENDING</small><h2>Carbon. Recovery. Flake.</h2></header>

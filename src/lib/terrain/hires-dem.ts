@@ -13,6 +13,7 @@
  */
 
 import proj4 from 'proj4';
+import {cachedDeckAsset} from '@/lib/cached-deck-asset';
 
 // Large rasters live on Cloudflare R2 in production (NEXT_PUBLIC_ASSET_BASE_URL)
 // and in /public locally. Both height rasters are gitignored, so a plain
@@ -26,13 +27,13 @@ const ASSET_BASE_URL = RAW_ASSET_BASE.endsWith('/')
 async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
   if (ASSET_BASE_URL) {
     try {
-      const remote = await fetch(`${ASSET_BASE_URL}${path}`, init);
+      const remote = await cachedDeckAsset(`${ASSET_BASE_URL}${path}`, init);
       if (remote.ok) return remote;
     } catch {
       // fall through to the local copy
     }
   }
-  return fetch(path, init);
+  return cachedDeckAsset(path, init);
 }
 
 /**

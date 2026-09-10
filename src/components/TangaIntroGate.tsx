@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import {useEffect, useRef, useState, type CSSProperties, type ReactNode} from 'react';
+import {preloadGeologyAssets} from '@/lib/preload-geology';
 
 // Large media lives on Cloudflare R2 (NEXT_PUBLIC_ASSET_BASE_URL) in
 // production and /public locally. Videos are gitignored — never in the bundle.
@@ -32,6 +33,14 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   const [videoSrc, setVideoSrc] = useState(INTRO_VIDEO_SRC);
   const [videoUnavailable, setVideoUnavailable] = useState(false);
   const [introDuration, setIntroDuration] = useState(50);
+
+  useEffect(() => {
+    if (DEEP_LINK_HASH && DEEP_LINK_HASH !== 'ranking') return;
+    // Give the opening frame/video a head start, then warm geology while the
+    // visitor follows the early slides. No hidden WebGL scene is mounted.
+    const timer = window.setTimeout(() => { void preloadGeologyAssets(); }, 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const completeIntro = () => {
     if (fallbackTimerRef.current) {
@@ -124,12 +133,12 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
               <video
                 ref={videoRef}
                 className="tanga-intro__video"
-                src={videoSrc}
+                src={introState==='checking'?undefined:videoSrc}
                 poster={INTRO_POSTER_SRC}
                 muted
                 playsInline
-                autoPlay
-                preload="auto"
+                autoPlay={introState==='playing'}
+                preload={introState==='checking'?'none':'auto'}
                 onLoadedMetadata={handleVideoMetadata}
                 onEnded={completeIntro}
                 onError={handleVideoError}

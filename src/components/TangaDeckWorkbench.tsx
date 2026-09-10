@@ -10,6 +10,8 @@ import {ArrowDown, ArrowUp, Box, Eye, EyeOff, Layers, ChevronLeft, ChevronRight,
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import proj4 from 'proj4';
+import {cachedDeckAsset} from '@/lib/cached-deck-asset';
+import {assetUrl} from '@/lib/asset-url';
 import {formatIntercept, interceptTone} from '@/lib/assay/intercepts';
 import {placeLabels, type Rect} from '@/lib/labels/declutter';
 import {loadHiresDem, type HiresDem} from '@/lib/terrain/hires-dem';
@@ -1853,7 +1855,9 @@ let drillCollarPromise: Promise<DrillCollar[]> | null = null;
 function loadDrillCollars(): Promise<DrillCollar[]> {
   if (drillCollarPromise) return drillCollarPromise;
 
-  drillCollarPromise = fetch('/assay_data.geojson', {cache: 'force-cache'})
+  drillCollarPromise = cachedDeckAsset(assetUrl('/assay_data.geojson'), {cache: 'force-cache'})
+    .then(response => response.ok ? response : cachedDeckAsset('/assay_data.geojson', {cache: 'force-cache'}))
+    .catch(() => cachedDeckAsset('/assay_data.geojson', {cache: 'force-cache'}))
     .then((response) => (response.ok ? response.json() : null))
     .then((payload) => {
       const features = Array.isArray(payload?.features) ? payload.features : [];
