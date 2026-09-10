@@ -29,8 +29,8 @@ export const DEFAULT_LAYER_SETTINGS: DeckLayerSettings = {
 
 /** Row order and copy for the layers panel. */
 export const DECK_LAYERS: ReadonlyArray<{id: DeckLayerId; label: string; detail: string}> = [
-  {id: 'blocks', label: 'Resource model', detail: 'Grade blocks and pit shell'},
+  {id: 'blocks', label: 'Geological / grade model', detail: 'Interpreted units or grade blocks'},
   {id: 'drilling', label: 'Drilling', detail: 'Traces, assays and collars'},
   {id: 'terrain', label: 'Terrain', detail: 'Ground surface'},
-  {id: 'context', label: 'Infrastructure', detail: 'Licence, roads, plant and haulage'},
+  {id: 'context', label: 'Site context', detail: 'Boundary, roads, conceptual pits and plant'},
 ];

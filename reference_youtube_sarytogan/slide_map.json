@@ -1,0 +1,161 @@
+{
+ "_how_to_use": "User asks for a slide on TOPIC -> take 'use_frames' as the visual reference (composition, labels, palette). 'design_tokens' describe what to copy. 'avoid_frames' look similar but teach the wrong beat.",
+ "mining_pit": {
+  "use_frames": [
+   "frame_0105.jpg",
+   "frame_0095.jpg",
+   "frame_0010.jpg"
+  ],
+  "design_tokens": [
+   "oblique aerial 3/4 view",
+   "dark pit voids vs tan steppe",
+   "optional dark-pill cyan labels with leader lines (Low grade / Waste dump)",
+   "plant sheds small at horizon for scale",
+   "cloudy sky band on top third"
+  ],
+  "avoid_frames": [
+   "frame_0080.jpg"
+  ],
+  "why": "0095/0105 ARE pits; 0080 is orebody/resource (purple zones + stat cards), not a pit."
+ },
+ "metallurgy_plant": {
+  "use_frames": [
+   "frame_0130.jpg",
+   "frame_0125.jpg"
+  ],
+  "design_tokens": [
+   "closer orbit than pit shots",
+   "white/blue sheds on concrete pads",
+   "one dark-pill cyan label per process unit (Flotation / Mill / Feed Bin / Crushing / Screening / Workshop / Power Substation)",
+   "leader line from label to unit",
+   "waste dam dark band as backdrop"
+  ],
+  "avoid_frames": [
+   "frame_0225.jpg",
+   "frame_0265.jpg"
+  ],
+  "why": "0130/0125 ARE the concentrator; 0225 is downstream thermal reactor (dark tech close-up), 0265 is downstream halls."
+ },
+ "resource_geology": {
+  "use_frames": [
+   "frame_0080.jpg",
+   "frame_0060.jpg",
+   "frame_0070.jpg"
+  ],
+  "design_tokens": [
+   "0080 proof: purple mineralised trends + dark stat cards, cyan number + white caption",
+   "0060 process: glowing pluton body + one label, drill dots show work done",
+   "0070 zones: red collar pins + one pill label per zone"
+  ],
+  "avoid_frames": [
+   "frame_0095.jpg",
+   "frame_0105.jpg"
+  ],
+  "why": "Geology = rocks/zones/stats. Pit frames show voids, no geology info."
+ },
+ "downstream_technology": {
+  "use_frames": [
+   "frame_0225.jpg",
+   "frame_0265.jpg"
+  ],
+  "design_tokens": [
+   "0225: dark slate background, isolated equipment cutaway, single cyan pill label",
+   "0265: daylight site, blue roofs, one label per building"
+  ],
+  "avoid_frames": [
+   "frame_0130.jpg"
+  ],
+  "why": "0225/0265 are purification/spheronisation story; 0130 is upstream flotation."
+ },
+ "logistics_location": {
+  "use_frames": [
+   "frame_0295.jpg"
+  ],
+  "design_tokens": [
+   "globe view, yellow route line",
+   "single dark label with leader (Sarytogan Graphite)"
+  ],
+  "avoid_frames": [
+   "frame_0020.jpg"
+  ],
+  "why": "0295 is routes/outro; 0020 is site location (now its own topic)."
+ },
+ "people_esg": {
+  "use_frames": [
+   "frame_0150.jpg",
+   "frame_0180.jpg"
+  ],
+  "design_tokens": [
+   "eye-level-ish low aerial",
+   "white buildings / red truck as human-scale anchors",
+   "warm daylight"
+  ],
+  "avoid_frames": [],
+  "why": "Camp + truck = workforce/logistics human beat."
+ },
+ "project_location": {
+  "use_frames": [
+   "frame_0020.jpg",
+   "frame_0047.jpg",
+   "frame_0010.jpg"
+  ],
+  "design_tokens": [
+   "0020 site pinpoint: satellite zoom + one pill + north arrow",
+   "0047 tenement: same aerial language + 'Mining License' pill over licence ground",
+   "0010 jurisdiction: globe + flag for country context"
+  ],
+  "avoid_frames": [
+   "frame_0295.jpg"
+  ],
+  "why": "0020 is WHERE the site is; 0295 is logistics routes (outro beat)."
+ },
+ "end_use_market": {
+  "use_frames": [
+   "frame_0030.jpg"
+  ],
+  "design_tokens": [
+   "macro product close-up, studio lighting, shallow depth",
+   "no labels \u2014 let the object speak; numbers in voiceover/caption"
+  ],
+  "avoid_frames": [],
+  "why": "The 'why should I care' slide: batteries, not rocks."
+ },
+ "esg_infra": {
+  "use_frames": [
+   "frame_0155.jpg",
+   "frame_0172.jpg",
+   "frame_0195.jpg"
+  ],
+  "design_tokens": [
+   "0155 tailings: low close orbit on dam wall + blue pond, no labels needed",
+   "0172 water: topo map + one pill per place/river + corridor line",
+   "0195 power: wide panorama, pylon mid-frame, single pill"
+  ],
+  "avoid_frames": [
+   "frame_0150.jpg"
+  ],
+  "why": "0150 is people/camp. Infra slides = dam, water map, power pano."
+ },
+ "product_stat": {
+  "use_frames": [
+   "frame_0235.jpg",
+   "frame_0080.jpg"
+  ],
+  "design_tokens": [
+   "stat overlay style: dark translucent bar, big cyan number + small white unit word (99.999% Carbon / 2800 Celsius)",
+   "put stats over the asset they describe (plant hall, orebody)"
+  ],
+  "avoid_frames": [],
+  "why": "The number-on-asset pattern: same treatment as 0080 resource cards."
+ },
+ "title_branding": {
+  "use_frames": [
+   "frame_0003.jpg"
+  ],
+  "design_tokens": [
+   "plain white, geometric hex-cube mark left, two-line wordmark, grey on white, generous whitespace"
+  ],
+  "avoid_frames": [],
+  "why": "Opening/closing card style."
+ }
+}

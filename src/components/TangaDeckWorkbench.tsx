@@ -11,6 +11,7 @@ import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import proj4 from 'proj4';
 import {formatIntercept, interceptTone} from '@/lib/assay/intercepts';
+import {placeLabels, type Rect} from '@/lib/labels/declutter';
 import {loadHiresDem, type HiresDem} from '@/lib/terrain/hires-dem';
 import {
   FALLBACK_RELIEF,
@@ -82,7 +83,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'resetView' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'resetView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 type ThreeCameraCommand = {
   id: number;
@@ -315,7 +316,7 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
   // model is on screen to back them up; repeating them here made the licence
   // slide read as a second resource slide with a map behind it.
   project: [
-    {label: 'Licence', value: '6.4 sq km · 100% owned'},
+    {label: 'Licence', value: 'Provisional project boundary'},
     {label: 'Tenure', value: 'Secure through 2030+'},
     {label: 'Drilled', value: '100 DD holes, 2022-25'},
   ],
@@ -345,9 +346,9 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
     {label: 'Inferred', value: '35 Mt @ 4.52% TGC'},
   ],
   mine_planning: [
-    {label: 'Ore in pit', value: '95.0 Mt @ 5.70% TGC'},
-    {label: 'Contained', value: '≈5.4 Mt graphite'},
-    {label: 'Pit value', value: 'US$0.58 Bn (NPV)'},
+    {label: 'Design', value: 'Conceptual only'},
+    {label: 'Footprints', value: 'Containment checked'},
+    {label: 'Licence', value: 'Provisional boundary'},
   ],
   metallurgy: [
     {label: 'Purity', value: '>97% TC concentrate'},
@@ -422,20 +423,18 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
     ],
   },
   mine_planning: {
-    title: 'Pit & Financial Snapshot',
-    source: 'Tanga OreWaste engine · scenario 1050-fine · 9 Aug 2026',
-    columns: ['Metric', 'Value', ''],
+    title: 'Conceptual site layout',
+    source: 'Original block coordinates + provisional project boundary',
+    columns: ['Constraint', 'Assumption', ''],
     rows: [
-      {group: 'Pit'},
-      {cells: ['Ore', '95 Mt @ 5.70% TGC', '']},
-      {cells: ['Contained graphite', '≈5.4 Mt', ''], emphasis: true},
-      {cells: ['Strip ratio', '≈0', '']},
-      {group: 'Financial'},
-      {cells: ['Base price', 'US$1,050 / t', '']},
-      {cells: ['Pit value (NPV, 10%)', 'US$0.58 Bn', ''], emphasis: true},
-      {group: 'Geometry'},
-      {cells: ['Pit slope', '50° fresh · 44° oxide', '']},
-      {cells: ['Recovery', '90% fresh · 85% oxide', '']},
+      {cells: ['Screening threshold', '3% TGC (not economic)', '']},
+      {cells: ['Vertical levels', '10 m conceptual', '']},
+      {cells: ['Batter / berm', '70° / 6.36 m concept', '']},
+      {cells: ['Plant campus', '960 × 672 m', 'Conceptual']},
+      {cells: ['Planning margin', '20 m around plant', '']},
+      {cells: ['Containment', 'Full footprints tested', '']},
+      {cells: ['Licence', 'Legal boundary unconfirmed', ''], emphasis: true},
+      {cells: ['Design status', 'Not optimised / not a reserve', '']},
     ],
   },
   metallurgy: {
@@ -477,6 +476,20 @@ const MODE_NARRATIVE_SOURCE: Record<WorkbenchMode, string> = {
   mine_planning: 'carbon_model',    // Carbon block model + iso-surface fits the pit shell story
   metallurgy: 'metallurgy',
   comparison: 'investment_thesis',  // Peer comparison closes into the investment case
+};
+
+const CHAPTER_GUIDANCE: Record<WorkbenchMode, {focus: string; bridge: string}> = {
+  ranking: {focus: 'Frame the opportunity, then explain that this tour separates measured evidence, geological interpretation and conceptual development.', bridge: 'First, place the project in its Tanzanian setting.'},
+  tanzania: {focus: 'Orient the audience from country to coast to project. Allow the camera to settle before introducing the next scale.', bridge: 'Now move from regional context to the footprint we are using.'},
+  project: {focus: 'Trace the existing project boundary. It is the unchanged presentation constraint, not a newly verified legal survey.', bridge: 'Within this footprint, the ground controls how development could fit.'},
+  topography: {focus: 'Read ridges, slopes and valleys from an oblique view. Distinguish observed relief from engineering assumptions about access and drainage.', bridge: 'The surface is only the beginning; the geological interpretation sits beneath it.'},
+  subsurface: {focus: 'Reveal the seven supplied interpreted rock units. Highlight the GRSC host and its relationship to surrounding rocks. Explain that an interpreted contact is not a directly observed boundary everywhere.', bridge: 'What evidence supports this geometry? Follow the drillholes.'},
+  drillholes: {focus: 'Show where drilling intersects the interpretation, then examine selected logged or assayed intervals. Separate sampled evidence from the spaces between holes.', bridge: 'Those observations inform a spatial model, with uncertainty between samples.'},
+  resource: {focus: 'Rotate the registered grade blocks and explain the legend. A 3% display threshold is not an economic cutoff; the visual model alone does not establish reserves.', bridge: 'Next, use this spatial pattern to illustrate a possible mining concept.'},
+  mine_planning: {focus: 'Read the admitted pit crests, benches and plant location together. These are presentation-grade geometric concepts inside the existing boundary, not optimised or engineered designs.', bridge: 'Follow the material from a conceptual excavation into the processing sequence.'},
+  metallurgy: {focus: 'Distinguish concentrate carbon, graphite recovery and flake-size distribution. Follow the illustrative liberation, flotation, dewatering and characterisation sequence; deck summaries remain pending laboratory-report verification.', bridge: 'Producing a concentrate is one step; connecting the site to logistics is the next.'},
+  accessibility: {focus: 'Move from the site to transport connections. Show the geographic relationship without implying that access, capacity or development permissions are secured.', bridge: 'Bring the evidence and remaining development decisions back into one closing view.'},
+  comparison: {focus: 'Recap the setting, geological evidence and conceptual development path. Close with the next validation steps, not an unsupported promise of operating performance.', bridge: 'Invite questions and switch to Explore evidence for detailed inspection.'},
 };
 
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
@@ -687,16 +700,17 @@ const INFO_BEFORE: Partial<Record<WorkbenchMode, InfoSlideId>> = {
 };
 
 const STORY_STEPS: StoryStep[] = [
-  {mode: 'ranking', act: '01', label: 'Peer field', command: 'show top 10 graphite projects', tone: '#a89c94'},
-  {mode: 'tanzania', act: '02', label: 'Country context', command: 'show Tanzania overview', tone: '#a89c94'},
-  {mode: 'project', act: '03', label: 'Project area', command: 'show project area', tone: '#c7551b'},
-  {mode: 'topography', act: '04', label: 'Topography', command: 'show topography of the area', tone: '#a89c94'},
-  {mode: 'accessibility', act: '05', label: 'Access routes', command: 'show road route to Tanga port', tone: '#c7551b'},
-  {mode: 'drillholes', act: '06', label: 'Drillholes', command: 'show me the drillholes', tone: '#c7551b'},
-  {mode: 'resource', act: '07', label: 'Resource model', command: 'show resource model', tone: '#c7551b'},
-  {mode: 'metallurgy', act: '08', label: 'Metallurgy', command: 'show metallurgy', tone: '#41200e'},
-  {mode: 'mine_planning', act: '09', label: 'Mine plan', command: 'show mine plan', tone: '#c7551b'},
-  {mode: 'comparison', act: '10', label: 'Peer compare', command: 'compare Tanga with peers', tone: '#b9954b'},
+  {mode: 'ranking', act: '01', label: 'The opportunity', command: 'show top 10 graphite projects', tone: '#a89c94'},
+  {mode: 'tanzania', act: '02', label: 'A place in Tanzania', command: 'show Tanzania overview', tone: '#a89c94'},
+  {mode: 'project', act: '03', label: 'The project footprint', command: 'show project area', tone: '#c7551b'},
+  {mode: 'topography', act: '04', label: 'Read the ground', command: 'show topography of the area', tone: '#a89c94'},
+  {mode: 'subsurface', act: '05', label: 'Inside the geology', command: 'show subsurface', tone: '#c7551b'},
+  {mode: 'drillholes', act: '06', label: 'Test the interpretation', command: 'show me the drillholes', tone: '#c7551b'},
+  {mode: 'resource', act: '07', label: 'Build the model', command: 'show resource model', tone: '#c7551b'},
+  {mode: 'mine_planning', act: '08', label: 'Shape a mining concept', command: 'show mine plan', tone: '#c7551b'},
+  {mode: 'metallurgy', act: '09', label: 'From rock to concentrate', command: 'show metallurgy', tone: '#41200e'},
+  {mode: 'accessibility', act: '10', label: 'Connect to market', command: 'show road route to Tanga port', tone: '#c7551b'},
+  {mode: 'comparison', act: '11', label: 'The case and next steps', command: 'compare Tanga with peers', tone: '#b9954b'},
 ];
 
 // Authored camera beats. A scene is the narrative chapter; a shot is a
@@ -738,13 +752,13 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'below', label: 'Deposit underside', detail: 'Reveal thickness and vertical continuity', threeAction: 'bottomView'},
   ],
   metallurgy: [
-    {id: 'samples', label: 'Metallurgy overview', detail: 'Relate testwork to the deposit', threeAction: 'resetView'},
-    {id: 'evidence', label: 'Product evidence', detail: 'Focus the metallurgy evidence zone', threeAction: 'zoomIn'},
+    {id: 'samples', label: 'Metallurgy overview', detail: 'Carbon, recovery and flake-size evidence', threeAction: 'resetView'},
   ],
   mine_planning: [
     {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'resetView'},
-    {id: 'operating-angle', label: 'Operating angle', detail: 'Read the shell against resource geometry', threeAction: 'projectAngle'},
-    {id: 'detail', label: 'Plan detail', detail: 'Push toward the selected planning volume', threeAction: 'zoomIn'},
+    {id: 'north-pit', label: 'North pit', detail: 'Inspect the northern conceptual excavation', threeAction: 'northPit'},
+    {id: 'south-pit', label: 'South pit', detail: 'Inspect the southern conceptual excavation', threeAction: 'southPit'},
+    {id: 'plant', label: 'Receiving & processing', detail: 'Illustrative haulage and larger plant complex', threeAction: 'plantDetail'},
   ],
   comparison: [
     {id: 'peers', label: 'Peer comparison', detail: 'Tanga against the public peer field', view: VIEW_STATES.comparison},
@@ -757,15 +771,15 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
 type StoryAct = {id: string; label: string; theme: string; numeral: string; thesis: string};
 const STORY_ACTS: StoryAct[] = [
   {id: 'opportunity', label: 'The Opportunity', theme: '#8fb4d6', numeral: 'I', thesis: 'A large flake-graphite asset in a proven province.'},
-  {id: 'asset', label: 'The Asset', theme: '#d96a2a', numeral: 'II', thesis: 'Drill-defined, JORC-compliant, and fully owned.'},
-  {id: 'value', label: 'The Value', theme: '#e0a94f', numeral: 'III', thesis: 'Coarse flake, low strip, and a route to market.'},
+  {id: 'asset', label: 'The Asset', theme: '#d96a2a', numeral: 'II', thesis: 'Geology, drilling and a spatially registered model.'},
+  {id: 'value', label: 'The Value', theme: '#e0a94f', numeral: 'III', thesis: 'From a mining concept to testwork and logistics.'},
 ];
 const MODE_ACT: Record<WorkbenchMode, string> = {
   ranking: 'opportunity',
   tanzania: 'opportunity',
   project: 'asset',
   topography: 'asset',
-  accessibility: 'asset',
+  accessibility: 'value',
   drillholes: 'asset',
   subsurface: 'asset',
   resource: 'asset',
@@ -785,44 +799,44 @@ const MODE_INVESTOR_ANGLE: Record<WorkbenchMode, {headline: string; points: stri
     points: ['Bars show contained graphite vs the top public peers', 'Tanga slots in at #5 once the resource is revealed', 'A large-scale asset in a proven graphite province'],
   },
   tanzania: {
-    headline: 'A mining-friendly, coastal jurisdiction',
-    points: ['Tanzania: established mining code, low royalties', 'Coastal Tanga Region — short haul to an Indian Ocean port', 'Neighbouring peers de-risk the geology'],
+    headline: 'Locate the project in Tanzania',
+    points: ['Country, regional and project-scale views establish location', 'The coastal corridor provides geographic context', 'Nearby projects do not validate this deposit or establish development permissions'],
   },
   project: {
-    headline: '100%-owned, contiguous license package',
-    points: ['6.4 sq km tenement, fully controlled', 'Roads, villages and power already nearby', 'Low-relief terrain suits open-pit mining'],
+    headline: 'Establish the project footprint',
+    points: ['Displayed polygon is a provisional project boundary', 'Authoritative licence geometry is required before legal containment can be confirmed', 'Terrain and access constrain conceptual facility placement'],
   },
   topography: {
-    headline: 'Workable terrain lowers build cost',
-    points: ['Moderate relief — straightforward pit and infrastructure', 'Real satellite terrain, not a stylised model', 'Drainage and access already understood'],
+    headline: 'Terrain frames the design questions',
+    points: ['Relief informs possible excavation and facility locations', 'Use the loaded terrain to inspect slopes and elevation', 'Drainage, access and construction costs require dedicated studies'],
   },
   accessibility: {
-    headline: 'Infrastructure is a de-risking factor',
-    points: ['~80 km to Tanga port for export', 'Hydro grid nodes within ~60 km', 'Road, power and rail context cut future CAPEX'],
+    headline: 'Connect the site to regional infrastructure',
+    points: ['Routes show geographic relationships to transport destinations', 'Mapped power and rail features are context, not secured connections', 'Access, capacity and development costs need verification'],
   },
   drillholes: {
-    headline: '100 holes = a drill-defined asset',
-    points: ['Colour = grade: red is high, blue is low', '≈10 km of diamond core, 3,728 TGC assays', 'JORC-ready QAQC underpins the resource'],
+    headline: 'Drilling tests the interpretation',
+    points: ['Use the active legend to interpret assay colours', 'Select intervals to examine sampled evidence', 'Coverage and QA/QC must be reviewed alongside the geological interpretation'],
   },
   subsurface: {
-    headline: 'Grade continues at depth',
-    points: ['Cutaway shows drillholes below surface', 'Mineralisation is coherent, not scattered', 'Supports a confident 3D geological model'],
+    headline: 'A geological framework to test',
+    points: ['Seven interpreted units are spatially registered to the project', 'Copper highlights the supplied graphitic-schist unit', 'Contacts, continuity and model provenance need geological approval'],
   },
   resource: {
     headline: 'The block model — the core of the value',
     points: ['Each block coloured by TGC grade', 'Ordinary kriging, lithology-domained', '183 Mt @ 4.86% TGC, JORC 2012 compliant'],
   },
   metallurgy: {
-    headline: 'It converts to a premium product',
-    points: ['>97% total carbon concentrate purity', 'Large-flake distribution commands premium pricing', 'Straightforward flotation — no exotic processing'],
+    headline: 'Testwork informs the processing concept',
+    points: ['The evidence panel reports existing deck summaries for tested composites', 'Flakes and process movement are illustrative, not laboratory imagery or operating performance', 'Product qualification, flowsheet design and market terms require further work'],
   },
   mine_planning: {
-    headline: 'A pit that already pays',
-    points: ['Only the minable blocks inside the optimised pit are shown', '95 Mt @ 5.70% TGC at a US$1,050/t base case', '≈US$0.58 Bn pit NPV with near-zero strip'],
+    headline: 'A block-informed mining concept',
+    points: ['North and south envelopes adapt the RF 1 sample footprint', 'Crests and plant pad are screened against the unchanged provisional boundary', 'Concepts do not establish full extraction; engineering and economics require validation'],
   },
   comparison: {
-    headline: 'Scale, purity and location combined',
-    points: ['#5 by M&I contained graphite among public peers', '>97% TC purity beats typical saleable product', 'Logistics already staged — a rare full package'],
+    headline: 'Evidence, interpretation and next decisions',
+    points: ['Review the source basis and date of each comparison', 'Keep testwork outcomes distinct from product qualification', 'Next steps: validate assumptions, develop designs and assess logistics'],
   },
 };
 
@@ -1285,8 +1299,8 @@ function modeSummary(mode: WorkbenchMode, routeTarget: RouteTarget, focus: Resou
   if (mode === 'accessibility') return `Elevated road context, Hale and New Pangani Falls grid nodes, concept mine infrastructure, and route to ${ROUTE_TARGETS[routeTarget].label}.`;
   if (mode === 'drillholes') return 'Assay traces are drawn over the project surface.';
   if (mode === 'subsurface') return 'The surface is opened as a cutaway view with drillholes below.';
-  if (mode === 'mine_planning') return 'At a US$1,050/t base case the optimum pit holds 95 Mt of ore at 5.70% TGC — ~5.4 Mt of contained graphite with a US$0.58 Bn NPV, essentially zero strip and 50° fresh-rock slopes.';
-  if (mode === 'metallurgy') return 'High-carbon drill intervals animate into concentrate purity, oxide recovery, and fresh recovery metrics.';
+  if (mode === 'mine_planning') return 'A conceptual layout derived from original model coordinates, screened against a provisional boundary. Pit geometry, plant siting and costs require engineering validation.';
+  if (mode === 'metallurgy') return 'An animated product illustration separates concentrate carbon, recovery and coarse-flake results from the mining concept.';
   if (mode === 'comparison') return 'Tanga is benchmarked against public graphite peers using contained graphite, MRE confidence, metallurgy, and logistics context.';
   if (focus === 'HighTGC') return 'High-grade graphite blocks are isolated using the TGC proxy in the resource model.';
   if (focus === 'LowTGC') return 'Lower-TGC blocks are isolated to show dilution and weaker graphite zones.';
@@ -1299,7 +1313,7 @@ function modeHeadline(mode: WorkbenchMode, focus: ResourceFocus, tangaInserted: 
   if (mode === 'ranking') return tangaInserted ? 'Tanga Joins The Field' : 'Graphite Peer Field';
   if (mode === 'resource') return `${resourceFocusLabel(focus)} Blocks`;
   if (mode === 'subsurface') return 'Inside Earth';
-  if (mode === 'mine_planning') return 'Economic Pit Optimum';
+  if (mode === 'mine_planning') return 'Conceptual Mine Layout';
   if (mode === 'metallurgy') return 'Metallurgy Reveal';
   if (mode === 'comparison') return 'Peer Comparison';
   return 'Tanga, Tanzania';
@@ -1430,9 +1444,9 @@ function legendForMode(mode: WorkbenchMode, routeTarget: RouteTarget, focus: Res
   }
   if (mode === 'mine_planning') {
     return [
-      {label: 'Ore in pit', detail: '95.0 Mt @ 5.70% TGC', tone: '#ef4444'},
-      {label: 'Contained graphite', detail: '≈5.4 Mt', tone: '#facc15'},
-      {label: 'Pit value (NPV)', detail: 'US$0.58 Bn @ US$1,050/t', tone: '#2dd4bf'},
+      {label: 'Candidate excavations', detail: 'Block-informed geometry', tone: '#c7551b'},
+      {label: 'Plant', detail: 'Illustrative concentrator', tone: '#facc15'},
+      {label: 'Boundary', detail: 'Provisional; legal check pending', tone: '#2dd4bf'},
     ];
   }
   if (mode === 'metallurgy') {
@@ -1569,7 +1583,7 @@ function sceneCalloutsForMode(
     // One bold callout only — the licence. (Was 2; the village-context box added
     // noise and repeated what the map already shows.)
     return [
-      {id: 'aoi', label: '6.4 sq km · 100% owned', detail: 'Contiguous licence, secure through 2030+, drilled on 100 holes', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
+      {id: 'aoi', label: 'Provisional project boundary', detail: 'Legal licence geometry unconfirmed; drill coverage shown', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
     ];
   }
   if (mode === 'topography') {
@@ -3480,12 +3494,12 @@ export default function TangaDeckWorkbench() {
         lineWidthMaxPixels: 7,
         parameters: {depthTest: false} as any,
       }),
-      // Layer 4: the area label — "6.4 sq km · 100% owned" at the polygon
+      // Layer 4: the area label — "Provisional project boundary" at the polygon
       // centroid. Only shown when we're actively looking at the license.
       // Replaced by the pinned map-label overlay (fixed screen slot + pointer).
       false && new TextLayer({
         id: 'project-boundary-label',
-        data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'TANGA LICENSE · 6.4 sq km · 100% OWNED'}],
+        data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'PROVISIONAL PROJECT BOUNDARY'}],
         getPosition: (d: any) => d.position,
         getText: (d: any) => d.text,
         getSize: 12,
@@ -4237,7 +4251,7 @@ export default function TangaDeckWorkbench() {
       out.push({id, text, lon, lat, z: heightAt(lon, lat) + lift, tone});
     };
     if (activeMode === 'project' || activeMode === 'topography') {
-      push('lbl-license', 'TANGA LICENSE · 6.4 sq km · 100% OWNED', PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, 260, '#f0b64a');
+      push('lbl-license', 'PROVISIONAL PROJECT BOUNDARY', PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, 260, '#f0b64a');
     }
     if (activeMode === 'project') {
       // Processing plant and product stockpile pins are gone from this scene:
@@ -4461,6 +4475,25 @@ export default function TangaDeckWorkbench() {
     return positioned;
   }, [mapLabelSources, activeMode, stageSize.width, stageSize.height, viewState.longitude, viewState.latitude, viewState.zoom, viewState.pitch, viewState.bearing]);
 
+  const safeMapChrome = useMemo(() => {
+    const width = stageSize.width, height = stageSize.height;
+    const keepOutRects: Rect[] = [
+      {x:0,y:0,width,height:150},
+      {x:0,y:height-112,width,height:112},
+      {x:width-(activeMode === 'ranking' ? 470 : 320),y:140,width:470,height:height-140},
+      ...projectedSceneCallouts.map(c => ({x:c.boxPixelX-112,y:c.boxPixelY-48,width:224,height:96})),
+    ];
+    if (activeMode === 'accessibility') keepOutRects.push({x:16,y:height-270,width:300,height:170});
+    function pack<T extends {boxPixelX:number;boxPixelY:number}>(labels:T[]) {
+      const result = placeLabels(labels.map((label,index) => ({id:String(index),anchorPx:{x:label.boxPixelX,y:label.boxPixelY},width:240,height:40,priority:labels.length-index})), {width, height}, {keepOutRects,offsetDistances:[0,60,110,170,230],padding:8});
+      return result.placed.map(p => {
+        keepOutRects.push({x:p.boxPx.x-120,y:p.boxPx.y-20,width:240,height:40});
+        return {...labels[Number(p.id)],boxPixelX:p.boxPx.x,boxPixelY:p.boxPx.y};
+      });
+    }
+    return {peers:pack(peerGlobeLabels),places:pack(pinnedMapLabels)};
+  }, [peerGlobeLabels,pinnedMapLabels,projectedSceneCallouts,stageSize.width,stageSize.height,activeMode]);
+
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
   const activeShots = STORY_SHOTS[activeMode] ?? [];
   const activeShot = activeShots[Math.min(activeShotIndex, Math.max(0, activeShots.length - 1))];
@@ -4587,8 +4620,12 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
-  // VRIFY-style autoplay pacing — 5s / 10s / 15s options. 10s default (mid).
-  const [autoplaySec, setAutoplaySec] = useState<5 | 10 | 15>(10);
+  const [isExploreMode, setExploreMode] = useState(false);
+  // Chapter budgets are shared across authored shots, not repeated per shot.
+  const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
+  const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
+  const transitionCardCount = nextChapterMode && INFO_BEFORE[nextChapterMode] ? 1 : 0;
+  const shotDwellSec = autoplaySec / Math.max(1, activeShots.length + transitionCardCount);
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
   // Annotation density, cycled with Ctrl+A:
   //   key → authored scene callouts plus the three strongest drill intercepts
@@ -4602,6 +4639,10 @@ export default function TangaDeckWorkbench() {
   // ask is usually "drop the blocks and show me just the holes", and changing
   // scene is too blunt an answer.
   const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
+  const defaultDrillingVisible = activeMode !== 'mine_planning' && activeMode !== 'metallurgy';
+  useEffect(() => {
+    setLayerSettings(current => ({...current, drilling: {...current.drilling, visible: defaultDrillingVisible}}));
+  }, [activeMode, defaultDrillingVisible]);
   const [isLayersOpen, setLayersOpen] = useState(false);
   const [layerQuery, setLayerQuery] = useState('');
   // Slide index. The reference deck keeps a permanent thumbnail rail down the
@@ -4615,7 +4656,7 @@ export default function TangaDeckWorkbench() {
   const setLayerOpacity = useCallback((id: DeckLayerId, opacity: number) => {
     setLayerSettings((current) => ({...current, [id]: {...current[id], opacity}}));
   }, []);
-  const resetLayers = useCallback(() => setLayerSettings(DEFAULT_LAYER_SETTINGS), []);
+  const resetLayers = useCallback(() => setLayerSettings({...DEFAULT_LAYER_SETTINGS, drilling: {...DEFAULT_LAYER_SETTINGS.drilling, visible: defaultDrillingVisible}}), [defaultDrillingVisible]);
   const filteredDeckLayers = useMemo(() => {
     const query = layerQuery.trim().toLowerCase();
     if (!query) return DECK_LAYERS;
@@ -4623,7 +4664,7 @@ export default function TangaDeckWorkbench() {
   }, [layerQuery]);
   // Drives the toolbar dot, so a presenter can see at a glance that something
   // is dialled down before they wonder why the scene looks wrong.
-  const layersModified = DECK_LAYERS.some(({id}) => !layerSettings[id].visible || layerSettings[id].opacity < 1);
+  const layersModified = DECK_LAYERS.some(({id}) => layerSettings[id].visible !== (id === 'drilling' ? defaultDrillingVisible : true) || layerSettings[id].opacity < 1);
   const annotationsOn = labelDensity !== 'off';
   const cycleAnnotations = useCallback(() => {
     setLabelDensity((prev) => (prev === 'key' ? 'all' : prev === 'all' ? 'off' : 'key'));
@@ -4668,8 +4709,10 @@ export default function TangaDeckWorkbench() {
     return opening;
   }), []);
   const toggleLayers = useCallback(() => setLayersOpen((open) => {
+    if(activeMode==='metallurgy')return false;
     const opening = !open;
     if (opening) {
+      setExploreMode(true);
       setIsInspectorOpen(false);
       setIsNotesOpen(false);
       setIsShortcutsOpen(false);
@@ -4677,7 +4720,7 @@ export default function TangaDeckWorkbench() {
       setIndexOpen(false);
     }
     return opening;
-  }), []);
+  }), [activeMode]);
   // First-run coach marks — a one-time hint so a cold viewer knows the deck is
   // interactive. Dismisses on first navigation and never returns.
   const [showCoach, setShowCoach] = useState(false);
@@ -4742,13 +4785,15 @@ export default function TangaDeckWorkbench() {
     if (isFullscreen && wakeEnabled) setWakeEnabled(false);
   }, [isFullscreen, wakeEnabled]);
 
-  // Autoplay ticks the story forward every 12s until it hits the last scene.
+  // Let the closing shot hold for its allocated time before stopping.
   useEffect(() => {
-    if (!isAutoplay) return;
-    if (isLastStory) { setIsAutoplay(false); return; }
-    const timer = window.setTimeout(handleNextStory, autoplaySec * 1000);
+    if (!isAutoplay || (threeVisible && threeLoadReport.scene !== 'ready')) return;
+    const timer = window.setTimeout(() => {
+      if (isLastStory) setIsAutoplay(false);
+      else handleNextStory();
+    }, shotDwellSec * 1000);
     return () => window.clearTimeout(timer);
-  }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, activeShotIndex, autoplaySec]);
+  }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, activeShotIndex, shotDwellSec, threeVisible, threeLoadReport.scene]);
 
   // Idle slow-orbit: once an immersive scene has flown in and settled, gently
   // rotate the camera bearing (geolibre / VRIFY "never frozen" feel). Cancels
@@ -4837,7 +4882,9 @@ export default function TangaDeckWorkbench() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      // Native form/disclosure controls own arrows and Space while focused.
+      // In particular, sample selectors must not advance the presentation.
+      if (target && (target.closest('input,textarea,select,button,summary,[role="slider"]') || target.isContentEditable)) return;
       // Ctrl/Cmd + A → toggle annotations (like VRIFY). Everything else with
       // a modifier goes to the browser so we don't fight shortcuts.
       if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
@@ -4957,16 +5004,22 @@ export default function TangaDeckWorkbench() {
       ref={stageRef}
       className={classNames(
         'tanga-deck',
+        !isExploreMode && 'tanga-deck--present',
         threeVisible && 'tanga-deck--three-active',
         sceneTransition.active && 'tanga-deck--transitioning',
         storyHeroVisible && 'tanga-deck--story-hero-active',
         activeMode === 'ranking' && 'tanga-deck--ranking',
         activeMode === 'comparison' && 'tanga-deck--comparison',
         isLayersOpen && 'tanga-deck--layers-open',
+        isNotesOpen && 'tanga-deck--notes-open',
+        isInspectorOpen && 'tanga-deck--inspector-open',
         isCoverScene && 'tanga-deck--cover',
         isAutoplay && 'tanga-deck--autoplay'
       )}
       data-act={MODE_ACT[activeMode]}
+      data-mode={activeMode}
+      onWheelCapture={() => setIsAutoplay(false)}
+      onPointerDownCapture={event => {if (event.target instanceof HTMLCanvasElement) setIsAutoplay(false);}}
       data-testid="tanga-deck-workbench"
     >
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
@@ -5147,10 +5200,10 @@ export default function TangaDeckWorkbench() {
       {/* Peer projects labelled on the globe, cross-highlighted with the
           ranking table. Without these the slide asserted a "global peer field"
           beside a globe showing nothing but unlabelled dots. */}
-      {annotationsOn && !threeVisible && !showCover && peerGlobeLabels.length > 0 && (
+      {annotationsOn && !threeVisible && !showCover && safeMapChrome.peers.length > 0 && (
         <section className="tanga-deck__peer-labels" aria-label="Peer projects on the globe">
           <svg className="tanga-deck__leader-svg tanga-deck__leader-svg--pin" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
-            {peerGlobeLabels.map((label) => (
+            {safeMapChrome.peers.map((label) => (
               <g key={`peer-leader-${label.key}`}>
                 <line
                   x1={label.anchorPixelX}
@@ -5168,7 +5221,7 @@ export default function TangaDeckWorkbench() {
               </g>
             ))}
           </svg>
-          {peerGlobeLabels.map((label, index) => (
+          {safeMapChrome.peers.map((label, index) => (
             <button
               type="button"
               key={label.key}
@@ -5201,17 +5254,17 @@ export default function TangaDeckWorkbench() {
         </section>
       )}
 
-      {annotationsOn && !threeVisible && !showCover && pinnedMapLabels.length > 0 && (
+      {annotationsOn && !threeVisible && !showCover && safeMapChrome.places.length > 0 && (
         <section className="tanga-deck__map-labels" aria-label="Map place labels">
           <svg className="tanga-deck__leader-svg tanga-deck__leader-svg--pin" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
-            {pinnedMapLabels.map((label) => label.anchorPixelX !== null && label.anchorPixelY !== null && (
+            {safeMapChrome.places.map((label) => label.anchorPixelX !== null && label.anchorPixelY !== null && (
               <g key={`pin-leader-${label.id}`}>
                 <line x1={label.anchorPixelX} y1={label.anchorPixelY} x2={label.boxPixelX} y2={label.boxPixelY} style={{color: label.tone, stroke: label.tone}} />
                 <circle cx={label.anchorPixelX} cy={label.anchorPixelY} r="3" style={{color: label.tone, fill: label.tone, stroke: '#ffffff'}} />
               </g>
             ))}
           </svg>
-          {pinnedMapLabels.map((label, index) => (
+          {safeMapChrome.places.map((label, index) => (
             <div
               key={label.id}
               className="tanga-deck__pin-label"
@@ -5402,7 +5455,7 @@ export default function TangaDeckWorkbench() {
       </div>
 
       {/* First-run coach marks — one-time interactive hint. */}
-      {showCoach && !showCover && (
+      {showCoach && !showCover && !isAutoplayMenuOpen && !isNotesOpen && !isLayersOpen && !isAutoplay && (
         <button type="button" className="tanga-deck__coach" onClick={dismissCoach} aria-label="Dismiss navigation hint">
           <span className="tanga-deck__coach-keys">
             <kbd>&larr;</kbd><kbd>&rarr;</kbd>
@@ -5420,7 +5473,7 @@ export default function TangaDeckWorkbench() {
       {isAutoplay && !isCoverScene && !isClosingScene && activeSlide?.narrative?.narrationScript && (
         <div className="tanga-deck__narration" role="status" aria-live="polite">
           <span className="tanga-deck__narration-eyebrow">{activeSlide.narrative?.chapterTitle ?? MODE_LABELS[activeMode]}</span>
-          <p key={activeMode}>{activeSlide.narrative.narrationScript}</p>
+          <p key={activeMode}>{CHAPTER_GUIDANCE[activeMode].bridge}</p>
         </div>
       )}
 
@@ -5446,7 +5499,7 @@ export default function TangaDeckWorkbench() {
           <div className="tanga-deck__cover-inner">
             <span className="tanga-deck__cover-eyebrow">Sakariya Mines &amp; Minerals · Investor Presentation</span>
             <h1 className="tanga-deck__cover-title">Tanga Graphite</h1>
-            <p className="tanga-deck__cover-sub">A drill-defined, JORC-compliant flake graphite resource on Tanzania&rsquo;s Mozambique Belt — 183&nbsp;Mt @ 4.86% TGC, with port, power and rail already in reach.</p>
+            <p className="tanga-deck__cover-sub">Follow the evidence beneath Tanzania&rsquo;s ground: geology, drilling and the grade model — then explore a conceptual mine, processing campus and the next development decisions.</p>
             <button type="button" className="tanga-deck__cover-cta" onClick={() => setCoverDismissed(true)}>
               Begin the story <ChevronRight size={18} strokeWidth={2.4} />
             </button>
@@ -5475,13 +5528,13 @@ export default function TangaDeckWorkbench() {
       {/* Closing CTA card — on the final scene. */}
       {isClosingScene && (
         <aside className="tanga-deck__closing" aria-label="Investment summary">
-          <span className="tanga-deck__closing-eyebrow">The Investment Case</span>
-          <h2 className="tanga-deck__closing-title">A de-risked graphite asset, ready to advance</h2>
+          <span className="tanga-deck__closing-eyebrow">Evidence → decisions</span>
+          <h2 className="tanga-deck__closing-title">From geological evidence to the next engineering decision</h2>
           <div className="tanga-deck__closing-metrics">
-            <div><strong><CountUp value="183" /> Mt</strong><span>Total resource @ 4.86% TGC</span></div>
-            <div><strong>&gt;<CountUp value="97" />% TC</strong><span>Concentrate purity</span></div>
-            <div><strong>US$<CountUp value="0.58" /> Bn</strong><span>Optimum pit NPV</span></div>
-            <div><strong>#<CountUp value="5" /></strong><span>By M&amp;I contained graphite</span></div>
+            <div><strong>01 · Ground</strong><span>Geology + drill traces → validate contacts and sample coverage</span></div>
+            <div><strong>02 · Model</strong><span>Grade cells → validate estimation and reporting basis</span></div>
+            <div><strong>03 · Mine</strong><span>Conceptual pits + plant → engineer access, stability and water management</span></div>
+            <div><strong>04 · Product</strong><span>Reported test summaries → verify lab reports, flowsheet and product qualification</span></div>
           </div>
           <p className="tanga-deck__closing-contact">
             Sakariya Mines &amp; Minerals · investor relations
@@ -5499,16 +5552,14 @@ export default function TangaDeckWorkbench() {
               Presenter · Scene {activeStoryIndex + 1}/{STORY_STEPS.length}
               <em className="tanga-deck__notes-timer" title="Elapsed since deck opened">{fmtElapsed(elapsedMs)}</em>
             </span>
-            <strong className="tanga-deck__notes-title">{activeSlide.narrative?.chapterTitle ?? activeSlide.title}</strong>
-            <small className="tanga-deck__notes-beat">{activeSlide.narrative?.storyBeat ?? activeSlide.subtitle}</small>
+            <strong className="tanga-deck__notes-title">{STORY_STEPS[activeStoryIndex]?.label}</strong>
+            <small className="tanga-deck__notes-beat">{autoplaySec}s chapter budget · orient → evidence → transition</small>
           </div>
-          {activeSlide.narrative?.narrationScript && (
-            <p className="tanga-deck__notes-script">{activeSlide.narrative.narrationScript}</p>
-          )}
-          {activeSlide.speakerNotes && (
+          <p className="tanga-deck__notes-script">{CHAPTER_GUIDANCE[activeMode].focus}</p>
+          {CHAPTER_GUIDANCE[activeMode].bridge && (
             <div className="tanga-deck__notes-block">
-              <span className="tanga-deck__notes-label">Speaker notes</span>
-              <p>{activeSlide.speakerNotes}</p>
+              <span className="tanga-deck__notes-label">Bridge to the next chapter</span>
+              <p>{CHAPTER_GUIDANCE[activeMode].bridge}</p>
             </div>
           )}
           {nextSlide && (
@@ -5529,6 +5580,19 @@ export default function TangaDeckWorkbench() {
         </aside>
       )}
 
+      <button type="button" className="tanga-deck__explore-toggle" aria-pressed={isExploreMode}
+        onClick={() => {setExploreMode(!isExploreMode); setLayersOpen(false);}}>
+        {isExploreMode ? 'Return to presentation' : 'Explore evidence'}
+      </button>
+      {!isCoverScene && !isClosingScene && (
+        <header className="tanga-deck__chapter-title">
+          <small>CHAPTER {String(activeStoryIndex + 1).padStart(2, '0')}</small>
+          <h1>{STORY_STEPS[activeStoryIndex]?.label}</h1>
+        </header>
+      )}
+      {(activeMode === 'mine_planning' || activeMode === 'metallurgy' || activeMode === 'project') && (
+        <p className="tanga-deck__planning-note">Conceptual layout · provisional project boundary · legal licence unconfirmed</p>
+      )}
       <nav className="tanga-deck__pager" aria-label="Deck navigation">
         <button
           type="button"
@@ -5595,8 +5659,8 @@ export default function TangaDeckWorkbench() {
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
-            style={{'--autoplay-dwell': `${autoplaySec}s`} as any}
-            key={`play-${activeStoryIndex}-${autoplaySec}-${isAutoplay}`}
+            style={{'--autoplay-dwell': `${shotDwellSec}s`} as any}
+            key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}-${isAutoplay}`}
             onClick={toggleAutoplay}
             aria-label={isAutoplay ? 'Pause autoplay' : 'Start autoplay'}
             aria-pressed={isAutoplay}
@@ -5608,31 +5672,31 @@ export default function TangaDeckWorkbench() {
             type="button"
             className="tanga-deck__pager-btn tanga-deck__pager-speed"
             onClick={() => setIsAutoplayMenuOpen((prev) => !prev)}
-            aria-label={`Autoplay dwell: ${autoplaySec} seconds`}
+            aria-label={`Chapter duration: ${autoplaySec} seconds`}
             aria-haspopup="menu"
             aria-expanded={isAutoplayMenuOpen}
-            title={`${autoplaySec}s per scene — click to change`}
+            title={`${autoplaySec}s per chapter · ${STORY_STEPS.length * autoplaySec / 60} minute tour — click to change`}
           >
             {autoplaySec}s
           </button>
           {isAutoplayMenuOpen && (
             <div className="tanga-deck__speed-menu" role="menu">
-              {[5, 10, 15].map((sec) => (
+              {([60, 90, 120] as const).map((sec) => (
                 <button
                   key={sec}
                   type="button"
                   role="menuitemradio"
                   aria-checked={autoplaySec === sec}
                   className={classNames(autoplaySec === sec && 'is-active')}
-                  onClick={() => { setAutoplaySec(sec as 5 | 10 | 15); setIsAutoplayMenuOpen(false); }}
+                  onClick={() => { setAutoplaySec(sec); setIsAutoplayMenuOpen(false); }}
                 >
-                  {sec} seconds
+                  {sec}s / chapter · {STORY_STEPS.length * sec / 60} min
                 </button>
               ))}
             </div>
           )}
         </div>
-        {threeVisible && (
+        {threeVisible && activeMode !== 'metallurgy' && (
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool', (isLayersOpen || layersModified) && 'is-active')}
@@ -5645,7 +5709,7 @@ export default function TangaDeckWorkbench() {
             {layersModified && <i className="tanga-deck__tool-dot" aria-hidden="true" />}
           </button>
         )}
-        {threeVisible && (
+        {threeVisible && activeMode !== 'metallurgy' && (
           <button
             type="button"
             className="tanga-deck__pager-btn tanga-deck__pager-btn--tool"
@@ -5656,7 +5720,7 @@ export default function TangaDeckWorkbench() {
             <Box size={16} strokeWidth={2.2} />
           </button>
         )}
-        <button
+        {activeMode!=='metallurgy'&&<button
           type="button"
           className={classNames(
             'tanga-deck__pager-btn tanga-deck__pager-btn--tool',
@@ -5674,7 +5738,7 @@ export default function TangaDeckWorkbench() {
               {assayFacts ? assayFacts.interceptCount : 'ALL'}
             </span>
           )}
-        </button>
+        </button>}
         <button
           type="button"
           className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool', isInspectorOpen && 'is-active')}

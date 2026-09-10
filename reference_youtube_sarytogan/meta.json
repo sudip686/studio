@@ -1,0 +1,11 @@
+{
+ "title": "Sarytogan Graphite PFS 3D Animation - English",
+ "youtube_id": "EVKrPWzrIFc",
+ "url": "https://www.youtube.com/watch?v=EVKrPWzrIFc",
+ "channel": "Sarytogan Graphite",
+ "duration_s": 311,
+ "thumbnail": "https://i.ytimg.com/vi/EVKrPWzrIFc/hqdefault.jpg",
+ "captions": "English auto-captions (yt-dlp android player-client)",
+ "related_study": "Sarytogan PFS Aug 2024 (ASX:SGA) - see Graphite_Studies/Asia/",
+ "re_fetch_video": "yt-dlp --extractor-args \"youtube:player_client=android\" -f 18 -o \"%(id)s.mp4\" URL"
+}
