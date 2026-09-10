@@ -1,0 +1,21 @@
+# Verified runtime assets on the existing R2 origin; keep out of Vercel uploads.
+public/geologicalModel.glb
+public/height.bin
+public/height_hires.bin
+public/height_preview_1024.bin
+public/BlockModel.geojson
+public/texture_rgb_8192.png
+public/terrain_texture_8k.jpg
+public/resource_model.bin
+public/assay_data.geojson
+public/lithology_data.geojson
+public/media/
+# Source-only research files and unreferenced raster/mesh exports are not runtime assets.
+public/*.docx
+public/*.pdf
+public/*.tif
+public/*.tiff
+public/generated/*.obj
+reference_youtube_sarytogan/
+.agents/
+.codex/

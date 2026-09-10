@@ -14,7 +14,7 @@ import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan
 import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
-import MetallurgyVisualStory from './MetallurgyVisualStory';
+import MetallurgyVisualStory from './MetallurgyProcessExhibit';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import GeologyCrossSections from './GeologyCrossSections';
 import {sectionWorld,type SectionSource,type SectionDefinition} from '@/lib/deck/cross-section';
@@ -1232,7 +1232,7 @@ dz: Number(props.dZ ?? 10),
 
 function loadBlocks() {
   if (!blockPromise) {
-    blockPromise = fetch('/api/block-model', {cache: 'force-cache'})
+    blockPromise = (ASSET_BASE_URL ? fetch(`${ASSET_BASE_URL}/BlockModel.geojson`,{cache:'force-cache'}).then(r=>r.ok?r:fetch('/api/block-model',{cache:'force-cache'})).catch(()=>fetch('/api/block-model',{cache:'force-cache'})) : fetch('/api/block-model', {cache: 'force-cache'}))
       .then(response => {if (!response.ok) throw new Error('Block model unavailable'); return response.json();})
       .then(parseBlockGeoJson)
       .then((blocks: ResourceBlock[]) => blocks.filter(b => b.carbon > 0 && Number.isFinite(b.y) && b.dx > 0 && b.dy > 0 && b.dz > 0))
@@ -2649,6 +2649,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
             opacity: isHost ? .78 : .12, depthWrite: isHost, side: THREE.DoubleSide, roughness: .85,
           }));
           mesh.name = object.name;
+          mesh.userData.tooltipItems=[{title:object.name.replace(/_/g,' '),rows:[isHost?'Interpreted graphitic-schist host unit.':'Interpreted surrounding rock unit.','Modelled contact geometry, not direct observations everywhere.'],tone:`#${mesh.material.color.getHexString()}`}];
+          pickables.push(mesh);
           geologyMeshes.push(mesh);
           modelBounds.expandByObject(mesh);
           tagDeckLayer(mesh, 'blocks'); stage.add(mesh); unitCount++;
@@ -3254,6 +3256,16 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         reportLoadState('ready', resources ? 'ready' : 'degraded', resources?.quality ?? assetQuality, `${shownHoleCount} drillholes ready`);
       }
 
+      if(mode==='mine_planning')stage.traverse(object=>{
+        if(!(object instanceof THREE.Mesh)||pickables.includes(object))return;
+        let parent:THREE.Object3D|null=object,plantPart=false;
+        while(parent){if(parent.name==='conceptual-concentrator')plantPart=true;parent=parent.parent;}
+        const pit=object.name==='Terraced conceptual excavation';
+        const target=object.name.startsWith('Target blocks');
+        if(!plantPart&&!pit&&!target)return;
+        object.userData.tooltipItems=[{title:object.name||(plantPart?'Processing plant equipment':'Mining concept'),rows:[target?'Above-threshold model cells explain the target; not ore reserves.':pit?'Conceptual benched pit envelope; not an optimised or engineered excavation.':'Illustrative concentrator equipment; dimensions and capacity are conceptual.'],tone:'#dfa066'}];
+        pickables.push(object);
+      });
       if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured) {
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.2, cameraShot.fov);
       }
@@ -3288,9 +3300,15 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const [hit] = raycaster.intersectObjects(pickables, false);
+      if(event.buttons){setHoverTooltip(null);return;}
+      const visiblePickables=pickables.filter(object=>{for(let p:THREE.Object3D|null=object;p;p=p.parent)if(!p.visible)return false;return true;});
+      const [hit] = raycaster.intersectObjects(visiblePickables, false).filter(hit=>{
+        const material=(hit.object as THREE.Mesh).material;
+        const materials=Array.isArray(material)?material:[material];
+        return !materials.every(m=>m&&m.opacity<.02)&&!materials.some(m=>m?.clippingPlanes?.some(p=>p.distanceToPoint(hit.point)<0));
+      });
       const tooltipItems = hit?.object?.userData?.tooltipItems as DrillPickInfo[] | undefined;
-      const tooltip = tooltipItems?.[hit.instanceId ?? 0];
+      const tooltip = tooltipItems?.[hit.instanceId ?? 0] ?? (tooltipItems?.length===1?tooltipItems[0]:undefined);
 
       if (!hit || !tooltip) {
         renderer.domElement.classList.remove('is-picking');

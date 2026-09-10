@@ -21,6 +21,7 @@ import {
   type ReliefStats,
 } from '@/lib/terrain/relief';
 import TangaStoryVideoHero from './TangaStoryVideoHero';
+import DeckHoverGuide from './DeckHoverGuide';
 import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {
@@ -5022,6 +5023,7 @@ export default function TangaDeckWorkbench() {
       onPointerDownCapture={event => {if (event.target instanceof HTMLCanvasElement) setIsAutoplay(false);}}
       data-testid="tanga-deck-workbench"
     >
+      <DeckHoverGuide mode={activeMode}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
           viewState={viewState as any}
