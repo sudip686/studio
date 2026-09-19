@@ -18,6 +18,7 @@ import MetallurgyVisualStory from './MetallurgyProcessExhibit';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import GeologyCrossSections from './GeologyCrossSections';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
+import {createSceneReveal,type RevealAction} from '@/lib/deck/scene-reveal';
 import {sectionWorld,type SectionSource,type SectionDefinition} from '@/lib/deck/cross-section';
 import {LITHOLOGY_COLOR_MAP} from '@/lib/boreholes/colors';
 import {
@@ -1802,11 +1803,20 @@ export default function TangaThreeGeologyScene({
   const crossViewRef=useRef<((section:SectionDefinition|null,flat:boolean)=>void)|null>(null);
   const [sectionPosition,setSectionPosition]=useState(50);
   const [hostOnly,setHostOnly]=useState(false);
+  const [exploded,setExploded]=useState(false);
+  const explodedRef=useRef(false);explodedRef.current=exploded;
+  const revealCommand=useRef<((action:RevealAction)=>void)|null>(null);
+  const [revealAction,setRevealAction]=useState<RevealAction>('none');
+  const [spotlight,setSpotlight]=useState('');
+  const spotlightRef=useRef('');spotlightRef.current=spotlight;
+  const [journeyHoles,setJourneyHoles]=useState<string[]>([]),[journeyHole,setJourneyHole]=useState(''),[journeyReadout,setJourneyReadout]=useState('');
+  const journeyCommand=useRef<((id:string|null)=>void)|null>(null);
   const [plantCutaway,setPlantCutaway]=useState(false);
   const [plantProcess,setPlantProcess]=useState('all');
   const detailOptions=useRef({sectionEnabled,sectionPosition,hostOnly,plantCutaway,plantProcess});
   detailOptions.current={sectionEnabled,sectionPosition,hostOnly,plantCutaway,plantProcess};
   const [haulCount, setHaulCount] = useState(0);
+  const [haulStatus,setHaulStatus]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
   const [targetCount, setTargetCount] = useState(0);
   const [evidenceHoleIds,setEvidenceHoleIds]=useState<string[]>([]);
   const [focusedSource,setFocusedSource]=useState<string|null>(null);
@@ -2045,7 +2055,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let plantDetailKey='';
     const targetMeshes: THREE.InstancedMesh<THREE.BoxGeometry,THREE.MeshBasicMaterial>[]=[];
     const pitSurfaces:THREE.Mesh[]=[];
+    const revealBlocks:THREE.InstancedMesh[]=[];
     const geologyMeshes:THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>[]=[];
+    let separation=0;
     const sectionPlane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
     const sectionPlanes=[sectionPlane];
     const haulTrucks:{mesh:THREE.Group;points:THREE.Vector3[];length:number;offset:number}[]=[];
@@ -2341,6 +2353,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     }
 
     const stage = new THREE.Group();
+    const displayReveal=createSceneReveal(stage,revealBlocks,pitSurfaces);
+    revealCommand.current=action=>{displayReveal.start(action);setRevealAction(action);};
+    let journeyUpdate:((time:number)=>void)|null=null;
     groupRef.current = stage;
     stageRef.current = stage;
     scene.add(stage);
@@ -2633,6 +2648,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         if (cancelled) {disposeObject(gltf.scene); return;}
         let unitCount = 0;
         const modelBounds = new THREE.Box3();
+        // Reuse the exact CRS converter instead of rebuilding it for every vertex.
+        const geologyProjection=proj4('EPSG:32737','WGS84');
         gltf.scene.updateMatrixWorld(true);
         gltf.scene.traverse(object => {
           if (!(object instanceof THREE.Mesh)) return;
@@ -2642,9 +2659,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
           const positions = geometry.getAttribute('position');
           for (let i = 0; i < positions.count; i++) {
             // Blender export axes: UTM easting, elevation, negative northing.
-            const [lon, lat] = proj4('EPSG:32737', 'WGS84', [positions.getX(i), -positions.getZ(i)]);
-            const p = localPoint(lon, lat, positions.getY(i));
-            positions.setXYZ(i, p.x, p.y, p.z);
+            const [lon, lat] = geologyProjection.forward([positions.getX(i), -positions.getZ(i)]);
+            positions.setXYZ(i,(lon-PROJECT_CENTER.lon)*METERS_PER_DEGREE_LON,(positions.getY(i)-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION,-(lat-PROJECT_CENTER.lat)*METERS_PER_DEGREE_LAT);
           }
           geometry.computeVertexNormals(); geometry.computeBoundingSphere(); geometry.computeBoundingBox();
           const isHost = object.name.includes('GRSC');
@@ -2680,6 +2696,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         const locator=new THREE.Group();locator.name='Active cross-section locator';stage.add(locator);
         crossViewRef.current=(definition,flat)=>{
           if(cancelled)return;
+          explodedRef.current=false;setExploded(false);separation=0;geologyMeshes.forEach(mesh=>mesh.position.y=0);
           setSectionEnabled(false);
           for(const child of [...locator.children]){locator.remove(child);disposeObject(child);}
           if(!definition)return;
@@ -2702,6 +2719,27 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       }
       const shownHoleCount = drillholeCount(shownDrillholes);
       const drillSurfaceOffsets = drillSurfaceOffsetByHole(shownDrillholes, terrainResources);
+      if(mode==='drillholes'){
+        const ids=[...new Set(shownDrillholes.map(d=>d.holeId))].sort();setJourneyHoles(ids);setJourneyHole(ids[0]??'');setJourneyReadout('Choose a hole, then play its recorded intervals.');
+        const marker=new THREE.Mesh(new THREE.SphereGeometry(7,16,10),new THREE.MeshBasicMaterial({color:0xffe7a0,depthTest:false}));marker.renderOrder=100;marker.visible=false;stage.add(marker);
+        const trace=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x6fffe4,depthTest:false}));trace.renderOrder=99;trace.visible=false;stage.add(trace);
+        journeyCommand.current=id=>{
+          journeyUpdate=null;marker.visible=false;trace.visible=false;
+          if(!id){setJourneyReadout('Drillhole journey stopped. Source data unchanged.');return;}
+          const intervals=drillholes.filter(d=>d.holeId===id).sort((a,b)=>a.depthFrom-b.depthFrom);if(!intervals.length)return;
+          const points=intervals.flatMap(d=>[registeredDrillPoint(d,'from',terrainResources,drillSurfaceOffsets),registeredDrillPoint(d,'to',terrainResources,drillSurfaceOffsets)]);
+          trace.geometry.dispose();trace.geometry=new THREE.BufferGeometry().setFromPoints(points);trace.visible=true;
+          const bounds=new THREE.Box3().setFromPoints(points),centre=bounds.getCenter(new THREE.Vector3());stage.updateMatrixWorld(true);const target=stage.localToWorld(centre);const distance=Math.max(180,bounds.getSize(new THREE.Vector3()).length()*2);
+          scheduleCameraTween(target.clone().add(new THREE.Vector3(distance*.5,distance*.3,distance)),target,1.2,42);
+          const from=intervals[0].depthFrom,to=Math.max(...intervals.map(d=>d.depthTo)),started=motionTime;let tick=-1;
+          journeyUpdate=time=>{
+            const progress=reducedMotion.matches?1:Math.min(1,(time-started)/12),depth=from+(to-from)*progress;
+            const sample=intervals.find(d=>depth>=d.depthFrom&&depth<=d.depthTo);marker.visible=Boolean(sample);
+            if(sample){const fraction=(depth-sample.depthFrom)/Math.max(.001,sample.depthTo-sample.depthFrom);marker.position.copy(registeredDrillPoint(sample,'from',terrainResources,drillSurfaceOffsets)).lerp(registeredDrillPoint(sample,'to',terrainResources,drillSurfaceOffsets),fraction);}
+            const next=Math.floor((time-started)*5);if(next!==tick){tick=next;setJourneyReadout(`${id} · ${depth.toFixed(1)} m${progress===1?' · complete':''} · ${sample?`${sample.lithology||'Lithology not supplied'} · ${Number.isFinite(sample.carbon)?sample.carbon.toFixed(2)+'% TGC':'Assay unavailable'}`:'No recorded interval here'}`);}
+          };
+        };
+      }
 
       // Composite intercepts from the FULL assay table, never from
       // `shownDrillholes` — that set is subsampled for draw performance, and
@@ -3065,6 +3103,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
 
         TGC_GRADE_BINS.forEach((bin, binIndex) => {
           const gradeBlocks = solidByGrade.get(bin.key) ?? [];
+          gradeBlocks.sort((a,b)=>a.z-b.z);
           if (!gradeBlocks.length || mode === 'mine_planning') return;
 
           const blockColor = new THREE.Color(bin.color);
@@ -3112,6 +3151,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
           tagDeckLayer(mesh, 'blocks');
           stage.add(mesh);
           tagDeckLayer(wireMesh, 'blocks');
+          revealBlocks.push(mesh);
+          if(sampled.length<=20000)revealBlocks.push(wireMesh);
           if(sampled.length<=20000)stage.add(wireMesh);
           registerReveal(mesh, 0.46 + binIndex * 0.16, 1.24, 0.68, -76 + binIndex * 6);
           if(sampled.length<=20000)registerReveal(wireMesh, 0.62 + binIndex * 0.16, 1.16, 0.68, -76 + binIndex * 6);
@@ -3210,7 +3251,12 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
             const gates:Point2[]=[end,[x-CONCEPT.plantWidth/2-20,z-CONCEPT.plantDepth/2-20],[x+CONCEPT.plantWidth/2+20,z],[x,z+CONCEPT.plantDepth/2+20]];
             const obstacles=[...sitePlan.pits,{ring:rectangle([x,z],CONCEPT.plantWidth,CONCEPT.plantDepth),centre:[x,z] as Point2,surface:level,floor:level,depth:0,support:0}];
             const routeAudit:{pit:number;reason:string;admitted:boolean}[]=[];
-            for(const pit of sitePlan.pits){
+            const routePits=sitePlan.pits;
+            setHaulCount(0);setHaulStatus('loading');
+            // Optional deterministic route search must not delay the authored
+            // camera, pit inspection or scene-ready state. It already yields.
+            void (async()=>{
+            for(const pit of routePits){
               const starts=pit.ring.map(p=>{const dx=p[0]-pit.centre[0],dz=p[1]-pit.centre[1],l=Math.hypot(dx,dz);return [p[0]+dx/l*65,p[1]+dz/l*65] as Point2;}).sort((a,b)=>Math.hypot(a[0]-end[0],a[1]-end[1])-Math.hypot(b[0]-end[0],b[1]-end[1]));
               let route:THREE.Vector3[]|null=null;
               let reason='';
@@ -3230,6 +3276,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
               for(let i=0;i<2;i++){const truck=buildHaulTruck();tagDeckLayer(truck,'context');stage.add(truck);haulTrucks.push({mesh:truck,points:route,length,offset:i*.5});}
             }
             setHaulCount(haulTrucks.length);host.dataset.haulTrucks=String(haulTrucks.length);
+            setHaulStatus('ready');applyDeckLayers(stage,layerSettingsRef.current);
+            })().catch(()=>{if(!cancelled)setHaulStatus('failed');});
             // Ground-level receiving apron: internal pit ramps and pad access remain unengineered.
           }
           const pit = sitePlan.pits[0];
@@ -3564,6 +3612,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
 
     const animate = () => {
       if (cancelled) return;
+      if(document.hidden){lastMotionElapsed=clock.getElapsedTime();frame=requestAnimationFrame(animate);return;}
       const elapsed = clock.getElapsedTime();
       const detail=detailOptions.current;
       if(mode==='subsurface'){
@@ -3571,7 +3620,13 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         sectionPlane.set(new THREE.Vector3(0,0,1),2900-detail.sectionPosition*55).applyMatrix4(stage.matrixWorld);
         renderer.clippingPlanes=detail.sectionEnabled?sectionPlanes:[];
         host.dataset.section=detail.sectionEnabled?String(detail.sectionPosition):'off';
-        for(const mesh of geologyMeshes)mesh.visible=layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));
+        const separate=explodedRef.current&&!detail.sectionEnabled;
+        if(detail.sectionEnabled)separation=0;
+        if(reducedMotion.matches)separation=separate?1:0;
+        else if(!presentationOptions.current.motionPaused&&!document.hidden)separation+=(Number(separate)-separation)*.065;
+        if(Math.abs(separation-Number(separate))<.001)separation=Number(separate);
+        geologyMeshes.forEach((mesh,i)=>{mesh.visible=layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));mesh.position.y=separation*i*85;});
+        host.dataset.geologySeparation=separation.toFixed(3);
       }
       if(processPlant&&plantDetailKey!==`${detail.plantCutaway}:${detail.plantProcess}`){
         plantDetailKey=`${detail.plantCutaway}:${detail.plantProcess}`;
@@ -3592,7 +3647,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       }
       const evidenceOpen=host.closest('.tanga-deck')?.classList.contains('tanga-deck--present')===false;
       const paused=presentationOptions.current.motionPaused||reducedMotion.matches||evidenceOpen||document.hidden;
+      displayReveal.update(paused?0:elapsed-lastMotionElapsed,reducedMotion.matches);
+      renderer.localClippingEnabled=true;
       if(!paused)motionTime+=Math.min(.5,elapsed-lastMotionElapsed);
+      journeyUpdate?.(motionTime);
       lastMotionElapsed=elapsed;
       host.dataset.haulMotion=paused?'paused':'playing';
       const story=miningStoryOptions.current;
@@ -3701,6 +3759,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         });
       });
       // Travel follows validated piecewise-linear rim routes; no spline overshoot.
+      if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.35+.1*Math.sin(motionTime*2):0;mesh.material.opacity=(mesh.name.includes('GRSC')?.78:.12)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
 
       const projectionTick = Math.floor(elapsed * 10);
       if (projectionTick !== lastProjectionTick) {
@@ -3719,6 +3778,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
 
     return () => {
       cancelled = true;
+      displayReveal.reset();revealCommand.current=null;
+      journeyCommand.current=null;journeyUpdate=null;
       // Drop the projection hook before teardown so a density change cannot
       // reach into a scene whose renderer is already disposed.
       projectCalloutsRef.current = null;
@@ -3934,7 +3995,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
             <small>{navInstrument.scaleDetail}</small>
           </div>
         </div>
+        {mode==='resource'&&<details className="tanga-three-animation-tools"><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
+          <>
+          {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>Recorded intervals only; gaps are not interpolated into new assays. Highlight is visible through the terrain.</small></details>}
           <div className="tanga-three__drill-legend" aria-label="Drillhole legend">
             <div className="tanga-three__drill-legend-head">
               <span>Drillhole Legend</span>
@@ -3971,6 +4035,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
               ))}
             </ol>
           </div>
+          </>
         )}
       </section>
       {mode === 'mine_planning' && <section className="tanga-mine-story" aria-label="Mining targets and animation">
@@ -3992,14 +4057,19 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
           <small>Full-size site coordinates; conceptual equipment and retaining platform, not an engineered facility.</small>
         </details>
-        <small>{haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Haul routes unavailable — animation withheld'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
+        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Haul routes unavailable — animation withheld'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
+        <details><summary>Pit inspection animations</summary><button onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
       {mode==='subsurface'&&<section className="tanga-geology-section" aria-label="Geology section controls">
         <small>READ THE DEPOSIT</small><h2>Surface → host rock → sampling</h2>
-        <button aria-pressed={sectionEnabled} onClick={()=>setSectionEnabled(v=>!v)}>{sectionEnabled?'Restore whole geology':'Open geology cutaway'}</button>
+        <button aria-pressed={sectionEnabled} onClick={()=>{setExploded(false);setSectionEnabled(v=>!v);}}>{sectionEnabled?'Restore whole geology':'Open geology cutaway'}</button>
+        <button aria-pressed={exploded} onClick={()=>{setMotionPaused(false);setSectionEnabled(false);setHostOnly(false);setExploded(v=>!v);}}>{exploded?'Reassemble registered geology':'Separate rock units'}</button>
+        {exploded&&<p role="status">Illustrative exploded view: units displaced vertically for inspection, not their true positions or stratigraphic order. Reassemble before interpreting contacts.</p>}
+        <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
         <label>North–south section position<input aria-label="Geology section position" type="range" min="0" max="100" value={sectionPosition} disabled={!sectionEnabled} onChange={e=>setSectionPosition(Number(e.target.value))}/></label>
         <button aria-pressed={hostOnly} onClick={()=>setHostOnly(v=>!v)}>{hostOnly?'Show all rock units':'Isolate GRSC host unit'}</button>
+        <label>Evidence spotlight<select aria-label="Geology spotlight unit" value={spotlight} onChange={e=>{setSpotlight(e.target.value);setHostOnly(false);}}><option value="">All units · no spotlight</option>{crossSource?.units.map(unit=><option key={unit.name} value={unit.name}>{unit.name.replace(/_/g,' ')}</option>)}</select></label>
         <p>Copper: interpreted GRSC unit. Muted colours: surrounding units. Drill traces provide sampling context; interpreted contacts are not measured everywhere.</p>
         <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
       </section>}
