@@ -1,31 +1,42 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {intersectBlocks,intersectUnit,projectDrills,sampleSectionPits,sampleSectionTerrain,sectionDefinitions,sectionWorld,type SectionDefinition,type SectionPoint,type SectionSource} from '@/lib/deck/cross-section';
+import {intersectBlocks,intersectUnit,projectDrills,sampleSectionPits,sampleSectionTerrain,sectionDefinitions,sectionWorld,offsetSection,type SectionDefinition,type SectionPoint,type SectionSource} from '@/lib/deck/cross-section';
 
 const path=(points:SectionPoint[],close=false)=>points.map(([x,y],i)=>`${i?'L':'M'}${x.toFixed(2)},${(-y).toFixed(2)}`).join(' ')+(close?' Z':'');
 const gradeColor=(grade:number)=>grade>=5?'#efa15b':grade>=3?'#55c3c8':'#d8e1e5';
 function ticks(low:number,high:number){const raw=(high-low)/7,power=10**Math.floor(Math.log10(raw||1)),step=[1,2,5,10].map(x=>x*power).find(x=>x>=raw)!;return Array.from({length:Math.floor(high/step)-Math.ceil(low/step)+1},(_,i)=>(Math.ceil(low/step)+i)*step);}
 
-export default function GeologyCrossSections({source,onView,loadSectionBlocks}:{source:SectionSource;onView:(section:SectionDefinition|null,flat:boolean)=>void;loadSectionBlocks?:()=>Promise<SectionSource['blocks']>}){
+export default function GeologyCrossSections({source,onView,loadSectionBlocks}:{source:SectionSource;onView:(section:SectionDefinition|null,flat:boolean,moveCamera?:boolean)=>void;loadSectionBlocks?:()=>Promise<SectionSource['blocks']>}){
   const definitions=useMemo(()=>sectionDefinitions(source),[source]);
   const [selected,setSelected]=useState(0),[open,setOpen]=useState(false),[halfWidth,setHalfWidth]=useState(25);
   const [blocks,setBlocks]=useState(false),[pits,setPits]=useState(false),[zoom,setZoom]=useState(1),[pan,setPan]=useState<[number,number]>([0,0]);
   const [hole,setHole]=useState<string|null>(null);
+  const [offset,setOffset]=useState(0),[sweeping,setSweeping]=useState(false);
+  const viewCallback=useRef(onView);viewCallback.current=onView;
+  useEffect(()=>{const stop=()=>setSweeping(false);window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   const [loadedBlocks,setLoadedBlocks]=useState<SectionSource['blocks']|null>(null),[blockStatus,setBlockStatus]=useState('');
   useEffect(()=>{if(!blocks||!loadSectionBlocks||loadedBlocks)return;let cancelled=false;setBlockStatus('Loading full grade cells on demand…');loadSectionBlocks().then(data=>{if(!cancelled){setLoadedBlocks(data);setBlockStatus('');}}).catch(()=>{if(!cancelled)setBlockStatus('Grade cells unavailable. Toggle off and on to retry. Geology remains available.');});return()=>{cancelled=true;};},[blocks,loadSectionBlocks,loadedBlocks]);
   const plotRef=useRef<HTMLDivElement>(null),drag=useRef<{x:number;y:number;pan:[number,number]}|null>(null);
   const [size,setSize]=useState({w:900,h:400});
-  const section=definitions[selected]??definitions[0];
+  const baseSection=definitions[selected]??definitions[0];
+  const section=useMemo(()=>baseSection?offsetSection(baseSection,offset,source.boundary):null,[baseSection,offset,source.boundary]);
+  useEffect(()=>{if(section)viewCallback.current(section,open,false);},[section,open]);
+  useEffect(()=>{
+    if(!sweeping)return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){setSweeping(false);return;}
+    const timer=setTimeout(()=>{if(document.hidden||offset>=100||!baseSection||!offsetSection(baseSection,offset+25,source.boundary)){setSweeping(false);return;}setOffset(v=>v+25);},1500);
+    return()=>clearTimeout(timer);
+  },[offset,sweeping,baseSection,source.boundary]);
   const result=useMemo(()=>section?{
-    units:source.units.map(u=>({...intersectUnit(u.geometry,section),name:u.name,color:u.color})),
-    terrain:sampleSectionTerrain(source,section),blocks:intersectBlocks(loadedBlocks??source.blocks,section),pits:sampleSectionPits(source,section),
-  }:null,[source,section,loadedBlocks]);
+    units:open?source.units.map(u=>({...intersectUnit(u.geometry,section),name:u.name,color:u.color})):[],
+    terrain:open?sampleSectionTerrain(source,section):[],blocks:open&&blocks?intersectBlocks(loadedBlocks??source.blocks,section):[],pits:open&&pits?sampleSectionPits(source,section):[],
+  }:null,[source,section,loadedBlocks,open,blocks,pits]);
   const drills=useMemo(()=>section?projectDrills(source.drills,section,halfWidth):[],[source,section,halfWidth]);
   useEffect(()=>{if(!open||!plotRef.current)return;const element=plotRef.current.querySelector('svg')!;const resize=()=>setSize({w:element.clientWidth,h:element.clientHeight});resize();const observer=new ResizeObserver(resize);observer.observe(element);return()=>observer.disconnect();},[open]);
   useEffect(()=>{setZoom(1);setPan([0,0]);setHole(null);},[selected]);
   if(!section||!result)return <aside className="tanga-cross-launch">Sections unavailable: no model-axis line inside the supplied boundary.</aside>;
   const heights=[...result.terrain.map(p=>p[1]),...result.units.flatMap(u=>[...u.loops.flat().map(p=>p[1]),...u.open.flat().map(p=>p[1])])].filter(Number.isFinite);
-  const low=Math.min(...heights)-30,high=Math.max(...heights)+30;
+  const low=heights.length?Math.min(...heights)-30:0,high=heights.length?Math.max(...heights)+30:100;
   const unitsPerPixel=Math.max((section.max-section.min)/(size.w-110),(high-low)/(size.h-90))/zoom;
   const viewWidth=size.w*unitsPerPixel,viewHeight=size.h*unitsPerPixel;
   const viewX=(section.min+section.max-viewWidth)/2+pan[0],viewY=-(high+low+viewHeight)/2+pan[1];
@@ -33,21 +44,24 @@ export default function GeologyCrossSections({source,onView,loadSectionBlocks}:{
   const unitLoops=result.units.reduce((sum,u)=>sum+u.loops.length,0),openSegments=result.units.reduce((sum,u)=>sum+u.open.length,0);
   const mask=path([...result.terrain,[section.max,low-10000],[section.min,low-10000]],true);
   const holeRows=drills.filter(d=>d.holeId===hole);
-  const choose=(index:number)=>{setSelected(index);onView(definitions[index],open);};
+  const choose=(index:number)=>{setSweeping(false);setOffset(0);setSelected(index);onView(definitions[index],open);};
   const boundary=source.boundary;const bx=boundary.map(p=>p[0]),bz=boundary.map(p=>p[1]);const mapSpan=Math.max(Math.max(...bx)-Math.min(...bx),Math.max(...bz)-Math.min(...bz));
   const mapX=(x:number)=>85+(x-(Math.min(...bx)+Math.max(...bx))/2)/mapSpan*110,mapZ=(z:number)=>65+(z-(Math.min(...bz)+Math.max(...bz))/2)/mapSpan*110;
   const endpoints=[sectionWorld(section,section.min),sectionWorld(section,section.max)];
   const selector=<label>Section<select aria-label="Cross-section view" value={selected} onChange={e=>choose(Number(e.target.value))}>{definitions.map((s,i)=><option key={s.id} value={i}>{s.ends.join('–')} · {s.title}</option>)}</select></label>;
+  const sweepControls=<div className="tanga-section-sweep"><label>Plane offset: {offset} m<input aria-label="Linked section plane offset" type="range" min="-100" max="100" step="25" value={offset} onChange={e=>{setSweeping(false);const value=Number(e.target.value);if(offsetSection(baseSection,value,source.boundary))setOffset(value);}}/></label><button aria-pressed={sweeping} onClick={()=>{if(sweeping)setSweeping(false);else{setOffset(offsetSection(baseSection,-100,source.boundary)?-100:0);setSweeping(true);}}}>{sweeping?'Pause section sweep':'Sweep section stations'}</button><small>25 m viewing stations; the locator and intersections share the same plane. Not contact uncertainty. Stops at boundary limits.</small></div>;
   if(!open)return <aside className="tanga-cross-launch" aria-label="Geological cross-sections">
     <small>MODEL-DERIVED SECTIONS</small><h2>Read across the deposit</h2>{selector}
     <button onClick={()=>onView(section,false)}>Locate {section.ends.join('–')} in 3D</button>
     <button onClick={()=>{onView(section,true);setOpen(true);}}>Open filled cross-section</button>
+    {sweepControls}
     <p>North, South and longitudinal views. Actual model intersections; no invented contacts.</p>
   </aside>;
   return <section className="tanga-cross-section" aria-label="Filled geological cross-section" data-section-id={section.id} data-closed-loops={unitLoops} data-open-segments={openSegments} data-projected-holes={new Set(drills.map(d=>d.holeId)).size}>
-    <header><div><small>INTERPRETED GEOLOGY · SECTION {section.ends.join('–')}</small><h2>{section.title}</h2></div><button onClick={()=>{setOpen(false);onView(section,false);}}>Return to 3D locator</button></header>
+    <header><div><small>INTERPRETED GEOLOGY · SECTION {section.ends.join('–')} · OFFSET {offset} m</small><h2>{section.title}</h2></div><button onClick={()=>{setSweeping(false);setOpen(false);onView(section,false);}}>Return to 3D locator</button></header>
     <aside className="tanga-cross-section__tools">
       {selector}
+      {sweepControls}
       <svg viewBox="0 0 170 130" className="tanga-cross-section__locator" role="img" aria-label={`${section.ends.join(' to ')} location inside the unchanged provisional project boundary; north up`}>
         <path d={boundary.map((p,i)=>`${i?'L':'M'}${mapX(p[0])},${mapZ(p[1])}`).join(' ')+'Z'} fill="#253e45" stroke="#dca15f"/>
         {source.pits.map((p,i)=><polygon key={i} points={p.ring.map(q=>`${mapX(q[0])},${mapZ(q[1])}`).join(' ')} fill="none" stroke="#869da6" strokeDasharray="2 2"/>)}

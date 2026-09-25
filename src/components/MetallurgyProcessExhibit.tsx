@@ -4,13 +4,22 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {createMetallurgyPlant,MET_GROUPS,PROCESS_STAGES,BASKET_POSITIONS} from '@/lib/deck/metallurgy-plant';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
-import {createMetallurgyInspection} from '@/lib/deck/metallurgy-inspection';
+import {createMetallurgyInspection,inspectionCameraPose} from '@/lib/deck/metallurgy-inspection';
+import {cameraEase,createResolutionGovernor} from '@/lib/deck/presentation-motion';
 
 export default function MetallurgyProcessExhibit({paused,onToggle}:{paused:boolean;onToggle:()=>void}){
   const host=useRef<HTMLDivElement>(null),pausedRef=useRef(paused),command=useRef<(n:number)=>void>();
   const [stage,setStage]=useState(-1),[group,setGroup]=useState(0),[evidence,setEvidence]=useState(false),[error,setError]=useState('');
   const [tip,setTip]=useState<{x:number;y:number;text:string}|null>(null);
   const [comparison,setComparison]=useState(1);
+  const [tour,setTour]=useState(false);
+  const groupRef=useRef(group);groupRef.current=group;
+  useEffect(()=>{
+    if(!tour||paused)return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){setTour(false);return;}
+    const timer=setTimeout(()=>{if(document.hidden||stage>=4){setTour(false);return;}command.current?.(stage+1);},5500);
+    return()=>clearTimeout(timer);
+  },[tour,paused,stage]);
   const inspectionRef=useRef<(mode:'flake'|'sieve'|'compare'|null)=>void>();
   const [inspectionMode,setInspectionMode]=useState<'flake'|'sieve'|'compare'|null>(null);
   pausedRef.current=paused;
@@ -21,6 +30,7 @@ export default function MetallurgyProcessExhibit({paused,onToggle}:{paused:boole
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.5;
     renderer.domElement.setAttribute('aria-label','Interactive graphite metallurgical testwork bench. Drag to orbit, scroll to zoom; stage buttons provide keyboard access.');el.appendChild(renderer.domElement);
     const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(36,1,.1,1000),plant=createMetallurgyPlant();scene.add(plant.root);
+    plant.pickables.forEach(mesh=>{if(mesh.material instanceof THREE.MeshStandardMaterial)mesh.material=mesh.material.clone();});
     const inspection=createMetallurgyInspection();scene.add(inspection.root);
     const labels=BASKET_POSITIONS.map(([x,z],i)=>{const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;const material=new THREE.SpriteMaterial({map:texture,depthTest:false});const sprite=new THREE.Sprite(material);sprite.position.set(x,9,z);sprite.scale.set(10,2.5,1);sprite.userData.testGroup=i;sprite.userData.stage=4;sprite.renderOrder=20;scene.add(sprite);return {canvas,texture,material,sprite};});
     labels.forEach(({canvas,texture},i)=>{const ctx=canvas.getContext('2d')!;ctx.fillStyle='#132a32';ctx.fillRect(0,0,512,128);ctx.strokeStyle='#58c8bd';ctx.lineWidth=5;ctx.strokeRect(3,3,506,122);ctx.fillStyle='#fff';ctx.font='bold 47px sans-serif';ctx.textAlign='center';ctx.fillText(MET_GROUPS[i].id,256,78);texture.needsUpdate=true;});
@@ -34,10 +44,11 @@ export default function MetallurgyProcessExhibit({paused,onToggle}:{paused:boole
     let target=new THREE.Vector3(0,1,0),destination=fullPosition(),tween=true,userOrbit=false,selectedStage=-1;
     camera.position.copy(destination);controls.target.copy(target);
     let detailMode:'flake'|'sieve'|'compare'|null=null,detailTime=0;
-    inspectionRef.current=mode=>{detailMode=mode;detailTime=0;setInspectionMode(mode);inspection.show(mode);inspection.update(matchMedia('(prefers-reduced-motion: reduce)').matches?2:0);plant.root.visible=!mode;labels.forEach(l=>l.sprite.visible=!mode);target.set(0,0,0);destination.set(12,22,Math.max(55,45/camera.aspect));tween=true;userOrbit=false;setTip(null);};
-    command.current=n=>{inspectionRef.current?.(null);selectedStage=n;setStage(n);const x=PROCESS_STAGES[n]?.x??0;target=new THREE.Vector3(x,n<0?1:4,0);destination=n<0?fullPosition():new THREE.Vector3(x+12,24,42);tween=true;userOrbit=false;setTip(null);};
-    const start=()=>{tween=false;userOrbit=true;setTip(null);};controls.addEventListener('start',start);
-    const resize=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();if(!userOrbit){if(detailMode){destination.set(12,22,Math.max(55,45/camera.aspect));tween=true;}else if(selectedStage<0){destination=fullPosition();tween=true;}}};const observer=new ResizeObserver(resize);observer.observe(el);resize();
+    const frameInspection=()=>{if(!detailMode)return;const pose=inspectionCameraPose(detailMode,camera.aspect);target.copy(pose.target);destination.copy(pose.position);tween=true;};
+    inspectionRef.current=mode=>{detailMode=mode;detailTime=pausedRef.current||matchMedia('(prefers-reduced-motion: reduce)').matches?6:0;setInspectionMode(mode);inspection.show(mode);inspection.update(detailTime);plant.root.visible=!mode;labels.forEach(l=>l.sprite.visible=!mode);frameInspection();userOrbit=false;setTip(null);};
+    command.current=n=>{inspectionRef.current?.(null);selectedStage=n;setStage(n);const x=PROCESS_STAGES[n]?.x??0;target=new THREE.Vector3(x,n<0?1:4,0);destination=n<0?fullPosition():new THREE.Vector3(x+9,20,Math.max(34,30/camera.aspect));tween=true;userOrbit=false;setTip(null);};
+    const start=()=>{tween=false;userOrbit=true;setTour(false);setTip(null);window.dispatchEvent(new Event('tanga:manual-exploration'));};controls.addEventListener('start',start);
+    const resize=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();if(!userOrbit){if(detailMode){frameInspection();}else if(selectedStage<0){destination=fullPosition();tween=true;}}};const observer=new ResizeObserver(resize);observer.observe(el);resize();
     const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let down=false,lastPick=0,downAt=[0,0];
     const basketClick=(event:PointerEvent)=>{if(detailMode||Math.hypot(event.clientX-downAt[0],event.clientY-downAt[1])>6)return;const r=el.getBoundingClientRect();pointer.set((event.clientX-r.left)/r.width*2-1,-(event.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects([...plant.pickables,...labels.map(l=>l.sprite)],false)[0];const index=hit?.object.userData.testGroup;if(Number.isInteger(index)&&MET_GROUPS[index]){setGroup(index);setEvidence(true);command.current?.(4);}};
     const pick=(event:PointerEvent)=>{if(down||performance.now()-lastPick<60)return;lastPick=performance.now();const r=el.getBoundingClientRect();pointer.set((event.clientX-r.left)/r.width*2-1,-(event.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects([...plant.pickables,...labels.map(l=>l.sprite)],false)[0];const n=hit?.object.userData.stage;const item=PROCESS_STAGES[n],sample=MET_GROUPS[hit?.object.userData.testGroup];el.style.cursor=sample?'pointer':item?'help':'grab';setTip(item?{x:Math.max(8,Math.min(r.width-260,event.clientX-r.left+16)),y:Math.max(8,Math.min(r.height-110,event.clientY-r.top+14)),text:sample?`${sample.id}: ${sample.basis}. Click for results.`:`${item.title}. ${item.brief}`} :null);};
@@ -45,17 +56,23 @@ export default function MetallurgyProcessExhibit({paused,onToggle}:{paused:boole
     const safePick=(event:PointerEvent)=>{if(detailMode){setTip(null);return;}pick(event);};
     el.addEventListener('pointermove',safePick);el.addEventListener('pointerdown',pointerDown);el.addEventListener('pointerup',basketClick);window.addEventListener('pointerup',up);el.addEventListener('pointerleave',leave);
     const reduced=matchMedia('(prefers-reduced-motion: reduce)');let frame=0,last=performance.now(),time=0;
+    const governor=createResolutionGovernor(renderer.getPixelRatio());
+    let tweenAge=0,wasTweening=false;
+    const tweenPosition=new THREE.Vector3(),tweenTarget=new THREE.Vector3(),lastDestination=new THREE.Vector3();
     const draw=(now:number)=>{const delta=Math.max(0,Math.min(.05,(now-last)/1000));last=now;const visible=el.getClientRects().length>0&&!document.hidden;
       if(visible){if(!pausedRef.current&&!reduced.matches){time+=delta;if(detailMode){detailTime+=delta;inspection.update(detailTime);}else plant.update(time);}
-        if(tween){camera.position.lerp(destination,reduced.matches?1:.08);controls.target.lerp(target,reduced.matches?1:.08);if(camera.position.distanceTo(destination)<.03)tween=false;}
-        controls.update();renderer.render(scene,camera);el.dataset.processTime=time.toFixed(2);el.dataset.cameraDistance=camera.position.distanceTo(controls.target).toFixed(1);el.dataset.userOrbit=String(userOrbit);
+        if(tween){if(!wasTweening||!lastDestination.equals(destination)){tweenAge=0;tweenPosition.copy(camera.position);tweenTarget.copy(controls.target);lastDestination.copy(destination);}tweenAge+=delta;const progress=reduced.matches?1:cameraEase(tweenAge/1.35);camera.position.lerpVectors(tweenPosition,destination,progress);controls.target.lerpVectors(tweenTarget,target,progress);if(progress===1)tween=false;}wasTweening=tween;
+        plant.pickables.forEach(mesh=>{if(!(mesh.material instanceof THREE.MeshStandardMaterial))return;const active=selectedStage>=0&&mesh.userData.stage===selectedStage;const selected=mesh.userData.testGroup===groupRef.current&&selectedStage===4;mesh.material.emissive.setHex(selected?0x935122:active?0x165351:0);mesh.material.emissiveIntensity=selected?.65:active?.25:0;});
+        labels.forEach((label,i)=>{label.material.opacity=selectedStage===4&&i!==groupRef.current?.35:1;});
+        if(time>8){const ratio=governor.sample(delta*1000);if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);}
+        controls.update();renderer.render(scene,camera);el.dataset.processTime=time.toFixed(2);el.dataset.inspectionTime=detailTime.toFixed(2);el.dataset.cameraDistance=camera.position.distanceTo(controls.target).toFixed(1);el.dataset.userOrbit=String(userOrbit);
       }frame=requestAnimationFrame(draw);
     };frame=requestAnimationFrame(draw);el.dataset.ready='true';
     return()=>{cancelAnimationFrame(frame);observer.disconnect();controls.dispose();command.current=undefined;inspectionRef.current=undefined;labels.forEach(l=>{l.texture.dispose();l.material.dispose();});el.removeEventListener('pointermove',safePick);el.removeEventListener('pointerdown',pointerDown);el.removeEventListener('pointerup',basketClick);window.removeEventListener('pointerup',up);el.removeEventListener('pointerleave',leave);const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();scene.traverse(o=>{if(o instanceof THREE.Mesh){geometries.add(o.geometry);(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>materials.add(m));}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
   },[]);
   const result=MET_GROUPS[group];
   return <section className="tanga-process-exhibit" aria-label="Animated graphite metallurgical testwork" data-inspection={inspectionMode??'bench'}>
-    <header><div><small>METALLURGICAL TESTWORK · ILLUSTRATIVE LAB EQUIPMENT</small><h2>Characterise the graphite.</h2></div><div className="tanga-process-actions"><button onClick={()=>command.current?.(-1)} data-deck-tip="Restore the full testwork bench after orbiting or zooming.">Full bench</button><button onClick={onToggle} aria-pressed={paused}>{paused?'Play testwork':'Pause testwork'}</button><button onClick={()=>setEvidence(v=>!v)} aria-expanded={evidence}>Test evidence</button></div></header>
+    <header><div><small>METALLURGICAL TESTWORK · ILLUSTRATIVE LAB EQUIPMENT</small><h2>Characterise the graphite.</h2></div><div className="tanga-process-actions"><button onClick={()=>{setTour(false);command.current?.(-1);}} data-deck-tip="Restore the full testwork bench after orbiting or zooming.">Full bench</button><button aria-pressed={tour} onClick={()=>{if(tour)setTour(false);else{if(paused)onToggle();command.current?.(0);setTour(true);}}}>{tour?'Stop guided testwork':'Guide through testwork'}</button><button onClick={onToggle} aria-pressed={paused}>{paused?'Play testwork':'Pause testwork'}</button><button onClick={()=>setEvidence(v=>!v)} aria-expanded={evidence}>Test evidence</button></div></header>
     <div className="tanga-process-body">
       <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>{error&&<p role="alert">{error}</p>}{tip&&<div className="tanga-process-tooltip" role="tooltip" style={{left:tip.x,top:tip.y}}>{tip.text}</div>}<div className="tanga-process-caption">{inspectionMode==='flake'?'Stylised layered graphite flake · not microscopy or measured particle geometry':inspectionMode==='sieve'?'Illustrative sieve motion · particle counts and mesh spacing do not represent measured fractions':inspectionMode==='compare'?`Left: ${result.id} · Right: ${MET_GROUPS[comparison].id} · Equal illustrative fill, not yield`:stage<0?'Sample → lab milling → flotation test → filtration → characterisation':PROCESS_STAGES[stage].brief}<small>Drag to orbit · scroll to zoom · use Full bench to return</small></div></div>
       <aside className="tanga-process-results"><label>Reported test group<select aria-label="Processing test group" value={group} onChange={e=>setGroup(Number(e.target.value))}>{MET_GROUPS.map((g,i)=><option key={g.id} value={i}>{g.id}</option>)}</select></label>

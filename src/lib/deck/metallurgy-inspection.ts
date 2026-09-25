@@ -1,12 +1,36 @@
 import * as THREE from 'three';
 
+export type InspectionMode = 'flake'|'sieve'|'compare';
+
+/** Fit the whole animated envelope, including plinths, to the available viewport. */
+export function inspectionCameraPose(mode:InspectionMode,aspect:number){
+  const half=mode==='compare'?new THREE.Vector3(18,11,18):new THREE.Vector3(11,mode==='flake'?7:12,11);
+  half.multiplyScalar(1.6);
+  const target=new THREE.Vector3(0,mode==='sieve'?-2:0,0);
+  const camera=new THREE.PerspectiveCamera(36,Math.max(.2,aspect),.1,1000);
+  const direction=new THREE.Vector3(.3,.25,1).normalize();
+  let distance=120;
+  for(let iteration=0;iteration<8;iteration++){
+    camera.position.copy(target).addScaledVector(direction,distance);
+    camera.lookAt(target);camera.updateMatrixWorld();
+    let extent=0;
+    for(const x of [-half.x,half.x])for(const y of [-half.y,half.y])for(const z of [-half.z,half.z]){
+      const point=new THREE.Vector3(x,y,z).add(target).project(camera);
+      extent=Math.max(extent,Math.abs(point.x),Math.abs(point.y));
+    }
+    // Keep a little breathing room; include the near side of the object.
+    distance=Math.max(half.length()+1,distance*extent/.88);
+  }
+  return {target,position:target.clone().addScaledVector(direction,distance)};
+}
+
 /** Stylised inspection illustrations: no measured particle sizes or mass balance. */
 export function createMetallurgyInspection() {
   const root = new THREE.Group();
   const flake = new THREE.Group(), sieve = new THREE.Group(), comparison = new THREE.Group();
   root.add(flake, sieve, comparison);
   root.scale.setScalar(1.6);
-  const graphite = new THREE.MeshStandardMaterial({color:0x8499a2, emissive:0x22343c, emissiveIntensity:.3, metalness:.6, roughness:.38});
+  const graphite = new THREE.MeshStandardMaterial({color:0x51616a, emissive:0x173342, emissiveIntensity:.35, metalness:.25, roughness:.42});
   const copper = new THREE.MeshStandardMaterial({color:0xcc854b, metalness:.7, roughness:.3});
   const steel = new THREE.MeshStandardMaterial({color:0x8aaeb9, metalness:.7, roughness:.32});
   const glass = new THREE.MeshStandardMaterial({color:0x70cfc6, transparent:true, opacity:.24, depthWrite:false, side:THREE.DoubleSide});
@@ -25,9 +49,11 @@ export function createMetallurgyInspection() {
     }
   }
   const flakeSheets=new THREE.Group();flake.add(flakeSheets);
+  const sheets:THREE.Mesh[]=[];
   for(let i=0;i<7;i++) {
     const sheet=add(flakeSheets,new THREE.CylinderGeometry(8,8,.12,6),graphite,0,i*.24-1,0);
     sheet.scale.z=.68;sheet.rotation.y=i*.035;
+    sheets.push(sheet);
   }
   const sieveLayers:THREE.Group[]=[];
   for(let i=0;i<4;i++) {
@@ -52,10 +78,14 @@ export function createMetallurgyInspection() {
     const rim=add(jar,new THREE.TorusGeometry(4,.2,8,40),copper,0,4.5,0);rim.rotation.x=Math.PI/2;
     return jar;
   });
-  function show(mode:'flake'|'sieve'|'compare'|null){root.visible=mode!==null;flake.visible=mode==='flake';sieve.visible=mode==='sieve';comparison.visible=mode==='compare';}
+  function show(mode:InspectionMode|null){root.visible=mode!==null;flake.visible=mode==='flake';sieve.visible=mode==='sieve';comparison.visible=mode==='compare';}
   function update(seconds:number){
     const t=Number.isFinite(seconds)?Math.max(0,seconds):0;
-    flakeSheets.rotation.set(.6,t*.18,.12);
+    // A slow, repeatable separation makes the layered illustration legible.
+    // This is not a physical simulation of graphite delamination.
+    const spread=.24+.85*(.5-.5*Math.cos(t*Math.PI/6));
+    sheets.forEach((sheet,i)=>{sheet.position.y=(i-3)*spread+1;});
+    flakeSheets.rotation.set(.18,t*.12,.08);
     sieveLayers.forEach((layer,i)=>{layer.position.x=Math.sin(t*18+i*.2)*.1;});
     jars.forEach((jar,i)=>{jar.position.y=(1-Math.min(1,t/1.2))*5*(i?1:-1);});
   }

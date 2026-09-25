@@ -5,8 +5,9 @@ const STEPS=[{mode:'subsurface',label:'Interpreted geology'},{mode:'drillholes',
 
 /** Revisits actual deck scenes, not fabricated summary images. */
 export default function EvidenceReplay({mode,ready,navigate}:{mode:WorkbenchMode;ready:boolean;navigate:(mode:WorkbenchMode)=>void}){
-  const [index,setIndex]=useState(-1),[paused,setPaused]=useState(false);
+  const [index,setIndex]=useState(-1),[paused,setPaused]=useState(true);
   const go=useRef(navigate);go.current=navigate;
+  useEffect(()=>{const stop=()=>setPaused(true);window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   useEffect(()=>{const hide=()=>{if(document.hidden)setPaused(true);};document.addEventListener('visibilitychange',hide);return()=>document.removeEventListener('visibilitychange',hide);},[]);
   const next=()=>{if(index>=2){setIndex(-1);go.current('comparison');}else{setIndex(index+1);go.current(STEPS[index+1].mode);}};
   useEffect(()=>{
@@ -16,6 +17,6 @@ export default function EvidenceReplay({mode,ready,navigate}:{mode:WorkbenchMode
     return()=>clearTimeout(timer);
   },[index,paused,ready,mode]);
   useEffect(()=>{if(index>=0&&mode!==STEPS[index].mode)setIndex(-1);},[mode,index]);
-  if(index<0)return mode==='comparison'?<button className="tanga-evidence-replay-start" onClick={()=>{setPaused(false);setIndex(0);go.current('subsurface');}}>Replay the evidence · 3 scenes</button>:null;
+  if(index<0)return mode==='comparison'?<button className="tanga-evidence-replay-start" onClick={()=>{setPaused(true);setIndex(0);go.current('subsurface');}}>Review the evidence · presenter controlled</button>:null;
   return <aside className="tanga-evidence-replay" aria-label="Closing evidence replay"><strong>{index+1}/3 · {STEPS[index].label}</strong><span>{ready?'Evidence view ready':'Preparing evidence view…'}</span><button aria-pressed={paused} onClick={()=>setPaused(v=>!v)}>{paused?'Resume replay':'Pause replay'}</button><button onClick={next}>Next evidence</button><button onClick={()=>{setIndex(-1);go.current('comparison');}}>Return to conclusion</button></aside>;
 }

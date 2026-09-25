@@ -4626,6 +4626,7 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
+  useEffect(()=>{const stop=()=>setIsAutoplay(false);window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   const [isExploreMode, setExploreMode] = useState(false);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
@@ -4813,14 +4814,16 @@ export default function TangaDeckWorkbench() {
     if (!ORBIT_MODES.has(activeMode)) return;
 
     const SETTLE_MS = 3600;   // clear the fly-in (≤2.4s) + a beat before orbiting
-    const SPEED = 1.5;        // degrees per second — a calm, barely-there drift
-    lastCameraInteractRef.current = performance.now();
+    const SPEED = 1.5;        // Brief establishing move, then hold.
+    const start=performance.now();
+    lastCameraInteractRef.current = start;
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
+      if(document.hidden||now-start>6600||lastCameraInteractRef.current>start){cancelAnimationFrame(raf);return;}
       if (now - lastCameraInteractRef.current < SETTLE_MS) return;
       setViewState((cur) => {
         // Strip any leftover flyTo props so the bearing nudge applies instantly
@@ -5045,6 +5048,7 @@ export default function TangaDeckWorkbench() {
             // A real user gesture pauses the idle orbit; it resumes after settle,
             // and it always wins over an in-flight camera move.
             if (userGesture) {
+              setIsAutoplay(false);
               lastCameraInteractRef.current = performance.now();
               flightUntilRef.current = 0;
               setViewState(nextViewState as DeckViewState);

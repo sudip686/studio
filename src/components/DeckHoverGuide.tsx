@@ -21,10 +21,11 @@ export default function DeckHoverGuide({mode}:{mode:string}){
       setTip({text,x:Math.max(10,Math.min(window.innerWidth-290,x+15)),y:y+110>window.innerHeight?Math.max(10,y-105):y+18});
     };
     const move=(e:PointerEvent)=>{if(e.buttons){setTip(null);return;}show(e.target,e.clientX,e.clientY);};
-    const focus=(e:FocusEvent)=>{const r=(e.target as Element).getBoundingClientRect();show(e.target,r.left,r.bottom);};
+    const focus=(e:FocusEvent)=>{const element=e.target as Element;if(!element.matches(':focus-visible'))return;const r=element.getBoundingClientRect();show(e.target,r.left,r.bottom);};
     const clear=()=>setTip(null);const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){dismissed=current;clear();}};
-    root.addEventListener('pointermove',move);root.addEventListener('pointerleave',clear);root.addEventListener('focusin',focus);root.addEventListener('focusout',clear);root.addEventListener('pointerdown',clear);root.addEventListener('scroll',clear,true);window.addEventListener('keydown',escape);
-    return()=>{root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',clear);root.removeEventListener('focusin',focus);root.removeEventListener('focusout',clear);root.removeEventListener('pointerdown',clear);root.removeEventListener('scroll',clear,true);window.removeEventListener('keydown',escape);};
+    const pointerDown=()=>{dismissed=current;clear();};
+    root.addEventListener('pointermove',move);root.addEventListener('pointerleave',clear);root.addEventListener('focusin',focus);root.addEventListener('focusout',clear);root.addEventListener('pointerdown',pointerDown);root.addEventListener('scroll',clear,true);window.addEventListener('keydown',escape);
+    return()=>{root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',clear);root.removeEventListener('focusin',focus);root.removeEventListener('focusout',clear);root.removeEventListener('pointerdown',pointerDown);root.removeEventListener('scroll',clear,true);window.removeEventListener('keydown',escape);};
   },[mode]);
   return <><span ref={marker} hidden/>{tip&&<div className="tanga-hover-guide" role="tooltip" style={{left:tip.x,top:tip.y}}>{tip.text}</div>}</>;
 }
