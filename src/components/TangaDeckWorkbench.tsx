@@ -24,6 +24,7 @@ import {
 } from '@/lib/terrain/relief';
 import TangaStoryVideoHero from './TangaStoryVideoHero';
 import DeckHoverGuide from './DeckHoverGuide';
+import EvidenceReplay from './EvidenceReplay';
 import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {
@@ -3348,7 +3349,7 @@ export default function TangaDeckWorkbench() {
 
     const timeout = window.setTimeout(() => {
       setSceneTransition((current) => current.key === nextKey ? {...current, active: false} : current);
-    }, 1850);
+    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
 
     return () => window.clearTimeout(timeout);
   }, [activeMode, resourceFocus, resourceHasBeenShown, routeTarget, threeVisible]);
@@ -4543,11 +4544,17 @@ export default function TangaDeckWorkbench() {
   // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
   // the ranking underneath (it does NOT advance — scene 1 is the peer field).
   const [coverDismissed, setCoverDismissed] = useState(false);
+  useEffect(() => {
+    const enter = () => setCoverDismissed(true);
+    if (document.querySelector('.tanga-intro-app[data-intro-complete="true"]')) enter();
+    window.addEventListener('tanga:intro-complete', enter);
+    return () => window.removeEventListener('tanga:intro-complete', enter);
+  }, []);
   // Act interstitial — a brief chapter card when the story crosses into a new
   // act (Opportunity → Asset → Value). Never on first mount or behind the cover.
   const [actCard, setActCard] = useState<StoryAct | null>(null);
   const lastActRef = useRef<string | null>(null);
-  const showCover = activeStoryIndex === 0 && !coverDismissed;
+  const showCover = activeStoryIndex === 0 && !coverDismissed && storyHeroState !== 'complete' && storyHeroState !== 'dismissed';
   const isCoverScene = showCover;
   // Scenes without a source-data table still get a panel — key insight chips
   // from SLIDE_FACTS — so the top-left zone is never awkwardly empty.
@@ -4625,6 +4632,7 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
+  useEffect(()=>{const stop=()=>setIsAutoplay(false);window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   const [isExploreMode, setExploreMode] = useState(false);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
@@ -4800,9 +4808,8 @@ export default function TangaDeckWorkbench() {
     return () => window.clearTimeout(timer);
   }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, activeShotIndex, shotDwellSec, threeVisible, threeLoadReport.scene]);
 
-  // Idle slow-orbit: once an immersive scene has flown in and settled, gently
-  // rotate the camera bearing (geolibre / VRIFY "never frozen" feel). Cancels
-  // the instant the user grabs the camera and resumes after a short settle.
+  // Brief establishing orbit after fly-in, then hold for the presenter.
+  // User camera interaction cancels it for the rest of this scene visit.
   // Off for reduced-motion, the cover, the globe overview, and 3D scenes.
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -4812,14 +4819,16 @@ export default function TangaDeckWorkbench() {
     if (!ORBIT_MODES.has(activeMode)) return;
 
     const SETTLE_MS = 3600;   // clear the fly-in (≤2.4s) + a beat before orbiting
-    const SPEED = 1.5;        // degrees per second — a calm, barely-there drift
-    lastCameraInteractRef.current = performance.now();
+    const SPEED = 1.5;        // Brief establishing move, then hold.
+    const start=performance.now();
+    lastCameraInteractRef.current = start;
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
+      if(document.hidden||now-start>6600||lastCameraInteractRef.current>start){cancelAnimationFrame(raf);return;}
       if (now - lastCameraInteractRef.current < SETTLE_MS) return;
       setViewState((cur) => {
         // Strip any leftover flyTo props so the bearing nudge applies instantly
@@ -5028,6 +5037,7 @@ export default function TangaDeckWorkbench() {
       data-testid="tanga-deck-workbench"
     >
       <DeckHoverGuide mode={activeMode}/>
+      <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
           viewState={viewState as any}
@@ -5040,9 +5050,10 @@ export default function TangaDeckWorkbench() {
               interactionState
               && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)
             );
-            // A real user gesture pauses the idle orbit; it resumes after settle,
-            // and it always wins over an in-flight camera move.
+            // A real user gesture cancels the establishing orbit and always
+            // wins over an in-flight camera move.
             if (userGesture) {
+              setIsAutoplay(false);
               lastCameraInteractRef.current = performance.now();
               flightUntilRef.current = 0;
               setViewState(nextViewState as DeckViewState);
@@ -5613,7 +5624,6 @@ export default function TangaDeckWorkbench() {
         <div className="tanga-deck__pager-status" aria-live="polite">
           <span className="tanga-deck__pager-label">
             {STORY_STEPS[activeStoryIndex]?.label ?? 'Scene'}
-            {activeShot && activeShots.length > 1 ? ` · ${activeShot.label}` : ''}
           </span>
           <button
             type="button"

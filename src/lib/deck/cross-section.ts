@@ -24,6 +24,23 @@ export const sectionDistance=(p:Point2,s:SectionDefinition)=>(p[0]-s.origin[0])*
 export const planeDistance=(p:Point2,s:SectionDefinition)=>-(p[0]-s.origin[0])*s.along[1]+(p[1]-s.origin[1])*s.along[0];
 export const sectionWorld=(s:SectionDefinition,u:number):Point2=>[s.origin[0]+u*s.along[0],s.origin[1]+u*s.along[1]];
 
+/** Translate a viewing plane, keeping its connected trace inside the unchanged boundary. */
+export function offsetSection(base:SectionDefinition,offset:number,boundary:Point2[]):SectionDefinition|null{
+  if(!Number.isFinite(offset))return null;
+  const section={...base,origin:[base.origin[0]-base.along[1]*offset,base.origin[1]+base.along[0]*offset] as Point2};
+  const cuts:number[]=[];
+  for(let i=0;i<boundary.length;i++){
+    const a=boundary[i],b=boundary[(i+1)%boundary.length],da=planeDistance(a,section),db=planeDistance(b,section);
+    if(Math.abs(da)<EPS)cuts.push(sectionDistance(a,section));
+    if(da*db<0){const t=da/(da-db);cuts.push(sectionDistance([a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])],section));}
+  }
+  const sorted=[...new Set(cuts.map(v=>Math.round(v/EPS)*EPS))].sort((a,b)=>a-b);
+  const ranges=sorted.slice(1).map((end,i)=>[Math.max(base.min,sorted[i]),Math.min(base.max,end)] as Point2)
+    .filter(([a,b])=>b>a&&inside(sectionWorld(section,(a+b)/2),boundary));
+  ranges.sort((a,b)=>Math.max(a[0],-a[1],0)-Math.max(b[0],-b[1],0));
+  return ranges[0]?{...section,min:ranges[0][0],max:ranges[0][1]}:null;
+}
+
 /** Deduplicated vertex PCA is a model-envelope direction, not measured strike. */
 export function sectionDefinitions(source:SectionSource):SectionDefinition[]{
   const points:Point2[]=[],seen=new Set<string>();

@@ -6,7 +6,7 @@ export const PROCESS_STAGES=[
   {id:'liberate',title:'Lab milling',brief:'A laboratory crusher and rotating test mill prepare material for characterisation. This is not production-plant equipment.',x:-24},
   {id:'float',title:'Flotation test',brief:'Bench flotation cells illustrate a separation test. Air bubbles are animated; reported recovery comes from deck test summaries, not a simulation.',x:0},
   {id:'dewater',title:'Filter & dry',brief:'A laboratory filter flask and drying oven illustrate sample preparation for measurement. The actual laboratory protocol is not supplied.',x:25},
-  {id:'product',title:'Sample baskets',brief:'Click any labelled basket to inspect its reported sample or group. Some groups overlap individual samples; these are not additive production outputs.',x:59},
+  {id:'product',title:'Sample baskets',brief:'Select a basket or result button to inspect its reported group. Groups can overlap; these are not additive production outputs.',x:59},
 ] as const;
 export const MET_GROUPS=MET_SAMPLES.map(s=>({...s,coarse:s.flake,fine:'Not separately reported'}));
 export const BASKET_POSITIONS=MET_SAMPLES.map((_,i)=>[45+(i%3)*11, -9+Math.floor(i/3)*12] as const);
