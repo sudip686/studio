@@ -80,7 +80,7 @@ export default function GeologyCrossSections({source,onView,loadSectionBlocks}:{
       <p>Assay / cell TGC:<br/><span style={{color:'#d8e1e5'}}>● &lt;3%</span> · <span style={{color:'#55c3c8'}}>● 3–&lt;5%</span> · <span style={{color:'#efa15b'}}>● ≥5%</span></p>
       <small>Display bins, not economic cutoffs. Geological fill comes from the plane; only drill traces use the projection window.</small>
     </aside>
-    <div ref={plotRef} className="tanga-cross-section__plot">
+    <div ref={plotRef} className="tanga-cross-section__plot" onPointerDownCapture={()=>setSweeping(false)}>
       <div className="tanga-cross-section__unit-key">{result.units.map(u=><span key={u.name}><i style={{background:u.color}}/>{u.name.replace(/_/g,' ')}</span>)}</div>
       <svg viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} role="img" aria-label={`${section.title}, equal-scale model intersections, distance in metres and supplied elevation datum`} onPointerDown={e=>{if(e.button!==0||(e.target instanceof Element&&e.target.closest('[data-section-hole]')))return;drag.current={x:e.clientX,y:e.clientY,pan};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerMove={e=>{if(!drag.current)return;setPan([drag.current.pan[0]-(e.clientX-drag.current.x)*unitsPerPixel,drag.current.pan[1]-(e.clientY-drag.current.y)*unitsPerPixel]);}} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
         <defs><clipPath id="tanga-section-ground"><path d={mask}/></clipPath></defs>

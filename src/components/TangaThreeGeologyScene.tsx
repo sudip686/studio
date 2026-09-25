@@ -1147,7 +1147,7 @@ function threeCallouts(
       {
         id: 'blocks',
         label: `${resourceFocusLabel(focus)} blocks`,
-        detail: 'Only the requested resource population is emphasized',
+        detail: 'Selected model population',
         x: 57, y: 35, tone: '#ef4444', anchor: [420, -165, 420], side: 'left', kind: 'story',
       },
       {
@@ -2321,18 +2321,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const pickables: THREE.Object3D[] = [];
 
     // Sky/ground hemisphere — cool sky, warm ground bounce for satellite terrain.
-    scene.add(new THREE.HemisphereLight(0xf3f9ff, 0x5a4a35, 1.1));
+    scene.add(new THREE.HemisphereLight(0xf3f9ff, 0x303d47, 1.1));
     // Warm sun key light — main shape former, cast shadows.
     const key = new THREE.DirectionalLight(0xfff2d8, 2.2);
     key.position.set(900, 1800, 1200);
     key.castShadow = true;
     // Cool fill from opposite side — keeps shadowed slopes readable without
     // washing out the terrain. No shadow casting on the fill (perf + softness).
-    const fill = new THREE.DirectionalLight(0xa8c5ff, 0.45);
+    const fill = new THREE.DirectionalLight(0xa8c5ff, mode==='subsurface' ? 0.8 : 0.55);
     fill.position.set(-1200, 900, -800);
     scene.add(fill);
     // Rim light behind + above — separates ridges from the dark background.
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.45);
+    const rimLight = new THREE.DirectionalLight(0xffffff, mode==='subsurface' ? 0.9 : 0.6);
     rimLight.position.set(0, 1600, -2000);
     scene.add(rimLight);
     key.shadow.mapSize.set(2048, 2048);
@@ -2398,7 +2398,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // reference decks keep the ground low-chroma so the orebody's
           // saturated grades are the only vivid thing on screen; a pale
           // surface competes with the data and washes the whole frame out.
-          color: TERRAIN_GROUND_COLOR,
+          color: mode==='subsurface' ? 0x52616a : TERRAIN_GROUND_COLOR,
           roughness: mode === 'drillholes' || mode === 'subsurface' ? 0.88 : 0.8,
           metalness: 0.0,
           transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
@@ -2465,7 +2465,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
             // combined with a bright IBL and 1.15 env intensity was blowing the
             // satellite imagery out to a pale glow — the ground lost its rock
             // colour and stopped separating from the white drill collars.
-            color: TERRAIN_TEXTURE_TINT,
+            color: mode==='subsurface' ? 0x9caeb8 : TERRAIN_TEXTURE_TINT,
             // Matte ground. The specular sheen read as wet plastic at this
             // scale and added to the wash.
             roughness: 0.88,
@@ -2520,6 +2520,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
     ) => {
       const materialStates = materialsForObject(object).map((material) => {
         const opacity = typeof material.opacity === 'number' ? material.opacity : 1;
+        material.userData.deckBaseOpacity ??= opacity;
         material.transparent = true;
         material.opacity = 0;
         material.needsUpdate = true;
@@ -2679,7 +2680,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
           const unitColor=isHost?0xc7551b:[0x648d9b,0xb6a57c,0x8b89ac,0x658e75,0xa37970,0x6f9caa,0x92947a][unitCount%7];
           const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
             color: unitColor, transparent: true,
-            opacity: isHost ? .78 : .12, depthWrite: isHost, side: THREE.DoubleSide, roughness: .85,
+            opacity: isHost ? .9 : .16, depthWrite: isHost, side: THREE.DoubleSide, roughness: .72,
           }));
           mesh.name = object.name;
           mesh.userData.tooltipItems=[{title:object.name.replace(/_/g,' '),rows:[isHost?'Interpreted graphitic-schist host unit.':'Interpreted surrounding rock unit.','Modelled contact geometry, not direct observations everywhere.'],tone:`#${mesh.material.color.getHexString()}`}];
@@ -3084,7 +3085,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
             bounds.expandByPoint(new THREE.Vector3(b.x-b.dx/2,b.y-b.dz/2,b.z-b.dy/2));
             bounds.expandByPoint(new THREE.Vector3(b.x+b.dx/2,b.y+b.dz/2,b.z+b.dy/2));
           }
-          const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*.85+200;
+          const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*1.05+200;
           bounds.getCenter(cameraShot.target);
           cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.85,distance*.55,distance*.12));
           cameraShot.from.copy(cameraShot.to).multiplyScalar(1.1);
@@ -3634,7 +3635,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       if(document.hidden){lastMotionElapsed=clock.getElapsedTime();frame=requestAnimationFrame(animate);return;}
       const elapsed = clock.getElapsedTime();
       const qualityNow=performance.now(),frameMs=qualityNow-lastQualityFrame;lastQualityFrame=qualityNow;
-      if(elapsed>8){const ratio=resolutionGovernor.sample(frameMs);if(ratio!==renderer.getPixelRatio()){renderer.setPixelRatio(ratio);composer.setPixelRatio(ratio);}host.dataset.renderScale=ratio.toFixed(2);}
+      if(elapsed>8){const ratio=resolutionGovernor.sample(frameMs);if(ratio!==renderer.getPixelRatio()){renderer.setPixelRatio(ratio);composer.setPixelRatio(ratio);}const scale=ratio.toFixed(2);if(host.dataset.renderScale!==scale)host.dataset.renderScale=scale;}
       const detail=detailOptions.current;
       if(mode==='subsurface'){
         stage.updateMatrixWorld(true);
@@ -3691,7 +3692,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         const at=routePosition(item.points,(returning?2-phase:phase)*item.length);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
-      targetMeshes.forEach(mesh=>{mesh.visible=beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=.9*layerSettingsRef.current.blocks.opacity;});
+      targetMeshes.forEach(mesh=>{mesh.visible=beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat>=2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;m.transparent=true;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5);m.opacity=(presentationOptions.current.targetXray ? .45 : 1)*reveal*layerSettingsRef.current.context.opacity;m.depthWrite=!presentationOptions.current.targetXray;});
       if (processPlant && processMarker) {
         const points = processPlant.userData.flow as THREE.Vector3[];
@@ -3777,6 +3778,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         item.object.position.copy(item.basePosition);
         item.object.position.y += item.yOffset * (1 - eased);
         item.materialStates.forEach(({material, opacity}) => {
+          material.userData.revealProgress = eased;
           material.opacity = opacity * eased * layerOpacity;
         });
       });
@@ -3786,9 +3788,11 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
           if(material?.userData.highlightTarget===undefined)continue;
           const old=material.userData.highlightOpacity??material.opacity;
           const next=reducedMotion.matches?material.userData.highlightTarget:THREE.MathUtils.lerp(old,material.userData.highlightTarget,.12);
-          material.userData.highlightOpacity=next;material.opacity=next;
+          const layer=material.userData.highlightLayer as DeckLayerId | undefined;
+          material.userData.highlightOpacity=next;
+          material.opacity=next*(layer?layerSettingsRef.current[layer].opacity:1)*(material.userData.revealProgress??1);
       }
-      if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.35+.1*Math.sin(motionTime*2):0;mesh.material.opacity=(mesh.name.includes('GRSC')?.78:.12)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
+      if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.28:0;mesh.material.opacity=(mesh.name.includes('GRSC')?.9:.16)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
 
       const projectionTick = Math.floor(elapsed * 10);
       if (projectionTick !== lastProjectionTick) {
@@ -3850,7 +3854,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       const key = name.replace('resource-grade-', '').replace('assay-', '').replace('-wire', '');
       materials.forEach((raw) => {
         const material = raw as THREE.Material & {opacity: number};
-        if (material.userData.baseOpacity === undefined) material.userData.baseOpacity = material.opacity;
+        if (material.userData.baseOpacity === undefined) material.userData.baseOpacity = material.userData.deckBaseOpacity??material.opacity;
+        material.userData.highlightLayer=obj.userData.deckLayer;
         const base = material.userData.baseOpacity as number;
         material.transparent = true;
         material.userData.highlightTarget = !activeGrade || key === activeGrade ? base : Math.min(base, DIM);
@@ -3878,7 +3883,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
       }
       material.needsUpdate = true;
     });
-  }, [activeGrade]);
+  }, [activeGrade, sceneReady]);
 
   // Clear any isolation when the scene changes, so a lock never leaks between scenes.
   useEffect(() => {
@@ -3981,7 +3986,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
               } as any}
             >
               <span>{mode==='mine_planning'&&miningBeat<2 ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
-              <strong>{mode==='mine_planning'&&miningBeat<2 ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>
+              {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2 ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
             </div>
           ))}
         </section>

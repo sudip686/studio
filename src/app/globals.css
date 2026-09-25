@@ -4999,7 +4999,7 @@ body {
 .tanga-deck {
   position: relative;
   width: 100vw;
-  min-width: 1180px;
+  min-width: 0;
   height: 100vh;
   /* `hidden` still makes this a scroll container, just without visible bars —
      so focusing the command input let the browser scroll the whole stage
@@ -13851,6 +13851,7 @@ button.tanga-deck__pager-count {
 @media(max-width:900px){.tanga-process-exhibit{left:16px;right:16px;overflow:auto;}.tanga-process-body{grid-template-columns:minmax(0,1fr) 190px;min-height:180px;}.tanga-process-exhibit header{flex-wrap:wrap;}.tanga-process-stages{grid-template-columns:repeat(3,minmax(0,1fr));}}
 .tanga-process-exhibit h2{color:#f0e4d2;}
 .tanga-process-actions{flex-wrap:wrap;justify-content:flex-end;}
+.tanga-deck:has(.tanga-deck__closing) .tanga-deck__title{display:none;}
 .tanga-section-sweep{display:grid;gap:8px;margin:12px 0;padding-top:10px;border-top:1px solid #65e8df33;}
 .tanga-section-sweep input{display:block;width:100%;accent-color:#65e8df;}
 .tanga-section-sweep small{font-size:10px;line-height:1.5;letter-spacing:0;}
@@ -13872,3 +13873,37 @@ button.tanga-deck__pager-count {
 .tanga-evidence-replay strong{color:#74d4ca;}.tanga-evidence-replay span{font-size:11px;}
 .tanga-evidence-replay button{padding:6px;border:1px solid #698b98;border-radius:5px;font-size:11px;}
 .tanga-evidence-replay-start{top:auto;bottom:108px;}
+
+/* Presentation polish: keep the evidence canvas dominant, without removing controls. */
+.tanga-deck { --hud-border: #78919d45; --hud-surface: #11202aed; }
+.tanga-deck :is(.tanga-geology-section,.tanga-cross-launch,.tanga-mine-story,.tanga-process-exhibit) { border-color:var(--hud-border); box-shadow:0 12px 32px #0003; }
+.tanga-deck :is(.tanga-geology-section,.tanga-cross-launch,.tanga-mine-story) { background:var(--hud-surface); }
+.tanga-deck :is(.tanga-geology-section,.tanga-cross-launch,.tanga-mine-story,.tanga-process-exhibit) button { border-color:#78919d66; background:#1b2c36; color:#e3edf1; transition:background-color 160ms ease,border-color 160ms ease; }
+.tanga-deck :is(.tanga-geology-section,.tanga-cross-launch,.tanga-mine-story,.tanga-process-exhibit) button:hover { background:#2a424e; border-color:#82c6c4; }
+.tanga-deck :is(.tanga-geology-section,.tanga-cross-launch,.tanga-mine-story,.tanga-process-exhibit) button[aria-pressed="true"] { background:#654126; border-color:#dda36c; color:#fff4e8; }
+.tanga-geology-section select { width:100%; background:#182b36; color:#e5edf0; border:1px solid #78919d66; border-radius:6px; padding:8px; }
+.tanga-deck :is(.tanga-geology-section,.tanga-cross-launch,.tanga-mine-story) small { font-size:11px; line-height:1.5; letter-spacing:.025em; }
+.tanga-deck .tanga-three__callout { max-width:180px; padding:8px 10px; background:#0c1822ed; box-shadow:0 4px 14px #0003; }
+.tanga-deck .tanga-three__callout strong { font-size:11px; line-height:1.4; font-weight:500; }
+.tanga-deck .tanga-three__callout span { letter-spacing:.09em; }
+.tanga-deck .tanga-three__callout:not(:has(strong)) { width:auto; min-width:36px; }
+/* Resource replay and the grade legend occupy successive slots, never the same one. */
+.tanga-deck .tanga-three.is-resource .tanga-three__nav-cluster { max-height:310px; overflow-y:auto; }
+.tanga-deck .tanga-three.is-resource .tanga-three__grade-legend { top:270px!important; max-height:calc(100svh - 376px)!important; }
+.tanga-deck .tanga-three.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:480px!important; max-height:calc(100svh - 586px)!important; }
+.tanga-deck .tanga-deck__pager-label { max-width:240px; font-size:11px; letter-spacing:.06em; }
+.tanga-deck .tanga-deck__pager-btn { background:#14232c; border-color:#8ba6b43d; }
+.tanga-deck .tanga-deck__pager-btn:is([aria-label="Next scene"],[aria-label="Previous scene"]) { background:#304b59; border-color:#8ba6b499; }
+.tanga-deck .tanga-deck__pager-btn:hover { background:#3a5360; }
+.tanga-deck .tanga-deck__pager button:focus-visible { outline:2px solid #7adbd4; outline-offset:3px; }
+.tanga-process-exhibit h2 { font-size:clamp(22px,2vw,28px); }
+.tanga-process-results { padding-left:18px; }
+.tanga-process-results .tanga-process-bin { padding:8px 10px; }
+.tanga-process-results .tanga-process-bin i { font-size:22px; }
+.tanga-process-caption { max-width:760px; justify-self:center; line-height:1.5; }
+/* A short, neutral handoff replaces the full-screen copper portal and duplicate title. */
+.tanga-deck .tanga-deck__portal-transition { background:#06111a; animation:tangaQuietHandoff 650ms ease-out both; }
+.tanga-deck__portal-transition :is(span,i,em,.tanga-deck__portal-copy) { display:none; }
+@keyframes tangaQuietHandoff { 0% {opacity:.28;} 100% {opacity:0;} }
+@media(prefers-reduced-motion:reduce) { .tanga-deck .tanga-deck__portal-transition { display:none; } }
+@media(max-width:900px) { .tanga-deck .tanga-deck__pager-label { max-width:170px; } .tanga-process-results { padding-left:10px; } }

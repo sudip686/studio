@@ -61,3 +61,56 @@ Do not commit or deploy as part of this design review. Preserve existing data an
 ## Visual retry
 
 The second pass replaces fixed inspection camera positions with per-mode, aspect-aware framing, removes the bench-stage row during inspection, adds slow illustrative separation of graphite sheets, and improves graphite contrast. A new regression samples actual animated vertices at five times and four aspect ratios for all three inspection modes to check clipping. Type checking and these tests passed. The dev server had stopped; it was restarted before fresh browser checks at 1366×768. Pause held inspection time at 17.62 seconds across separate observations. Clicked tooltips now dismiss rather than lingering over results, and paused/reduced-motion inspections start in a settled pose. These retry changes have not been deployed or separately production-built.
+
+## Story-flow implementation and follow-up QA — 25 September 2026
+
+This section supersedes the corresponding items in the earlier future-work list; it does not claim every earlier idea has shipped.
+
+| Area | Implemented behavior |
+|---|---|
+| Shared motion | Cubic camera easing, brief establishing movement then hold; manual orbit cancels camera automation and autoplay |
+| Geology | Boundary-contained section offsets at 25 m viewing stations; optional −100 to +100 m sweep updates the registered 3D locator and filled section together |
+| Drilling | Recorded-interval journey with an initial close view and subsequent whole-hole context; depth, lithology and assay readout |
+| Resource | Smooth grade emphasis retaining dim full-model context; fade respects layer opacity and entry reveal |
+| Mining | North pit, South pit and Whole site camera presets; drill evidence → grade targets → pit concept → processing beats |
+| Metallurgy | Guided equipment closeups, stage/basket emphasis, manual sample selection stops the tour; inspection modes retain reported test-group results |
+| Conclusion | Evidence recap starts presenter-controlled; explicit next/resume/return controls |
+| Performance | Resolution governor lowers pixel ratio after sustained slow frames; lower-resolution main scenes skip postprocessing, without altering geometry or assays |
+| Layout | Removed the deck's 1180 px minimum width, corrected duplicate closing title, retained scrollable evidence panels |
+
+### Checks and observed results
+
+- Type checking, cross-section regression and scene-animation regression passed. The final production rebuild and service-worker generation passed after the layout/initialization corrections.
+- Linked section sweep was observed at −100 m and +100 m: locator coordinates shifted by 200 m and closed model intersections changed from 7 to 11 loops.
+- Mining North-pit preset and the shared authored-camera reset both worked; reset returned camera distance from 2449 to 4798 scene units and reported the authored-view status.
+- Layout audits found no panel overlaps/out-of-viewport panels in the tested mining states at laptop and tablet size. Tablet metallurgy inspection also passed at 768×1024 after the width fix. Resource overview was visually reviewed at 1920×1080.
+- Reduced-motion metallurgy inspection remained at its settled 6.00-second pose across observations; manual sample selection and return-to-bench controls remained available.
+- Closing screenshot confirmed the duplicate title card is gone. Additional map-scene layout checks covered Tanzania, footprint, topography and access at laptop size.
+- No JavaScript errors were returned by the checked browser session. Some automation attempts lost their browser connection or hit the entry cover; only successful, correctly navigated states are counted above.
+
+### Deliberate limits / remaining work
+
+- Current haul-route screening rejected both candidate routes, so no trucks were spawned. This is the safe fallback, not verified truck animation. A separate route-design pass is needed; do not bypass boundary/pit screening for visual effect.
+- The opening retains its existing geographic sequence, with settling motion improved; this pass did not add an entirely new terrain-opening sequence.
+- Cross-section views share the same plane, but the filled view is a workbench, not a simultaneous split-screen 3D/2D comparison.
+- No inferred metallurgy size fractions, economic reserve, new assay values or unsourced logistics route are introduced. Nearby-block validation and additional fraction-specific interactions still require suitable evidence and design work.
+- Cold-network R2/Vercel loading, all phones, every panel combination and every slide at every resolution have not been certified. Local adaptive rendering is not a measured production speedup claim.
+- No commit, R2 upload or deployment was performed by this implementation pass.
+
+## UI, pacing and efficiency polish — no new features
+
+Implemented after the live-app design review:
+
+- Replaced the large copper transition and duplicate transition title with a 650 ms neutral fade (disabled for reduced motion).
+- Connected the actual intro gate to the cover: finishing/skipping the intro enters the opportunity chapter directly. A DOM completion marker also handles a workbench that mounts late; deep-link entry behavior is retained.
+- Unified existing panel/button styling, strengthened previous/next hierarchy, shortened navigation labels, styled the geology selector, and made section endpoint labels compact.
+- Fixed resource replay controls sharing space with the grade legend. Closed and expanded replay states now have separate bounded slots.
+- Refined geology fill/rim lighting and neutralised its terrain tint, preserved geological colours, softened mining target opacity after the target beat, and pulled resource framing back slightly. No boundary, pit, block or assay geometry changed.
+- Reduced metallurgy exposure and fill-light intensity, widened basket-stage framing, made framing respond to resize, and kept only the selected basket's billboard visible. Hidden labels are excluded from ray picking; other baskets retain their tooltip and existing result buttons.
+- Extended guided testwork holds to seven seconds per equipment stage and ten seconds at results. Camera transitions remain interruptible.
+- Metallurgy highlights update on selection/mode changes instead of every frame. Telemetry writes run at 4 Hz, and settled paused/reduced-motion views skip GPU rendering until invalidated. The lightweight animation scheduler remains active to detect interaction. This is not yet an app-wide demand-rendering rewrite.
+- Inspected existing preload/cache code: priority ordering and shared in-flight requests are already present, so no additional cache system was added.
+
+Verification: separate TypeScript check, production build/service-worker generation, cross-section and scene-animation regressions passed. Browser review covered 1440×900 geology/resource/mining/metallurgy and 768×1024 metallurgy. Expanded resource and tablet metallurgy panel audits returned no overlaps/out-of-viewport panels in the tested states. Intro Skip reached the opportunity chapter without the second cover. Reduced-motion metallurgy inspection held at 6.00 seconds, with render count unchanged at 6 across a 2.2-second settled observation. No browser JavaScript errors were returned in the checked session.
+
+Limits: this is targeted local QA, not every viewport/panel combination. Load telemetry in the development browser still showed seconds spent preparing heavy scenes; download, geometry preparation and GPU-upload costs were not independently benchmarked. No claim of faster production cold loads is made. Existing R2/Vercel deployments were not changed or validated in this pass.
