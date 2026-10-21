@@ -2,16 +2,69 @@
   "bounds_utm": {
     "minX": 472359.62572800094,
     "maxX": 479959.62572800094,
-    "minY": 9464402.587291513,
-    "maxY": 9471602.587291513
+    "minY": 9462802.587291513,
+    "maxY": 9473202.587291513
   },
-  "width": 2048,
-  "height": 1940,
+  "width": 1024,
+  "height": 1402,
   "elevation_m": {
-    "min": 204.29443359375,
-    "max": 1008.1314086914062
+    "min": 204.4654083251953,
+    "max": 1021.29345703125
   },
   "crs_epsg": 32737,
   "rgb_texture": "terrain_texture_hires.jpg",
-  "source_height_grid": "height_hires.bin"
+  "source_height_grid": "height_hires.bin",
+  "regional_context": {
+    "file": "Tanga3D/dem_S05.tif",
+    "source_crs": "EPSG:4326",
+    "source_resolution_degrees": [
+      0.0002777777777777778,
+      0.0002777777777777778
+    ],
+    "source_description": "regional Copernicus DEM used only outside valid survey DTM cells"
+  },
+  "survey_surface": {
+    "source_file": "DTM.tif",
+    "source_report": "SURVEY REPORT_TANGA GRAPHITE PROJECT; topographical survey sheets 1_2 and 2_2",
+    "survey_date": "August 2025",
+    "acquisition": "Aerial survey",
+    "crs": "EPSG:32737",
+    "horizontal_units": "metres",
+    "source_cell_size_m": [
+      0.6554286841901998,
+      0.6554286841901937
+    ],
+    "source_raster_interpretation": "PixelIsPoint",
+    "source_elevation_units": "metres",
+    "vertical_datum": "Not stated in the supplied DTM metadata; no vertical transformation applied",
+    "source_bounds_utm": {
+      "minX": 474962.2350594676,
+      "minY": 9464941.59024133,
+      "maxX": 477490.8789230734,
+      "maxY": 9472950.273333449
+    },
+    "source_valid_cell_count": 31025389,
+    "output_grid": {
+      "width": 1024,
+      "height": 1402,
+      "cell_size_m": [
+        7.421875,
+        7.417974322396576
+      ]
+    },
+    "valid_output_fraction": 0.16862002384985736,
+    "elevation_range_m": [
+      365.02435302734375,
+      913.5985107421875
+    ],
+    "derived_slope": {
+      "units": "degrees",
+      "method": "central differences of source DTM elevations using source pixel spacing; no cross-NoData gradients",
+      "range_degrees": [
+        0.0,
+        67.7202377319336
+      ]
+    },
+    "supplied_slope_raster_used": false
+  }
 }

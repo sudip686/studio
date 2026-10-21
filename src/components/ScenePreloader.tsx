@@ -56,15 +56,7 @@ export default function ScenePreloader() {
           warmFirstAvailable(candidates, opts);
         });
 
-        // Prioritize high-res 8K texture for presentation slides (lithology, assay, carbon_model, classification)
-        const isPresentationSlide = typeof window !== 'undefined'
-          ? window.location.pathname
-              ?.split('/')
-              .some((segment) => ['lithology', 'assay', 'carbon_model', 'classification'].includes(segment))
-          : false;
-        const textureCandidates = [
-          ...(isPresentationSlide ? ['/terrain_texture_8k.jpg', '/texture_rgb_8192.png'] : ['/texture_rgb_8192.png', '/terrain_texture_8k.jpg']),
-        ];
+        const textureCandidates = ['/terrain_texture_hires.jpg', '/terrain_texture_8k.jpg'];
 
         textureCandidates.forEach((src) => {
           const img = new Image();

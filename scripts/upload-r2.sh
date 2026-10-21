@@ -22,8 +22,15 @@ PUBLIC_DIR="public"
 
 # Files the app fetches from ASSET_BASE_URL. Object key = path after /public.
 FILES=(
+  "terrain_hires_meta.json"
+  "height_hires.bin"
+  "survey_height_hires.bin"
+  "survey_coverage_hires.bin"
+  "survey_slope_hires.bin"
+  "terrain_texture_hires.jpg"
   "terrain_preview_meta.json"
   "height_preview_1024.bin"
+  "height.bin"
   "topography.png"
   "terrain_texture_8k.jpg"
   "texture_rgb_8192.png"
