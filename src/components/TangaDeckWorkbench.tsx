@@ -884,7 +884,7 @@ const PEER_COMPARISON_METRICS = [
   {
     label: 'Peer position',
     value: '#5',
-    detail: `${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(1)} Mt M&I contained graphite`,
+    detail: `In this selected peer set · ${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(1)} Mt M&I contained graphite`,
   },
   {
     label: 'Resource scale',
@@ -892,24 +892,24 @@ const PEER_COMPARISON_METRICS = [
     detail: 'Total MRE at 4.86% TGC with 148 Mt Indicated',
   },
   {
-    label: 'Metallurgy',
+    label: 'Testwork',
     value: '>97% TC',
-    detail: 'Concentrate purity with 93.0% oxide and 94.4% fresh recovery',
+    detail: 'Reported purity and recovery figures; source report cross-check pending',
   },
   {
-    label: 'Location edge',
+    label: 'Project setting',
     value: 'NE Tanzania',
-    detail: 'Road, port, rail and hydro-grid context already staged',
+    detail: 'Mapped access relationships; utility and capacity assumptions remain unverified',
   },
 ];
 
 function peerComparisonNote(project: string) {
-  if (project === 'Tanga Graphite') return 'Indicated-heavy MRE plus strong purity/recovery story';
-  if (project === 'Mahenge') return 'Large Tanzanian development benchmark';
-  if (project === 'Siviour') return 'Battery-anode development comparator';
-  if (project === 'Epanko') return 'Permitted Tanzanian graphite peer';
-  if (project === 'Bunyu') return 'Coastal Tanzania development reference';
-  return 'Public graphite peer';
+  if (project === 'Tanga Graphite') return 'Reported Indicated MRE; testwork figures require source-report cross-check';
+  if (project === 'Mahenge') return 'Public Tanzanian peer; estimate basis and effective date may differ';
+  if (project === 'Siviour') return 'Public development peer; estimate basis and effective date may differ';
+  if (project === 'Epanko') return 'Public Tanzanian peer; estimate basis and effective date may differ';
+  if (project === 'Bunyu') return 'Public Tanzanian peer; estimate basis and effective date may differ';
+  return 'Selected public peer; estimate basis and effective date may differ';
 }
 
 // Shared atmospheric horizon haze (geolibre look). MapLibre's sky spec blends a
@@ -3778,7 +3778,10 @@ export default function TangaDeckWorkbench() {
       }),
       showGraphitePeers && activeMode === 'ranking' && new TextLayer<any>({
         id: 'graphite-peer-rank-badges',
-        data: graphiteRows,
+        // Keep the country-scale comparison map quiet: ranking is already
+        // legible in the panel and the anchored labels carry project names.
+        // Only add an on-globe badge when the Tanga comparison is revealed.
+        data: tangaRankingInserted ? graphiteRows.filter((project) => project.isTanga) : [],
         getPosition: (project) => [project.lon, project.lat, project.isTanga ? 210000 : 146000],
         getText: (project) => `#${project.displayRank}`,
         getSize: (project) => project.isTanga ? 14 : 12,
@@ -4343,7 +4346,10 @@ export default function TangaDeckWorkbench() {
       // scene has only four to show, so it keeps them all.
       .slice()
       .sort((a, b) => (b.containedGraphiteMt || 0) - (a.containedGraphiteMt || 0))
-      .filter((project, index) => isCountryScene || index < 5 || project.isTanga)
+      // The peer list already carries the full comparison set. Keep only the
+      // two largest global anchors on the opening globe, then add Tanga when
+      // it is revealed; this leaves the East African cluster legible.
+      .filter((project, index) => isCountryScene || index < 2 || project.isTanga)
       .map((project) => {
         let point: {x: number; y: number} | null = null;
         try {
@@ -6102,10 +6108,10 @@ export default function TangaDeckWorkbench() {
         >
           <div className="tanga-deck__ranking-head">
             <span>{tangaRankingInserted ? 'Global Ranking' : 'Peer Context'}</span>
-            <strong>{tangaRankingInserted ? 'Tanga enters the world’s top 5 graphite deposits' : 'Top 10 public graphite projects'}</strong>
+            <strong>{tangaRankingInserted ? 'Tanga ranks #5 in this peer set' : 'Top 10 public graphite projects'}</strong>
             <small>{tangaRankingInserted
-              ? 'Ranked #5 by M&I contained graphite — ahead of every other Tanzanian peer.'
-              : 'M&I contained graphite basis; click any globe dot or row for owner, listing, grade, flake distribution and metallurgy notes.'}</small>
+              ? 'By reported M&I contained graphite. Peer estimates may differ in effective date and reporting basis.'
+              : 'Ranked by reported M&I contained graphite. Select a project for ownership, grade, flake and metallurgy context.'}</small>
           </div>
 
           <ol className="tanga-deck__ranking-list">
@@ -6143,7 +6149,7 @@ export default function TangaDeckWorkbench() {
                 <span className="tanga-deck__rank-main">
                   <strong>
                     {project.project}
-                    {project.isTanga && <span className="tanga-deck__rank-badge">NEW · TOP 5</span>}
+                    {project.isTanga && <span className="tanga-deck__rank-badge">RANK 5 · THIS SET</span>}
                   </strong>
                   <small>{project.company} / {project.country}</small>
                   <span className="tanga-deck__rank-bar" aria-hidden="true"><i /></span>
@@ -6169,7 +6175,7 @@ export default function TangaDeckWorkbench() {
                 <li className="is-win"><i>Metallurgy</i><b>&gt;97% TC</b><s>premium conc.</s><b>large-flake</b></li>
                 <li><i>Listing</i><b>Private</b><s>pre-market entry</s><b>ASX: BKT</b></li>
               </ul>
-              <p>Comparable scale, a coastal logistics edge and &gt;97% TC metallurgy — entering the global top 5 pre-market.</p>
+              <p>In this selected peer set, Tanga ranks fifth by reported M&amp;I contained graphite. Port distance and metallurgical testwork are context, not demonstrated cost or product advantages.</p>
             </div>
           ) : (
             <div className="tanga-deck__ranking-foot">

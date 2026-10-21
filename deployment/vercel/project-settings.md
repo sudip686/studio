@@ -5,8 +5,12 @@
 - Framework preset: Next.js.
 - Root directory: repository root containing `package.json`.
 - Build command: `npm run build`.
-- Install command: `npm ci`.
+- Install command: `npm install --legacy-peer-deps` (matches `vercel.json` and the current lockfile).
 - Output directory: leave default for Next.js.
+
+The app is hosted on Vercel. Cloudflare is used for the public R2 asset origin
+configured with `NEXT_PUBLIC_ASSET_BASE_URL`; this repository does not include a
+Cloudflare Pages or Workers deployment adapter.
 
 ## Environment Variables
 
@@ -35,6 +39,7 @@ Suggested:
 ## Production Safety Notes
 
 - Do not place `OPENAI_API_KEY` in a `NEXT_PUBLIC_*` variable.
-- Remove broad CORS headers from app code during the hardening pass unless a real integration needs them.
-- Remove `typescript.ignoreBuildErrors: true` during the hardening pass.
+- TypeScript checking remains enabled during production builds.
+- The app does not add wildcard CORS headers to its own responses. Configure
+  cross-origin access on the Cloudflare R2 bucket for the specific app origins.
 

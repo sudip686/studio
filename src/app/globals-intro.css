@@ -118,7 +118,7 @@
   position: absolute;
   left: clamp(2rem, 4vw, 5.5rem);
   bottom: clamp(5.25rem, 9vw, 10rem);
-  width: min(44rem, 48vw);
+  width: min(52rem, 54vw);
   text-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
 }
 
@@ -133,11 +133,13 @@
 }
 
 .tanga-intro__copy h1 {
-  margin: 0.85rem 0 1rem;
+  max-width: 10.5ch;
+  margin: 0.72rem 0 1rem;
   color: #fff;
-  font-size: clamp(4rem, 7vw, 9.5rem);
-  line-height: 0.9;
-  letter-spacing: 0;
+  font-size: clamp(3.5rem, 5.8vw, 7.25rem);
+  line-height: 0.94;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
 }
 
 .tanga-intro__copy p {
@@ -166,14 +168,20 @@
   position: absolute;
   right: clamp(1.5rem, 3vw, 4rem);
   bottom: clamp(1.5rem, 3vw, 4rem);
+  min-height: 48px;
   padding: 0.95rem 1.35rem;
 }
 
 .tanga-intro__skip:hover,
 .tanga-intro__blocked button:hover {
-  transform: translateY(-1px);
   border-color: rgba(217, 107, 43, 0.72);
   background: rgba(217, 107, 43, 0.84);
+}
+
+.tanga-intro__skip:focus-visible,
+.tanga-intro__blocked button:focus-visible {
+  outline: 3px solid rgba(255, 222, 174, 0.94);
+  outline-offset: 3px;
 }
 
 .tanga-intro__timeline {
