@@ -34,6 +34,8 @@ The adapter configuration does not create a Worker, publish a deployment, create
 
 ## Terrain source and display
 
+The registered survey binaries and `terrain_context_512.bin` must ship as ordinary Git objects. `.gitattributes` overrides the broad LFS rule for these files. `npm run build` and `npm run cf:build` validate their dimensions and reject pointer files before packaging. The Three.js viewer uses the metadata's `context_grid` entry; do not substitute the legacy R2 `height_hires.bin` without regenerating matching metadata.
+
 The application terrain is built from the August 2025 survey `DTM.tif` on the same EPSG:32737 project grid. Source elevation is retained only for valid survey cells; the remaining scene tile uses the regional Copernicus DEM. The survey covers 16.862% of the wider presentation terrain tile. Its vertical datum is not stated in the source metadata, and collar elevations are left at their recorded values pending a vertical-reference reconciliation.
 
 Rebuild locally with `python scripts/build_survey_terrain.py`, then rebuild the reprojected imagery texture with `python scripts/gen_hires_texture.py`. These scripts require rasterio, numpy, pyproj, Pillow and mercantile (the working environment used `C:\temp\tanga-raster-tools`).

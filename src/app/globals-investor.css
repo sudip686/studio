@@ -1,5 +1,6 @@
 /* Opening chapter polish: keep the peer comparison quiet enough for the globe
    to lead, with clear labels and a contained, readable data panel. */
+body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck__cover {
   background:
     radial-gradient(ellipse at 72% 54%, rgba(217, 106, 42, 0.1), transparent 32%),
@@ -799,4 +800,60 @@
   .tanga-deck--work-completed-story .tanga-deck__title,.tanga-deck--decision-story .tanga-deck__title { max-width: calc(100vw - 32px); }
   .tanga-deck--work-completed-story .tanga-deck__title p,.tanga-deck--decision-story .tanga-deck__title p { max-width: 32ch; }
   .tanga-evidence-drawer { padding: 24px 18px 18px; }
+}
+.tanga-three__camera-tools { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; pointer-events:auto; }
+.tanga-three__camera-tools button { min-height:36px; padding:6px 9px; border:1px solid #78919d66; border-radius:7px; background:#162832ed; color:#e6ece9; font-size:11px; cursor:pointer; }
+.tanga-three__camera-tools button:hover { background:#29424e; border-color:#82c6c4; }
+.tanga-three__camera-tools button:focus-visible { outline:2px solid #efb980; outline-offset:2px; }
+.tanga-three__camera-tools button:disabled { opacity:.45; cursor:wait; }
+.tanga-three__camera-tools small { grid-column:1/-1; color:#afbdc3; font-size:10px; line-height:1.5; }
+.tanga-deck--present .tanga-cross-launch { display:none; }
+.tanga-deck .tanga-geology-section { top:305px; max-height:calc(100svh - 417px); }
+.tanga-deck .tanga-deck__deck-stage, .tanga-deck .tanga-three__canvas { transform:none!important; }
+.tanga-deck .tanga-mine-story { top:305px; max-height:calc(100svh - 417px); }
+.tanga-peer-benchmark { position:absolute; z-index:44; inset:154px 26px 116px; display:grid; grid-template-columns:minmax(240px,.72fr) minmax(0,1.6fr); gap:40px; pointer-events:none; color:#f1eee6; }
+.tanga-peer-benchmark__narrative { align-self:center; max-width:380px; }
+.tanga-peer-benchmark__eyebrow,.tanga-peer-benchmark__chart header span { font-size:10px; letter-spacing:.15em; color:#c49c7a; }
+.tanga-peer-benchmark h2 { color:#f1eee6; font-size:clamp(30px,3.4vw,57px); font-weight:650; line-height:1.08; margin:14px 0 18px; letter-spacing:-.04em; text-wrap:balance; }
+.tanga-peer-benchmark h2 em { color:#e89f60; font-style:normal; }
+.tanga-peer-benchmark__narrative>p { font-size:14px; line-height:1.6; max-width:330px; color:#c4cbd0; }
+.tanga-peer-benchmark__mre { margin:22px 0; padding:14px 0 14px 18px; border-left:2px solid #d58c51; }
+.tanga-peer-benchmark__mre>span { display:block; font-size:9px; letter-spacing:.12em; color:#c8a789; }
+.tanga-peer-benchmark__mre strong { display:block; font-size:27px; margin:8px 0 2px; }
+.tanga-peer-benchmark__mre strong small,.tanga-peer-benchmark__mre b small { font-size:12px; color:#b9c6ca; font-weight:400; }
+.tanga-peer-benchmark__mre>div { font-size:12px; color:#bac7cb; }
+.tanga-peer-benchmark__mre>b { display:block; margin-top:10px; color:#efb481; font-size:23px; }
+.tanga-peer-benchmark__narrative>button { pointer-events:auto; padding:12px 16px; border:1px solid #b77d4a; border-radius:8px; color:#ffe4cc; background:#382a20ed; font-size:12px; cursor:pointer; }
+.tanga-peer-benchmark__narrative>small { display:block; max-width:340px; margin-top:14px; color:#a6b2b9; font-size:10px; line-height:1.5; }
+.tanga-peer-benchmark__chart { display:flex; flex-direction:column; min-height:0; padding:20px; background:#0c151de8; border:1px solid #84949b33; border-radius:14px; pointer-events:auto; }
+.tanga-peer-benchmark__chart header { display:flex; justify-content:space-between; align-items:end; gap:12px; margin-bottom:14px; }
+.tanga-peer-benchmark__chart h3 { color:#f1eee6; font-size:22px; letter-spacing:-.03em; margin:5px 0 0; }
+.tanga-peer-benchmark__chart header>span { letter-spacing:0; white-space:nowrap; color:#aeb9c0; }
+.tanga-peer-benchmark ol { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:4px; list-style:none; margin:0; padding:0; scrollbar-width:thin; }
+.tanga-peer-benchmark li { position:relative; display:grid; grid-template-columns:28px minmax(145px,1.2fr) minmax(40px,1fr) 48px; gap:12px; align-items:center; flex:1; min-height:34px; padding:5px 9px; border:1px solid transparent; border-radius:6px; background:#b2c3cf06; }
+.tanga-peer-benchmark li.is-tanga { background:#c7732833; border-color:#df985ccc; box-shadow:0 0 22px #c7732814; }
+.tanga-peer-benchmark__rank { color:#7c98a6; font-size:12px; font-variant-numeric:tabular-nums; }
+.tanga-peer-benchmark__project strong { display:block; font-size:12px; font-weight:500; }
+.tanga-peer-benchmark__project small { display:block; font-size:9px; color:#93a6b0; }
+.tanga-peer-benchmark__bar { height:7px; border-radius:3px; background:#66808b12; }
+.tanga-peer-benchmark__bar i { display:block; height:100%; border-radius:3px; background:#6d8795; }
+.tanga-peer-benchmark .is-tanga :is(.tanga-peer-benchmark__rank,.tanga-peer-benchmark__project strong,b) { color:#ffd4ae; }
+.tanga-peer-benchmark .is-tanga .tanga-peer-benchmark__bar i { background:#df985c; }
+.tanga-peer-benchmark li>b { text-align:right; font-size:13px; font-variant-numeric:tabular-nums; }
+.tanga-peer-benchmark footer { margin-top:12px; font-size:9px; line-height:1.5; color:#99acb6; }
+.tanga-peer-benchmark footer a { color:#d6ac87; text-decoration:underline; }
+.tanga-peer-benchmark button:focus-visible,.tanga-peer-benchmark a:focus-visible { outline:2px solid #efb980; outline-offset:3px; }
+@media(max-width:900px) { .tanga-peer-benchmark { gap:18px; grid-template-columns:230px minmax(0,1fr); } .tanga-peer-benchmark__chart { padding:12px; } .tanga-peer-benchmark li { gap:6px; grid-template-columns:20px minmax(110px,1fr) 40px; } .tanga-peer-benchmark__bar { display:none; } }
+@media(max-width:600px) { .tanga-peer-benchmark { inset:150px 16px 120px; display:flex; flex-direction:column; gap:12px; overflow:auto; pointer-events:auto; } .tanga-peer-benchmark__narrative { max-width:none; align-self:stretch; } .tanga-peer-benchmark h2 { font-size:28px; margin:5px 0 8px; } .tanga-peer-benchmark h2 br { display:none; } .tanga-peer-benchmark__narrative>p { font-size:11px; } .tanga-peer-benchmark__mre { display:none; } .tanga-peer-benchmark__narrative>small { font-size:9px; margin-top:8px; } .tanga-peer-benchmark__chart { flex:none; min-height:520px; } .tanga-peer-benchmark__chart h3 { font-size:17px; } }
+.tanga-deck .tanga-three.is-resource .tanga-three__grade-legend { top:350px!important; max-height:calc(100svh - 462px)!important; }
+.tanga-deck .tanga-three.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:550px!important; max-height:calc(100svh - 662px)!important; }
+@media(max-width:600px) {
+  .tanga-deck .tanga-deck__pager { z-index:60; flex-wrap:nowrap!important; }
+  .tanga-deck__pager .tanga-deck__executive-tour,
+  .tanga-deck__pager .tanga-deck__pager-speed,
+  .tanga-deck__pager .tanga-deck__pager-btn--tool { display:none!important; }
+  .tanga-deck__pager .tanga-deck__pager-play { display:inline-flex!important; }
+  .tanga-deck__pager-count { flex:1; min-width:0!important; }
+  .tanga-deck__pager-track { width:auto!important; gap:4px; }
+  .tanga-peer-benchmark { bottom:112px; }
 }

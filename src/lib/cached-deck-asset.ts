@@ -1,7 +1,7 @@
 /** Bounded, best-effort persistent cache for public geology assets only. */
-export const DECK_ASSET_CACHE='tanga-public-3d-v1';
+export const DECK_ASSET_CACHE='tanga-public-3d-v2';
 const TTL=24*60*60*1000;
-const ALLOWED=/\/(geologicalModel\.glb|height_hires\.bin|height_preview_1024\.bin|assay_data\.geojson|lithology_data\.geojson|BlockModel\.geojson|api\/block-model|terrain_(hires|preview)_meta\.json|terrain_texture_hires\.jpg)$/;
+const ALLOWED=/\/(geologicalModel\.glb|height_hires\.bin|terrain_context_512\.bin|survey_(height|coverage|slope)_hires\.bin|height_preview_1024\.bin|assay_data\.geojson|lithology_data\.geojson|BlockModel\.geojson|api\/block-model|terrain_(hires|preview)_meta\.json|terrain_texture_hires\.jpg)$/;
 const pending=new Map<string,Promise<Response>>();
 export async function cachedDeckAsset(url:string,init?:RequestInit):Promise<Response>{
   if(typeof window==='undefined'||!('caches' in window)||!ALLOWED.test(new URL(url,window.location.href).pathname)||init?.signal)return fetch(url,init);

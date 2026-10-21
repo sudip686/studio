@@ -42,7 +42,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
   const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
   const milestone = WORK_MILESTONES[milestoneIndex];
 
-  if (chapter === 'ranking') return <aside className="tanga-story-panel tanga-story-panel--timeline" aria-label="Work completed timeline">
+  if (chapter === 'work_completed') return <aside className="tanga-story-panel tanga-story-panel--timeline" aria-label="Work completed timeline">
     <div className="tanga-story-panel__eyebrow">PROJECT PROGRESS · SOURCE-DATED</div>
     <h2>Work completed</h2>
     <p className="tanga-story-panel__intro">Four distinct evidence milestones. Select one to inspect what it adds to the project picture.</p>
@@ -75,7 +75,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <img className="tanga-story-project-image" src="/presentation-assets/verified-core-example.jpg" alt="Photograph of labelled Tanga graphite drill core with a cut line and sampling intervals"/>
     <div className="tanga-story-image-caption"><span>AMC MRE · Figure 3.9</span><small>Report image · not the selected 3D hole</small></div>
     <div className="tanga-story-inline-note">100 diamond drillholes described in AMC MRE §3.2</div>
-    <div className="tanga-story-datum-note">Collars retain source elevations. The survey DTM vertical datum is not stated, so collar-to-surface alignment is unverified.</div>
+    <div className="tanga-story-datum-note">Collar symbols mark the DTM surface; drill traces retain recorded elevations. Their vertical datum agreement requires verification. Use Below ground to inspect the traces from underneath.</div>
   </aside>;
 
   if (chapter === 'subsurface') return <aside className="tanga-story-panel tanga-story-panel--geology" aria-label="Petrography sample evidence">

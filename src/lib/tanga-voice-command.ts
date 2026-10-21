@@ -1,5 +1,6 @@
 export type WorkbenchMode =
   | 'ranking'
+  | 'work_completed'
   | 'tanzania'
   | 'project'
   | 'topography'
@@ -44,12 +45,13 @@ export type CommandIntent = {
 };
 
 export const STORY_SLIDE_MODES: WorkbenchMode[] = [
-  'ranking',
-  'tanzania',
   'project',
+  'tanzania',
+  'ranking',
+  'work_completed',
   'topography',
-  'subsurface',
   'drillholes',
+  'subsurface',
   'resource',
   'mine_planning',
   'metallurgy',
@@ -67,15 +69,19 @@ export type CanonicalVoiceCommand = {
 export const TANGA_CANONICAL_COMMANDS: CanonicalVoiceCommand[] = [
   {id: 'next-slide', label: 'Next slide', example: 'next slide', aliases: ['next', 'next slide', 'go next']},
   {id: 'previous-slide', label: 'Previous slide', example: 'previous slide', aliases: ['previous', 'previous slide', 'back slide']},
-  {id: 'slide-1', label: 'Slide 1 peer ranking', example: 'slide 1', aliases: ['slide 1', 'slide one', 'act one']},
+  {id: 'slide-1', label: 'Slide 1 meet Tanga', example: 'slide 1', aliases: ['slide 1', 'slide one', 'act one']},
   {id: 'slide-2', label: 'Slide 2 Tanzania', example: 'slide 2', aliases: ['slide 2', 'slide two', 'act two']},
-  {id: 'slide-3', label: 'Slide 3 project area', example: 'slide 3', aliases: ['slide 3', 'slide three', 'act three']},
-  {id: 'slide-4', label: 'Slide 4 topography', example: 'slide 4', aliases: ['slide 4', 'slide four', 'act four']},
-  {id: 'slide-5', label: 'Slide 5 access routes', example: 'slide 5', aliases: ['slide 5', 'slide five', 'act five']},
+  {id: 'slide-3', label: 'Slide 3 peer ranking', example: 'slide 3', aliases: ['slide 3', 'slide three', 'act three']},
+  {id: 'slide-4', label: 'Slide 4 work completed', example: 'slide 4', aliases: ['slide 4', 'slide four', 'act four']},
+  {id: 'slide-5', label: 'Slide 5 topography', example: 'slide 5', aliases: ['slide 5', 'slide five', 'act five']},
   {id: 'slide-6', label: 'Slide 6 drillholes', example: 'slide 6', aliases: ['slide 6', 'slide six', 'act six']},
-  {id: 'slide-7', label: 'Slide 7 resource model', example: 'slide 7', aliases: ['slide 7', 'slide seven', 'act seven']},
-  {id: 'slide-8', label: 'Slide 8 metallurgy', example: 'slide 8', aliases: ['slide 8', 'slide eight', 'act eight']},
-  {id: 'slide-9', label: 'Slide 9 peer comparison', example: 'slide 9', aliases: ['slide 9', 'slide nine', 'act nine']},
+  {id: 'slide-7', label: 'Slide 7 subsurface geology', example: 'slide 7', aliases: ['slide 7', 'slide seven', 'act seven']},
+  {id: 'slide-8', label: 'Slide 8 resource model', example: 'slide 8', aliases: ['slide 8', 'slide eight', 'act eight']},
+  {id: 'slide-9', label: 'Slide 9 mine planning', example: 'slide 9', aliases: ['slide 9', 'slide nine', 'act nine']},
+  {id: 'slide-10', label: 'Slide 10 metallurgy', example: 'slide 10', aliases: ['slide 10', 'slide ten', 'act ten']},
+  {id: 'slide-11', label: 'Slide 11 access routes', example: 'slide 11', aliases: ['slide 11', 'slide eleven', 'act eleven']},
+  {id: 'slide-12', label: 'Slide 12 next decisions', example: 'slide 12', aliases: ['slide 12', 'slide twelve', 'act twelve']},
+  {id: 'work-timeline', label: 'Work completed', example: 'show project work timeline', aliases: ['work completed', 'evidence milestones']},
   {id: 'top-projects', label: 'Top 10 projects', example: 'show top 10 graphite projects', aliases: ['top 10 resource', 'top ten projects']},
   {id: 'peer-comparison', label: 'Peer comparison', example: 'show peer comparison', aliases: ['compare Tanga with peers', 'metallurgy comparison']},
   {id: 'tanzania', label: 'Tanzania overview', example: 'show Tanzania overview', aliases: ['country overview', 'regional overview']},
@@ -288,13 +294,19 @@ function slideNumberTokenToNumber(token: string) {
     ate: 8,
     nine: 9,
     ninth: 9,
+    ten: 10,
+    tenth: 10,
+    eleven: 11,
+    eleventh: 11,
+    twelve: 12,
+    twelfth: 12,
   };
   return words[normalized] ?? null;
 }
 
 function slideNumberFromCommand(text: string) {
-  const slidePattern = /\b(?:slide|scene|act|chapter)\s+(?:number\s+|no\s+)?([0-9]+|one|first|won|two|second|to|too|three|third|tree|four|fourth|for|five|fifth|six|sixth|seven|seventh|eight|eighth|ate|nine|ninth)\b/;
-  const leadingOrdinalPattern = /\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\s+(?:slide|scene|act|chapter)\b/;
+  const slidePattern = /\b(?:slide|scene|act|chapter)\s+(?:number\s+|no\s+)?([0-9]+|one|first|won|two|second|to|too|three|third|tree|four|fourth|for|five|fifth|six|sixth|seven|seventh|eight|eighth|ate|nine|ninth|ten|tenth|eleven|eleventh|twelve|twelfth)\b/;
+  const leadingOrdinalPattern = /\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)\s+(?:slide|scene|act|chapter)\b/;
   const match = text.match(slidePattern) ?? text.match(leadingOrdinalPattern);
   if (!match?.[1]) return null;
 
@@ -1035,6 +1047,9 @@ function rotationDegrees(text: string): 90 | 180 | 360 | null {
 export function ruleIntent(raw: string): CommandIntent {
   const text = normalizeDomainTerms(raw);
   if (!text) return {mode: null, confidence: 0, source: 'rules', reason: 'Empty command'};
+  if (/\b(work completed|work timeline|evidence milestones|project milestones)\b/.test(text)) {
+    return {mode: 'work_completed', confidence: .95, source: 'rules', reason: 'Work completed timeline'};
+  }
 
   const slideNumber = slideNumberFromCommand(text);
   if (slideNumber) return slideIntent(slideNumber);

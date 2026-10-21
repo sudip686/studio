@@ -61,10 +61,15 @@
       "units": "degrees",
       "method": "central differences of source DTM elevations using source pixel spacing; no cross-NoData gradients",
       "range_degrees": [
-        0.0,
+        0,
         67.7202377319336
       ]
     },
     "supplied_slope_raster_used": false
+  },
+  "context_grid": {
+    "width": 512,
+    "height": 701,
+    "file": "terrain_context_512.bin"
   }
 }

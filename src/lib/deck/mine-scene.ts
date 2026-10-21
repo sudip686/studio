@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {CONCEPT, inside, insetCrest, type CandidatePit, type Point2} from './site-planning';
+import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
 
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
 export function buildConcentrator() {
@@ -103,6 +104,8 @@ export function buildConcentrator() {
   }
   root.userData.flow=flow;
   root.userData.labels=[['ROM / feed',-106,32,20],['Crushing & milling',-50,37,-20],['Flotation',40,30,-24],['Dewatering & product',95,35,45]];
+  addPlantDetail(root, materials);
+  batchPlantMeshes(root);
   root.scale.set(CONCEPT.plantWidth/400,CONCEPT.plantWidth/400,CONCEPT.plantDepth/280);
   return root;
 }

@@ -96,6 +96,10 @@ def main() -> None:
     if regional_valid.sum() != width * height:
         raise ValueError("Regional DEM does not cover the full terrain presentation window")
     write_grid("height_hires.bin", regional)
+    # The regional source is ~30 m resolution. A 14.8 m context grid retains
+    # that information and can travel with metadata on both hosting platforms.
+    context = regional.reshape(height // 2, 2, width // 2, 2).mean(axis=(1, 3))
+    write_grid("terrain_context_512.bin", context)
     regional_min, regional_max = float(regional.min()), float(regional.max())
     metadata = {
         "bounds_utm": bounds,
@@ -105,6 +109,7 @@ def main() -> None:
         "crs_epsg": 32737,
         "rgb_texture": "terrain_texture_hires.jpg",
         "source_height_grid": "height_hires.bin",
+        "context_grid": {"width": width // 2, "height": height // 2, "file": "terrain_context_512.bin"},
         "regional_context": regional_source,
     }
 

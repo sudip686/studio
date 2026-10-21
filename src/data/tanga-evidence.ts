@@ -1,5 +1,5 @@
 export type TangaChapterId =
-  | 'ranking' | 'tanzania' | 'project' | 'topography' | 'accessibility'
+  | 'ranking' | 'work_completed' | 'tanzania' | 'project' | 'topography' | 'accessibility'
   | 'drillholes' | 'subsurface' | 'resource' | 'mine_planning'
   | 'metallurgy' | 'comparison';
 
@@ -12,6 +12,10 @@ export type EvidenceSource = {
 
 export const CHAPTER_SOURCES: Record<TangaChapterId, EvidenceSource[]> = {
   ranking: [
+    {title: 'Mining Intelligence / Costmine global project benchmark', locator: 'Published 7 November 2023 · reported Measured + Indicated contained graphite', qualification: 'Historical selected project benchmark, not a verified current ranking of every natural graphite deposit. Peer disclosures have different effective dates; Epanko uses its 2024 MRE.', href: 'https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/'},
+    {title: 'AMC Tanga Graphite MRE', locator: '19 December 2025 · 148 Mt Indicated at 4.94% TGC', qualification: '7.31 Mt contained graphite in the Indicated category places Tanga fifth when inserted into this comparison set.'},
+  ],
+  work_completed: [
     {title: 'AMC Tanga Graphite Mineral Resource Estimate', locator: 'Final report · 19 December 2025 · drilling §3.2; Table I', qualification: 'Work dates and estimate values are attributed to the report; no project ownership claim is made.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
     {title: 'Survey Report · Tanga Graphite Project', locator: 'Survey methods and field photographs · survey delivery dated August 2025', qualification: 'Photographs are contextual source images; they are not location-tagged to the displayed camera.'},
   ],
@@ -22,7 +26,7 @@ export const CHAPTER_SOURCES: Record<TangaChapterId, EvidenceSource[]> = {
     {title: 'Survey Report · Tanga Graphite Project', locator: 'Topographical survey sheets 1–2 · CRS WGS 84 / UTM zone 37S', qualification: 'Aerial image is a report figure; shown as site context, not a georeferenced orthophoto.'},
   ],
   topography: [
-    {title: 'Surveyed digital terrain model', locator: 'DTM.tif · August 2025 aerial survey · EPSG:32737 · source spacing ≈0.655 m', qualification: 'Source metadata does not state the vertical datum. The DTM is sampled to a ≈7.4 m presentation grid; outer terrain uses regional DEM. Grid spacing is not an accuracy claim.'},
+    {title: 'Surveyed digital terrain model', locator: 'DTM.tif · August 2025 aerial survey · EPSG:32737 · source spacing ≈0.655 m', qualification: 'Source metadata does not state the vertical datum. The DTM is sampled to a ≈7.4 m raster and ≈20 m display mesh; outer terrain uses regional DEM. Grid spacing is not an accuracy claim.'},
     {title: 'Derived slope display', locator: 'Computed from DTM elevations and source pixel spacing · degrees', qualification: 'The supplied SLOPE.tif is not displayed because its numeric units are not documented.'},
   ],
   accessibility: [
