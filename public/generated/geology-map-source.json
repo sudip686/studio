@@ -1,0 +1,16 @@
+{
+  "asset": "/presentation-assets/mre-regional-geology.jpg",
+  "report": "0424046 Tanga Graphite Mineral Resource Estimate - 19 December 2025",
+  "figure": "2.1",
+  "pdfPage": 18,
+  "reportPage": 8,
+  "originalImage": "5676ca897f6f7ba61c9612b12ca5e1e11c2e862d2b3b310b4fd29435b88f55c0.jpg",
+  "sha256": "98f6d9cfb405b0fe20878389f442686ce4775d2f315c67885711c5cc2cdb7546",
+  "processing": "Unmodified byte copy of original extracted figure; includes legend",
+  "registration": "Not georeferenced; regional context only",
+  "projectMap": {
+    "asset": "/geology_map.jpg",
+    "basis": "Existing project asset; image registration and date not independently verified"
+  },
+  "modelPlan": "Orthographic projection of existing registered geological volumes; no remeshing or extrusion"
+}

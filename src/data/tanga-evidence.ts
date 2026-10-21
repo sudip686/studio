@@ -37,6 +37,8 @@ export const CHAPTER_SOURCES: Record<TangaChapterId, EvidenceSource[]> = {
     {title: 'AMC Tanga Graphite Mineral Resource Estimate', locator: 'Final report · 19 December 2025 · drilling §3.2; Figure 3.9', qualification: 'The core photograph is report evidence and is not asserted to be the selected 3D hole.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
   ],
   subsurface: [
+      {title:'Tanga project geological map', locator:'Existing project asset · original coordinate grid and lithology legend', qualification:'Document view only; raster registration and source date require independent verification. Model plan projects interpreted volumes and is not a surface outcrop map.', href:'/geology_map.jpg'},
+      {title:'AMC MRE · Regional geological map', locator:'19 December 2025 · Figure 2.1 · PDF p.18 / report p.8 · after Geological Survey of Tanzania, 2015', qualification:'Regional Tanzania context at 1:10,000,000; not the detailed project map or a source for extruded 3D contacts.', href:'/presentation-assets/mre-regional-geology.jpg'},
     {title: 'Merged petrography report · Tanga Graphite Project', locator: 'Sample crosswalk: TGF002 / TGDD1009 / 18.25–18.38 m; assay ID TD0058', qualification: 'A traceable sample record. The 3D geological surfaces remain interpreted between observation points.'},
     {title: 'Photomicrograph', locator: 'TGF002 · TGDD1009 · 18.25–18.38 m', qualification: 'Source micrograph reproduced without adding a scale or changing its interpretation.', href: '/presentation-assets/petrography-tgdd1009-18m.jpg'},
   ],

@@ -947,3 +947,34 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media(max-width:760px) { .tanga-evidence-sequence { display:none; } .tanga-material-entry { flex-wrap:wrap; } .tanga-material-counts { gap:7px; font-size:9px; } .tanga-material-counts strong { display:block; font-size:23px; } .tanga-material-evidence { padding:16px; } .tanga-material-evidence h2 { font-size:23px; } }
 @media(max-width:760px) { .tanga-material-evidence figure img { display:block; height:auto; max-height:42svh; } }
 .tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:590px!important; max-height:calc(100svh - 702px)!important; }
+/* Geological documents -> registered plan -> depth, sharing the chapter HUD. */
+.tanga-geology-map-sheet{position:absolute;z-index:24;left:300px;right:440px;top:215px;bottom:185px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #ffffff24;border-radius:14px;background:#252a2f;box-shadow:0 20px 70px #0004}
+.tanga-geology-map-sheet__toolbar{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#171e23}
+.tanga-geology-map-sheet__toolbar [role=group]{display:flex;gap:4px}
+.tanga-geology-map-sheet button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;border:1px solid #ffffff20;border-radius:6px;padding:5px 8px;background:#ffffff08;color:#e4eaec;font-size:11px;cursor:pointer}
+.tanga-geology-map-sheet button[aria-pressed=true]{border-color:#e1b87999;background:#e1b87918;color:#f3d7aa}
+.tanga-geology-map-sheet button:disabled{opacity:.35;cursor:default}
+.tanga-geology-map-sheet__viewport{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;background:#f8f8f4}
+.tanga-geology-map-sheet__viewport img{display:block;max-width:none;object-fit:contain}
+.tanga-geology-map-sheet footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;color:#b9c6cb;font-size:10px}
+.tanga-geology-map-sheet footer a{display:inline-flex;align-items:center;gap:4px;color:#edd3ad;white-space:nowrap}
+.tanga-geology-map-sequence{list-style:none;margin:18px 0;padding:0;display:grid;gap:0}
+.tanga-geology-map-sequence li{display:flex;align-items:center;gap:12px;border-left:1px solid #ffffff28;padding:10px 0 10px 15px;color:#95a4ab;font-size:12px}
+.tanga-geology-map-sequence li span{font-size:10px;letter-spacing:.1em;font-variant-numeric:tabular-nums}
+.tanga-geology-map-sequence li[aria-current=step]{border-left:2px solid #e1b879;color:#f1d6b0;background:linear-gradient(90deg,#e1b87912,transparent)}
+.tanga-story-panel--map button:disabled{opacity:.55;cursor:wait}
+.tanga-deck:has(.tanga-geology-map-sheet) .tanga-three__callout-layer{visibility:hidden}
+@media(max-width:1050px){.tanga-geology-map-sheet{left:24px;right:390px;top:200px;bottom:195px}}
+@media(max-width:760px){.tanga-geology-map-sheet{left:12px;right:12px;top:170px;bottom:270px;min-height:150px}.tanga-geology-map-sheet__toolbar{padding:6px;gap:4px}.tanga-geology-map-sheet footer{padding:6px;font-size:9px}.tanga-story-panel--map{max-height:125px!important;bottom:141px!important}.tanga-story-panel--map h2{font-size:18px}.tanga-story-panel--map .tanga-geology-map-sequence,.tanga-story-panel--map .tanga-story-inline-note{display:none}.tanga-story-panel--map .tanga-story-datum-note{font-size:10px}}
+
+.tanga-geology-map-sheet{bottom:119px}
+.tanga-geology-map-sheet__viewport{background:#151d22}
+.tanga-deck:has(.tanga-geology-map-sheet) .tanga-three__nav-cluster{visibility:hidden}
+@media(max-width:760px){.tanga-geology-map-sheet{bottom:285px}}
+@media(max-width:760px){
+  .tanga-story-panel--map{display:flex;flex-direction:column;padding:12px 16px!important}
+  .tanga-story-panel--map .tanga-story-panel__compare{order:1;flex-shrink:0;margin:6px 0 0;min-height:36px}
+  .tanga-story-panel--map .tanga-story-panel__intro,.tanga-story-panel--map .tanga-story-datum-note{order:2}
+}
+
+.tanga-geology-map-sheet__viewport,.tanga-story-panel--map{scrollbar-width:thin;scrollbar-color:#8d7756 #192127}

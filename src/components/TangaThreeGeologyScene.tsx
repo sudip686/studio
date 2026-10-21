@@ -226,7 +226,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'geologyPlan' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
   stage?: string;
 };
@@ -2121,7 +2121,8 @@ export default function TangaThreeGeologyScene({
     scene.background = new THREE.Color(sceneSky);
     // Fog tinted to the sky so distant ground fades into the horizon instead of
     // ending on a hard cut.
-    scene.fog = new THREE.Fog(sceneSky, 4600, 12000);
+    const authoredFog = new THREE.Fog(sceneSky, 4600, 12000);
+    scene.fog = authoredFog;
 
     const depthGridGroup = new THREE.Group();
     depthGridGroup.name = 'depth-grid';
@@ -2255,6 +2256,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let developmentMarker: THREE.Mesh | null = null;
     let feedAnchor: THREE.Vector3 | null = null;
     let facilityFocused = false;
+    let geologyPlan = false;
+    let geologyModelReady = false;
+    let recoverPlanFog = false;
+    const geologyPlanExtent = new THREE.Vector3(2500, 0, 5000);
+    const planProjection = new THREE.OrthographicCamera();
     let processMarker: THREE.Mesh | null = null;
     let plantDetailKey='';
     const targetMeshes: THREE.InstancedMesh<THREE.BoxGeometry,THREE.MeshBasicMaterial>[]=[];
@@ -2283,7 +2289,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
-      const opacity = terrainOpacityForView(mode, surfaceCameraView);
+      const opacity = geologyPlan ? .12 : terrainOpacityForView(mode, surfaceCameraView);
       const isGlass = opacity < 1;
       terrainSurfaceMaterials.forEach((material) => {
         material.visible = true;
@@ -2406,7 +2412,22 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let stageBaseRotation = rotationKeyRef.current * Math.PI / 2;
     let stageVerticalBaseRotation = 0;
 
+    const leaveGeologyPlan = () => {
+      if (!geologyPlan) return;
+      geologyPlan = false; scene.fog = authoredFog; controls.enableRotate = true;
+      const departureDistance = camera.position.distanceTo(controls.target);
+      authoredFog.near = Math.max(4600, departureDistance * 1.1);
+      authoredFog.far = Math.max(12000, departureDistance * 2);
+      recoverPlanFog = true;
+      controls.minPolarAngle = .04; controls.maxPolarAngle = Math.PI - .04;
+      controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; controls.touches.ONE = THREE.TOUCH.ROTATE;
+      camera.updateProjectionMatrix();
+      surfaceCameraView = 'default'; applyTerrainSurfaceView();
+      host.dataset.geologyProjection = 'perspective';
+      window.dispatchEvent(new Event('tanga:geology-perspective'));
+    };
     const scheduleCameraTween = (toPosition: THREE.Vector3, toTarget: THREE.Vector3, duration = 1.35, toFov = camera.fov) => {
+      leaveGeologyPlan();
       userTookControl = true;
       cameraTween = {
         start: clock.getElapsedTime(),
@@ -2421,6 +2442,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     };
 
     const consumeCameraCommand = (command: ThreeCameraCommand) => {
+      if (command.action === 'geologyPlan' && mode === 'subsurface' && !geologyModelReady) return;
       // Local inspection buttons use independent IDs; don't let them suppress
       // subsequent commands from the shared presentation toolbar.
       if(command===cameraCommandRef.current){
@@ -2428,6 +2450,32 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         consumedCameraCommandIdRef.current = command.id;
       }
 
+      if (command.action === 'geologyPlan' && mode === 'subsurface') {
+        geologyPlan = true; scene.fog = null;
+        cameraTween = null;
+        userTookControl = true;
+        controls.enableRotate = false; controls.minPolarAngle = 0; controls.maxPolarAngle = 0;
+        controls.mouseButtons.LEFT = THREE.MOUSE.PAN; controls.touches.ONE = THREE.TOUCH.PAN;
+        setSectionEnabled(false);
+        explodedRef.current = false; setExploded(false); separation = 0;
+        stageBaseRotation = 0; stageVerticalBaseRotation = 0;
+        rotationTween = null; verticalRotationTween = null; stage.rotation.set(0, 0, 0);
+        controls.target.copy(cameraShot.target);
+        const halfHeight = Math.max(geologyPlanExtent.z / .98, geologyPlanExtent.x / (camera.aspect * 1.04)) * 1.08;
+        const distance = Math.min(controls.maxDistance, Math.max(1800, halfHeight / Math.tan(THREE.MathUtils.degToRad(42 / 2))));
+        camera.position.copy(cameraShot.target).add(new THREE.Vector3(0, distance, .01));
+        camera.fov = 42;
+        controls.update();
+        surfaceCameraView = 'top'; applyTerrainSurfaceView();
+        host.dataset.geologyProjection = 'orthographic';
+        setStatus('North-up orthographic projection of the existing geological model; not a surface outcrop map');
+        return;
+      }
+      // Dolly and pan retain the measured plan. Authored 3D commands restore
+      // perspective before the camera tilts; source geometry never changes.
+      if (geologyPlan && command.action !== 'zoomIn' && command.action !== 'zoomOut') {
+        leaveGeologyPlan();
+      }
       const target = controls.target.clone();
       const direction = camera.position.clone().sub(target);
       if (direction.lengthSq() < 1) direction.copy(cameraShot.to).sub(cameraShot.target);
@@ -3095,6 +3143,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         host.dataset.geologyBounds = JSON.stringify({min:modelBounds.min.toArray(), max:modelBounds.max.toArray()});
         const centre = modelBounds.getCenter(new THREE.Vector3());
         const extent = modelBounds.getSize(new THREE.Vector3());
+        geologyPlanExtent.copy(extent);
         if (!Number.isFinite(extent.length()) || Math.abs(centre.x) > 10000 || Math.abs(centre.z) > 10000) {
           throw new Error('Geological registration failed: model bounds outside local project coordinates');
         }
@@ -3734,7 +3783,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         object.userData.tooltipItems=[{title:object.name||(plantPart?'Processing plant equipment':'Mining concept'),rows:[target?'Above-threshold model cells explain the target; not ore reserves.':pit?'Conceptual benched pit envelope; not an optimised or engineered excavation.':'Illustrative concentrator equipment; dimensions and capacity are conceptual.'],tone:'#dfa066'}];
         pickables.push(object);
       });
-      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured) {
+      if (mode === 'subsurface') {
+        geologyModelReady = true;
+        if (cameraCommandRef.current?.action === 'geologyPlan') consumeCameraCommand(cameraCommandRef.current);
+      }
+      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured && !geologyPlan) {
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.2, cameraShot.fov);
       }
         const shouldUpgradeTerrain = !cancelled && (resources?.quality ?? assetQuality) === 'preview';
@@ -3776,7 +3829,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
+      raycaster.setFromCamera(pointer, geologyPlan ? planProjection : camera);
       const visiblePickables=pickables.filter(object=>{for(let p:THREE.Object3D|null=object;p;p=p.parent)if(!p.visible)return false;return true;});
       const [hit] = raycaster.intersectObjects(visiblePickables, false).filter(hit=>{
         const material=(hit.object as THREE.Mesh).material;
@@ -4210,8 +4263,26 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           material.userData.highlightOpacity=next;
           material.opacity=next*(layer?layerSettingsRef.current[layer].opacity:1)*(material.userData.revealProgress??1);
       }
-      if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.28:0;mesh.material.opacity=(mesh.name.includes('GRSC')?.9:.16)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
+      if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.28:0;mesh.material.opacity=(mesh.name.includes('GRSC')?.9:geologyPlan?.65:.16)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
 
+      if (recoverPlanFog && !geologyPlan) {
+        authoredFog.near = THREE.MathUtils.lerp(authoredFog.near, 4600, .04);
+        authoredFog.far = THREE.MathUtils.lerp(authoredFog.far, 12000, .04);
+        if (authoredFog.far - 12000 < 1) {authoredFog.near = 4600; authoredFog.far = 12000; recoverPlanFog = false;}
+      }
+      if (geologyPlan) {
+        // Use a real parallel projection while retaining OrbitControls' existing
+        // dolly/pan distances. Its perspective pan span equals this ortho span.
+        const halfHeight = camera.position.distanceTo(controls.target) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        planProjection.left = -halfHeight * camera.aspect; planProjection.right = halfHeight * camera.aspect;
+        planProjection.top = halfHeight; planProjection.bottom = -halfHeight;
+        planProjection.near = camera.near; planProjection.far = camera.far;
+        planProjection.updateProjectionMatrix();
+        planProjection.matrixWorld.copy(camera.matrixWorld);
+        planProjection.matrixWorldInverse.copy(camera.matrixWorldInverse);
+        camera.projectionMatrix.copy(planProjection.projectionMatrix);
+        camera.projectionMatrixInverse.copy(planProjection.projectionMatrixInverse);
+      }
       const projectionTick = Math.floor(elapsed * (interacting || cameraTween || (!userTookControl && flyProgress < 1) || performance.now() - lastInteractionAt < 500 ? 30 : 10));
       if (projectionTick !== lastProjectionTick) {
         lastProjectionTick = projectionTick;
@@ -4485,7 +4556,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             window.dispatchEvent(new Event('tanga:manual-exploration'));
             cameraCommandHandlerRef.current?.({id: Date.now(), action: 'resetView'});
           }}>Reset view</button>
-          <small>Drag to orbit · Shift + drag to pan · scroll to zoom</small>
+          <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
           {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{inspectionOpen ? 'Close inspection tools' : 'Inspection tools'}</button>}
         </div>
         {mode==='resource'&&<details className="tanga-three-animation-tools"><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
