@@ -10,6 +10,8 @@ import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan
 import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
+import {buildGeologySurface,type GeologySurfaceData} from '@/lib/deck/geology-surface';
+import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import MetallurgyVisualStory from './MetallurgyProcessExhibit';
@@ -226,7 +228,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'geologyPlan' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'geologyPlan' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
   stage?: string;
 };
@@ -247,6 +249,7 @@ type TangaThreeGeologySceneProps = {
   layerSettings?: DeckLayerSettings;
   inspectionMode?: boolean;
   onInspectEvidence?: () => void;
+  onSiteFacilities?: (ids:string[])=>void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
@@ -1646,7 +1649,7 @@ function createTerrainPatchGeometry(mode: GeologyMode) {
   const segmentsX = 176;
   const segmentsY = 140;
   const width = TERRAIN_PATCH_WIDTH;
-  const depth = TERRAIN_PATCH_DEPTH;
+  const depth = mode === 'subsurface' ? 12000 : TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
@@ -1699,7 +1702,7 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
   const segmentsX = 384;
   const segmentsY = 526;
   const width = TERRAIN_PATCH_WIDTH;
-  const depth = TERRAIN_PATCH_DEPTH;
+  const depth = mode === 'subsurface' ? 12000 : TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
   const uvs: number[] = [];
   const colors: number[] = [];
@@ -1963,6 +1966,7 @@ export default function TangaThreeGeologyScene({
   layerSettings = DEFAULT_LAYER_SETTINGS,
   inspectionMode = false,
   onInspectEvidence,
+  onSiteFacilities,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -2019,8 +2023,8 @@ export default function TangaThreeGeologyScene({
   const [evidenceHoleIds,setEvidenceHoleIds]=useState<string[]>([]);
   const [focusedSource,setFocusedSource]=useState<string|null>(null);
   const evidenceFocusRef=useRef<((holeId:string)=>void)|null>(null);
-  const [miningBeat,setMiningBeat]=useState(0);
-  const [storyPlaying,setStoryPlaying]=useState(true);
+  const [miningBeat,setMiningBeat]=useState(3);
+  const [storyPlaying,setStoryPlaying]=useState(false);
   const [storyReplay,setStoryReplay]=useState(0);
   const [evidenceVisible,setEvidenceVisible]=useState(true);
   const miningStoryOptions=useRef({beat:0,playing:true,replay:0,holes:true});
@@ -2074,6 +2078,7 @@ export default function TangaThreeGeologyScene({
     if (!visible || !hostRef.current) return;
 
     let cancelled = false;
+    consumedCameraCommandIdRef.current=0;
     const sceneStartedAt = performance.now();
     const reportLoadState = (
       sceneState: SceneLoadState,
@@ -2253,10 +2258,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let sitePlan: SitePlan | null = null;
     let processPlant: THREE.Group | null = null;
     let developmentInfrastructure: THREE.Group | null = null;
+    let siteCampus:THREE.Group|null=null;
+    let campusFacilities:CampusFacility[]=[];
+    let mineCampusReady=false;
+    if(mode==='mine_planning')onSiteFacilities?.([]);
     let developmentMarker: THREE.Mesh | null = null;
     let feedAnchor: THREE.Vector3 | null = null;
     let facilityFocused = false;
     let geologyPlan = false;
+    let geologySurface:THREE.Group|null=null;
+    let geologySurfaceOpacity=0;
+    let geologySectionLocator:THREE.Group|null=null;
+    const geologyPlanTarget=new THREE.Vector3();
     let geologyModelReady = false;
     let recoverPlanFog = false;
     const geologyPlanExtent = new THREE.Vector3(2500, 0, 5000);
@@ -2289,7 +2302,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
-      const opacity = geologyPlan ? .12 : terrainOpacityForView(mode, surfaceCameraView);
+      const opacity = geologyPlan ? .92 : terrainOpacityForView(mode, surfaceCameraView);
       const isGlass = opacity < 1;
       terrainSurfaceMaterials.forEach((material) => {
         material.visible = true;
@@ -2320,7 +2333,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       terrainSurfaceMaterials.push(material);
       applyTerrainSurfaceView();
     };
-    const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 1, 26000);
+    const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 1, mode === 'subsurface' ? 65000 : 26000);
     camera.fov = cameraShot.fov;
     camera.position.copy(cameraShot.from);
     camera.updateProjectionMatrix();
@@ -2337,6 +2350,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // luminance (~220 was washed; target ~185 with more tonal range).
     renderer.toneMappingExposure = mode === 'topography' ? 0.9 : 1.02;
     renderer.shadowMap.enabled = mode === 'mine_planning';
+    if(mode==='mine_planning'){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;}
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
@@ -2360,7 +2374,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     controls.minPolarAngle = 0.04;
     controls.maxPolarAngle = Math.PI - 0.04;
     controls.target.copy(DEFAULT_CAMERA_TARGET);
-    controls.maxDistance = 16000;
+    controls.maxDistance = mode === 'subsurface' ? 34000 : 16000;
     controls.minDistance = 25;
     controls.update();
     controlsRef.current = controls;
@@ -2429,6 +2443,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const scheduleCameraTween = (toPosition: THREE.Vector3, toTarget: THREE.Vector3, duration = 1.35, toFov = camera.fov) => {
       leaveGeologyPlan();
       userTookControl = true;
+      if(mode==='subsurface'&&camera.aspect<1)toPosition=toTarget.clone().add(toPosition.clone().sub(toTarget).multiplyScalar(1.2/camera.aspect));
+      if((mode==='subsurface'||(mode==='mine_planning'&&facilityFocused))&&camera.aspect<1){
+        // Centre facility detail in the phone's free canvas above its inspector.
+        const forward=toTarget.clone().sub(toPosition).normalize();
+        const right=forward.clone().cross(camera.up).normalize();
+        const screenUp=right.cross(forward).normalize();
+        const shift=screenUp.multiplyScalar(-toPosition.distanceTo(toTarget)*Math.tan(THREE.MathUtils.degToRad(toFov/2))*.11);
+        toPosition=toPosition.clone().add(shift);toTarget=toTarget.clone().add(shift);
+      }
       cameraTween = {
         start: clock.getElapsedTime(),
         duration: reducedMotion.matches ? .001 : duration,
@@ -2443,6 +2466,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     const consumeCameraCommand = (command: ThreeCameraCommand) => {
       if (command.action === 'geologyPlan' && mode === 'subsurface' && !geologyModelReady) return;
+      if(mode==='mine_planning'&&!mineCampusReady&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','northPit','southPit'].includes(command.action))return;
       // Local inspection buttons use independent IDs; don't let them suppress
       // subsequent commands from the shared presentation toolbar.
       if(command===cameraCommandRef.current){
@@ -2460,15 +2484,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         explodedRef.current = false; setExploded(false); separation = 0;
         stageBaseRotation = 0; stageVerticalBaseRotation = 0;
         rotationTween = null; verticalRotationTween = null; stage.rotation.set(0, 0, 0);
-        controls.target.copy(cameraShot.target);
-        const halfHeight = Math.max(geologyPlanExtent.z / .98, geologyPlanExtent.x / (camera.aspect * 1.04)) * 1.08;
+        controls.target.copy(geologyPlanTarget);
+        const halfHeight = Math.max(geologyPlanExtent.z / 1.3, geologyPlanExtent.x / (camera.aspect * 1.04)) * 1.08;
         const distance = Math.min(controls.maxDistance, Math.max(1800, halfHeight / Math.tan(THREE.MathUtils.degToRad(42 / 2))));
-        camera.position.copy(cameraShot.target).add(new THREE.Vector3(0, distance, .01));
+        camera.position.copy(geologyPlanTarget).add(new THREE.Vector3(0, distance, .01));
         camera.fov = 42;
         controls.update();
         surfaceCameraView = 'top'; applyTerrainSurfaceView();
         host.dataset.geologyProjection = 'orthographic';
-        setStatus('North-up orthographic projection of the existing geological model; not a surface outcrop map');
+        setStatus('Digitized rock polygons on terrain · north-up · approximate source-grid registration');
         return;
       }
       // Dolly and pan retain the measured plan. Authored 3D commands restore
@@ -2526,6 +2550,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const centre=stage.localToWorld(feedAnchor.clone());
         scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,1.5,42);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed');return;
+      }
+      if(command.action==='tailingsView'||command.action==='wasteView'||command.action==='campusView'){
+        const selected=campusFacilities.filter(f=>command.action==='wasteView'?f.id==='waste':command.action==='tailingsView'?f.id==='tailings':f.id!=='waste');
+        if(!selected.length){setStatus('Facility withheld: no illustrative footprint passed the display checks');return;}
+        facilityFocused=true;setStoryPlaying(false);setMiningBeat(3);
+        const bounds=new THREE.Box3();for(const f of selected)for(const [x,z] of f.footprint)bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,f.level+8,z)));
+        if(command.action==='campusView'&&processPlant)bounds.expandByObject(processPlant);
+        const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+        const span=Math.max(size.x,size.z,300);
+        const offset=command.action==='campusView'?new THREE.Vector3(0,span*2.4,span*.12):new THREE.Vector3(span*.85,span*.8,span*.95);
+        if(command.action==='tailingsView'||command.action==='wasteView')offset.multiplyScalar(1.35);
+        offset.multiplyScalar(Math.max(1,.65/camera.aspect));
+        scheduleCameraTween(centre.clone().add(offset),centre,1.8,42);
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id.startsWith('facility-')&&(command.action==='wasteView'?item.id==='facility-waste':command.action==='tailingsView'?item.id==='facility-tailings':item.id!=='facility-waste')||(command.action==='campusView'&&item.id==='development-plant'));
+        return;
       }
       if(command.action==='siteServices'&&processPlant){
         facilityFocused=true;
@@ -2670,6 +2709,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     key.shadow.normalBias = 1.5;
     key.shadow.camera.updateProjectionMatrix();
     scene.add(key);
+    if(mode==='mine_planning')scene.add(key.target);
+    let mineShadowRadius=4200;
+    let lastMineShadowKey='';
+    const mineLightOffset=new THREE.Vector3(900,1800,1200);
     // Decorative colour accents. Both kept subtle so the overhead sun always
     // wins on the terrain *top*. Previously an amber PointLight sat BELOW the
     // surface (y=-220) at high intensity, lighting the underside brighter than
@@ -3144,6 +3187,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const centre = modelBounds.getCenter(new THREE.Vector3());
         const extent = modelBounds.getSize(new THREE.Vector3());
         geologyPlanExtent.copy(extent);
+        geologyPlanTarget.copy(centre);
+        try {
+          const response=await fetch('/generated/geology-surface-polygons.json');
+          if(response.ok){
+            const data=await response.json() as GeologySurfaceData;
+            if(cancelled)return;
+            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,(x,z)=>terrainSurfaceY(terrainResources,x,-z));
+            geologySurface=mapped.group;tagDeckLayer(geologySurface,'context');stage.add(geologySurface);
+            geologySurface.children.forEach(mesh=>pickables.push(mesh));
+            if(!mapped.bounds.isEmpty()) {mapped.bounds.getCenter(geologyPlanTarget);mapped.bounds.getSize(geologyPlanExtent);}
+            host.dataset.geologySurfaceUnits=String(mapped.group.children.length);
+            host.dataset.geologySurfaceBasis='Digitized project map; approximate printed-grid registration';
+          }
+        } catch {host.dataset.geologySurfaceBasis='Map overlay unavailable; existing model retained';}
         if (!Number.isFinite(extent.length()) || Math.abs(centre.x) > 10000 || Math.abs(centre.z) > 10000) {
           throw new Error('Geological registration failed: model bounds outside local project coordinates');
         }
@@ -3157,7 +3214,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const crossHeight=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
         const crossBoundary:Point2[]=(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z];});
         setCrossSource({units:geologyMeshes.map(mesh=>({name:mesh.name,color:`#${mesh.material.color.getHexString()}`,geometry:mesh.geometry})),drills:drillholes.map(d=>({...d,from:drillPointFromCoords(d.from).toArray() as [number,number,number],to:drillPointFromCoords(d.to).toArray() as [number,number,number]})),blocks,pits:sitePlan?.pits??[],boundary:crossBoundary,height:crossHeight});
-        const locator=new THREE.Group();locator.name='Active cross-section locator';stage.add(locator);
+        const locator=new THREE.Group();locator.name='Active cross-section locator';geologySectionLocator=locator;stage.add(locator);
         crossViewRef.current=(definition,flat,moveCamera=true)=>{
           if(cancelled)return;
           explodedRef.current=false;setExploded(false);separation=0;geologyMeshes.forEach(mesh=>mesh.position.y=0);
@@ -3731,6 +3788,23 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             sitePlan.audit.push(`Proposed feed apron shifted ${Math.round(apron.offsetM)} m from the old map marker to clear current conceptual pits; corridor screened against pit envelopes only`);
             host.dataset.siteAudit=JSON.stringify(sitePlan.audit);
             host.dataset.plantDetail = JSON.stringify({sourceMeshes:plant.userData.detailMeshCount,drawMeshes:plant.userData.batchedMeshCount,stages:plant.userData.processStages.length});
+            if(terrainResources){
+              const utm=terrainResources.meta.bounds_utm;
+              const campus=buildMineSiteCampus({plant:[x,z],plantLevel:level,feed,pits:sitePlan.pits,boundary:(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z] as Point2;}),
+                bounds:{minX:utm.minX-PROJECT_UTM_CENTER.easting,maxX:utm.maxX-PROJECT_UTM_CENTER.easting,minZ:PROJECT_UTM_CENTER.northing-utm.maxY,maxZ:PROJECT_UTM_CENTER.northing-utm.minY},
+                height:(px,pz)=>terrainSurfaceY(terrainResources,px,-pz),surveyed:(px,pz)=>Boolean(sampleTerrainAtLocal(terrainResources!,px,-pz).surveyed)});
+              siteCampus=campus.root;campusFacilities=campus.facilities;tagDeckLayer(siteCampus,'context');stage.add(siteCampus);
+              siteCampus.traverse(object=>{if(object instanceof THREE.Mesh){
+                if(!object.userData.tooltipItems)object.userData.tooltipItems=[{title:'Illustrative site service detail',rows:['Parked equipment and concept pipes; no validated route, operating schedule or utility connection.'],tone:'#c9ad7d'}];
+                pickables.push(object);
+              }});
+              host.dataset.siteFacilities=JSON.stringify(campus.facilities.map(f=>({...f,utm:[f.point[0]+PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-f.point[1]]})));
+              host.dataset.siteFacilityOmissions=JSON.stringify(campus.omissions);
+              onSiteFacilities?.(campus.facilities.map(f=>f.id));
+              sitePlan.audit.push('Waste / tailings / water footprints are illustrative display placements, not sourced facility designs; no capacity or siting suitability established',...campus.omissions);
+              host.dataset.siteAudit=JSON.stringify(sitePlan.audit);
+            }
+
             processMarker=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshBasicMaterial({color:0xffb760}));plant.add(processMarker);
             // PaulSam separates mine-to-feed haulage from the downhill conveyor.
             // Do not invent a pit-to-lowland haul road through the licence edge.
@@ -3746,6 +3820,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             for(const p of sitePlan.pits)for(const [x,z] of p.ring)bounds.expandByPoint(new THREE.Vector3(x,p.surface-p.depth*.25,z));
             if(sitePlan.plant){const [x,z]=sitePlan.plant;const y=processPlant?.position.y??0;for(const sign of [-1,1])bounds.expandByPoint(new THREE.Vector3(x+sign*125,y,z+sign*125));}
             const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*.9+250;
+            for(const f of campusFacilities)for(const [x,z] of f.footprint)bounds.expandByPoint(new THREE.Vector3(x,f.level,z));
             bounds.getCenter(cameraShot.target);
             cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.8, distance*.85, distance*.18));
             cameraShot.from.copy(cameraShot.target).add(new THREE.Vector3(-distance, distance, distance*1.3));
@@ -3757,6 +3832,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story'});
               calloutsForProjection.push({id:'development-plant',label:'Lowland processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story'});
             }
+            for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell · concept',water:'Settling / reclaim · concept','raw-water':'Raw-water pond · concept',waste:'Waste-rock benches · concept'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story'});
             siteOverviewCallouts = calloutsForProjection;
             for(const label of calloutsForProjection)calloutAnchors.set(label.id,new THREE.Vector3(...label.anchor));
           }
@@ -3783,11 +3859,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         object.userData.tooltipItems=[{title:object.name||(plantPart?'Processing plant equipment':'Mining concept'),rows:[target?'Above-threshold model cells explain the target; not ore reserves.':pit?'Conceptual benched pit envelope; not an optimised or engineered excavation.':'Illustrative concentrator equipment; dimensions and capacity are conceptual.'],tone:'#dfa066'}];
         pickables.push(object);
       });
+      if(mode==='mine_planning'){
+        mineCampusReady=true;
+        const pending=cameraCommandRef.current;
+        if(pending&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','northPit','southPit'].includes(pending.action))consumeCameraCommand(pending);
+      }
       if (mode === 'subsurface') {
         geologyModelReady = true;
         if (cameraCommandRef.current?.action === 'geologyPlan') consumeCameraCommand(cameraCommandRef.current);
       }
-      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured && !geologyPlan) {
+      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured && !geologyPlan && !facilityFocused) {
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.2, cameraShot.fov);
       }
         const shouldUpgradeTerrain = !cancelled && (resources?.quality ?? assetQuality) === 'preview';
@@ -3906,7 +3987,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       stage.updateMatrixWorld(true);
 
       const density = labelDensityRef.current;
-      if (density === 'off') {
+      if (density === 'off' || geologyPlan) {
         setProjectedFrame({width, height, items: []});
         return;
       }
@@ -4144,6 +4225,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         evidenceLines.forEach(line=>{const count=line.geometry.getAttribute('position').count;line.geometry.setDrawRange(0,beat===0&&story.playing&&!reducedMotion.matches?Math.floor(Math.min(1,storyAge/2.5)*count/2)*2:count);});
         if(processPlant)processPlant.visible=beat>=3&&layerSettingsRef.current.context.visible;
         if(developmentInfrastructure)developmentInfrastructure.visible=beat>=3&&layerSettingsRef.current.context.visible;
+        if(siteCampus)siteCampus.visible=beat>=3&&layerSettingsRef.current.context.visible;
       }
       for(const item of haulTrucks){
         item.mesh.visible=beat>=3&&layerSettingsRef.current.context.visible;
@@ -4263,7 +4345,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           material.userData.highlightOpacity=next;
           material.opacity=next*(layer?layerSettingsRef.current[layer].opacity:1)*(material.userData.revealProgress??1);
       }
-      if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.28:0;mesh.material.opacity=(mesh.name.includes('GRSC')?.9:geologyPlan?.65:.16)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
+      if(geologySurface){
+        const goal=geologyPlan?.78:0;
+        geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,.065);
+        geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.context.visible;
+        geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.context.opacity;});
+      }
+      if(geologySectionLocator)geologySectionLocator.visible=!geologyPlan;
+      if(mode==='subsurface')for(const mesh of geologyMeshes){mesh.visible=!geologyPlan&&layerSettingsRef.current.blocks.visible;const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.28:0;mesh.material.opacity=(geologyPlan?0:mesh.name.includes('GRSC')?.9:.16)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
 
       if (recoverPlanFog && !geologyPlan) {
         authoredFog.near = THREE.MathUtils.lerp(authoredFog.near, 4600, .04);
@@ -4303,6 +4392,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           -profilePoint.north
         );
       }
+      if(mode==='mine_planning'){
+        key.target.position.copy(controls.target);key.position.copy(controls.target).add(mineLightOffset);
+        const radius=Math.round(clamp(camera.position.distanceTo(controls.target)*.65,350,4200)/25)*25;
+        if(radius!==mineShadowRadius){mineShadowRadius=radius;key.shadow.camera.left=-radius;key.shadow.camera.right=radius;key.shadow.camera.top=radius;key.shadow.camera.bottom=-radius;key.shadow.camera.updateProjectionMatrix();}
+        key.shadow.normalBias=facilityFocused ? .15 : .6;
+        const shadowKey=[controls.target.x.toFixed(1),controls.target.y.toFixed(1),controls.target.z.toFixed(1),radius,stage.rotation.x.toFixed(3),stage.rotation.y.toFixed(3),stage.children.length,beat,facilityFocused,plantDetailKey,processPlant?.visible,siteCampus?.visible,pitSurfaces[0]?.visible].join(':');
+        if(shadowKey!==lastMineShadowKey){lastMineShadowKey=shadowKey;renderer.shadowMap.needsUpdate=true;}
+
+      }
       renderer.render(scene,camera);
       frame = requestAnimationFrame(animate);
     };
@@ -4327,6 +4425,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.dispose();
       environmentTexture.dispose();
       disposeObject(scene);
+      key.shadow.map?.dispose();
+      key.shadow.mapPass?.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();

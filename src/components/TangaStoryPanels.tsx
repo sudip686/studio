@@ -2,7 +2,7 @@
 
 import {useEffect, useState} from 'react';
 import {ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, X} from 'lucide-react';
-import {DEVELOPMENT_FACILITIES} from '@/data/tanga-development';
+import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-development';
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
 
 export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
@@ -39,7 +39,9 @@ export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   </>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment}: {chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:'overview'|'feed'|'plant'|'services')=>void}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, developmentViewId, availableDevelopment = []}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void}) {
+  const developmentView=DEVELOPMENT_FACILITIES.find(view=>view.id===developmentViewId);
+  const developmentAvailable=(id:DevelopmentView)=>Boolean(onInspectDevelopment)&&!((id==='tailings'||id==='waste')&&!availableDevelopment.includes(id))&&!(id==='campus'&&!availableDevelopment.length);
   const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
   const milestone = WORK_MILESTONES[milestoneIndex];
 
@@ -101,13 +103,15 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'mine_planning') return <aside className="tanga-story-panel tanga-story-panel--concept" aria-label="Concept and terrain comparison">
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
-    <h2>From the ridge to the lowlands</h2>
-    <p className="tanga-story-panel__intro">PaulSam proposes uphill ore collection and downhill processing between Bwiti and Magati. Follow the connection, then inspect the proposed facilities.</p>
-    <nav className="tanga-development-views" aria-label="Inspect proposed development areas">{DEVELOPMENT_FACILITIES.filter(view=>view.id!=='plant').map(view=><button type="button" key={view.id} disabled={!onInspectDevelopment} onClick={()=>onInspectDevelopment?.(view.id)}><strong>{view.label}</strong><small>{view.detail}</small></button>)}</nav>
+    <h2>{developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
+    <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Follow PaulSam’s uphill feed point and lowland plant candidate, then explore the illustrative waste and water systems.'}</p>
+    <span className="tanga-site-concept-tag">Proposed site · illustrative facilities</span>
+    <select className="tanga-development-select" aria-label="Mine site view" value={developmentViewId ?? 'overview'} onChange={event=>onInspectDevelopment?.(event.target.value as DevelopmentView)}>{DEVELOPMENT_FACILITIES.map(view=><option key={view.id} value={view.id} disabled={!developmentAvailable(view.id)}>{view.label}</option>)}</select>
+    <nav className="tanga-development-views" aria-label="Inspect proposed development areas">{DEVELOPMENT_FACILITIES.filter(view=>view.id!=='plant').map(view=><button type="button" key={view.id} disabled={!developmentAvailable(view.id)} aria-pressed={developmentViewId === view.id} onClick={()=>onInspectDevelopment?.(view.id)}><strong>{view.label}</strong><small>{view.detail}</small></button>)}</nav>
     <details className="tanga-development-source"><summary>Report location &amp; alternatives</summary><p>Option 2 is the report’s planning assumption: 2.15 km and 24° reported inclination. The map trace is approximately 2.45 km, so its alignment and the 2.15 km table estimate need reconciliation. Options 1 and 3 are alternatives, not additional operating conveyors.</p><img src="/presentation-assets/paulsam-conveyor-sites.jpg" alt="PaulSam Figure 3.3 showing three candidate feed stations and conveyor alignments on a labelled UTM 37S grid"/><p>Figure 3.3 · PDF p.33 · June 2023. Locations traced approximately from the grid. The proposed feed apron is offset nearby to clear the current conceptual pit envelope. No surveyed plant parcel or engineered alignment is supplied.</p></details>
     <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Inspect the processing plant <ArrowRight size={14}/></button>
-    {onToggleSurfaceConcept && <button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView ? 'Show concept over terrain' : 'Compare measured terrain'} <ArrowRight size={14}/></button>}
-    <p className="tanga-story-panel__qualification">The lowland campus is outside the provisional mine boundary. Map locations are approximate; buildings, process equipment and water provision are illustrative. Land, forest, water and tailings studies remain required.</p>
+    {onToggleSurfaceConcept && <button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView ? 'Show concept over terrain' : 'Compare original terrain'} <ArrowRight size={14}/></button>}
+    <details className="tanga-development-source"><summary>Concept scope &amp; limits</summary><p>Plant candidate: report-based, outside the provisional mine boundary. Added waste and water placements are illustrative and exceed the plant allowance. Capacity, drainage, ground conditions and land approval remain unverified. Lowland additions use regional terrain context; local survey reconciliation is required.</p></details>
   </aside>;
 
   if (chapter === 'accessibility') return <aside className="tanga-story-panel tanga-story-panel--logistics" aria-label="Report development and export chain">

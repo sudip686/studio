@@ -7,6 +7,7 @@ import {ArrowRight, ExternalLink, Minus, Plus} from 'lucide-react';
 export default function TangaGeologyMapStage({step, ready, onAdvance}: {step: number; ready: boolean; onAdvance: () => void}) {
   const [regional, setRegional] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [legendOpen,setLegendOpen]=useState(false);
   const pan = useRef<{x: number; y: number; left: number; top: number} | null>(null);
   const sheet = step === 0;
   const source = regional ? '/presentation-assets/mre-regional-geology.jpg' : '/geology_map.jpg';
@@ -33,16 +34,17 @@ export default function TangaGeologyMapStage({step, ready, onAdvance}: {step: nu
       </div>
       <footer><span>{regional ? 'AMC · 19 Dec 2025 · Fig. 2.1 · PDF p.18' : 'Tanga project geological map · original legend and grid retained'}</span><a href={source} target="_blank" rel="noreferrer">Full resolution <ExternalLink size={12}/></a></footer>
     </section>}
+    {step === 1 && <div className={`tanga-geology-surface-legend ${legendOpen?'is-open':''}`} aria-label="Mapped rock types"><button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>Rock legend · 7 units {legendOpen?'−':'+'}</button><div>{[['#d8d8e1','Graphitic schist'],['#a188da','Khondalite'],['#0755f5','Kyanite sillimanite schist'],['#b065ac','Mafic granulite'],['#f169e1','Quartzofeldspathic rock'],['#f5d333','Quartzite'],['#41a9ec','Crystalline limestone']].map(([color,label])=><span key={label}><i style={{background:color}}/>{label}</span>)}</div></div>}
     <aside className="tanga-story-panel tanga-story-panel--map" aria-label="Geology map to model story">
       <div className="tanga-story-panel__eyebrow">GEOLOGICAL FRAMEWORK · {sheet ? '01 / MAP' : step === 1 ? '02 / PLAN' : '03 / DEPTH'}</div>
-      <h2>{sheet ? 'Read the geology' : step === 1 ? 'The same model, in plan' : 'Give the geology depth'}</h2>
-      <p className="tanga-story-panel__intro">{sheet ? 'Start with the mapped rock units and their relationship to the recorded drilling. Then inspect the project interpretation from above and below.' : step === 1 ? 'A north-up orthographic view removes perspective. Follow the interpreted units across the project before tilting into depth.' : 'The plan lifts into the existing 3D interpretation. Rock contacts, terrain and recorded holes retain their registered coordinates.'}</p>
+      <h2>{sheet ? 'Read the geology' : step === 1 ? 'Rock types on the ground' : 'Give the geology depth'}</h2>
+      <p className="tanga-story-panel__intro">{sheet ? 'Start with the mapped rock units and their relationship to the recorded drilling. Then inspect the project interpretation from above and below.' : step === 1 ? 'Only the mapped rock areas are coloured. Transparent gaps keep the terrain visible; hover a polygon to identify its rock type.' : 'The camera drops from overhead toward the horizon. The surface map fades as the existing registered 3D geological interpretation is revealed.'}</p>
       <ol className="tanga-geology-map-sequence" aria-label="Map to model sequence">
-        {['Read the 2D map', 'Locate the model in plan', 'Tilt into 3D'].map((label, i) => <li key={label} aria-current={step === i ? 'step' : undefined}><span>0{i + 1}</span>{label}</li>)}
+        {['Read the source map', 'Drape the rock polygons', 'Tilt into the 3D model'].map((label, i) => <li key={label} aria-current={step === i ? 'step' : undefined}><span>0{i + 1}</span>{label}</li>)}
       </ol>
-      <div className="tanga-story-inline-note">{sheet ? 'Source map colours follow its original legend. In the 3D interpretation, orange highlights the graphitic-schist host.' : 'Orange: interpreted graphitic-schist host. Muted colours: surrounding modelled rock units.'}</div>
-      <p className="tanga-story-datum-note">{sheet ? (regional ? 'The MRE figure is regional context at 1:10,000,000. It is separate from the detailed project map and 3D interpretation.' : 'Existing project map asset; its image-to-ground registration has not been independently verified. It is displayed as a document, not draped onto the terrain.') : 'The plan projects existing interpreted volumes; it is not a new surface outcrop map. No contacts are created by extruding the report image.'}</p>
-      <button type="button" className="tanga-story-panel__compare" onClick={onAdvance} disabled={!ready}>{!ready ? 'Preparing project model…' : sheet ? 'View the project in plan' : step === 1 ? 'Lift into 3D' : 'Reveal the interpreted section'} <ArrowRight size={14}/></button>
+      <div className="tanga-story-inline-note">{sheet ? 'Source map colours follow its original legend. In the 3D interpretation, orange highlights the graphitic-schist host.' : (step === 1 ? 'Polygon colours follow the source-map legend. Soil cover is transparent.' : 'Orange: interpreted graphitic-schist host. Muted colours: surrounding modelled rock units.')}</div>
+      <p className="tanga-story-datum-note">{sheet ? (regional ? 'The MRE figure is regional context at 1:10,000,000. It is separate from the detailed project map and 3D interpretation.' : 'Source sheet retained for comparison. The next view digitizes its coloured rock areas using the printed UTM grid; original geological shapefiles were not supplied.') : (step === 1 ? 'Derived polygons, approximately registered from the printed grid. Map datum and contacts need survey verification. Grab sampling is reported, but usable sample coordinates were not found.' : 'Mapped surface areas and modelled volumes are distinct interpretations. No report-image contacts are extruded into the existing model.')}</p>
+      <button type="button" className="tanga-story-panel__compare" onClick={onAdvance} disabled={!ready}>{!ready ? 'Preparing project model…' : sheet ? 'Drape the rock polygons' : step === 1 ? 'Lift into 3D' : 'Reveal the interpreted section'} <ArrowRight size={14}/></button>
     </aside>
   </>;
 }

@@ -978,3 +978,76 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 
 .tanga-geology-map-sheet__viewport,.tanga-story-panel--map{scrollbar-width:thin;scrollbar-color:#8d7756 #192127}
+.tanga-site-concept-tag{display:inline-flex;margin:2px 0 0;border-left:2px solid #bda173;padding:5px 9px;color:#e0c7a3;font-size:10px;letter-spacing:.035em;background:#bda1730c}
+.tanga-development-views{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.tanga-development-views button{min-width:0;min-height:58px}
+.tanga-development-views button[aria-pressed=true]{border-color:#d7b592;background:#49372b}
+.tanga-development-views button:disabled{opacity:.4;cursor:default}
+.tanga-story-panel--concept{scrollbar-width:thin;scrollbar-color:#8d7756 #192127}
+.tanga-development-select{display:none}
+.tanga-peer-pin{position:absolute;pointer-events:auto;transform:translate(-50%,-50%);display:grid;place-items:center;min-width:22px;width:22px;height:22px;padding:0;border:1px solid #e0e8ed;border-radius:50%;background:#172c3bed;color:#f3eade;font-size:10px;font-variant-numeric:tabular-nums;cursor:pointer;z-index:3;box-shadow:0 1px 8px #0009}
+.tanga-peer-pin.is-tanga,.tanga-peer-pin.is-active{background:#bd5e2c;color:white;border-color:#ffe0ac;z-index:5}
+.tanga-peer-pin:focus-visible{outline:2px solid #ffd4a2;outline-offset:4px}
+.tanga-geology-surface-legend{position:absolute;z-index:24;left:24px;bottom:180px;width:215px;padding:14px 16px;background:#172026e8;border-left:2px solid #bd946e;display:grid;gap:7px;color:#d7e0e4;font-size:11px;pointer-events:none}
+.tanga-geology-surface-legend span{display:flex;align-items:center;gap:9px}
+.tanga-geology-surface-legend i{width:13px;height:13px;border-radius:2px;flex-shrink:0}
+/* The comparison leaves a broad, unobstructed globe between two edge columns. */
+.tanga-peer-benchmark{inset:174px 24px 122px;display:grid;grid-template-columns:220px minmax(0,1fr) 352px;gap:24px;overflow:visible}
+.tanga-peer-benchmark__narrative{grid-column:1;align-self:start;max-width:220px;pointer-events:none}
+.tanga-peer-benchmark h2{font-size:34px;line-height:1.12;margin:12px 0}
+.tanga-peer-benchmark__narrative>p{font-size:12px;line-height:1.55}
+.tanga-peer-benchmark__narrative>small{font-size:10px;line-height:1.5}
+.tanga-peer-benchmark__narrative>button{min-height:38px;padding:9px 12px;font-size:11px}
+.tanga-peer-benchmark__narrative>.tanga-peer-benchmark__globe-reset{display:block;margin-top:9px;background:#19242ae6;border-color:#ffffff30;color:#cdd7dc}
+.tanga-peer-benchmark__chart{grid-column:3;padding:14px;border-radius:10px;background:#111b22ed;min-height:0;overflow:hidden}
+.tanga-peer-benchmark__chart header{margin-bottom:10px}
+.tanga-peer-benchmark__chart h3{font-size:18px}
+.tanga-peer-benchmark li{display:block;flex:0 0 auto;padding:0;min-height:0}
+.tanga-peer-benchmark li>button{display:grid;grid-template-columns:24px minmax(0,1fr) 42px;gap:8px;align-items:center;width:100%;min-height:36px;padding:5px 7px;text-align:left;background:transparent;border:0;color:inherit;cursor:pointer}
+.tanga-peer-benchmark li>button>b{text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+.tanga-peer-benchmark__project strong{font-size:11px}
+.tanga-peer-benchmark__project small{font-size:9px}
+.tanga-peer-benchmark li.is-selected{background:#b7c5cc16;border-color:#b5c7d2}
+.tanga-peer-benchmark__selection{padding:10px 0 0;margin-top:8px;border-top:1px solid #ffffff25;flex-shrink:0}
+.tanga-peer-benchmark__selection strong,.tanga-peer-benchmark__selection span{display:block;font-size:11px}
+.tanga-peer-benchmark__selection span,.tanga-peer-benchmark__selection small{color:#9fb3bf;font-size:9px;margin-top:4px}
+.tanga-peer-benchmark__selection p{font-size:11px;line-height:1.45;color:#dfc5aa;margin:5px 0}
+.tanga-peer-benchmark footer{flex-shrink:0;font-size:9px;line-height:1.45;margin-top:9px}
+.tanga-peer-benchmark__select{display:none}
+@media(max-width:1050px){.tanga-peer-benchmark{grid-template-columns:170px minmax(0,1fr) 300px;gap:12px}.tanga-peer-benchmark h2{font-size:27px}}
+@media(max-width:760px){
+  .tanga-development-select{display:block;width:100%;min-height:40px;margin:8px 0;background:#1d2a32;color:#f1dfc7;border:1px solid #ac8a62;border-radius:6px;padding:8px;font-size:12px}
+  .tanga-story-panel--concept{max-height:162px!important;bottom:141px!important;padding:12px 16px!important}
+  .tanga-story-panel--concept h2{font-size:18px;margin:5px 0}
+  .tanga-story-panel--concept .tanga-story-panel__intro,.tanga-story-panel--concept .tanga-site-concept-tag,.tanga-story-panel--concept .tanga-development-views,.tanga-story-panel--concept .tanga-story-panel__link{display:none}
+  .tanga-three.is-mine_planning .tanga-three__camera-tools{display:none}
+  .tanga-geology-surface-legend{left:12px;bottom:310px;max-width:145px;padding:9px;font-size:9px;gap:4px}
+  .tanga-peer-benchmark{inset:170px 12px 140px;display:flex;flex-direction:column;justify-content:space-between;overflow:visible;pointer-events:none}
+  .tanga-peer-benchmark__narrative{align-self:flex-start;max-width:230px}
+  .tanga-peer-benchmark h2{font-size:23px;margin:0 0 6px}
+  .tanga-peer-benchmark h2 br{display:none}
+  .tanga-peer-benchmark__narrative>p,.tanga-peer-benchmark__narrative>small,.tanga-peer-benchmark__eyebrow{display:none}
+  .tanga-peer-benchmark__narrative>button{display:inline-block;min-height:32px;padding:7px 9px;font-size:10px}
+  .tanga-peer-benchmark__narrative>.tanga-peer-benchmark__globe-reset{display:inline-block;margin:0 0 0 6px}
+  .tanga-peer-benchmark__chart{flex:none;min-height:0;max-height:205px;padding:10px}
+  .tanga-peer-benchmark__chart header{margin-bottom:7px}.tanga-peer-benchmark__chart h3{font-size:15px}
+  .tanga-peer-benchmark__select{display:block;width:100%;background:#24333e;color:#f0e5d8;padding:9px;border:1px solid #a58d70;border-radius:5px;font-size:11px;min-height:38px}
+  .tanga-peer-benchmark ol{display:none}.tanga-peer-benchmark footer{font-size:8px;margin-top:6px}
+  .tanga-peer-benchmark__selection{padding-top:6px;margin-top:6px}.tanga-peer-benchmark__selection small{display:none}
+}
+
+.tanga-peer-benchmark ol{gap:2px;scrollbar-color:#52616c #172128;scrollbar-width:thin}
+.tanga-peer-benchmark li>button{min-height:32px;padding-block:3px}
+.tanga-peer-benchmark__project strong,.tanga-peer-benchmark__project small{line-height:1.2}
+
+@media(max-width:760px){.tanga-peer-benchmark__chart{overflow:auto;scrollbar-width:thin;scrollbar-color:#52616c #172128}}
+
+.tanga-geology-surface-legend>div{display:grid;gap:7px}
+.tanga-geology-surface-legend>button{display:none}
+@media(max-width:760px){
+  .tanga-deck:has(.tanga-geology-surface-legend) .tanga-three__camera-tools{display:none}
+  .tanga-geology-surface-legend{pointer-events:auto;width:auto;max-width:180px;bottom:310px}
+  .tanga-geology-surface-legend>button{display:block;background:transparent;border:0;color:#e9d1b1;padding:4px 0;font-size:10px;cursor:pointer;min-height:30px}
+  .tanga-geology-surface-legend>div{display:none;gap:5px}
+  .tanga-geology-surface-legend.is-open>div{display:grid;margin-top:7px}
+}
