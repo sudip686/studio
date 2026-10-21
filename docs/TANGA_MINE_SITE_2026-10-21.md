@@ -35,3 +35,5 @@ Runtime placements in EPSG:32737: tailings E477950/N9463420 (340 × 260 m); sett
 `npm run typecheck` passed. `npm run cf:build` passed, including the Next.js production build and OpenNext worker bundle; the existing large-asset R2 routing remains intact. No Cloudflare worker was published.
 
 Hosted Vercel preview `bb2f213` reached Ready. Waste-rock and processing-plant detail cameras were inspected on the hosted app. The local site audit placed all four facilities without omissions; the hosted controls and corresponding 3D facilities loaded successfully.
+
+Phone presentation mode uses the compact site selector; the detailed processing-equipment inspector is reserved for evidence mode. Plant-detail cameras fit the narrow viewport.

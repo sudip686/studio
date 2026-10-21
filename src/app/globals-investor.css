@@ -1053,3 +1053,5 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 
 .tanga-peer-benchmark li>button:disabled{cursor:wait}
+
+@media(max-width:760px){.tanga-deck--present .tanga-three.is-mine_planning .tanga-mine-story{display:none}}

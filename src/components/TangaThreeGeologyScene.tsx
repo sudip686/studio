@@ -2575,13 +2575,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       if(command.action==='plantDetail'&&processPlant){
         facilityFocused=true;
-        setStoryPlaying(false); setMiningBeat(3); setInspectionOpen(true);
+        setStoryPlaying(false); setMiningBeat(3); setInspectionOpen(camera.aspect>=1);
         const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
         const selected=stages?.find(item=>item.id===command.stage);
         calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:item.point,kind:'story' as const}));
         for(const callout of calloutsForProjection){calloutAnchors.set(callout.id,new THREE.Vector3(...callout.anchor));calloutObjects.set(callout.id,processPlant);}
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
-        const position=centre.clone().add(selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350));
+        const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
         scheduleCameraTween(position,centre,1.3,42);return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
