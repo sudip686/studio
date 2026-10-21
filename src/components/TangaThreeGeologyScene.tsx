@@ -167,6 +167,7 @@ const CHROME_SELECTORS = [
   // resource scene ended up with a callout sitting 46% over its own panel.
   '.tanga-deck__data-panel',
   '.tanga-story-panel',
+  '.tanga-story-cue',
   '.tanga-deck__insight-panel',
   '.tanga-deck__ranking',
   '.tanga-three__grade-legend',
@@ -241,6 +242,7 @@ type TangaThreeGeologySceneProps = {
    */
   labelDensity?: LabelDensity;
   layerSettings?: DeckLayerSettings;
+  inspectionMode?: boolean;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
@@ -1955,9 +1957,12 @@ export default function TangaThreeGeologyScene({
   onLoadState,
   labelDensity = 'key',
   layerSettings = DEFAULT_LAYER_SETTINGS,
+  inspectionMode = false,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const [inspectionOpen, setInspectionOpen] = useState(false);
+  useEffect(() => setInspectionOpen(false), [mode]);
   const controlsRef = useRef<OrbitControls | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
   const gradeFocusMaterialsRef=useRef<THREE.Material[]>([]);
@@ -2445,6 +2450,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
 
       if(command.action==='plantDetail'&&processPlant){
+        setStoryPlaying(false); setMiningBeat(3); setInspectionOpen(true);
         const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
         const selected=stages?.find(item=>item.id===command.stage);
         calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:item.point,kind:'story' as const}));
@@ -2454,6 +2460,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         scheduleCameraTween(position,centre,1.3,42);return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
+        setStoryPlaying(false); setMiningBeat(2);
         calloutsForProjection = siteOverviewCallouts;
         const pits=[...(sitePlan?.pits??[])].sort((a,b)=>a.centre[1]-b.centre[1]);
         const pit=pits[command.action==='northPit'?0:1];
@@ -4308,7 +4315,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           : 'Drillhole volume';
 
   return (
-    <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`)} aria-hidden={!visible}>
+    <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
       {!sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
       {(/failed|unavailable|exceeded|could not|no contained/i.test(status)) && (
@@ -4442,6 +4449,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             cameraCommandHandlerRef.current?.({id: Date.now(), action: 'resetView'});
           }}>Reset view</button>
           <small>Drag to orbit · Shift + drag to pan · scroll to zoom</small>
+          {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{inspectionOpen ? 'Close inspection tools' : 'Inspection tools'}</button>}
         </div>
         {mode==='resource'&&<details className="tanga-three-animation-tools"><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
@@ -4569,7 +4577,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <footer>TC = total carbon in concentrate; TGC = total graphitic carbon in feed/model. Feed assay and complete impurity/sieve tables are not connected here.<br/>Source: existing project-deck summaries (metallurgy and product_quality); original laboratory report verification pending.</footer>
       </section>}
       {mode === 'resource' && (
-        <div className="tanga-three__grade-legend" aria-label="TGC grade legend">
+        <details className="tanga-three__grade-legend" aria-label="TGC grade legend">
+          <summary>Read the grade colours · % TGC</summary>
           <div className="tanga-three__grade-head">
             <span>TGC Grade</span>
             <strong>{resourceFocusLabel(resourceFocus)} view</strong>
@@ -4602,7 +4611,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               </li>
             ))}
           </ol>
-        </div>
+        </details>
       )}
     </section>
   );
