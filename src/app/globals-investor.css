@@ -226,6 +226,262 @@
   text-wrap: balance;
 }
 
+/* One quiet instrument system for evidence cards, scene markers and map tools.
+   The canvas stays dominant; cards use a shared inset, radius, type scale and
+   hairline so scene-specific content no longer looks assembled from different
+   HUD kits. */
+:root {
+  --tanga-panel-bg: rgba(9, 15, 22, 0.94);
+  --tanga-panel-border: rgba(218, 229, 239, 0.14);
+  --tanga-panel-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  --tanga-panel-radius: 14px;
+  --tanga-panel-pad: 15px;
+  --tanga-label: #9dc6d1;
+  --tanga-muted: rgba(223, 231, 237, 0.68);
+  --tanga-accent: #e39a5e;
+}
+
+.tanga-deck__data-panel,
+.tanga-deck__insight-panel,
+.tanga-three__grade-legend,
+.tanga-three__drill-legend,
+.tanga-deck__peer-popup,
+.tanga-deck__notes,
+.tanga-deck__layers,
+.tanga-deck__inspector {
+  border: 1px solid var(--tanga-panel-border) !important;
+  border-radius: var(--tanga-panel-radius) !important;
+  background: linear-gradient(155deg, rgba(15, 23, 32, 0.97), var(--tanga-panel-bg)) !important;
+  box-shadow: var(--tanga-panel-shadow) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.08) !important;
+  backdrop-filter: blur(18px) saturate(1.08) !important;
+}
+
+/* Source data keeps a compact, natural height. The earlier forced top/bottom
+   pairing stretched short tables into empty glass columns and squeezed labels. */
+.tanga-deck .tanga-deck__data-panel,
+.tanga-deck .tanga-deck__insight-panel {
+  top: clamp(126px, 18vh, 154px) !important;
+  right: 24px !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: min(320px, 28vw) !important;
+  height: max-content !important;
+  max-height: calc(100svh - 280px) !important;
+  padding: var(--tanga-panel-pad) !important;
+  gap: 12px !important;
+  overflow: auto !important;
+}
+
+.tanga-deck__data-panel-head,
+.tanga-deck__insight-eyebrow {
+  gap: 5px !important;
+  padding-bottom: 11px !important;
+  border-bottom-color: rgba(218, 229, 239, 0.12) !important;
+}
+
+.tanga-deck__data-panel-eyebrow,
+.tanga-deck__insight-eyebrow,
+.tanga-three__drill-legend-head > span,
+.tanga-three__grade-head > span {
+  color: var(--tanga-label) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.17em !important;
+}
+
+.tanga-deck__data-panel-title {
+  font-size: 17px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.025em !important;
+}
+
+.tanga-deck__data-panel-source {
+  color: var(--tanga-muted) !important;
+  font-size: 10px !important;
+  line-height: 1.45 !important;
+}
+
+.tanga-deck__data-table {
+  table-layout: fixed !important;
+}
+
+.tanga-deck__data-table th:empty,
+.tanga-deck__data-table td:empty {
+  display: none !important;
+}
+
+.tanga-deck__data-table th,
+.tanga-deck__data-table td {
+  padding: 8px 7px !important;
+  line-height: 1.35 !important;
+}
+
+.tanga-deck__data-table th.is-label,
+.tanga-deck__data-table td.is-label {
+  width: 50%;
+  color: rgba(225, 232, 238, 0.72) !important;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 11px !important;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.tanga-deck__data-table th.is-num,
+.tanga-deck__data-table td.is-num {
+  width: 50%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.tanga-deck__data-table th.is-num { white-space: nowrap; }
+
+.tanga-deck__data-table td.is-num {
+  color: rgba(250, 247, 242, 0.94) !important;
+}
+
+.tanga-deck__data-panel { overflow-x: hidden !important; }
+
+.tanga-deck__data-table tr.is-emphasis td {
+  background: rgba(220, 133, 77, 0.13) !important;
+}
+
+.tanga-deck__data-panel.is-topography .tanga-deck__data-table tr:not(.is-emphasis) td:nth-child(2) {
+  background: transparent !important;
+}
+
+.tanga-deck--three-active .tanga-deck__geo-overlay {
+  display: none !important;
+}
+
+/* Camera-pinned labels use the same card tone and do not compete with titles. */
+.tanga-deck__callout,
+.tanga-three__callout {
+  min-width: 176px;
+  max-width: 224px !important;
+  padding: 10px 12px !important;
+  gap: 5px !important;
+  border: 1px solid rgba(232, 239, 244, 0.16) !important;
+  border-left: 2px solid var(--callout-tone, var(--tanga-accent)) !important;
+  border-radius: 10px !important;
+  background: linear-gradient(155deg, rgba(13, 20, 28, 0.95), rgba(7, 12, 18, 0.94)) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.tanga-deck__callout > span,
+.tanga-three__callout > span {
+  color: var(--tanga-label) !important;
+  font-size: 9px !important;
+  letter-spacing: 0.15em !important;
+  line-height: 1.25 !important;
+}
+
+.tanga-deck__callout > strong,
+.tanga-three__callout > strong {
+  color: rgba(248, 247, 244, 0.95) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.42 !important;
+}
+
+.tanga-deck__pin-label {
+  min-height: 28px;
+  padding: 6px 10px !important;
+  border: 1px solid rgba(216, 229, 239, 0.18) !important;
+  border-radius: 7px !important;
+  background: rgba(8, 14, 21, 0.92) !important;
+  color: rgba(247, 245, 241, 0.94) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0.045em !important;
+}
+
+.tanga-deck__peer-label.is-tanga,
+.tanga-deck__pin-label.is-active {
+  border-color: rgba(227, 154, 94, 0.62) !important;
+  color: #ffe0bd !important;
+}
+
+.tanga-three.is-topography .tanga-three__drill-legend-head strong {
+  color: rgba(240, 237, 231, 0.88);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .tanga-deck .tanga-deck__data-panel,
+  .tanga-deck .tanga-deck__insight-panel {
+    top: 160px !important;
+    right: 14px !important;
+    width: min(284px, calc(100vw - 28px)) !important;
+    max-height: calc(100svh - 300px) !important;
+    padding: 13px !important;
+  }
+
+}
+
+@media (max-width: 600px) {
+  .tanga-deck .tanga-deck__explore-toggle {
+    top: 84px !important;
+    right: 12px !important;
+    width: 112px;
+    min-height: 38px;
+    padding: 6px 10px;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .tanga-deck .tanga-deck__data-panel,
+  .tanga-deck .tanga-deck__insight-panel {
+    max-height: min(34svh, 300px) !important;
+  }
+
+  .tanga-deck .tanga-deck__pager {
+    bottom: 10px !important;
+    left: 50% !important;
+    width: calc(100vw - 20px) !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    padding: 7px !important;
+    border-radius: 16px !important;
+  }
+
+  .tanga-deck__pager-divider,
+  .tanga-deck__pager-btn--tool[aria-label="Show speaker notes"],
+  .tanga-deck__pager-btn--tool[aria-label="Keyboard shortcuts"] {
+    display: none !important;
+  }
+
+  .tanga-deck__pager-btn { width: 34px !important; height: 34px !important; }
+  .tanga-deck__pager-speed { width: 42px !important; height: 34px !important; padding: 0 !important; }
+  .tanga-deck__pager-count { min-width: 96px !important; }
+  .tanga-deck__pager-track { width: 72px !important; }
+  .tanga-deck__voice-dock { display: none !important; }
+
+  .tanga-three.is-topography .tanga-three__nav-cluster {
+    top: auto !important;
+    bottom: 146px !important;
+    left: 14px !important;
+    width: min(248px, calc(100vw - 28px)) !important;
+  }
+
+  .tanga-three.is-topography .tanga-three__instrument-row {
+    grid-template-columns: 48px minmax(0, 1fr) !important;
+  }
+
+  .tanga-three.is-topography .tanga-three__drill-legend li small {
+    max-width: 34ch;
+  }
+}
+
 @media (max-width: 760px) {
   .tanga-intro__brand {
     top: max(1rem, env(safe-area-inset-top));

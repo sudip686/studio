@@ -87,7 +87,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'resetView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 type ThreeCameraCommand = {
   id: number;
@@ -386,6 +386,7 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
       {cells: ['Max elevation', '≈940 m', '']},
       {cells: ['Min elevation', '≈300 m', '']},
       {cells: ['Relief range', '≈640 m', ''], emphasis: true},
+      {cells: ['Vertical display', '1.25×', '']},
       {cells: ['Setting', 'Maramba village', '']},
       // "Low-relief foothills" sat directly under a relief range of ~800 m in
       // the same panel, which is a contradiction a reader will catch. The
@@ -734,8 +735,8 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'tested-ground', label: 'Tested ground', detail: 'Close on the boundary and drill coverage', view: {...VIEW_STATES.project, zoom: 13.35, pitch: 54, bearing: 28}},
   ],
   topography: [
-    {id: 'relief', label: 'Relief overview', detail: 'Read the full terrain envelope', view: VIEW_STATES.topography},
-    {id: 'raking-light', label: 'Raking relief', detail: 'Lower the view to reveal drainage and slope', view: {...VIEW_STATES.topography, zoom: 13.75, pitch: 68, bearing: 34}},
+    {id: 'relief', label: 'Relief overview', detail: 'Rotate the measured project surface in three dimensions', threeAction: 'resetView'},
+    {id: 'raking-light', label: 'Raking relief', detail: 'Move across the ridges from a low oblique angle', threeAction: 'terrainProfile'},
   ],
   accessibility: [
     {id: 'corridor', label: 'Access corridor', detail: 'Project-to-port infrastructure context', view: VIEW_STATES.accessibility},
@@ -3058,7 +3059,7 @@ export default function TangaDeckWorkbench() {
     };
   }, [prepareVoiceSession, releaseMicStream]);
 
-  const threeVisible = activeMode === 'drillholes' || activeMode === 'subsurface' || activeMode === 'resource' || activeMode === 'mine_planning' || activeMode === 'metallurgy';
+  const threeVisible = activeMode === 'topography' || activeMode === 'drillholes' || activeMode === 'subsurface' || activeMode === 'resource' || activeMode === 'mine_planning' || activeMode === 'metallurgy';
   const localContextMode = activeMode === 'project' || activeMode === 'topography' || activeMode === 'accessibility';
   // Native MapLibre terrain and external DEM hillshade tiles make this globe path
   // slower and have triggered terrain-depth shader errors, so relief is carried by
@@ -4084,19 +4085,17 @@ export default function TangaDeckWorkbench() {
     const sorted = scored.sort((a, b) => b.score - a.score).map((item) => item.prompt);
     return (sorted.length > 0 ? sorted : COMMON_PROMPTS).slice(0, 6);
   }, [activeMode, commandText, resourceFocus, routeTarget]);
-  const threeMode = (threeVisible ? activeMode : 'drillholes') as 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
+  const threeMode = (threeVisible ? activeMode : 'drillholes') as 'topography' | 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
   const storyHeroVisible = false;
   const legendItems = legendForMode(activeMode, routeTarget, resourceFocus);
   const scale = niceScale(viewState, threeVisible);
   const compassBearing = viewState.bearing;
   const terrainStatus = threeVisible
-    ? 'Three.js geology'
+    ? activeMode === 'topography' ? 'Three.js terrain' : 'Three.js geology'
     : activeMode === 'ranking'
       ? 'Peer globe active'
       : activeMode === 'comparison'
         ? 'Peer comparison active'
-      : activeMode === 'topography'
-        ? 'Raised DEM active'
         : activeMode === 'project'
           ? 'Fast project view'
         : 'Globe imagery active';
@@ -5391,7 +5390,7 @@ export default function TangaDeckWorkbench() {
           pager, keyboard shortcuts, autoplay, and speaker notes. */}
 
       {activeDataTable && (
-        <aside key={`data-${activeMode}`} className="tanga-deck__data-panel" aria-label={activeDataTable.title}>
+        <aside key={`data-${activeMode}`} className={classNames('tanga-deck__data-panel', `is-${activeMode}`)} aria-label={activeDataTable.title}>
           <div className="tanga-deck__data-panel-head">
             <span className="tanga-deck__data-panel-eyebrow">Source data</span>
             <strong className="tanga-deck__data-panel-title">{activeDataTable.title}</strong>

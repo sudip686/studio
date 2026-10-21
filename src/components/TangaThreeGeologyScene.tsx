@@ -33,13 +33,19 @@ import {
 import {DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {placeLabels, type LabelCandidate, type Rect} from '@/lib/labels/declutter';
 
-type GeologyMode = 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
+type GeologyMode = 'topography' | 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
 /**
  * Ground palette. The reference decks keep the earth desaturated and warm so
  * the orebody's saturated grade colours are the only vivid thing on screen.
  */
 const TERRAIN_GROUND_COLOR = 0x9a8267;   // untextured fallback surface
 const TERRAIN_TEXTURE_TINT = 0xcbb9a4;   // multiplier over the satellite map
+const TOPOGRAPHY_ELEVATION_RAMP = [
+  {at: 0, color: new THREE.Color('#27352f')},
+  {at: 0.36, color: new THREE.Color('#46564a')},
+  {at: 0.72, color: new THREE.Color('#6f684f')},
+  {at: 1, color: new THREE.Color('#927653')},
+];
 /** Flat neutral sky, kept dark enough that the deck's HUD still reads over it. */
 const SKY_COLOR = 0x2b2723;
 
@@ -218,7 +224,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'resetView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
 };
 
@@ -389,6 +395,7 @@ type TerrainMeta = {
   };
   width: number;
   height: number;
+  elevation_m: {min: number; max: number};
 };
 
 type TangaTerrainResources = {
@@ -550,7 +557,7 @@ function localLonLatFromPlane(x: number, planeY: number) {
   };
 }
 
-function sampleTerrainAtLocal(resources: TangaTerrainResources, x: number, planeY: number, lift = 0) {
+function sampleTerrainAtLocal(resources: TangaTerrainResources, x: number, planeY: number, lift = 0, verticalScale = VERTICAL_EXAGGERATION) {
   const {lon, lat} = localLonLatFromPlane(x, planeY);
   const [easting, northing] = proj4('WGS84', 'EPSG:32737', [lon, lat]) as [number, number];
   const {bounds_utm, width, height} = resources.meta;
@@ -560,6 +567,7 @@ function sampleTerrainAtLocal(resources: TangaTerrainResources, x: number, plane
   if (u < 0 || u > 1 || v < 0 || v > 1) {
     return {
       y: SURFACE_Y + surfaceRise(x, planeY) + lift,
+      elevation: LOCAL_VERTICAL_DATUM + surfaceRise(x, planeY),
       u: clamp(u, 0, 1),
       v: clamp((northing - minY) / Math.max(1, maxY - minY), 0, 1),
     };
@@ -582,7 +590,8 @@ function sampleTerrainAtLocal(resources: TangaTerrainResources, x: number, plane
   const terrainHeight = top * (1 - ty) + bottom * ty;
 
   return {
-    y: (terrainHeight - LOCAL_VERTICAL_DATUM) * VERTICAL_EXAGGERATION + lift,
+    y: (terrainHeight - LOCAL_VERTICAL_DATUM) * verticalScale + lift,
+    elevation: terrainHeight,
     u: clamp(u, 0, 1),
     v: clamp((northing - minY) / Math.max(1, maxY - minY), 0, 1),
   };
@@ -826,6 +835,15 @@ function makeCameraShot(
 }
 
 function cameraShotForMode(mode: GeologyMode, lowCamera: boolean): CameraShot {
+  if (mode === 'topography') {
+    return makeCameraShot(
+      new THREE.Vector3(-6200, 4700, 8100),
+      new THREE.Vector3(-4550, 3250, 5900),
+      new THREE.Vector3(0, -30, 0),
+      {fov: 42, lift: 170, drift: new THREE.Vector3(36, 8, 28), yawDrift: 0.006, flySeconds: 3.6}
+    );
+  }
+
   if (mode === 'resource') {
     return lowCamera
       ? makeCameraShot(
@@ -1110,6 +1128,23 @@ function threeCallouts(
     ? `${assayFacts.interceptCount} intercepts above ${assayFacts.cutoffLabel} across ${assayFacts.holeCount} holes`
     : null;
 
+  if (mode === 'topography') {
+    return [
+      {
+        id: 'terrain-ridges',
+        label: 'Ridge relief',
+        detail: 'Measured project DEM · 1.25× display scale',
+        x: 37, y: 32, tone: '#e4a85d', anchor: [-1650, 180, -940], side: 'right', kind: 'story',
+      },
+      {
+        id: 'terrain-drainage',
+        label: 'Slope & elevation',
+        detail: 'Relief follows the measured project DEM',
+        x: 62, y: 58, tone: '#84c7d5', anchor: [1260, -20, 980], side: 'left', kind: 'story',
+      },
+    ];
+  }
+
   if (mode === 'drillholes') {
     return [
       {
@@ -1178,6 +1213,13 @@ function threeCallouts(
 }
 
 function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
+  if (mode === 'topography') {
+    return [
+      {label: 'Terrain surface', detail: 'Measured DEM with modest vertical emphasis', tone: '#d99a59'},
+      {label: 'Project boundary', detail: 'Provisional boundary from supplied project data', tone: '#ffe3a6'},
+      {label: 'Lower elevations', detail: 'Dark green to warm stone at higher ground', tone: '#46564a'},
+    ];
+  }
   if (mode === 'resource') {
     return [
       {label: 'Drill assays', detail: 'purple intervals kept as support', tone: '#c084fc'},
@@ -1594,15 +1636,32 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
   const depth = TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
   const uvs: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
 
   for (let row = 0; row <= segmentsY; row += 1) {
     const planeY = (row / segmentsY - 0.5) * depth;
     for (let column = 0; column <= segmentsX; column += 1) {
       const x = (column / segmentsX - 0.5) * width;
-      const sample = sampleTerrainAtLocal(resources, x, planeY, mode === 'subsurface' ? 18 : 4);
+      const verticalScale = mode === 'topography' ? 1.25 : VERTICAL_EXAGGERATION;
+      const sample = sampleTerrainAtLocal(resources, x, planeY, mode === 'subsurface' ? 18 : 4, verticalScale);
       positions.push(x, sample.y, -planeY);
       uvs.push(sample.u, sample.v);
+      if (mode === 'topography') {
+        const elevationMin = resources.meta.elevation_m.min;
+        const elevationRange = Math.max(1, resources.meta.elevation_m.max - elevationMin);
+        const normalized = clamp((sample.elevation - elevationMin) / elevationRange, 0, 1);
+        let rampIndex = 0;
+        while (rampIndex < TOPOGRAPHY_ELEVATION_RAMP.length - 2 && normalized > TOPOGRAPHY_ELEVATION_RAMP[rampIndex + 1].at) rampIndex += 1;
+        const lower = TOPOGRAPHY_ELEVATION_RAMP[rampIndex];
+        const upper = TOPOGRAPHY_ELEVATION_RAMP[rampIndex + 1];
+        const blend = clamp((normalized - lower.at) / (upper.at - lower.at), 0, 1);
+        colors.push(
+          lower.color.r + (upper.color.r - lower.color.r) * blend,
+          lower.color.g + (upper.color.g - lower.color.g) * blend,
+          lower.color.b + (upper.color.b - lower.color.b) * blend,
+        );
+      }
     }
   }
 
@@ -1622,6 +1681,7 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  if (mode === 'topography') geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -2119,7 +2179,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // Lower exposure so the bright satellite terrain doesn't wash out; a CSS
     // contrast/saturation grade then adds punch. Tuned by measuring canvas
     // luminance (~220 was washed; target ~185 with more tonal range).
-    renderer.toneMappingExposure = 1.02;
+    renderer.toneMappingExposure = mode === 'topography' ? 0.9 : 1.02;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
@@ -2224,6 +2284,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return;
       }
 
+      if (command.action === 'terrainProfile' && mode === 'topography') {
+        surfaceCameraView = 'default';
+        applyTerrainSurfaceView();
+        const profileTarget = new THREE.Vector3(360, -30, -300);
+        const profilePosition = profileTarget.clone().add(new THREE.Vector3(5550, 3400, 5200));
+        scheduleCameraTween(profilePosition, profileTarget, 2.2, 43);
+        setStatus('Camera following the project terrain from a raking angle');
+        return;
+      }
+
       if(command.action==='plantDetail'&&processPlant){
         const centre=processPlant.position.clone().add(new THREE.Vector3(0,40,0));
         const position=centre.clone().add(new THREE.Vector3(1000,780,1060));
@@ -2321,18 +2391,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const pickables: THREE.Object3D[] = [];
 
     // Sky/ground hemisphere — cool sky, warm ground bounce for satellite terrain.
-    scene.add(new THREE.HemisphereLight(0xf3f9ff, 0x303d47, 1.1));
+    scene.add(new THREE.HemisphereLight(0xf3f9ff, 0x303d47, mode === 'topography' ? 0.42 : 1.1));
     // Warm sun key light — main shape former, cast shadows.
-    const key = new THREE.DirectionalLight(0xfff2d8, 2.2);
+    const key = new THREE.DirectionalLight(0xfff2d8, mode === 'topography' ? 1.05 : 2.2);
     key.position.set(900, 1800, 1200);
     key.castShadow = true;
     // Cool fill from opposite side — keeps shadowed slopes readable without
     // washing out the terrain. No shadow casting on the fill (perf + softness).
-    const fill = new THREE.DirectionalLight(0xa8c5ff, mode==='subsurface' ? 0.8 : 0.55);
+    const fill = new THREE.DirectionalLight(0xa8c5ff, mode === 'subsurface' ? 0.8 : mode === 'topography' ? 0.18 : 0.55);
     fill.position.set(-1200, 900, -800);
     scene.add(fill);
     // Rim light behind + above — separates ridges from the dark background.
-    const rimLight = new THREE.DirectionalLight(0xffffff, mode==='subsurface' ? 0.9 : 0.6);
+    const rimLight = new THREE.DirectionalLight(0xffffff, mode === 'subsurface' ? 0.9 : mode === 'topography' ? 0.18 : 0.6);
     rimLight.position.set(0, 1600, -2000);
     scene.add(rimLight);
     key.shadow.mapSize.set(2048, 2048);
@@ -2460,23 +2530,24 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
         const texturedTerrain = new THREE.Mesh(
           terrainGeometry,
           new THREE.MeshStandardMaterial({
-            map: terrainTexture,
+            map: mode === 'topography' ? null : terrainTexture,
             // Neutral-warm multiplier, not a near-white one. The old 0xfff4e2
             // combined with a bright IBL and 1.15 env intensity was blowing the
             // satellite imagery out to a pale glow — the ground lost its rock
             // colour and stopped separating from the white drill collars.
-            color: mode==='subsurface' ? 0x9caeb8 : TERRAIN_TEXTURE_TINT,
+            color: mode === 'subsurface' ? 0x9caeb8 : mode === 'topography' ? 0xffffff : TERRAIN_TEXTURE_TINT,
             // Matte ground. The specular sheen read as wet plastic at this
             // scale and added to the wash.
             roughness: 0.88,
             metalness: 0.0,
-            envMapIntensity: 0.55,
+            envMapIntensity: mode === 'topography' ? 0.72 : 0.55,
             transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
             opacity: terrainOpacityForView(mode, surfaceCameraView),
             emissive: new THREE.Color('#120d09'),
             emissiveIntensity: 0.03,
             alphaTest: 0,
             side: THREE.DoubleSide,
+            vertexColors: mode === 'topography',
             depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
             depthTest: true,
             polygonOffset: true,
@@ -3896,8 +3967,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
   const compassBearing = navInstrument.northAngleDeg;
   const hasProjectedCallouts = projectedFrame.width > 0 && projectedFrame.items.length > 0;
   const projectedCallouts = hasProjectedCallouts ? projectedFrame.items : [];
-  const minimalViewerChrome = mode === 'drillholes' || mode === 'resource';
-  const sceneHeading = mode === 'resource'
+  const minimalViewerChrome = mode === 'drillholes' || mode === 'resource' || mode === 'topography';
+  const sceneHeading = mode === 'topography'
+    ? 'Measured terrain relief'
+    : mode === 'resource'
     ? `${resourceFocusLabel(resourceFocus)} resource model`
     : mode === 'metallurgy'
       ? 'Metallurgy reveal'
@@ -4038,8 +4111,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode);
           {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>Recorded intervals only; gaps are not interpolated into new assays. Highlight is visible through the terrain.</small></details>}
           <div className="tanga-three__drill-legend" aria-label="Drillhole legend">
             <div className="tanga-three__drill-legend-head">
-              <span>Drillhole Legend</span>
-              <strong>{mode === 'metallurgy' ? 'Metallurgy support' : mode === 'subsurface' ? 'Subsurface traces' : 'Assay intervals'}</strong>
+              <span>{mode === 'topography' ? 'Surface Legend' : 'Drillhole Legend'}</span>
+              <strong>{mode === 'topography' ? 'Terrain context' : mode === 'metallurgy' ? 'Metallurgy support' : mode === 'subsurface' ? 'Subsurface traces' : 'Assay intervals'}</strong>
             </div>
             {mode === 'drillholes' && (
               <div className="tanga-three__assay-ramp" aria-hidden="true">
