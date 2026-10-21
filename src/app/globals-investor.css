@@ -725,6 +725,41 @@
 .tanga-story-feature p { margin: 5px 0 0; color: rgba(245,241,235,.72); font-size: 10px; line-height: 1.5; }
 .tanga-story-panel__stepper { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: rgba(245,241,235,.48); font-size: 9px; letter-spacing: .1em; }
 .tanga-story-panel__stepper button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; background: rgba(255,255,255,.055); color: white; cursor: pointer; }
+.tanga-story-panel--timeline { width: min(468px, calc(100vw - 36px)); }
+.tanga-story-feature img { height: clamp(184px, 24vh, 260px); object-position: center 48%; }
+.tanga-deck--work-completed-story .tanga-deck__deck-stage { opacity: 0; pointer-events: none; }
+.tanga-deck--work-completed-story .tanga-story-feature { display: none; }
+.tanga-milestone-stage { position: fixed; z-index: 18; top: 49%; left: clamp(240px, 19vw, 320px); right: clamp(500px, 31vw, 540px); height: min(58vh, 590px); min-height: 360px; overflow: hidden; transform: translateY(-47%); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; background: #11171b; box-shadow: 0 28px 90px rgba(0,0,0,.4); }
+.tanga-milestone-stage img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.tanga-milestone-stage.is-figure img { padding: 24px; object-fit: contain; background: #13191d; }
+.tanga-milestone-stage__shade { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(3,7,10,.24),transparent 30%,rgba(3,7,10,.12) 54%,rgba(3,7,10,.86)); pointer-events: none; }
+.tanga-milestone-stage.is-figure .tanga-milestone-stage__shade { background: linear-gradient(180deg,rgba(3,7,10,.14),transparent 34%,rgba(3,7,10,.72)); }
+.tanga-milestone-stage__caption { position: absolute; right: clamp(18px,3vw,42px); bottom: clamp(20px,4vh,42px); left: clamp(18px,3vw,42px); max-width: 60ch; color: #fff; text-shadow: 0 2px 18px rgba(0,0,0,.65); }
+.tanga-milestone-stage__caption>span,.tanga-milestone-stage__tag { color: #ffc092; font-size: 10px; font-weight: 680; letter-spacing: .12em; text-transform: uppercase; }
+.tanga-milestone-stage__caption h2 { margin: 8px 0 5px; color: #fff; font: 600 clamp(23px,3vw,38px)/1.05 'Space Grotesk',Inter,sans-serif; letter-spacing: -.035em; }
+.tanga-milestone-stage__caption p { margin: 0; color: rgba(255,255,255,.84); font-size: clamp(12px,1.1vw,15px); line-height: 1.5; }
+.tanga-milestone-stage__tag { position: absolute; top: 18px; left: 18px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; background: rgba(8,13,18,.65); backdrop-filter: blur(10px); }
+.tanga-story-feature p { font-size: 12px; }
+.tanga-story-timeline button { min-height: 42px; }
+.tanga-story-timeline button span { font-size: 10px; }
+.tanga-story-timeline button strong { font-size: 12px; }
+.tanga-story-panel__qualification { margin: 12px 0 0; color: rgba(245,241,235,.5); font-size: 10px; line-height: 1.5; }
+.tanga-story-panel__link,.tanga-story-panel__compare { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; padding: 11px 12px; border: 1px solid rgba(230,151,96,.33); border-radius: 10px; background: rgba(230,151,96,.085); color: #f5b483; font: inherit; font-size: 11px; font-weight: 650; text-align: left; cursor: pointer; transition: background .18s ease,border-color .18s ease,transform .18s ease; }
+.tanga-story-panel__link:hover,.tanga-story-panel__compare:hover { transform: translateY(-1px); border-color: rgba(230,151,96,.58); background: rgba(230,151,96,.14); }
+.tanga-story-panel__link:focus-visible,.tanga-story-panel__compare:focus-visible { outline: 2px solid #f6be91; outline-offset: 3px; }
+.tanga-story-panel--concept { width: min(390px, calc(100vw - 36px)); }
+.tanga-deck__executive-tour { min-height: 36px; padding: 0 13px; border: 1px solid rgba(230,151,96,.32); border-radius: 999px; background: rgba(230,151,96,.11); color: #f4b184; font: inherit; font-size: 10px; font-weight: 680; white-space: nowrap; cursor: pointer; }
+.tanga-deck__executive-tour:hover { background: rgba(230,151,96,.19); }
+.tanga-deck__executive-tour:focus-visible { outline: 2px solid #f6be91; outline-offset: 3px; }
+.tanga-deck--bright-room .tanga-story-panel { border-color: rgba(255,255,255,.34); background: linear-gradient(150deg,rgba(29,35,39,.98),rgba(18,24,29,.97)); box-shadow: 0 24px 70px rgba(0,0,0,.62); }
+.tanga-deck--bright-room .tanga-story-panel__intro,.tanga-deck--bright-room .tanga-story-panel__qualification { color: rgba(255,255,255,.82); }
+.tanga-deck--bright-room .tanga-story-panel__eyebrow,.tanga-deck--bright-room .tanga-story-image-caption span { color: #ffc092; }
+
+@media (max-width: 1200px) {
+  .tanga-milestone-stage { display: none; }
+  .tanga-deck--work-completed-story .tanga-story-feature { display: block; }
+  .tanga-deck--work-completed-story .tanga-deck__deck-stage { opacity: 0; }
+}
 .tanga-story-project-image { display: block; width: 100%; max-height: 186px; margin-top: 15px; object-fit: cover; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: #252a2d; }
 .tanga-story-image-caption { display: grid; gap: 4px; padding: 9px 2px 0; }
 .tanga-story-image-caption small { color: rgba(245,241,235,.48); font-size: 9px; }
@@ -752,6 +787,11 @@
   .tanga-story-panel h2 { font-size: 20px; }
   .tanga-story-panel__intro { font-size: 10px; }
   .tanga-story-feature img { height: 105px; }
+  .tanga-story-panel--timeline .tanga-story-feature img { height: clamp(116px, 19vh, 158px); }
+  .tanga-deck--work-completed-story .tanga-story-panel { bottom: 166px; max-height: min(40svh, 330px); }
+  .tanga-deck--work-completed-story .tanga-story-feature img { height: 105px; }
+  .tanga-story-panel__qualification { font-size: 9px; }
+  .tanga-deck__executive-tour { min-height: 34px; padding: 0 9px; font-size: 9px; }
   .tanga-story-project-image { max-height: 125px; margin-top: 10px; }
   .tanga-story-micrograph { max-height: 125px; }
   .tanga-story-timeline { gap: 1px; margin: 9px 0; }

@@ -6,7 +6,7 @@ import {DeckGL} from '@deck.gl/react';
 import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
-import {ArrowDown, ArrowUp, Box, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
+import {ArrowDown, ArrowUp, Box, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import proj4 from 'proj4';
@@ -26,7 +26,7 @@ import TangaStoryVideoHero from './TangaStoryVideoHero';
 import DeckHoverGuide from './DeckHoverGuide';
 import EvidenceReplay from './EvidenceReplay';
 import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
-import {TangaChapterStoryPanel, TangaEvidenceDrawer} from './TangaStoryPanels';
+import {TangaChapterStoryPanel, TangaEvidenceDrawer, TangaMilestoneStage} from './TangaStoryPanels';
 import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {
@@ -89,7 +89,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 type ThreeCameraCommand = {
   id: number;
@@ -685,6 +685,10 @@ const STORY_STEPS: StoryStep[] = [
   {mode: 'comparison', act: '11', label: 'Evidence to decisions', command: 'show next decisions', tone: '#b9954b'},
 ];
 
+// A short, presentation-ready route through seven distinct questions. The full
+// technical sequence remains available in the chapter index and normal tour.
+const EXECUTIVE_ROUTE: WorkbenchMode[] = ['tanzania', 'ranking', 'topography', 'drillholes', 'subsurface', 'resource', 'comparison'];
+
 // Authored camera beats. A scene is the narrative chapter; a shot is a
 // deliberate camera/evidence composition inside that chapter. Advancing a
 // shot keeps the current map/Three.js scene mounted and preserves layer state.
@@ -702,8 +706,8 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'tested-ground', label: 'Tested ground', detail: 'Close on the boundary and drill coverage', view: {...VIEW_STATES.project, zoom: 13.35, pitch: 54, bearing: 28}},
   ],
   topography: [
-    {id: 'relief', label: 'Relief overview', detail: 'Rotate the measured project surface in three dimensions', threeAction: 'resetView'},
-    {id: 'raking-light', label: 'Raking relief', detail: 'Move across the ridges from a low oblique angle', threeAction: 'terrainProfile'},
+    {id: 'relief', label: 'Surveyed land', detail: 'Establish the full measured surface at true vertical scale', threeAction: 'resetView'},
+    {id: 'raking-light', label: 'Ridge profile', detail: 'Read a cross-ridge profile in raking light', threeAction: 'terrainProfile'},
   ],
   accessibility: [
     {id: 'corridor', label: 'Access corridor', detail: 'Project-to-port infrastructure context', view: VIEW_STATES.accessibility},
@@ -715,13 +719,13 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'intercepts', label: 'Best intercepts', detail: 'Push into the strongest reported intervals', threeAction: 'zoomIn'},
   ],
   subsurface: [
-    {id: 'framework', label: 'Geology framework', detail: 'Full subsurface interpretation', threeAction: 'resetView'},
-    {id: 'section', label: 'Section angle', detail: 'Read contacts and structural continuity', threeAction: 'projectAngle'},
+    {id: 'framework', label: 'Observed evidence', detail: 'Start with recorded holes and the named sample crosswalk', threeAction: 'resetView'},
+    {id: 'section', label: 'Interpreted host', detail: 'Open a reversible section to read interpreted contacts', threeAction: 'revealSection'},
   ],
   resource: [
-    {id: 'resource', label: 'Resource overview', detail: 'Full classified model', threeAction: 'resetView'},
-    {id: 'grade', label: 'Grade architecture', detail: 'Move closer to the block distribution', threeAction: 'zoomIn'},
-    {id: 'below', label: 'Deposit underside', detail: 'Reveal thickness and vertical continuity', threeAction: 'bottomView'},
+    {id: 'resource', label: 'Model overview', detail: 'Hold on the reported model and its source legend', threeAction: 'resetView'},
+    {id: 'grade', label: 'Model detail', detail: 'Inspect the displayed block population', threeAction: 'zoomIn'},
+    {id: 'section', label: 'Model section', detail: 'Use the section controls to inspect vertical relationships', threeAction: 'projectAngle'},
   ],
   metallurgy: [
     {id: 'samples', label: 'Metallurgy overview', detail: 'Carbon, recovery and flake-size evidence', threeAction: 'resetView'},
@@ -2056,6 +2060,8 @@ export default function TangaDeckWorkbench() {
   const [activeMode, setActiveMode] = useState<WorkbenchMode>(DEFAULT_MODE);
   const [isExploreMode, setExploreMode] = useState(false);
   const [activeShotIndex, setActiveShotIndex] = useState(0);
+  const [geologySectionShown, setGeologySectionShown] = useState(false);
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState('survey');
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
   const [resourceFocus, setResourceFocus] = useState<ResourceFocus>('Indicated');
   const [viewState, setViewState] = useState<DeckViewState>(VIEW_STATES[DEFAULT_MODE]);
@@ -4590,6 +4596,7 @@ export default function TangaDeckWorkbench() {
     const targetStep = STORY_STEPS[clamped];
     const defaults = storyStepDefaults(targetStep.mode);
     setActiveShotIndex(0);
+    setGeologySectionShown(false);
     setStatusText(`${targetStep.act}: ${targetStep.label}`);
     void activateMode(targetStep.mode, {
       routeTarget: defaults.routeTarget,
@@ -4602,6 +4609,8 @@ export default function TangaDeckWorkbench() {
     const nextIndex = clamp(requestedIndex, 0, Math.max(0, shots.length - 1));
     const shot = shots[nextIndex];
     setActiveShotIndex(nextIndex);
+    if (shot.threeAction === 'revealSection') setGeologySectionShown(true);
+    if (shot.threeAction === 'resetView' || shot.threeAction === 'restoreSection') setGeologySectionShown(false);
     setStatusText(`${MODE_LABELS[mode]} · ${shot.label}`);
 
     if (shot.view) {
@@ -4617,19 +4626,52 @@ export default function TangaDeckWorkbench() {
     }
   }, [issueThreeCameraCommand]);
 
+  const toggleGeologySection = useCallback(() => {
+    const action: ThreeCameraAction = geologySectionShown ? 'restoreSection' : 'revealSection';
+    issueThreeCameraCommand(action);
+    setGeologySectionShown((shown) => !shown);
+  }, [geologySectionShown, issueThreeCameraCommand]);
+
+  const handleExecutiveAdvance = useCallback(() => {
+    if (activeShotIndex < activeShots.length - 1) {
+      applyStoryShot(activeMode, activeShotIndex + 1);
+      return;
+    }
+    const routeIndex = EXECUTIVE_ROUTE.indexOf(activeMode);
+    const nextMode = EXECUTIVE_ROUTE[routeIndex + 1];
+    if (!nextMode) {
+      setIsAutoplay(false);
+      setIsExecutiveTour(false);
+      return;
+    }
+    const nextIndex = STORY_STEPS.findIndex((step) => step.mode === nextMode);
+    goToStoryIndex(nextIndex);
+  }, [activeMode, activeShotIndex, activeShots.length, applyStoryShot, goToStoryIndex]);
+
+  const startExecutiveTour = useCallback(() => {
+    const firstIndex = STORY_STEPS.findIndex((step) => step.mode === EXECUTIVE_ROUTE[0]);
+    setIsAutoplay(false);
+    setIsExecutiveTour(true);
+    setPendingInfo(null);
+    goToStoryIndex(firstIndex);
+    window.setTimeout(() => setIsAutoplay(true), 0);
+  }, [goToStoryIndex]);
+
   // ── Presenter control layer ────────────────────────────────────────────
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBlackout, setIsBlackout] = useState(false);
+  const [brightRoom, setBrightRoom] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
-  useEffect(()=>{const stop=()=>setIsAutoplay(false);window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
+  const [isExecutiveTour, setIsExecutiveTour] = useState(false);
+  useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
   const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
   const transitionCardCount = nextChapterMode && INFO_BEFORE[nextChapterMode] ? 1 : 0;
-  const shotDwellSec = autoplaySec / Math.max(1, activeShots.length + transitionCardCount);
+  const shotDwellSec = (isExecutiveTour ? 30 : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
   // Annotation density, cycled with Ctrl+A:
   //   key → authored scene callouts plus the three strongest drill intercepts
@@ -4643,7 +4685,26 @@ export default function TangaDeckWorkbench() {
   // ask is usually "drop the blocks and show me just the holes", and changing
   // scene is too blunt an answer.
   const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
+  const [surfaceConceptView, setSurfaceConceptView] = useState(false);
+  const preCompareLayersRef = useRef<DeckLayerSettings | null>(null);
+  const toggleSurfaceConceptView = useCallback(() => {
+    setLayerSettings((current) => {
+      if (!surfaceConceptView) {
+        preCompareLayersRef.current = current;
+        return {...current, terrain: {...current.terrain, visible: true}, drilling: {...current.drilling, visible: false}, blocks: {...current.blocks, visible: false}, context: {...current.context, visible: false}};
+      }
+      return preCompareLayersRef.current ?? DEFAULT_LAYER_SETTINGS;
+    });
+    setSurfaceConceptView((current) => !current);
+  }, [surfaceConceptView]);
   const defaultDrillingVisible = activeMode !== 'mine_planning' && activeMode !== 'metallurgy';
+  useEffect(() => {
+    if (activeMode !== 'mine_planning' && surfaceConceptView) {
+      setLayerSettings(preCompareLayersRef.current ?? DEFAULT_LAYER_SETTINGS);
+      preCompareLayersRef.current = null;
+      setSurfaceConceptView(false);
+    }
+  }, [activeMode, surfaceConceptView]);
   useEffect(() => {
     setLayerSettings(current => ({...current, drilling: {...current.drilling, visible: defaultDrillingVisible}}));
   }, [activeMode, defaultDrillingVisible]);
@@ -4763,8 +4824,8 @@ export default function TangaDeckWorkbench() {
 
   // Explicit manual actions from the presenter — pause autoplay so nothing
   // auto-advances after they take the wheel.
-  const handleManualPrev = useCallback(() => { setIsAutoplay(false); handlePrevStory(); }, [handlePrevStory]);
-  const handleManualNext = useCallback(() => { setIsAutoplay(false); handleNextStory(); }, [handleNextStory]);
+  const handleManualPrev = useCallback(() => { setIsAutoplay(false); setIsExecutiveTour(false); handlePrevStory(); }, [handlePrevStory]);
+  const handleManualNext = useCallback(() => { setIsAutoplay(false); setIsExecutiveTour(false); handleNextStory(); }, [handleNextStory]);
 
   const toggleFullscreen = useCallback(() => {
     if (typeof document === 'undefined') return;
@@ -4793,11 +4854,12 @@ export default function TangaDeckWorkbench() {
   useEffect(() => {
     if (!isAutoplay || (threeVisible && threeLoadReport.scene !== 'ready')) return;
     const timer = window.setTimeout(() => {
+      if (isExecutiveTour) { handleExecutiveAdvance(); return; }
       if (isLastStory) setIsAutoplay(false);
       else handleNextStory();
     }, shotDwellSec * 1000);
     return () => window.clearTimeout(timer);
-  }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, activeShotIndex, shotDwellSec, threeVisible, threeLoadReport.scene]);
+  }, [isAutoplay, isExecutiveTour, isLastStory, handleNextStory, handleExecutiveAdvance, activeStoryIndex, activeShotIndex, shotDwellSec, threeVisible, threeLoadReport.scene]);
 
   // Brief establishing orbit after fly-in, then hold for the presenter.
   // User camera interaction cancels it for the rest of this scene visit.
@@ -5021,12 +5083,13 @@ export default function TangaDeckWorkbench() {
         isNotesOpen && 'tanga-deck--notes-open',
         isInspectorOpen && 'tanga-deck--inspector-open',
         isCoverScene && 'tanga-deck--cover',
-        isAutoplay && 'tanga-deck--autoplay'
+        isAutoplay && 'tanga-deck--autoplay',
+        brightRoom && 'tanga-deck--bright-room'
       )}
       data-act={MODE_ACT[activeMode]}
       data-mode={activeMode}
-      onWheelCapture={() => setIsAutoplay(false)}
-      onPointerDownCapture={event => {if (event.target instanceof HTMLCanvasElement) setIsAutoplay(false);}}
+      onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
+      onPointerDownCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
       data-testid="tanga-deck-workbench"
     >
       <DeckHoverGuide mode={activeMode}/>
@@ -5480,9 +5543,9 @@ export default function TangaDeckWorkbench() {
 
       {/* Guided narration caption — during autoplay the deck reads itself
           like a self-running pitch (great for a lobby / booth screen). */}
-      {isAutoplay && !isCoverScene && !isClosingScene && (
+      {isAutoplay && !isCoverScene && (!isClosingScene || isExecutiveTour) && (
         <div className="tanga-deck__narration" role="status" aria-live="polite">
-          <span className="tanga-deck__narration-eyebrow">{STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}</span>
+          <span className="tanga-deck__narration-eyebrow">{isExecutiveTour ? `Executive route · ${STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}` : STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}</span>
           <p key={activeMode}>{CHAPTER_GUIDANCE[activeMode].bridge}</p>
         </div>
       )}
@@ -5645,6 +5708,7 @@ export default function TangaDeckWorkbench() {
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
+          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the three minute thirty second executive route" title="Executive route · 3 min 30 sec · 7 chapters">Executive tour · 3½ min</button>
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
@@ -5757,6 +5821,9 @@ export default function TangaDeckWorkbench() {
           title="Fullscreen  (F)"
         >
           {isFullscreen ? <Minimize2 size={16} strokeWidth={2.2} /> : <Maximize2 size={16} strokeWidth={2.2} />}
+        </button>
+        <button type="button" className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool', brightRoom && 'is-active')} onClick={() => setBrightRoom((value) => !value)} aria-label={brightRoom ? 'Disable bright-room display' : 'Enable bright-room display'} aria-pressed={brightRoom} title="Bright-room display">
+          <Sun size={16} strokeWidth={2.2}/>
         </button>
         <button
           type="button"
@@ -6006,7 +6073,8 @@ export default function TangaDeckWorkbench() {
       </section>
 
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
-      {!isExploreMode && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId}/>}
+      {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
+      {!isExploreMode && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={setSelectedMilestoneId}/ >}
 
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">

@@ -38,8 +38,8 @@ export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   </>;
 }
 
-export function TangaChapterStoryPanel({chapter}: {chapter: TangaChapterId}) {
-  const [milestoneIndex, setMilestoneIndex] = useState(0);
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange}: {chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void}) {
+  const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
   const milestone = WORK_MILESTONES[milestoneIndex];
 
   if (chapter === 'ranking') return <aside className="tanga-story-panel tanga-story-panel--timeline" aria-label="Work completed timeline">
@@ -47,15 +47,17 @@ export function TangaChapterStoryPanel({chapter}: {chapter: TangaChapterId}) {
     <h2>Work completed</h2>
     <p className="tanga-story-panel__intro">Four distinct evidence milestones. Select one to inspect what it adds to the project picture.</p>
     <nav className="tanga-story-timeline" aria-label="Select a project milestone">
-      {WORK_MILESTONES.map((item, index) => <button type="button" key={item.id} className={index === milestoneIndex ? 'is-active' : ''} onClick={() => setMilestoneIndex(index)} aria-current={index === milestoneIndex ? 'step' : undefined}>
+      {WORK_MILESTONES.map((item, index) => <button type="button" key={item.id} className={index === milestoneIndex ? 'is-active' : ''} onClick={() => onMilestoneChange?.(item.id)} aria-current={index === milestoneIndex ? 'step' : undefined}>
         <span>{item.date}</span><strong>{item.title}</strong>
       </button>)}
     </nav>
     <div className="tanga-story-feature">
-      <img src={milestone.image} alt={milestone.imageAlt}/>
+      <img src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
       <div><span>{milestone.source}</span><p>{milestone.detail}</p></div>
     </div>
-    <div className="tanga-story-panel__stepper"><button type="button" aria-label="Previous milestone" onClick={() => setMilestoneIndex((milestoneIndex + WORK_MILESTONES.length - 1) % WORK_MILESTONES.length)}><ChevronLeft size={16}/></button><span>{String(milestoneIndex + 1).padStart(2, '0')} / {String(WORK_MILESTONES.length).padStart(2, '0')}</span><button type="button" aria-label="Next milestone" onClick={() => setMilestoneIndex((milestoneIndex + 1) % WORK_MILESTONES.length)}><ChevronRight size={16}/></button></div>
+    {milestone.id === 'survey' && onOpenSurvey && <button type="button" className="tanga-story-panel__link" onClick={onOpenSurvey}>Open the measured terrain chapter <ArrowRight size={14}/></button>}
+    <p className="tanga-story-panel__qualification">The DTM is spatially registered. Report photographs and figures are shown as source context, not mapped locations.</p>
+    <div className="tanga-story-panel__stepper"><button type="button" aria-label="Previous milestone" onClick={() => onMilestoneChange?.(WORK_MILESTONES[(milestoneIndex + WORK_MILESTONES.length - 1) % WORK_MILESTONES.length].id)}><ChevronLeft size={16}/></button><span>{String(milestoneIndex + 1).padStart(2, '0')} / {String(WORK_MILESTONES.length).padStart(2, '0')}</span><button type="button" aria-label="Next milestone" onClick={() => onMilestoneChange?.(WORK_MILESTONES[(milestoneIndex + 1) % WORK_MILESTONES.length].id)}><ChevronRight size={16}/></button></div>
   </aside>;
 
   if (chapter === 'project') return <aside className="tanga-story-panel tanga-story-panel--project" aria-label="Tanga project introduction">
@@ -83,6 +85,15 @@ export function TangaChapterStoryPanel({chapter}: {chapter: TangaChapterId}) {
     <img className="tanga-story-micrograph" src="/presentation-assets/petrography-tgdd1009-18m.jpg" alt="Photomicrograph for Tanga petrography sample TGF002"/>
     <div className="tanga-story-image-caption"><span>18.25–18.38 m · graphite-bearing schist</span><small>Source scale bar retained</small></div>
     <p className="tanga-story-panel__intro">The 3D contacts are geological interpretations between observations; this image documents the named sample only.</p>
+    {onRevealGeology && <button type="button" className="tanga-story-panel__compare" aria-pressed={geologySectionShown} onClick={onRevealGeology}>{geologySectionShown ? 'Restore full interpretation' : 'Reveal interpreted section'} <ArrowRight size={14}/></button>}
+  </aside>;
+
+  if (chapter === 'mine_planning') return <aside className="tanga-story-panel tanga-story-panel--concept" aria-label="Concept and terrain comparison">
+    <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
+    <h2>Fit the concept to the ground</h2>
+    <p className="tanga-story-panel__intro">Switch between the measured terrain and the supplied conceptual layout from the same camera position. The geometry remains illustrative.</p>
+    {onToggleSurfaceConcept && <button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView ? 'Show concept over terrain' : 'Compare measured terrain'} <ArrowRight size={14}/></button>}
+    <p className="tanga-story-panel__qualification">Concept geometry is not an optimised mine design, reserve, schedule, cost estimate or permitted facility.</p>
   </aside>;
 
   if (chapter === 'comparison') return <aside className="tanga-story-panel tanga-story-panel--decisions" aria-label="Evidence-led next decisions">
@@ -94,4 +105,15 @@ export function TangaChapterStoryPanel({chapter}: {chapter: TangaChapterId}) {
   </aside>;
 
   return null;
+}
+
+export function TangaMilestoneStage({milestoneId}: {milestoneId: string}) {
+  const milestone = WORK_MILESTONES.find((item) => item.id === milestoneId) ?? WORK_MILESTONES[1];
+  const isFigure = milestone.id === 'resource';
+  return <section className={`tanga-milestone-stage${isFigure ? ' is-figure' : ''}`} aria-label={`${milestone.title} source evidence`}>
+    <img src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
+    <div className="tanga-milestone-stage__shade"/>
+    <div className="tanga-milestone-stage__caption"><span>{milestone.date} · {milestone.source}</span><h2>{milestone.title}</h2><p>{milestone.detail}</p></div>
+    <span className="tanga-milestone-stage__tag">Source evidence</span>
+  </section>;
 }

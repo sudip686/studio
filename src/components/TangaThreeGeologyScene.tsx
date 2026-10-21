@@ -225,7 +225,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
 };
 
@@ -1175,7 +1175,7 @@ function threeCallouts(
       {
         id: 'terrain-ridges',
         label: 'Ridge relief',
-        detail: 'Measured project DEM · 1.25× display scale',
+        detail: 'Measured project DEM · 1× vertical scale',
         x: 37, y: 32, tone: '#e4a85d', anchor: [-1650, 180, -940], side: 'right', kind: 'story',
       },
       {
@@ -1701,7 +1701,15 @@ const segmentsY = 1402;
       uvs.push(sample.u, sample.v);
       if (mode === 'topography') {
         if (!sample.surveyed) {
-          colors.push(0.34, 0.35, 0.34);
+          // Three visual zones: the measured survey ramp, quiet nearby context,
+          // then a cooler regional fade. These are display treatments, not
+          // legal project boundaries or added geological interpretation.
+          const nearby = new THREE.Color('#394138');
+          const regional = new THREE.Color('#56616a');
+          const distance = Math.hypot(x, planeY);
+          const fade = clamp((distance - 1800) / 5700, 0, 1);
+          const contextColor = nearby.lerp(regional, fade);
+          colors.push(contextColor.r, contextColor.g, contextColor.b);
         } else if (display === 'slope' && sample.slopeDegrees !== null && Number.isFinite(sample.slopeDegrees)) {
           const value = clamp(sample.slopeDegrees, 0, 55);
           let index = 0;
@@ -2400,6 +2408,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return;
       }
 
+      if (command.action === 'revealSection' || command.action === 'restoreSection') {
+        const showSection = command.action === 'revealSection';
+        setSectionEnabled(showSection);
+        if (showSection) {
+          const sectionTarget = new THREE.Vector3(0, mode === 'resource' ? -160 : -80, -20);
+          const sectionPosition = new THREE.Vector3(1380, mode === 'resource' ? 560 : 420, 420);
+          scheduleCameraTween(sectionPosition, sectionTarget, 1.45, 44);
+        }
+        setStatus(showSection ? 'Section revealed at true model coordinates' : 'Section restored to the full interpretation');
+        return;
+      }
+
       if(command.action==='plantDetail'&&processPlant){
         const centre=processPlant.position.clone().add(new THREE.Vector3(0,40,0));
         const position=centre.clone().add(new THREE.Vector3(1000,780,1060));
@@ -2496,19 +2516,23 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const pointer = new THREE.Vector2();
     const pickables: THREE.Object3D[] = [];
 
-    // Sky/ground hemisphere — cool sky, warm ground bounce for satellite terrain.
-    scene.add(new THREE.HemisphereLight(0xf3f9ff, 0x303d47, mode === 'topography' ? 0.42 : 1.1));
-    // Warm sun key light — main shape former, cast shadows.
-    const key = new THREE.DirectionalLight(0xfff2d8, mode === 'topography' ? 1.05 : 2.2);
-    key.position.set(900, 1800, 1200);
+    // Purpose-built light recipes keep terrain shape legible while keeping
+    // geology and grade colours close to their source legend colours.
+    const isTerrainView = mode === 'topography';
+    const isModelView = mode === 'resource' || mode === 'subsurface';
+    scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x343a36 : 0x303d47, isTerrainView ? 0.48 : 0.82));
+    // Low raking key across the mapped ridges: the land stays dimensional
+    // without suggesting a different sun position or changing elevation.
+    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : 0xfff1d8, isTerrainView ? 1.2 : mode === 'mine_planning' ? 1.45 : 1.7);
+    key.position.set(isTerrainView ? 1800 : 900, isTerrainView ? 1050 : 1800, isTerrainView ? 1150 : 1200);
     key.castShadow = true;
     // Cool fill from opposite side — keeps shadowed slopes readable without
     // washing out the terrain. No shadow casting on the fill (perf + softness).
-    const fill = new THREE.DirectionalLight(0xa8c5ff, mode === 'subsurface' ? 0.8 : mode === 'topography' ? 0.18 : 0.55);
+    const fill = new THREE.DirectionalLight(isModelView ? 0xd9e2e8 : 0xa8c5ff, isTerrainView ? 0.28 : mode === 'mine_planning' ? 0.42 : 0.52);
     fill.position.set(-1200, 900, -800);
     scene.add(fill);
     // Rim light behind + above — separates ridges from the dark background.
-    const rimLight = new THREE.DirectionalLight(0xffffff, mode === 'subsurface' ? 0.9 : mode === 'topography' ? 0.18 : 0.6);
+    const rimLight = new THREE.DirectionalLight(0xffffff, isTerrainView ? 0.12 : isModelView ? 0.46 : 0.4);
     rimLight.position.set(0, 1600, -2000);
     scene.add(rimLight);
     key.shadow.mapSize.set(2048, 2048);
@@ -2529,9 +2553,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // underglow now only exists where there's a subsurface block model to reveal.
     const showsBlockModel =
       mode === 'subsurface' || mode === 'resource' || mode === 'mine_planning';
-    const teal = new THREE.PointLight(0x2dd4bf, showsBlockModel ? 900 : 420, 5200);
-    teal.position.set(-1200, 620, -900);
-    scene.add(teal);
+    if (showsBlockModel) {
+      const teal = new THREE.PointLight(0x2dd4bf, 350, 5200);
+      teal.position.set(-1200, 620, -900);
+      scene.add(teal);
+    }
     if (showsBlockModel) {
       // Gentle warm underglow to lift the voxel model off the dark backdrop —
       // dim enough that it never out-shines the key light on the surface above.
