@@ -23,6 +23,7 @@
 - [x] Add whole-plant and six equipment camera views, roof cutaways and object-anchored process labels.
 - [x] Retain the existing contained site-placement checks, conceptual pit footprints and explicit engineering limitations.
 - [x] Correct the phone body overflow and keep navigation above the peer chart.
+- [x] Route the external assay, lithology and geological GLB assets through the existing same-origin stream allowlist so unique preview hosts do not depend on browser cross-origin access.
 
 ## Browser checks
 
