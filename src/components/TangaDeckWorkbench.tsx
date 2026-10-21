@@ -24,6 +24,7 @@ import {
 } from '@/lib/terrain/relief';
 import TangaStoryVideoHero from './TangaStoryVideoHero';
 import DeckHoverGuide from './DeckHoverGuide';
+import EvidenceReplay from './EvidenceReplay';
 import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {
@@ -86,7 +87,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'resetView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 type ThreeCameraCommand = {
   id: number;
@@ -385,6 +386,7 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
       {cells: ['Max elevation', '≈940 m', '']},
       {cells: ['Min elevation', '≈300 m', '']},
       {cells: ['Relief range', '≈640 m', ''], emphasis: true},
+      {cells: ['Vertical display', '1.25×', '']},
       {cells: ['Setting', 'Maramba village', '']},
       // "Low-relief foothills" sat directly under a relief range of ~800 m in
       // the same panel, which is a contradiction a reader will catch. The
@@ -733,8 +735,8 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'tested-ground', label: 'Tested ground', detail: 'Close on the boundary and drill coverage', view: {...VIEW_STATES.project, zoom: 13.35, pitch: 54, bearing: 28}},
   ],
   topography: [
-    {id: 'relief', label: 'Relief overview', detail: 'Read the full terrain envelope', view: VIEW_STATES.topography},
-    {id: 'raking-light', label: 'Raking relief', detail: 'Lower the view to reveal drainage and slope', view: {...VIEW_STATES.topography, zoom: 13.75, pitch: 68, bearing: 34}},
+    {id: 'relief', label: 'Relief overview', detail: 'Rotate the measured project surface in three dimensions', threeAction: 'resetView'},
+    {id: 'raking-light', label: 'Raking relief', detail: 'Move across the ridges from a low oblique angle', threeAction: 'terrainProfile'},
   ],
   accessibility: [
     {id: 'corridor', label: 'Access corridor', detail: 'Project-to-port infrastructure context', view: VIEW_STATES.accessibility},
@@ -883,7 +885,7 @@ const PEER_COMPARISON_METRICS = [
   {
     label: 'Peer position',
     value: '#5',
-    detail: `${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(1)} Mt M&I contained graphite`,
+    detail: `In this selected peer set · ${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(1)} Mt M&I contained graphite`,
   },
   {
     label: 'Resource scale',
@@ -891,24 +893,24 @@ const PEER_COMPARISON_METRICS = [
     detail: 'Total MRE at 4.86% TGC with 148 Mt Indicated',
   },
   {
-    label: 'Metallurgy',
+    label: 'Testwork',
     value: '>97% TC',
-    detail: 'Concentrate purity with 93.0% oxide and 94.4% fresh recovery',
+    detail: 'Reported purity and recovery figures; source report cross-check pending',
   },
   {
-    label: 'Location edge',
+    label: 'Project setting',
     value: 'NE Tanzania',
-    detail: 'Road, port, rail and hydro-grid context already staged',
+    detail: 'Mapped access relationships; utility and capacity assumptions remain unverified',
   },
 ];
 
 function peerComparisonNote(project: string) {
-  if (project === 'Tanga Graphite') return 'Indicated-heavy MRE plus strong purity/recovery story';
-  if (project === 'Mahenge') return 'Large Tanzanian development benchmark';
-  if (project === 'Siviour') return 'Battery-anode development comparator';
-  if (project === 'Epanko') return 'Permitted Tanzanian graphite peer';
-  if (project === 'Bunyu') return 'Coastal Tanzania development reference';
-  return 'Public graphite peer';
+  if (project === 'Tanga Graphite') return 'Reported Indicated MRE; testwork figures require source-report cross-check';
+  if (project === 'Mahenge') return 'Public Tanzanian peer; estimate basis and effective date may differ';
+  if (project === 'Siviour') return 'Public development peer; estimate basis and effective date may differ';
+  if (project === 'Epanko') return 'Public Tanzanian peer; estimate basis and effective date may differ';
+  if (project === 'Bunyu') return 'Public Tanzanian peer; estimate basis and effective date may differ';
+  return 'Selected public peer; estimate basis and effective date may differ';
 }
 
 // Shared atmospheric horizon haze (geolibre look). MapLibre's sky spec blends a
@@ -3057,7 +3059,7 @@ export default function TangaDeckWorkbench() {
     };
   }, [prepareVoiceSession, releaseMicStream]);
 
-  const threeVisible = activeMode === 'drillholes' || activeMode === 'subsurface' || activeMode === 'resource' || activeMode === 'mine_planning' || activeMode === 'metallurgy';
+  const threeVisible = activeMode === 'topography' || activeMode === 'drillholes' || activeMode === 'subsurface' || activeMode === 'resource' || activeMode === 'mine_planning' || activeMode === 'metallurgy';
   const localContextMode = activeMode === 'project' || activeMode === 'topography' || activeMode === 'accessibility';
   // Native MapLibre terrain and external DEM hillshade tiles make this globe path
   // slower and have triggered terrain-depth shader errors, so relief is carried by
@@ -3348,7 +3350,7 @@ export default function TangaDeckWorkbench() {
 
     const timeout = window.setTimeout(() => {
       setSceneTransition((current) => current.key === nextKey ? {...current, active: false} : current);
-    }, 1850);
+    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
 
     return () => window.clearTimeout(timeout);
   }, [activeMode, resourceFocus, resourceHasBeenShown, routeTarget, threeVisible]);
@@ -3777,7 +3779,10 @@ export default function TangaDeckWorkbench() {
       }),
       showGraphitePeers && activeMode === 'ranking' && new TextLayer<any>({
         id: 'graphite-peer-rank-badges',
-        data: graphiteRows,
+        // Keep the country-scale comparison map quiet: ranking is already
+        // legible in the panel and the anchored labels carry project names.
+        // Only add an on-globe badge when the Tanga comparison is revealed.
+        data: tangaRankingInserted ? graphiteRows.filter((project) => project.isTanga) : [],
         getPosition: (project) => [project.lon, project.lat, project.isTanga ? 210000 : 146000],
         getText: (project) => `#${project.displayRank}`,
         getSize: (project) => project.isTanga ? 14 : 12,
@@ -4080,19 +4085,17 @@ export default function TangaDeckWorkbench() {
     const sorted = scored.sort((a, b) => b.score - a.score).map((item) => item.prompt);
     return (sorted.length > 0 ? sorted : COMMON_PROMPTS).slice(0, 6);
   }, [activeMode, commandText, resourceFocus, routeTarget]);
-  const threeMode = (threeVisible ? activeMode : 'drillholes') as 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
+  const threeMode = (threeVisible ? activeMode : 'drillholes') as 'topography' | 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
   const storyHeroVisible = false;
   const legendItems = legendForMode(activeMode, routeTarget, resourceFocus);
   const scale = niceScale(viewState, threeVisible);
   const compassBearing = viewState.bearing;
   const terrainStatus = threeVisible
-    ? 'Three.js geology'
+    ? activeMode === 'topography' ? 'Three.js terrain' : 'Three.js geology'
     : activeMode === 'ranking'
       ? 'Peer globe active'
       : activeMode === 'comparison'
         ? 'Peer comparison active'
-      : activeMode === 'topography'
-        ? 'Raised DEM active'
         : activeMode === 'project'
           ? 'Fast project view'
         : 'Globe imagery active';
@@ -4342,7 +4345,10 @@ export default function TangaDeckWorkbench() {
       // scene has only four to show, so it keeps them all.
       .slice()
       .sort((a, b) => (b.containedGraphiteMt || 0) - (a.containedGraphiteMt || 0))
-      .filter((project, index) => isCountryScene || index < 5 || project.isTanga)
+      // The peer list already carries the full comparison set. Keep only the
+      // two largest global anchors on the opening globe, then add Tanga when
+      // it is revealed; this leaves the East African cluster legible.
+      .filter((project, index) => isCountryScene || index < 2 || project.isTanga)
       .map((project) => {
         let point: {x: number; y: number} | null = null;
         try {
@@ -4543,11 +4549,17 @@ export default function TangaDeckWorkbench() {
   // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
   // the ranking underneath (it does NOT advance — scene 1 is the peer field).
   const [coverDismissed, setCoverDismissed] = useState(false);
+  useEffect(() => {
+    const enter = () => setCoverDismissed(true);
+    if (document.querySelector('.tanga-intro-app[data-intro-complete="true"]')) enter();
+    window.addEventListener('tanga:intro-complete', enter);
+    return () => window.removeEventListener('tanga:intro-complete', enter);
+  }, []);
   // Act interstitial — a brief chapter card when the story crosses into a new
   // act (Opportunity → Asset → Value). Never on first mount or behind the cover.
   const [actCard, setActCard] = useState<StoryAct | null>(null);
   const lastActRef = useRef<string | null>(null);
-  const showCover = activeStoryIndex === 0 && !coverDismissed;
+  const showCover = activeStoryIndex === 0 && !coverDismissed && storyHeroState !== 'complete' && storyHeroState !== 'dismissed';
   const isCoverScene = showCover;
   // Scenes without a source-data table still get a panel — key insight chips
   // from SLIDE_FACTS — so the top-left zone is never awkwardly empty.
@@ -4625,6 +4637,7 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
+  useEffect(()=>{const stop=()=>setIsAutoplay(false);window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   const [isExploreMode, setExploreMode] = useState(false);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
@@ -4800,9 +4813,8 @@ export default function TangaDeckWorkbench() {
     return () => window.clearTimeout(timer);
   }, [isAutoplay, isLastStory, handleNextStory, activeStoryIndex, activeShotIndex, shotDwellSec, threeVisible, threeLoadReport.scene]);
 
-  // Idle slow-orbit: once an immersive scene has flown in and settled, gently
-  // rotate the camera bearing (geolibre / VRIFY "never frozen" feel). Cancels
-  // the instant the user grabs the camera and resumes after a short settle.
+  // Brief establishing orbit after fly-in, then hold for the presenter.
+  // User camera interaction cancels it for the rest of this scene visit.
   // Off for reduced-motion, the cover, the globe overview, and 3D scenes.
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -4812,14 +4824,16 @@ export default function TangaDeckWorkbench() {
     if (!ORBIT_MODES.has(activeMode)) return;
 
     const SETTLE_MS = 3600;   // clear the fly-in (≤2.4s) + a beat before orbiting
-    const SPEED = 1.5;        // degrees per second — a calm, barely-there drift
-    lastCameraInteractRef.current = performance.now();
+    const SPEED = 1.5;        // Brief establishing move, then hold.
+    const start=performance.now();
+    lastCameraInteractRef.current = start;
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
+      if(document.hidden||now-start>6600||lastCameraInteractRef.current>start){cancelAnimationFrame(raf);return;}
       if (now - lastCameraInteractRef.current < SETTLE_MS) return;
       setViewState((cur) => {
         // Strip any leftover flyTo props so the bearing nudge applies instantly
@@ -5028,6 +5042,7 @@ export default function TangaDeckWorkbench() {
       data-testid="tanga-deck-workbench"
     >
       <DeckHoverGuide mode={activeMode}/>
+      <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
           viewState={viewState as any}
@@ -5040,9 +5055,10 @@ export default function TangaDeckWorkbench() {
               interactionState
               && (interactionState.isDragging || interactionState.isPanning || interactionState.isZooming || interactionState.isRotating)
             );
-            // A real user gesture pauses the idle orbit; it resumes after settle,
-            // and it always wins over an in-flight camera move.
+            // A real user gesture cancels the establishing orbit and always
+            // wins over an in-flight camera move.
             if (userGesture) {
+              setIsAutoplay(false);
               lastCameraInteractRef.current = performance.now();
               flightUntilRef.current = 0;
               setViewState(nextViewState as DeckViewState);
@@ -5374,7 +5390,7 @@ export default function TangaDeckWorkbench() {
           pager, keyboard shortcuts, autoplay, and speaker notes. */}
 
       {activeDataTable && (
-        <aside key={`data-${activeMode}`} className="tanga-deck__data-panel" aria-label={activeDataTable.title}>
+        <aside key={`data-${activeMode}`} className={classNames('tanga-deck__data-panel', `is-${activeMode}`)} aria-label={activeDataTable.title}>
           <div className="tanga-deck__data-panel-head">
             <span className="tanga-deck__data-panel-eyebrow">Source data</span>
             <strong className="tanga-deck__data-panel-title">{activeDataTable.title}</strong>
@@ -5613,7 +5629,6 @@ export default function TangaDeckWorkbench() {
         <div className="tanga-deck__pager-status" aria-live="polite">
           <span className="tanga-deck__pager-label">
             {STORY_STEPS[activeStoryIndex]?.label ?? 'Scene'}
-            {activeShot && activeShots.length > 1 ? ` · ${activeShot.label}` : ''}
           </span>
           <button
             type="button"
@@ -6092,10 +6107,10 @@ export default function TangaDeckWorkbench() {
         >
           <div className="tanga-deck__ranking-head">
             <span>{tangaRankingInserted ? 'Global Ranking' : 'Peer Context'}</span>
-            <strong>{tangaRankingInserted ? 'Tanga enters the world’s top 5 graphite deposits' : 'Top 10 public graphite projects'}</strong>
+            <strong>{tangaRankingInserted ? 'Tanga ranks #5 in this peer set' : 'Top 10 public graphite projects'}</strong>
             <small>{tangaRankingInserted
-              ? 'Ranked #5 by M&I contained graphite — ahead of every other Tanzanian peer.'
-              : 'M&I contained graphite basis; click any globe dot or row for owner, listing, grade, flake distribution and metallurgy notes.'}</small>
+              ? 'By reported M&I contained graphite. Peer estimates may differ in effective date and reporting basis.'
+              : 'Ranked by reported M&I contained graphite. Select a project for ownership, grade, flake and metallurgy context.'}</small>
           </div>
 
           <ol className="tanga-deck__ranking-list">
@@ -6133,7 +6148,7 @@ export default function TangaDeckWorkbench() {
                 <span className="tanga-deck__rank-main">
                   <strong>
                     {project.project}
-                    {project.isTanga && <span className="tanga-deck__rank-badge">NEW · TOP 5</span>}
+                    {project.isTanga && <span className="tanga-deck__rank-badge">RANK 5 · THIS SET</span>}
                   </strong>
                   <small>{project.company} / {project.country}</small>
                   <span className="tanga-deck__rank-bar" aria-hidden="true"><i /></span>
@@ -6159,7 +6174,7 @@ export default function TangaDeckWorkbench() {
                 <li className="is-win"><i>Metallurgy</i><b>&gt;97% TC</b><s>premium conc.</s><b>large-flake</b></li>
                 <li><i>Listing</i><b>Private</b><s>pre-market entry</s><b>ASX: BKT</b></li>
               </ul>
-              <p>Comparable scale, a coastal logistics edge and &gt;97% TC metallurgy — entering the global top 5 pre-market.</p>
+              <p>In this selected peer set, Tanga ranks fifth by reported M&amp;I contained graphite. Port distance and metallurgical testwork are context, not demonstrated cost or product advantages.</p>
             </div>
           ) : (
             <div className="tanga-deck__ranking-foot">

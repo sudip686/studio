@@ -1,6 +1,7 @@
 import './globals.css';
 import './globals-intro.css';
 import './hud.css';
+import './globals-investor.css';
 import type {Metadata, Viewport} from 'next';
 import ServiceWorkerRegistrar from './ServiceWorkerRegistrar';
 
@@ -10,7 +11,7 @@ const OG_IMAGE = (process.env.NEXT_PUBLIC_ASSET_BASE_URL
 
 const TITLE = 'Tanga Graphite · Investor Presentation';
 const DESCRIPTION =
-  'An interactive 3D story of the Tanga Graphite Project, Tanzania — a top-5 global graphite deposit: 183 Mt @ 4.86% TGC, >97% TC concentrate, and coastal port/power/rail access. By Sakariya Mines & Minerals.';
+  'Explore the Tanga Graphite Project in an interactive 3D presentation connecting regional setting, geology, drilling, resource modelling, metallurgical testwork and conceptual development studies. By Sakariya Mines & Minerals.';
 
 export const metadata: Metadata = {
   title: TITLE,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {intersectUnit,stitchSectionSegments,projectDrills,intersectBlocks,sectionDefinitions,sectionWorld,planeDistance,sampleSectionTerrain,sampleSectionPits,type SectionDefinition,type SectionSource} from '../src/lib/deck/cross-section';
+import {intersectUnit,stitchSectionSegments,projectDrills,intersectBlocks,sectionDefinitions,sectionWorld,planeDistance,sampleSectionTerrain,sampleSectionPits,offsetSection,type SectionDefinition,type SectionSource} from '../src/lib/deck/cross-section';
 import {rectangle,inside} from '../src/lib/deck/site-planning';
 
 const section:SectionDefinition={id:'test',title:'Test',ends:['A','A′'],origin:[0,0],along:[1,0],min:-100,max:100,azimuth:90};
@@ -39,4 +39,14 @@ assert.ok(Math.abs(definitions[2].along[1])>.99,'Longitudinal follows geometric 
 for(const d of definitions)for(const u of [d.min,(d.min+d.max)/2,d.max]){const p=sectionWorld(d,u);assert.ok(inside(p,source.boundary));assert.ok(Math.abs(planeDistance(p,d))<1e-8);}
 assert.ok(sampleSectionTerrain(source,definitions[0]).every(p=>p[1]===720));
 assert.ok(sampleSectionPits(source,definitions[0]).flat().every(p=>p[1]<=720));
+const originalBoundary=JSON.stringify(source.boundary);
+for(const offset of [-100,-50,0,50,100]){
+  const shifted=offsetSection(definitions[0],offset,source.boundary);
+  if(!shifted)continue;
+  for(let i=1;i<20;i++)assert.ok(inside(sectionWorld(shifted,shifted.min+(shifted.max-shifted.min)*i/20),source.boundary));
+  assert.ok(Math.abs(planeDistance(shifted.origin,definitions[0])-offset)<1e-6);
+}
+assert.equal(offsetSection(section,10000,source.boundary),null);
+assert.equal(offsetSection(section,NaN,source.boundary),null);
+assert.equal(JSON.stringify(source.boundary),originalBoundary,'Sweep never mutates boundary');
 console.log('PASS: closed fills, exact areas/datum, ambiguous outlines, duplicate removal, crossing slab clipping, exact block intersections, N/S model-axis definitions and matching locator');

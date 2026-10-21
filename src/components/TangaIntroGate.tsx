@@ -29,6 +29,7 @@ type TangaIntroGateProps = {
 export default function TangaIntroGate({children}: TangaIntroGateProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fallbackTimerRef = useRef<number | null>(null);
+  const finishTimerRef = useRef<number | null>(null);
   const [introState, setIntroState] = useState<IntroState>('checking');
   const [videoSrc, setVideoSrc] = useState(INTRO_VIDEO_SRC);
   const [videoUnavailable, setVideoUnavailable] = useState(false);
@@ -43,12 +44,16 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   }, []);
 
   const completeIntro = () => {
+    if (finishTimerRef.current !== null) return;
     if (fallbackTimerRef.current) {
       window.clearTimeout(fallbackTimerRef.current);
       fallbackTimerRef.current = null;
     }
     setIntroState('finishing');
-    window.setTimeout(() => setIntroState('done'), 620);
+    // The intro is already the welcome: reveal the first actual chapter,
+    // rather than requiring a second "Begin" click on the cover behind it.
+    window.dispatchEvent(new Event('tanga:intro-complete'));
+    finishTimerRef.current = window.setTimeout(() => setIntroState('done'), 620);
   };
 
   useEffect(() => {
@@ -86,6 +91,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
 
   useEffect(() => {
     return () => {
+      if (finishTimerRef.current !== null) window.clearTimeout(finishTimerRef.current);
       if (fallbackTimerRef.current) {
         window.clearTimeout(fallbackTimerRef.current);
       }
@@ -118,7 +124,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
 
   return (
     <>
-      <div className={showIntro ? 'tanga-intro-app is-preloading' : 'tanga-intro-app'}>
+      <div className={showIntro ? 'tanga-intro-app is-preloading' : 'tanga-intro-app'} data-intro-complete={!DEEP_LINK_HASH&&(introState==='finishing'||introState==='done')?'true':undefined}>
         {children}
       </div>
 
