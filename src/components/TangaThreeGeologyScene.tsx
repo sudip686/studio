@@ -10,6 +10,8 @@ import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan
 import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
+import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
+import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import MetallurgyVisualStory from './MetallurgyProcessExhibit';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import GeologyCrossSections from './GeologyCrossSections';
@@ -168,6 +170,7 @@ const CHROME_SELECTORS = [
   '.tanga-deck__data-panel',
   '.tanga-story-panel',
   '.tanga-story-cue',
+  '.tanga-evidence-sequence',
   '.tanga-deck__insight-panel',
   '.tanga-deck__ranking',
   '.tanga-three__grade-legend',
@@ -223,7 +226,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
   stage?: string;
 };
@@ -243,6 +246,7 @@ type TangaThreeGeologySceneProps = {
   labelDensity?: LabelDensity;
   layerSettings?: DeckLayerSettings;
   inspectionMode?: boolean;
+  onInspectEvidence?: () => void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
@@ -852,7 +856,7 @@ function terrainOpacityForView(mode: GeologyMode, view: SurfaceCameraView) {
   // The default three-quarter view, where most of the deck is presented.
   if (mode === 'subsurface') return 0.28;
   if (mode === 'drillholes') return 0.42;
-  if (mode === 'resource') return 0.62;
+  if (mode === 'resource') return 0.32;
 if (mode === 'mine_planning') return 1;
   return 1;
 }
@@ -1958,6 +1962,7 @@ export default function TangaThreeGeologyScene({
   labelDensity = 'key',
   layerSettings = DEFAULT_LAYER_SETTINGS,
   inspectionMode = false,
+  onInspectEvidence,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -2111,10 +2116,12 @@ export default function TangaThreeGeologyScene({
     // makes a subsurface view read as a deposit rather than as floating shapes.
     // Left transparent (background = null) would show the page's black through,
     // which is what flattened the scene before.
-    scene.background = new THREE.Color(SKY_COLOR);
+    const subsurfaceStudio = ['drillholes','subsurface','resource'].includes(mode);
+    const sceneSky = subsurfaceStudio ? 0x252a2f : SKY_COLOR;
+    scene.background = new THREE.Color(sceneSky);
     // Fog tinted to the sky so distant ground fades into the horizon instead of
     // ending on a hard cut.
-    scene.fog = new THREE.Fog(SKY_COLOR, 4600, 12000);
+    scene.fog = new THREE.Fog(sceneSky, 4600, 12000);
 
     const depthGridGroup = new THREE.Group();
     depthGridGroup.name = 'depth-grid';
@@ -2244,6 +2251,10 @@ export default function TangaThreeGeologyScene({
 const cameraShot = cameraShotForMode(mode, lowCamera);
     let sitePlan: SitePlan | null = null;
     let processPlant: THREE.Group | null = null;
+    let developmentInfrastructure: THREE.Group | null = null;
+    let developmentMarker: THREE.Mesh | null = null;
+    let feedAnchor: THREE.Vector3 | null = null;
+    let facilityFocused = false;
     let processMarker: THREE.Mesh | null = null;
     let plantDetailKey='';
     const targetMeshes: THREE.InstancedMesh<THREE.BoxGeometry,THREE.MeshBasicMaterial>[]=[];
@@ -2294,6 +2305,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       });
     };
     const registerTerrainSurfaceMaterial = (material: THREE.MeshStandardMaterial) => {
+      if (subsurfaceStudio) {
+        material.onBeforeCompile = shader => {
+          shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\nfloat groundLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));\ndiffuseColor.rgb = mix(vec3(groundLuma), diffuseColor.rgb, 0.18);');
+        };
+        material.customProgramCacheKey = () => 'tanga-muted-subsurface-ground-v1';
+      }
       terrainSurfaceMaterials.push(material);
       applyTerrainSurfaceView();
     };
@@ -2418,6 +2435,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const normalizedDirection = direction.normalize();
 
       if (command.action === 'resetView') {
+        facilityFocused=false;
         if (mode === 'mine_planning') calloutsForProjection = siteOverviewCallouts;
         controls.maxPolarAngle = Math.PI - 0.04;
         surfaceCameraView = 'default';
@@ -2449,17 +2467,38 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return;
       }
 
+      if(command.action==='developmentOverview'){
+        facilityFocused=false;
+        setStoryPlaying(false);setMiningBeat(3);calloutsForProjection=siteOverviewCallouts;
+        scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);return;
+      }
+      if(command.action==='feedPoint'&&feedAnchor){
+        facilityFocused=true;
+        setStoryPlaying(false);setMiningBeat(3);
+        const centre=stage.localToWorld(feedAnchor.clone());
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,1.5,42);
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed');return;
+      }
+      if(command.action==='siteServices'&&processPlant){
+        facilityFocused=true;
+        setStoryPlaying(false);setMiningBeat(3);
+        const centre=processPlant.localToWorld(new THREE.Vector3(...(processPlant.userData.siteServices as [number,number,number])));
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,1.5,42);
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant');return;
+      }
       if(command.action==='plantDetail'&&processPlant){
+        facilityFocused=true;
         setStoryPlaying(false); setMiningBeat(3); setInspectionOpen(true);
         const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
         const selected=stages?.find(item=>item.id===command.stage);
         calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:item.point,kind:'story' as const}));
         for(const callout of calloutsForProjection){calloutAnchors.set(callout.id,new THREE.Vector3(...callout.anchor));calloutObjects.set(callout.id,processPlant);}
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
-        const position=centre.clone().add(selected?new THREE.Vector3(290,230,310):new THREE.Vector3(1000,780,1060));
+        const position=centre.clone().add(selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350));
         scheduleCameraTween(position,centre,1.3,42);return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
+        facilityFocused=false;
         setStoryPlaying(false); setMiningBeat(2);
         calloutsForProjection = siteOverviewCallouts;
         const pits=[...(sitePlan?.pits??[])].sort((a,b)=>a.centre[1]-b.centre[1]);
@@ -3004,6 +3043,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const p=localPoint(lon,lat,elevation);return {x:p.x,y:p.y,z:p.z,dx,dy,dz,carbon};
         });
         sitePlan = planSite(footprintBlocks, boundary, (x, z) => terrainSurfaceY(terrainResources, x, -z), 'north-south');
+        if(mode==='mine_planning'){
+          sitePlan.plant=[DEVELOPMENT_SITE.dischargeUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.dischargeUtm[1]];
+          sitePlan.audit=sitePlan.audit.filter(item=>!item.startsWith('Plant footprint')&&!item.startsWith('No admissible plant'));
+          sitePlan.audit.push('Lowland candidate 2 from PaulSam Figure 3.3; approximate map-grid registration, outside the provisional mine boundary', '250 × 250 m land allowance from Table 5.3; internal facility layout illustrative');
+        }
         sitePlan.audit.push(`RF 1 sample footprint reference · ${reference.provenance.sourceTimestamp} · not full extraction`);
         host.dataset.siteAudit = JSON.stringify(sitePlan.audit);
         host.dataset.sitePlan = JSON.stringify(sitePlan);
@@ -3622,45 +3666,28 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (sitePlan.plant) {
             const plant = buildConcentrator();
             const [x, z] = sitePlan.plant;
-            const level=placeConcentrator(plant,x,z,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz));
+            const level=placeConcentrator(plant,x,z,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz),{width:250,depth:250});
             tagDeckLayer(plant, 'context');
             stage.add(plant);
             processPlant=plant;
+            const mappedFeed:Point2=[DEVELOPMENT_SITE.feedUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.feedUtm[1]];
+            const apron=proposeFeedApron(mappedFeed,[x,z],sitePlan.pits,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz));
+            if(!apron)throw new Error('No conflict-free feed apron near the mapped candidate; do not render a facility over a pit');
+            const feed=apron.point;
+            developmentInfrastructure=buildDevelopmentInfrastructure(feed,[x,z],(px,pz)=>terrainSurfaceY(terrainResources,px,-pz),level);
+            tagDeckLayer(developmentInfrastructure,'context');stage.add(developmentInfrastructure);
+            feedAnchor=new THREE.Vector3(...(developmentInfrastructure.userData.feedAnchor as [number,number,number]));
+            developmentMarker=new THREE.Mesh(new THREE.SphereGeometry(3,8,6),new THREE.MeshBasicMaterial({color:0xf3c389}));developmentInfrastructure.add(developmentMarker);
+            host.dataset.developmentReference=JSON.stringify({site:2,mappedFeedUtm:DEVELOPMENT_SITE.feedUtm,proposedFeedUtm:[Math.round(feed[0]+PROJECT_UTM_CENTER.easting),Math.round(PROJECT_UTM_CENTER.northing-feed[1])],feedOffsetM:Math.round(apron.offsetM),plantUtm:DEVELOPMENT_SITE.dischargeUtm,registration:'Approximate map tracing; feed apron offset clear of concept pits · EPSG:32737',reportedLengthM:2150,source:DEVELOPMENT_SOURCE});
+            sitePlan.audit.push(`Proposed feed apron shifted ${Math.round(apron.offsetM)} m from the old map marker to clear current conceptual pits; corridor screened against pit envelopes only`);
+            host.dataset.siteAudit=JSON.stringify(sitePlan.audit);
             host.dataset.plantDetail = JSON.stringify({sourceMeshes:plant.userData.detailMeshCount,drawMeshes:plant.userData.batchedMeshCount,stages:plant.userData.processStages.length});
             processMarker=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshBasicMaterial({color:0xffb760}));plant.add(processMarker);
-            const boundary:Point2[]=(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z];});
-            const end:Point2=[x-CONCEPT.plantWidth/2-10,z+CONCEPT.plantDepth*.25];
-            const height=(px:number,pz:number)=>terrainSurfaceY(terrainResources,px,-pz);
-            const gates:Point2[]=[end,[x-CONCEPT.plantWidth/2-20,z-CONCEPT.plantDepth/2-20],[x+CONCEPT.plantWidth/2+20,z],[x,z+CONCEPT.plantDepth/2+20]];
-            const obstacles=[...sitePlan.pits,{ring:rectangle([x,z],CONCEPT.plantWidth,CONCEPT.plantDepth),centre:[x,z] as Point2,surface:level,floor:level,depth:0,support:0}];
-            const routeAudit:{pit:number;reason:string;admitted:boolean}[]=[];
-            const routePits=sitePlan.pits;
-            setHaulCount(0);setHaulStatus('loading');
-            // Optional deterministic route search must not delay the authored
-            // camera, pit inspection or scene-ready state. It already yields.
-            void (async()=>{
-            for(const pit of routePits){
-              const starts=pit.ring.map(p=>{const dx=p[0]-pit.centre[0],dz=p[1]-pit.centre[1],l=Math.hypot(dx,dz);return [p[0]+dx/l*65,p[1]+dz/l*65] as Point2;}).sort((a,b)=>Math.hypot(a[0]-end[0],a[1]-end[1])-Math.hypot(b[0]-end[0],b[1]-end[1]));
-              let route:THREE.Vector3[]|null=null;
-              let reason='';
-              for(const gate of gates){
-                const admittedStarts=starts.filter(p=>contained(rectangle(p,18,18),boundary)&&!obstacles.some(o=>overlaps(rectangle(p,18,18),o.ring))).sort((a,b)=>Math.hypot(a[0]-gate[0],a[1]-gate[1])-Math.hypot(b[0]-gate[0],b[1]-gate[1])).slice(0,2);
-                for(const start of admittedStarts){route=await planHaulRoute(start,gate,boundary,obstacles,height,value=>{reason=value;},()=>cancelled);if(cancelled)return;if(route)break;}
-                if(route)break;
-              }
-              routeAudit.push({pit:pit.centre[1],reason,admitted:Boolean(route)});
-              host.dataset.haulAudit=JSON.stringify(routeAudit);
-              if(!route)continue;
-              const road=buildHaulRoad(route);tagDeckLayer(road,'context');stage.add(road);
-              const receiving=route[route.length-1];
-              const apron=new THREE.Mesh(new THREE.ConeGeometry(8,6,16),new THREE.MeshStandardMaterial({color:0x75604b}));
-              apron.position.copy(receiving).add(new THREE.Vector3(0,3,0));tagDeckLayer(apron,'context');stage.add(apron);
-              const length=route.slice(1).reduce((sum,p,i)=>sum+p.distanceTo(route[i]),0);
-              for(let i=0;i<2;i++){const truck=buildHaulTruck();tagDeckLayer(truck,'context');stage.add(truck);haulTrucks.push({mesh:truck,points:route,length,offset:i*.5});}
-            }
-            setHaulCount(haulTrucks.length);host.dataset.haulTrucks=String(haulTrucks.length);
-            setHaulStatus('ready');applyDeckLayers(stage,layerSettingsRef.current);
-            })().catch(()=>{if(!cancelled)setHaulStatus('failed');});
+            // PaulSam separates mine-to-feed haulage from the downhill conveyor.
+            // Do not invent a pit-to-lowland haul road through the licence edge.
+            setHaulCount(0);setHaulStatus('ready');
+            host.dataset.haulTrucks='0';
+            host.dataset.haulRoutes=JSON.stringify([{admitted:false,reason:'No surveyed mine-to-feed haul road supplied; indicative conveyor shown separately'}]);
             // Ground-level receiving apron: internal pit ramps and pad access remain unengineered.
           }
           const pit = sitePlan.pits[0];
@@ -3668,7 +3695,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (pit) {
             const bounds=new THREE.Box3();
             for(const p of sitePlan.pits)for(const [x,z] of p.ring)bounds.expandByPoint(new THREE.Vector3(x,p.surface-p.depth*.25,z));
-            if(sitePlan.plant){const [x,z]=sitePlan.plant;const y=processPlant?.position.y??0;for(const sign of [-1,1])bounds.expandByPoint(new THREE.Vector3(x+sign*CONCEPT.plantWidth/2,y,z+sign*CONCEPT.plantDepth/2));}
+            if(sitePlan.plant){const [x,z]=sitePlan.plant;const y=processPlant?.position.y??0;for(const sign of [-1,1])bounds.expandByPoint(new THREE.Vector3(x+sign*125,y,z+sign*125));}
             const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*.9+250;
             bounds.getCenter(cameraShot.target);
             cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.8, distance*.85, distance*.18));
@@ -3677,6 +3704,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             cameraShot.targetMid.copy(cameraShot.target);
             cameraShot.drift.set(8, 3, 8);
             calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const}));
+            if(feedAnchor&&sitePlan.plant&&processPlant){
+              calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story'});
+              calloutsForProjection.push({id:'development-plant',label:'Lowland processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story'});
+            }
             siteOverviewCallouts = calloutsForProjection;
             for(const label of calloutsForProjection)calloutAnchors.set(label.id,new THREE.Vector3(...label.anchor));
           }
@@ -4056,9 +4087,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(mode==='mine_planning'){
         if(beat!==lastStoryBeat){lastStoryBeat=beat;setMiningBeat(beat);}
         host.dataset.miningBeat=String(beat);
-        evidenceGroup.visible=story.holes&&layerSettingsRef.current.context.visible;
+        evidenceGroup.visible=(!facilityFocused||beat<3)&&story.holes&&layerSettingsRef.current.context.visible;
         evidenceLines.forEach(line=>{const count=line.geometry.getAttribute('position').count;line.geometry.setDrawRange(0,beat===0&&story.playing&&!reducedMotion.matches?Math.floor(Math.min(1,storyAge/2.5)*count/2)*2:count);});
         if(processPlant)processPlant.visible=beat>=3&&layerSettingsRef.current.context.visible;
+        if(developmentInfrastructure)developmentInfrastructure.visible=beat>=3&&layerSettingsRef.current.context.visible;
       }
       for(const item of haulTrucks){
         item.mesh.visible=beat>=3&&layerSettingsRef.current.context.visible;
@@ -4066,12 +4098,17 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const at=routePosition(item.points,(returning?2-phase:phase)*item.length);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
-      targetMeshes.forEach(mesh=>{mesh.visible=beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat>=2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
+      targetMeshes.forEach(mesh=>{mesh.visible=(!facilityFocused||beat<3)&&beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat>=2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;m.transparent=true;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5);m.opacity=(presentationOptions.current.targetXray ? .45 : 1)*reveal*layerSettingsRef.current.context.opacity;m.depthWrite=!presentationOptions.current.targetXray;});
       if (processPlant && processMarker) {
         const points = processPlant.userData.flow as THREE.Vector3[];
         const phase = (motionTime / 3) % (points.length - 1), index = Math.floor(phase);
         processMarker.position.lerpVectors(points[index], points[index+1], phase-index);
+      }
+      if(developmentInfrastructure&&developmentMarker){
+        const points=developmentInfrastructure.userData.flow as THREE.Vector3[];
+        const phase=(motionTime/600)%(1),at=phase*(points.length-1),index=Math.floor(at);
+        developmentMarker.position.lerpVectors(points[index],points[index+1],at-index);
       }
       const flyProgress = reducedMotion.matches?1:ease(Math.min(1, elapsed / cameraShot.flySeconds));
       if (cameraTween) {
@@ -4392,8 +4429,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 '--callout-tone': callout.tone,
               } as any}
             >
-              <span>{mode==='mine_planning'&&miningBeat<2 ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
-              {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2 ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
+              <span>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
+              {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
             </div>
           ))}
         </section>
@@ -4525,10 +4562,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         )}
       </section>
       {mode === 'mine_planning' && <section className="tanga-mine-story" aria-label="Mining targets and animation">
-        <h2>Why these pits?</h2>
+        <h2>{miningBeat>=3?'Processing & site services':'Why these pits?'}</h2>
         <div className="tanga-mine-story__steps" aria-label="Mining camera presets">
           {(['northPit','southPit','resetView'] as const).map((action,index)=><button key={action} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(index===2?3:2);setFocusedSource(null);cameraCommandHandlerRef.current?.({id:Date.now(),action});}}>{['North pit','South pit','Whole site'][index]}</button>)}
         </div>
+        {miningBeat<3&&<>
         {focusedSource&&<p aria-live="polite">{focusedSource}<br/><small>Trace colour: white context, teal ≥4.5%, copper ≥5% TGC.</small></p>}
         <div className="tanga-mine-story__steps" aria-label="Evidence to concept sequence">
           {['01 · Drill evidence','02 · Grade targets','03 · Pit concept','04 · Processing'].map((label,index)=><button key={label} aria-pressed={miningBeat===index} onClick={()=>{setStoryPlaying(false);setMiningBeat(index);}}>{label}</button>)}
@@ -4541,14 +4579,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <small>{targetCount.toLocaleString()} source cells · original size and position<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on':'Solid pit view'}</button>
         <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
-        <details><summary>Explore processing equipment</summary>
+        </>}
+        <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
           <button onClick={()=>{setPlantCutaway(true);setPlantProcess('all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>Inspect whole processing plant</button>
           <div className="tanga-mine-story__steps">{[['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product silos']].map(([id,label])=><button key={id} onClick={()=>{setPlantCutaway(true);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:id});}}>{label}</button>)}</div>
           <button aria-pressed={plantCutaway} onClick={()=>{setPlantCutaway(v=>!v);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>{plantCutaway?'Restore plant roofs':'Cut away plant roofs'}</button>
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
           <small>Six connected process areas in site coordinates. Illustrative equipment and retaining platform; an engineered plant design is not supplied.</small>
         </details>
-        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Haul routes unavailable — animation withheld'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
+        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Mine-to-feed road requires survey; map-traced conveyor is shown separately'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
@@ -4565,7 +4604,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
-      {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}
+      {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)} onInspectEvidence={onInspectEvidence}/>}
       {mode === 'metallurgy' && <section className="tanga-met-report" aria-label="Metallurgy testwork summary">
         <header><small>DECK SUMMARY · LAB REPORT VERIFICATION PENDING</small><h2>Carbon. Recovery. Flake.</h2></header>
         <MetallurgySampleExplorer/>

@@ -2,6 +2,7 @@
 
 import {useEffect, useState} from 'react';
 import {ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, X} from 'lucide-react';
+import {DEVELOPMENT_FACILITIES} from '@/data/tanga-development';
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
 
 export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
@@ -38,7 +39,7 @@ export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   </>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant}: {chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment}: {chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:'overview'|'feed'|'plant'|'services')=>void}) {
   const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
   const milestone = WORK_MILESTONES[milestoneIndex];
 
@@ -100,11 +101,20 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'mine_planning') return <aside className="tanga-story-panel tanga-story-panel--concept" aria-label="Concept and terrain comparison">
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
-    <h2>One site. A connected concept.</h2>
-    <p className="tanga-story-panel__intro">Move from the conceptual pits to the plant: crushing, milling, flotation, thickening, dewatering and product handling.</p>
+    <h2>From the ridge to the lowlands</h2>
+    <p className="tanga-story-panel__intro">PaulSam proposes uphill ore collection and downhill processing between Bwiti and Magati. Follow the connection, then inspect the proposed facilities.</p>
+    <nav className="tanga-development-views" aria-label="Inspect proposed development areas">{DEVELOPMENT_FACILITIES.filter(view=>view.id!=='plant').map(view=><button type="button" key={view.id} disabled={!onInspectDevelopment} onClick={()=>onInspectDevelopment?.(view.id)}><strong>{view.label}</strong><small>{view.detail}</small></button>)}</nav>
+    <details className="tanga-development-source"><summary>Report location &amp; alternatives</summary><p>Option 2 is the report’s planning assumption: 2.15 km and 24° reported inclination. The map trace is approximately 2.45 km, so its alignment and the 2.15 km table estimate need reconciliation. Options 1 and 3 are alternatives, not additional operating conveyors.</p><img src="/presentation-assets/paulsam-conveyor-sites.jpg" alt="PaulSam Figure 3.3 showing three candidate feed stations and conveyor alignments on a labelled UTM 37S grid"/><p>Figure 3.3 · PDF p.33 · June 2023. Locations traced approximately from the grid. The proposed feed apron is offset nearby to clear the current conceptual pit envelope. No surveyed plant parcel or engineered alignment is supplied.</p></details>
     <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Inspect the processing plant <ArrowRight size={14}/></button>
     {onToggleSurfaceConcept && <button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView ? 'Show concept over terrain' : 'Compare measured terrain'} <ArrowRight size={14}/></button>}
-    <p className="tanga-story-panel__qualification">Concept geometry is not an optimised mine design, reserve, schedule, cost estimate or permitted facility.</p>
+    <p className="tanga-story-panel__qualification">The lowland campus is outside the provisional mine boundary. Map locations are approximate; buildings, process equipment and water provision are illustrative. Land, forest, water and tailings studies remain required.</p>
+  </aside>;
+
+  if (chapter === 'accessibility') return <aside className="tanga-story-panel tanga-story-panel--logistics" aria-label="Report development and export chain">
+    <div className="tanga-story-panel__eyebrow">PAULSAM · JUNE 2023 · LOGISTICS CONCEPT</div><h2>Ore, concentrate, export cargo</h2>
+    <p className="tanga-story-panel__intro">Different materials need different links. The report separates hillside ore transport from road delivery of concentrate.</p>
+    <ol className="tanga-development-chain">{[['Mine to feed point','Local ore haulage · route requires survey'],['Feed point to lowlands','Candidate conveyor · planning option 2'],['Processing to stuffing yard','Concentrate haulage · road upgrades assessed'],['Stuffing and storage','Mabokweni / Kwa Songoro alternatives'],['Port of exit','Tanga preferred in the 2023 study']].map(([title,detail],i)=><li key={title}><span>{String(i+1).padStart(2,'0')}</span><div><strong>{title}</strong><small>{detail}</small></div></li>)}</ol>
+    <p className="tanga-story-panel__qualification">Study §§3.3, 5.3 and 6. A stuffing yard plot is not georeferenced in the supplied report. Map infrastructure and the displayed route do not establish a project connection or current capacity.</p>
   </aside>;
 
   if (chapter === 'comparison') return <aside className="tanga-story-panel tanga-story-panel--decisions" aria-label="Evidence-led next decisions">

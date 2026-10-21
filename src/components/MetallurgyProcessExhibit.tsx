@@ -4,11 +4,13 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {createMetallurgyPlant,MET_GROUPS,PROCESS_STAGES,BASKET_POSITIONS} from '@/lib/deck/metallurgy-plant';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
+import TangaMaterialEvidence from './TangaMaterialEvidence';
 import {createMetallurgyInspection,inspectionCameraPose} from '@/lib/deck/metallurgy-inspection';
 import {cameraEase,createResolutionGovernor} from '@/lib/deck/presentation-motion';
 
-export default function MetallurgyProcessExhibit({paused,onToggle}:{paused:boolean;onToggle:()=>void}){
+export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvidence}:{paused:boolean;onToggle:()=>void;onInspectEvidence?:()=>void}){
   const host=useRef<HTMLDivElement>(null),pausedRef=useRef(paused),command=useRef<(n:number)=>void>();
+  const [materialEvidence,setMaterialEvidence]=useState(false);
   const [stage,setStage]=useState(-1),[group,setGroup]=useState(0),[evidence,setEvidence]=useState(false),[error,setError]=useState('');
   const [tip,setTip]=useState<{x:number;y:number;text:string}|null>(null);
   const [comparison,setComparison]=useState(1);
@@ -105,6 +107,8 @@ export default function MetallurgyProcessExhibit({paused,onToggle}:{paused:boole
         {evidence&&<div className="tanga-process-evidence"><MetallurgySampleExplorer key={group} initialIndex={group}/></div>}
       </aside>
     </div>
+    <button type="button" className="tanga-material-entry" onClick={()=>{setTour(false);onInspectEvidence?.();setMaterialEvidence(true);}}>Explore the actual samples <span>Microscopy · SEM · laboratory preparation ↗</span></button>
+    {materialEvidence&&<TangaMaterialEvidence onClose={()=>setMaterialEvidence(false)}/>}
     <nav className="tanga-process-stages" aria-label="Inspect testwork equipment">{PROCESS_STAGES.map((s,i)=><button key={s.id} aria-pressed={stage===i} data-deck-tip={s.brief} onClick={()=>{setTour(false);command.current?.(i);}}><b>0{i+1}</b>{s.title}</button>)}</nav>
     <footer>Illustrative testwork sequence, not the verified laboratory protocol. Results: existing deck summaries; laboratory verification pending. TC, recovery and flake size measure different characteristics.</footer>
   </section>;

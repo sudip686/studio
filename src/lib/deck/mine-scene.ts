@@ -9,6 +9,9 @@ export function buildConcentrator() {
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
+  // 250 × 250 m land allowance in PaulSam Table 5.3. Internal arrangement is
+  // illustrative; it is not a surveyed parcel or an engineered general arrangement.
+  box(500,1,500,0,-1,0,materials.concrete,'PaulSam land allowance · illustrative 250 × 250 m');
   box(400,3,280,0,0,0,materials.concrete,'Plant pad');
   // A perimeter service lane and drainage edge make the pad read as a site.
   box(392,.15,7,0,1.6,135,materials.roof,'Conceptual service lane');
@@ -105,22 +108,42 @@ export function buildConcentrator() {
   root.userData.flow=flow;
   root.userData.labels=[['ROM / feed',-106,32,20],['Crushing & milling',-50,37,-20],['Flotation',40,30,-24],['Dewatering & product',95,35,45]];
   addPlantDetail(root, materials);
+  // Supporting facilities occupy the southern service yard, clear of the process.
+  shed('Administration and laboratory',-20,194,75,44,18);
+  shed('Heavy vehicle workshop and spares',-155,194,115,58,24);
+  for(const x of [-192,-155,-118])box(25,18,.4,x,9,223.3,materials.roof,'Workshop roller shutter bay');
+  for(let i=0;i<6;i++)box(9,5,.4,-51+i*12,12,216.3,materials.water,'Administration glazing');
+  for(const x of [50,100,150])box(23,21,.4,x,10.5,130.3,materials.steel,'Product warehouse loading door');
+  for(let i=0;i<5;i++)box(4,.2,32,-190+i*15,1.5,194,materials.concrete,'Workshop service bay markings');
+  box(90,2,65,144,1,193,materials.roof,'Lined site-water provision · illustrative');
+  box(80,.4,55,144,2.2,193,materials.water,'Site water / reclaim allowance · not a TSF design');
+  for(const x of [-246,246]){
+    for(let z=-246;z<=246;z+=24)box(.7,5,.7,x,2.5,z,materials.steel,'Perimeter fence post');
+    for(const y of [2,4.5])box(.4,.4,492,x,y,0,materials.steel,'Perimeter fence rail');
+  }
+  for(const z of [-246,246]){
+    for(let x=-246;x<=246;x+=24)if(z<0||Math.abs(x)>40)box(.7,5,.7,x,2.5,z,materials.steel,'Perimeter fence post');
+    for(const y of [2,4.5])for(const sign of [-1,1])box(206,.4,.4,sign*143,y,z,materials.steel,'Perimeter fence rail and gate opening');
+  }
+  for(let i=0;i<7;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
+  root.userData.siteServices=[-20,25,194];
   batchPlantMeshes(root);
   root.scale.set(CONCEPT.plantWidth/400,CONCEPT.plantWidth/400,CONCEPT.plantDepth/280);
   return root;
 }
 
 /** Presentation-only level platform; not an earthworks or retaining-wall design. */
-export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:number,z:number)=>number) {
+export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:number,z:number)=>number,footprint?:{width:number;depth:number}) {
+  const width=footprint?.width??CONCEPT.plantWidth,depth=footprint?.depth??CONCEPT.plantDepth;
   let low=Infinity,high=-Infinity;
-  for(let dx=-CONCEPT.plantWidth/2;dx<=CONCEPT.plantWidth/2;dx+=5)for(let dz=-CONCEPT.plantDepth/2;dz<=CONCEPT.plantDepth/2;dz+=5){
+  for(let dx=-width/2;dx<=width/2;dx+=5)for(let dz=-depth/2;dz<=depth/2;dz+=5){
     const y=height(x+dx,z+dz);low=Math.min(low,y);high=Math.max(high,y);
   }
   const level=high+1.5;
   // Follow the actual sampled perimeter rather than extending a deep box beneath
   // every edge. This remains a retaining-platform illustration, not earthworks.
   const vertices:number[]=[];
-  const corners:Point2[]=[[-CONCEPT.plantWidth/2,-CONCEPT.plantDepth/2],[CONCEPT.plantWidth/2,-CONCEPT.plantDepth/2],[CONCEPT.plantWidth/2,CONCEPT.plantDepth/2],[-CONCEPT.plantWidth/2,CONCEPT.plantDepth/2]];
+  const corners:Point2[]=[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]];
   for(let edge=0;edge<4;edge++){
     const a=corners[edge],b=corners[(edge+1)%4],n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/5);
     for(let i=0;i<n;i++){

@@ -92,7 +92,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 type ThreeCameraCommand = {
   id: number;
@@ -469,7 +469,7 @@ const CHAPTER_GUIDANCE: Record<WorkbenchMode, {focus: string; bridge: string}> =
   subsurface: {focus: 'Follow the TGF002 sample crosswalk through petrography, drillhole and assay records. Explain that interpreted contacts extend between observations.', bridge: 'Use this geological framework to read the reported estimate and grade distribution.'},
   drillholes: {focus: 'Show the recorded drill traces and the source core example. Separate sampled evidence from the spaces between holes.', bridge: 'The holes provide observations for the geological interpretation.'},
   resource: {focus: 'Rotate the registered grade blocks and explain the legend. A 3% display threshold is not an economic cutoff; the visual model alone does not establish reserves.', bridge: 'Next, use this spatial pattern to illustrate a possible mining concept.'},
-  mine_planning: {focus: 'Read the admitted pit crests, benches and plant location together. These are presentation-grade geometric concepts inside the existing boundary, not optimised or engineered designs.', bridge: 'Next, examine the laboratory testwork behind the processing questions.'},
+  mine_planning: {focus: 'Separate the conceptual pits from the uphill feed station and lowland processing candidate traced from PaulSam’s June 2023 map. The report uses candidate 2 as a planning assumption; facilities and conveyor supports remain illustrative.', bridge: 'Next, examine the laboratory testwork behind the processing questions.'},
   metallurgy: {focus: 'Distinguish concentrate carbon, graphite recovery and flake-size distribution. Follow the illustrative liberation, flotation, dewatering and characterisation sequence; deck summaries remain pending laboratory-report verification.', bridge: 'Producing a concentrate is one step; connecting the site to logistics is the next.'},
   accessibility: {focus: 'Move from the site to transport connections. Show the geographic relationship without implying that access, capacity or development permissions are secured.', bridge: 'Bring the evidence and remaining development decisions back into one closing view.'},
   comparison: {focus: 'Close on the evidence gaps that matter: dataset reconciliation, study confidence and development constraints. Invite discussion around those next decisions.', bridge: 'Open Sources & basis or switch to Explore for detailed inspection.'},
@@ -748,7 +748,9 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'resetView'},
     {id: 'north-pit', label: 'North pit', detail: 'Inspect the northern conceptual excavation', threeAction: 'northPit'},
     {id: 'south-pit', label: 'South pit', detail: 'Inspect the southern conceptual excavation', threeAction: 'southPit'},
-    {id: 'plant', label: 'Processing plant', detail: 'Inspect six connected illustrative processing areas', threeAction: 'plantDetail'},
+    {id: 'feed', label: 'Uphill feed station', detail: 'Follow the report’s feed-in point and downhill conveyor', threeAction: 'feedPoint'},
+    {id: 'plant', label: 'Lowland processing', detail: 'Inspect the PaulSam planning candidate and illustrative concentrator', threeAction: 'plantDetail'},
+    {id: 'services', label: 'Site services', detail: 'Workshop, laboratory, offices and site-water provision', threeAction: 'siteServices'},
   ],
   comparison: [
     {id: 'decisions', label: 'Next study decisions', detail: 'Close on evidence reconciliation and development questions', view: VIEW_STATES.comparison},
@@ -5186,6 +5188,7 @@ export default function TangaDeckWorkbench() {
           labelDensity={labelDensity}
           layerSettings={layerSettings}
           inspectionMode={isExploreMode}
+          onInspectEvidence={()=>{setIsAutoplay(false);setIsExecutiveTour(false);}}
           onAssayFacts={setAssayFacts}
         />
       )}
@@ -6109,10 +6112,11 @@ export default function TangaDeckWorkbench() {
         )}
       </section>
 
+      {!isExploreMode && !isCoverScene && ['topography','drillholes','subsurface','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 Surface'],['drillholes','02 Drilling'],['subsurface','03 Geology'],['resource','04 Estimate']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
-      {!isExploreMode && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}} onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand('plantDetail');} : undefined}/ >}
+      {!isExploreMode && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}} onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(view === 'feed' ? 'feedPoint' : view === 'services' ? 'siteServices' : view === 'plant' ? 'plantDetail' : 'developmentOverview');} : undefined} onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}/ >}
       {!isExploreMode && !isCoverScene && !storyHeroVisible && ['topography','drillholes','subsurface','resource','mine_planning'].includes(activeMode) && <TangaStoryCue mode={activeMode} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Review the evidence'} onContinue={handleManualNext}/>}
 
       {activeMode === 'accessibility' && (

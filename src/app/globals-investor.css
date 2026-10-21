@@ -901,4 +901,49 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck .tanga-three.is-visible.is-resource .tanga-three__grade-legend { display:block!important; top:350px!important; max-height:calc(100svh - 462px)!important; padding:12px; }
 .tanga-three__grade-legend>summary { color:#e3bb98; font-size:11px; cursor:pointer; }
 .tanga-three__grade-legend[open]>.tanga-three__grade-head { margin-top:14px; }
+.tanga-evidence-sequence { position:absolute; z-index:31; top:164px; left:300px; display:flex; gap:3px; padding:4px; border:1px solid #d1d9df24; border-radius:7px; background:#101a20da; backdrop-filter:blur(12px); }
+.tanga-evidence-sequence button { border:0; border-radius:4px; background:transparent; color:#b2c1c9; padding:8px 11px; font-size:10px; cursor:pointer; }
+.tanga-evidence-sequence button[aria-current=step] { color:#f4d4b8; background:#81502c66; }
+.tanga-evidence-sequence button:focus-visible { outline:2px solid #e6b081; outline-offset:2px; }
+.tanga-three:is(.is-drillholes,.is-subsurface,.is-resource) .tanga-three__callout { border:1px solid #cbd5dd29; border-radius:5px; padding:10px 12px; background:linear-gradient(#1a232bf2,#0c141bf0); box-shadow:0 4px 18px #0003; }
+.tanga-three:is(.is-drillholes,.is-subsurface,.is-resource) .tanga-three__callout strong { font-size:11px; line-height:1.45; }
+.tanga-three:is(.is-drillholes,.is-subsurface,.is-resource) .tanga-three__leader-svg line { stroke:#e4e9eb!important; stroke-width:1; opacity:.8; }
+.tanga-development-views { display:grid; grid-template-columns:1fr; gap:5px; margin:15px 0; }
+.tanga-development-views button { display:grid; gap:3px; border:1px solid #d7b59233; border-radius:6px; background:#19272e; padding:9px 11px; color:#e8d3bf; text-align:left; cursor:pointer; }
+.tanga-development-views button strong { font-size:11px; font-weight:550; }
+.tanga-development-views button small { color:#aebec6; font-size:9px; }
+.tanga-development-source { margin:13px 0; padding:10px 0; border-block:1px solid #d5e0e51b; color:#d8b18f; font-size:10px; }
+.tanga-development-source summary { cursor:pointer; }
+.tanga-development-source img { width:100%; height:auto; margin-top:10px; border-radius:4px; }
+.tanga-development-source p { color:#b5c2c9; font-size:10px; line-height:1.5; }
+.tanga-development-chain { list-style:none; padding:0; margin:18px 0; display:grid; gap:15px; }
+.tanga-development-chain li { display:flex; gap:12px; align-items:flex-start; }
+.tanga-development-chain li>span { border:1px solid #c9946055; padding:5px; border-radius:50%; font-size:9px; color:#dfaf85; }
+.tanga-development-chain strong { display:block; font-size:12px; color:#e4dfd7; }
+.tanga-development-chain small { display:block; margin-top:4px; color:#acbec7; font-size:10px; line-height:1.45; }
+.tanga-process-exhibit { grid-template-rows:auto minmax(0,1fr) auto auto auto; }
+.tanga-process-exhibit .tanga-material-entry { display:flex; align-items:center; justify-content:space-between; gap:15px; border-color:#bc8958; background:#493220; text-align:left; }
+.tanga-material-entry span { color:#d2b99f; font-size:10px; }
+.tanga-material-evidence { width:min(1000px,calc(100vw - 40px)); max-height:calc(100svh - 48px); padding:24px; overflow:auto; border:1px solid #b98e6466; border-radius:14px; background:#101b23; color:#e7e9e7; box-shadow:0 30px 100px #0009; }
+.tanga-material-evidence::backdrop { background:#02080ec9; backdrop-filter:blur(7px); }
+.tanga-material-evidence header { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; }
+.tanga-process-exhibit .tanga-material-evidence header { flex-wrap:nowrap; }
+.tanga-material-evidence header>div { min-width:0; flex:1; }
+.tanga-material-evidence header>button { flex:0 0 38px; width:38px; height:38px; padding:0; display:grid; place-items:center; }
+.tanga-material-evidence header span { color:#dcac81; letter-spacing:.13em; font-size:10px; }
+.tanga-material-evidence h2 { margin:8px 0; font-size:28px; }
+.tanga-material-evidence p { color:#b5c3cb; font-size:12px; line-height:1.55; }
+.tanga-material-evidence header button { font-size:24px; }
+.tanga-material-counts { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:20px 0; padding-block:14px; border-block:1px solid #c1ced529; font-size:11px; color:#b5c3cb; }
+.tanga-material-counts strong { color:#ecd1b5; font-size:26px; margin-right:7px; }
+.tanga-material-counts i { color:#ac835f; }
+.tanga-material-evidence nav { display:flex; gap:8px; margin-bottom:16px; }
+.tanga-material-evidence figure { margin:0; }
+.tanga-material-evidence figure img { width:100%; height:min(42svh,480px); object-fit:contain; background:#080f14; }
+.tanga-material-evidence figcaption { margin-top:8px; color:#c9a582; font-size:11px; }
+.tanga-material-evidence figcaption a { display:inline-block; margin-left:12px; color:#eac09d; text-decoration:underline; }
+.tanga-material-evidence footer { border-top:1px solid #c1ced529; padding-top:12px; }
+@media(max-width:1050px) { .tanga-evidence-sequence { top:150px; left:300px; } .tanga-evidence-sequence button { padding:7px; font-size:9px; } }
+@media(max-width:760px) { .tanga-evidence-sequence { display:none; } .tanga-material-entry { flex-wrap:wrap; } .tanga-material-counts { gap:7px; font-size:9px; } .tanga-material-counts strong { display:block; font-size:23px; } .tanga-material-evidence { padding:16px; } .tanga-material-evidence h2 { font-size:23px; } }
+@media(max-width:760px) { .tanga-material-evidence figure img { display:block; height:auto; max-height:42svh; } }
 .tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:590px!important; max-height:calc(100svh - 702px)!important; }

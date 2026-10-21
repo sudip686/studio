@@ -10,7 +10,7 @@ export const TANGA_STORY: Record<WorkbenchMode, {question: string; takeaway: str
   drillholes: {question: 'Where has the ground been sampled?', takeaway: 'Recorded drill intervals are observations; the spaces between holes require interpretation.', seconds: 28},
   subsurface: {question: 'How are the observations connected?', takeaway: 'The geological model connects sampled rock units into an interpreted framework.', seconds: 26},
   resource: {question: 'What does the estimate add?', takeaway: 'The reported estimate describes scale and grade; the blocks show their spatial distribution.', seconds: 28},
-  mine_planning: {question: 'How could the site fit together?', takeaway: 'Explore the relationship between conceptual pits, terrain and six processing areas.', seconds: 34},
+  mine_planning: {question: 'How could the site fit together?', takeaway: 'Follow the uphill feed station and proposed lowland processing concept from the 2023 logistics study.', seconds: 34},
   metallurgy: {question: 'What did the testwork show?', takeaway: 'Concentrate carbon, recovery and flake size answer different processing questions.', seconds: 24},
   accessibility: {question: 'How does the site connect outward?', takeaway: 'Road, port, rail and power locations frame the next infrastructure questions.', seconds: 16},
   comparison: {question: 'What should the next study resolve?', takeaway: 'Reconcile the evidence, strengthen study confidence and test development constraints.', seconds: 14},
