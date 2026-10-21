@@ -3,7 +3,6 @@
 import * as THREE from 'three';
 import proj4 from 'proj4';
 import { projectLonLat } from '@/lib/utils/three-helpers';
-import { ASSET_BASE_URL } from '@/lib/constants';
 import {assetUrl} from '@/lib/asset-url';
 
 export type TerrainModelCenter = { lon: number; lat: number };
@@ -161,11 +160,7 @@ function resolveTerrainTexturePath(meta: TerrainMeta) {
     return textureName.startsWith('/') ? textureName : `/${textureName}`;
   }
 
-  if (ASSET_BASE_URL) {
-    return `${ASSET_BASE_URL}/terrain_texture_8k.jpg`;
-  }
-
-  return '/terrain_texture_8k.jpg';
+  return assetUrl('/terrain_texture_8k.jpg');
 }
 
 function applyTextureTuning(texture: THREE.Texture, renderer?: THREE.WebGLRenderer | null) {

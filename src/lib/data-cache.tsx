@@ -18,7 +18,6 @@ type FetchJsonOptions = {
 };
 
 const DEFAULT_MODEL_CENTER = { lon: 0, lat: 0 };
-const REMOTE_ASSET_BASE_URL = process.env.NEXT_PUBLIC_ASSET_BASE_URL?.replace(/\/$/, '') ?? '';
 const GEOJSON_FETCH_ATTEMPTS = 2;
 const GEOJSON_FETCH_TIMEOUT_MS = 7000;
 
@@ -117,20 +116,17 @@ const initialState: DataCache = {
 
 const resourceCandidates: Record<CacheResourceKey, string[]> = {
   lithology: [
-    REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/lithology_data.geojson` : '',
     '/lithology_data.geojson',
     '/api/lithology-data',
-  ].filter(Boolean),
+  ],
   assay: [
-    REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/assay_data.geojson` : '',
     '/assay_data.geojson',
     '/api/assay-data',
-  ].filter(Boolean),
+  ],
   blockModel: [
-    REMOTE_ASSET_BASE_URL ? `${REMOTE_ASSET_BASE_URL}/BlockModel.geojson` : '',
     '/BlockModel.geojson',
     '/api/block-model',
-  ].filter(Boolean),
+  ],
 };
 
 function delay(ms: number) {

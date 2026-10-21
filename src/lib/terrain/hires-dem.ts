@@ -14,6 +14,7 @@
 
 import proj4 from 'proj4';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
+import {assetUrl} from '@/lib/asset-url';
 
 // Large rasters live on Cloudflare R2 in production (NEXT_PUBLIC_ASSET_BASE_URL)
 // and in /public locally. Both height rasters are gitignored, so a plain
@@ -25,6 +26,8 @@ const ASSET_BASE_URL = RAW_ASSET_BASE.endsWith('/')
   : RAW_ASSET_BASE;
 
 async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
+  const local = await cachedDeckAsset(assetUrl(path), init);
+  if (local.ok) return local;
   if (ASSET_BASE_URL) {
     try {
       const remote = await cachedDeckAsset(`${ASSET_BASE_URL}${path}`, init);
@@ -33,7 +36,7 @@ async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
       // fall through to the local copy
     }
   }
-  return cachedDeckAsset(path, init);
+  return local;
 }
 
 /**
@@ -42,7 +45,7 @@ async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
  * with no R2 configured still renders relief instead of nothing.
  */
 const RASTER_SOURCES = [
-  {meta: '/terrain_hires_meta.json', height: '/height_hires.bin'},
+  {meta: '/terrain_hires_meta.json?v=survey-2026-10-21', height: '/height_hires.bin?v=survey-2026-10-21', survey: true},
   {meta: '/terrain_preview_meta.json', height: '/height_preview_1024.bin'},
 ] as const;
 
@@ -80,7 +83,7 @@ export function loadHiresDem(): Promise<HiresDem | null> {
 
   demPromise = (async () => {
     for (const source of RASTER_SOURCES) {
-      const dem = await loadRaster(source.meta, source.height);
+      const dem = await loadRaster(source.meta, source.height, 'survey' in source);
       if (dem) return dem;
     }
     return null;
@@ -89,11 +92,16 @@ export function loadHiresDem(): Promise<HiresDem | null> {
   return demPromise;
 }
 
-async function loadRaster(metaUrl: string, heightUrl: string): Promise<HiresDem | null> {
+async function loadRaster(metaUrl: string, heightUrl: string, includeSurvey = false): Promise<HiresDem | null> {
   try {
-    const [metaResponse, binResponse] = await Promise.all([
+    const optionalBinary = (url: string) => fetchAsset(url, {cache: 'force-cache'})
+      .then((response) => response.ok ? response.arrayBuffer() : null)
+      .catch(() => null);
+    const [metaResponse, binResponse, surveyHeightBuffer, surveyCoverageBuffer] = await Promise.all([
       fetchAsset(metaUrl, {cache: 'force-cache'}),
       fetchAsset(heightUrl, {cache: 'force-cache'}),
+      includeSurvey ? optionalBinary('/survey_height_hires.bin?v=survey-2026-10-21') : Promise.resolve(null),
+      includeSurvey ? optionalBinary('/survey_coverage_hires.bin?v=survey-2026-10-21') : Promise.resolve(null),
     ]);
     if (!metaResponse.ok || !binResponse.ok) return null;
 
@@ -110,6 +118,12 @@ async function loadRaster(metaUrl: string, heightUrl: string): Promise<HiresDem 
 
     if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
     if (heights.length !== width * height) return null;
+    const surveyHeights = surveyHeightBuffer?.byteLength === width * height * 4
+      ? new Float32Array(surveyHeightBuffer)
+      : null;
+    const surveyCoverage = surveyCoverageBuffer?.byteLength === width * height
+      ? new Uint8Array(surveyCoverageBuffer)
+      : null;
 
     const sample = (lon: number, lat: number): number | null => {
       let easting: number;
@@ -127,7 +141,8 @@ async function loadRaster(metaUrl: string, heightUrl: string): Promise<HiresDem 
       const column = Math.min(width - 1, Math.max(0, Math.round(u * (width - 1))));
       const row = Math.min(height - 1, Math.max(0, Math.round(v * (height - 1))));
 
-      const value = heights[row * width + column];
+      const index = row * width + column;
+      const value = surveyCoverage?.[index] && surveyHeights ? surveyHeights[index] : heights[index];
       return Number.isFinite(value) ? value : null;
     };
 

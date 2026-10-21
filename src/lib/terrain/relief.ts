@@ -17,6 +17,7 @@ export interface ReliefStats {
   rangeM: number;
   /** Ground extent of the tile, for the panel's provenance line. */
   extentKm: { width: number; height: number } | null;
+  surveyCoveragePercent: number;
 }
 
 /**
@@ -25,25 +26,32 @@ export interface ReliefStats {
  * `public/terrain_hires_meta.json` at the time of writing.
  */
 export const FALLBACK_RELIEF: ReliefStats = {
-  minM: 204,
-  maxM: 1008,
-  rangeM: 804,
-  extentKm: { width: 7.6, height: 7.2 },
+  minM: 365,
+  maxM: 914,
+  rangeM: 549,
+  extentKm: { width: 2.5, height: 8.0 },
+  surveyCoveragePercent: 17,
 };
 
-const HIRES_META_URL = '/terrain_hires_meta.json';
+const HIRES_META_URL = '/terrain_hires_meta.json?v=survey-2026-10-21';
 
 interface TerrainMeta {
   bounds_utm?: { minX?: number; maxX?: number; minY?: number; maxY?: number };
   elevation_m?: { min?: number; max?: number };
+  survey_surface?: {
+    source_bounds_utm?: {minX?: number; maxX?: number; minY?: number; maxY?: number};
+    elevation_range_m?: number[];
+    valid_output_fraction?: number;
+  };
 }
 
 function toStats(meta: TerrainMeta | null): ReliefStats | null {
-  const min = Number(meta?.elevation_m?.min);
-  const max = Number(meta?.elevation_m?.max);
+  const survey = meta?.survey_surface;
+  const min = Number(survey?.elevation_range_m?.[0] ?? meta?.elevation_m?.min);
+  const max = Number(survey?.elevation_range_m?.[1] ?? meta?.elevation_m?.max);
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
 
-  const bounds = meta?.bounds_utm;
+  const bounds = survey?.source_bounds_utm ?? meta?.bounds_utm;
   const width = Number(bounds?.maxX) - Number(bounds?.minX);
   const height = Number(bounds?.maxY) - Number(bounds?.minY);
   const extentKm =
@@ -56,6 +64,7 @@ function toStats(meta: TerrainMeta | null): ReliefStats | null {
     maxM: Math.round(max),
     rangeM: Math.round(max - min),
     extentKm,
+    surveyCoveragePercent: Math.round((survey?.valid_output_fraction ?? 0) * 100),
   };
 }
 
@@ -88,5 +97,5 @@ export function reliefSourceLabel(relief: ReliefStats): string {
   const size = extent
     ? `${extent.width.toFixed(1)} x ${extent.height.toFixed(1)} km tile`
     : 'project tile';
-  return `Measured from the hi-res terrain raster · ${size}`;
+  return `August 2025 surveyed DTM · ${size} footprint; ${relief.surveyCoveragePercent}% valid coverage in the wider presentation tile`;
 }

@@ -411,6 +411,126 @@
   font-size: 12px;
 }
 
+.tanga-three.is-topography .tanga-three__terrain-tools {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid rgba(213, 226, 231, 0.16);
+  border-radius: 12px;
+  background: linear-gradient(150deg, rgba(12, 23, 29, 0.94), rgba(8, 15, 20, 0.88));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32), inset 0 1px rgba(255, 255, 255, 0.06);
+  color: #e9eeeb;
+  pointer-events: auto;
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.tanga-three.is-topography .tanga-three__terrain-tools-head {
+  display: grid;
+  gap: 5px;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-tools-head > span {
+  color: #f4eee5;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-tools-head > small,
+.tanga-three.is-topography .tanga-three__terrain-provenance {
+  color: rgba(220, 229, 230, 0.72);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 3px;
+  border: 1px solid rgba(207, 220, 225, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.tanga-three.is-topography .tanga-three__terrain-switch button {
+  min-height: 30px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(234, 239, 238, 0.72);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-switch button[aria-pressed="true"] {
+  border-color: rgba(96, 192, 183, 0.34);
+  background: rgba(60, 142, 139, 0.2);
+  color: #d9f7ee;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-profile {
+  display: block;
+  width: 100%;
+  height: 58px;
+  overflow: visible;
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(100, 163, 157, 0.09), rgba(100, 163, 157, 0.015));
+}
+
+.tanga-three.is-topography .tanga-three__terrain-profile path {
+  fill: none;
+  stroke: rgba(214, 223, 222, 0.18);
+  stroke-width: 1;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-profile polyline {
+  fill: none;
+  stroke: #e0b27d;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-profile line,
+.tanga-three.is-topography .tanga-three__terrain-profile circle {
+  stroke: #75d1c1;
+  fill: #75d1c1;
+  stroke-width: 1.5;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-profile-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  align-items: center;
+  color: rgba(225, 232, 232, 0.78);
+  font-size: 10px;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-profile-control strong {
+  color: #f2d5ac;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-profile-control input {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  accent-color: #68c5b8;
+  cursor: ew-resize;
+}
+
+.tanga-three.is-topography .tanga-three__terrain-provenance {
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .tanga-deck .tanga-deck__data-panel,
   .tanga-deck .tanga-deck__insight-panel {
@@ -433,6 +553,11 @@
     font-size: 10px;
     line-height: 1.2;
     white-space: normal;
+  }
+
+  .tanga-deck .tanga-deck__chapter-title h1 {
+    max-width: calc(100vw - 160px);
+    font-size: clamp(18px, 5.5vw, 22px);
   }
 
   .tanga-deck .tanga-deck__data-panel,
@@ -538,4 +663,100 @@
   .tanga-deck--ranking .tanga-deck__ranking-list li {
     transition: none;
   }
+}
+
+/* Story chapters are built around one source-backed visual and one clear job. */
+.tanga-deck .tanga-evidence-trigger {
+  position: fixed;
+  z-index: 80;
+  top: 22px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(232, 220, 204, .23);
+  border-radius: 999px;
+  background: rgba(9, 14, 20, .84);
+  color: #f6f0e8;
+  font: 600 11px/1 Inter, sans-serif;
+  letter-spacing: .04em;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+  backdrop-filter: blur(16px);
+  cursor: pointer;
+}
+.tanga-deck .tanga-evidence-trigger:hover { border-color: rgba(232, 150, 91, .72); background: rgba(24, 27, 30, .96); }
+.tanga-evidence-trigger:focus-visible,
+.tanga-story-panel button:focus-visible,
+.tanga-evidence-drawer button:focus-visible,
+.tanga-evidence-drawer a:focus-visible { outline: 2px solid #f3a66f; outline-offset: 3px; }
+.tanga-evidence-scrim { position: fixed; z-index: 120; inset: 0; display: flex; justify-content: flex-end; background: rgba(1, 5, 9, .55); backdrop-filter: blur(5px); }
+.tanga-evidence-drawer { width: min(460px, 100vw); height: 100%; display: flex; flex-direction: column; padding: 30px 28px 22px; border-left: 1px solid rgba(255,255,255,.12); background: linear-gradient(160deg,#17212b,#0b1118 58%); color: #f5f1eb; box-shadow: -24px 0 70px rgba(0,0,0,.4); animation: tanga-evidence-in 220ms ease-out both; }
+@keyframes tanga-evidence-in { from { transform: translateX(24px); opacity: .5; } to { transform: translateX(0); opacity: 1; } }
+.tanga-evidence-drawer header { display: flex; justify-content: space-between; gap: 22px; padding-bottom: 23px; border-bottom: 1px solid rgba(255,255,255,.11); }
+.tanga-evidence-drawer header span,.tanga-story-panel__eyebrow { color: #e69760; font-size: 9px; font-weight: 700; letter-spacing: .18em; }
+.tanga-evidence-drawer h2 { margin: 8px 0 5px; font: 600 25px/1.1 'Space Grotesk',Inter,sans-serif; letter-spacing: -.035em; }
+.tanga-evidence-drawer header p { margin: 0; color: rgba(245,241,235,.65); font-size: 12px; line-height: 1.5; }
+.tanga-evidence-drawer header button { align-self: flex-start; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; background: rgba(255,255,255,.06); color: white; cursor: pointer; }
+.tanga-evidence-list { display: grid; gap: 12px; overflow: auto; padding: 20px 2px 20px 0; }
+.tanga-evidence-list article { padding: 16px; border: 1px solid rgba(255,255,255,.1); border-radius: 14px; background: rgba(255,255,255,.035); }
+.tanga-evidence-source-title { display: flex; align-items: flex-start; gap: 9px; color: #f2a36b; }
+.tanga-evidence-source-title strong { color: #f5f1eb; font-size: 13px; line-height: 1.4; }
+.tanga-evidence-list article>span { display: block; margin: 9px 0 6px 24px; color: rgba(245,241,235,.72); font-size: 11px; line-height: 1.5; }
+.tanga-evidence-list article p { margin: 0 0 0 24px; color: rgba(245,241,235,.55); font-size: 10px; line-height: 1.55; }
+.tanga-evidence-list article a { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0 24px; color: #f4b184; font-size: 11px; font-weight: 650; text-decoration: none; }
+.tanga-evidence-drawer footer { margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.1); color: rgba(245,241,235,.48); font-size: 10px; line-height: 1.5; }
+
+.tanga-story-panel { position: fixed; z-index: 24; top: 50%; right: clamp(18px, 2.3vw, 34px); width: min(366px, calc(100vw - 36px)); max-height: calc(100svh - 200px); overflow: auto; transform: translateY(-44%); padding: 22px; border: 1px solid rgba(244, 234, 222, .15); border-radius: 20px; background: linear-gradient(150deg,rgba(18,24,30,.94),rgba(8,13,18,.9)); color: #f5f1eb; box-shadow: 0 30px 90px rgba(0,0,0,.43); backdrop-filter: blur(20px); }
+.tanga-story-panel h2 { margin: 9px 0 8px; color: #f5f1eb !important; font: 600 clamp(20px,2vw,25px)/1.12 'Space Grotesk',Inter,sans-serif; letter-spacing: -.035em; }
+.tanga-story-panel__intro { margin: 0; color: rgba(245,241,235,.68); font-size: 11px; line-height: 1.55; }
+.tanga-story-panel--timeline { width: min(414px, calc(100vw - 36px)); padding: 20px; }
+.tanga-story-timeline { display: grid; gap: 4px; margin: 15px 0; }
+.tanga-story-timeline button { display: grid; grid-template-columns: 86px minmax(0,1fr); align-items: center; gap: 10px; min-height: 37px; padding: 5px 9px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; color: rgba(245,241,235,.65); cursor: pointer; }
+.tanga-story-timeline button span { color: rgba(245,241,235,.45); font-size: 9px; letter-spacing: .035em; }
+.tanga-story-timeline button strong { font-size: 11px; font-weight: 570; }
+.tanga-story-timeline button.is-active { border-color: rgba(230,151,96,.26); background: rgba(230,151,96,.09); color: #fff; }
+.tanga-story-timeline button.is-active span { color: #f3ae7b; }
+.tanga-story-feature { overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; background: rgba(0,0,0,.18); }
+.tanga-story-feature img { display: block; width: 100%; height: 157px; object-fit: cover; background: #252a2d; }
+.tanga-story-feature>div { padding: 11px 12px 12px; }
+.tanga-story-feature>div span,.tanga-story-image-caption span { color: #f0a36a; font-size: 9px; font-weight: 650; letter-spacing: .055em; }
+.tanga-story-feature p { margin: 5px 0 0; color: rgba(245,241,235,.72); font-size: 10px; line-height: 1.5; }
+.tanga-story-panel__stepper { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: rgba(245,241,235,.48); font-size: 9px; letter-spacing: .1em; }
+.tanga-story-panel__stepper button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; background: rgba(255,255,255,.055); color: white; cursor: pointer; }
+.tanga-story-project-image { display: block; width: 100%; max-height: 186px; margin-top: 15px; object-fit: cover; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: #252a2d; }
+.tanga-story-image-caption { display: grid; gap: 4px; padding: 9px 2px 0; }
+.tanga-story-image-caption small { color: rgba(245,241,235,.48); font-size: 9px; }
+.tanga-story-inline-note { margin-top: 15px; padding: 11px 12px; border-left: 2px solid #e69760; background: rgba(255,255,255,.045); color: rgba(245,241,235,.78); font-size: 10px; line-height: 1.45; }
+.tanga-story-panel--geology { width: min(390px, calc(100vw - 36px)); }
+.tanga-sample-crosswalk { display: flex; align-items: center; justify-content: space-between; gap: 5px; margin: 14px 0 10px; padding: 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(255,255,255,.035); }
+.tanga-sample-crosswalk span { display: grid; gap: 3px; color: rgba(245,241,235,.48); font-size: 8px; }
+.tanga-sample-crosswalk b { color: #f6f0e8; font-size: 10px; }
+.tanga-sample-crosswalk i { color: #e69760; font-size: 12px; font-style: normal; }
+.tanga-story-micrograph { display: block; width: 100%; max-height: 211px; object-fit: contain; border: 1px solid rgba(255,255,255,.13); border-radius: 10px; background: #131313; }
+.tanga-story-panel--geology>.tanga-story-panel__intro { margin-top: 13px; }
+.tanga-story-panel--decisions ol { display: grid; gap: 13px; margin: 18px 0; padding: 0; list-style: none; }
+.tanga-story-panel--decisions li { display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 10px; }
+.tanga-story-panel--decisions li>span { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid rgba(230,151,96,.38); border-radius: 50%; color: #f3aa73; font-size: 9px; }
+.tanga-story-panel--decisions li strong { color: #f5f1eb; font-size: 11px; }
+.tanga-story-panel--decisions li p { margin: 4px 0 0; color: rgba(245,241,235,.59); font-size: 10px; line-height: 1.48; }
+.tanga-story-close { display: flex; align-items: center; gap: 6px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); color: #f2b17e; font-size: 9px; font-weight: 620; }
+.tanga-story-datum-note { margin-top: 8px; padding: 9px 10px; border: 1px solid rgba(237,177,126,.26); border-radius: 9px; background: rgba(237,177,126,.055); color: rgba(245,241,235,.68); font-size: 9px; line-height: 1.5; }
+.tanga-deck--work-completed-story .tanga-deck__title,.tanga-deck--decision-story .tanga-deck__title { max-width: min(490px, calc(100vw - 480px)); }
+.tanga-deck--work-completed-story .tanga-deck__ranking,.tanga-deck--decision-story .tanga-deck__comparison { display: none !important; }
+
+@media (max-width: 760px) {
+  .tanga-deck .tanga-evidence-trigger { top: auto; right: 12px; bottom: 91px; min-height: 35px; padding: 0 11px; font-size: 10px; }
+  .tanga-story-panel,.tanga-story-panel--timeline,.tanga-story-panel--geology { top: auto; right: 12px; bottom: 141px; width: min(340px, calc(100vw - 24px)); max-height: min(54svh, 465px); transform: none; padding: 16px; border-radius: 15px; }
+  .tanga-story-panel h2 { font-size: 20px; }
+  .tanga-story-panel__intro { font-size: 10px; }
+  .tanga-story-feature img { height: 105px; }
+  .tanga-story-project-image { max-height: 125px; margin-top: 10px; }
+  .tanga-story-micrograph { max-height: 125px; }
+  .tanga-story-timeline { gap: 1px; margin: 9px 0; }
+  .tanga-story-timeline button { min-height: 30px; }
+  .tanga-deck--work-completed-story .tanga-deck__title,.tanga-deck--decision-story .tanga-deck__title { max-width: calc(100vw - 32px); }
+  .tanga-deck--work-completed-story .tanga-deck__title p,.tanga-deck--decision-story .tanga-deck__title p { max-width: 32ch; }
+  .tanga-evidence-drawer { padding: 24px 18px 18px; }
 }

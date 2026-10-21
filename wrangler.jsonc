@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tanga-graphite-presentation",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-21",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": {
+    "NEXT_PUBLIC_ASSET_BASE_URL": "https://pub-0887cc21d7c44deb9d54cd4243378162.r2.dev"
+  },
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "tanga-graphite-presentation"
+    }
+  ],
+  "observability": {"enabled": true}
+}
