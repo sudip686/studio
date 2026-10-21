@@ -21,7 +21,7 @@ Interaction thesis: preserve spatial registration while tilting from north-up pl
 - [x] Preserve the historical benchmark basis and fifth-of-eleven Tanga calculation.
 - [x] Review desktop and phone screenshots; verify globe pin/row selection, source map, plan and depth transition.
 - [x] TypeScript and production/Cloudflare build.
-- [ ] Commit/push branch and verify Vercel preview.
+- [x] Commit/push branch and verify Vercel preview.
 
 ## Source and limits
 
@@ -38,3 +38,9 @@ Verified seven surface units; north-up orthographic view and restored perspectiv
 Desktop globe reviewed with narrow edge columns. The list selected Lac Gueret and turned to Canada; the Sarytogan globe pin selected the corresponding list row. Phone selector chose Siviour and turned to Australia. The 10 → 11 comparison recalculated Tanga to fifth. Chapter labels show geology 06, resource 07, peer comparison 08, mine concept 09.
 
 Phone review at 390 × 844 includes compact map legend and purpose controls. TypeScript and the Cloudflare/Next.js production build passed. Console checks on the reviewed local scenes showed no runtime errors.
+
+## Hosted verification and final interaction refinements
+
+Vercel feature deployment `bb2f213` reached Ready in 1m14s. Hosted review loaded all seven mapped units with north-up orthographic projection, selected Tanga at fifth, and loaded the mine facilities through the existing same-origin asset routes.
+
+A follow-up prevents peer-row selection for 750 ms while the 600 ms ranking animation runs, avoiding a moving row being clicked as another project passes underneath. Verified locally that rows are disabled during the reveal and Tanga selects correctly afterwards. Mapped polygons are clipped to the original terrain patch; its imagery is no longer stretched to extend the map. A fresh local scene retained all seven units with clean patch edges. The final Cloudflare/Next.js build passed after these refinements.

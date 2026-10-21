@@ -1051,3 +1051,5 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-geology-surface-legend>div{display:none;gap:5px}
   .tanga-geology-surface-legend.is-open>div{display:grid;margin-top:7px}
 }
+
+.tanga-peer-benchmark li>button:disabled{cursor:wait}

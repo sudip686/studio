@@ -20,7 +20,7 @@ Interaction thesis: deliberate facility camera moves, a recoverable overhead sit
 - [x] Improve close facility shadows without adding postprocessing passes.
 - [x] Label new facilities as conceptual; no storage capacity, siting approval or engineering claim.
 - [x] TypeScript, Cloudflare build, browser and responsive checks.
-- [ ] Commit, push and verify the Vercel branch preview.
+- [x] Commit, push and verify the Vercel branch preview.
 
 ## Evidence limits
 
@@ -33,3 +33,5 @@ Chrome desktop review: all four facilities placed with no omissions; overhead lo
 Runtime placements in EPSG:32737: tailings E477950/N9463420 (340 × 260 m); settling/reclaim E477390/N9463340 (130 × 95 m); raw water E477740/N9463930 (100 × 80 m); waste E476658.61/N9466658.61 (240 × 180 m). Terrain relief under these footprints is 15.66, 7.04, 7.03 and 28.03 m respectively. Waste uses survey coverage; the three lowland facilities use regional context terrain. These are display layouts, not engineered placements.
 
 `npm run typecheck` passed. `npm run cf:build` passed, including the Next.js production build and OpenNext worker bundle; the existing large-asset R2 routing remains intact. No Cloudflare worker was published.
+
+Hosted Vercel preview `bb2f213` reached Ready. Waste-rock and processing-plant detail cameras were inspected on the hosted app. The local site audit placed all four facilities without omissions; the hosted controls and corresponding 3D facilities loaded successfully.

@@ -4,7 +4,7 @@ type MapUnit = {properties:{unit:string;color:string};geometry:{type:'MultiPolyg
 export type GeologySurfaceData = {features:MapUnit[]};
 
 /** Derived map polygons only. No source model vertices are changed or extruded. */
-export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:number;northing:number}, height:(x:number,z:number)=>number) {
+export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:number;northing:number}, height:(x:number,z:number)=>number, extent:{width:number;depth:number}) {
   const group = new THREE.Group();
   group.name = 'Digitized geological map · approximate grid registration';
   const bounds = new THREE.Box3();
@@ -19,7 +19,20 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
         else {const m=c.clone().lerp(a,.5);triangle(a,b,m,depth+1);triangle(m,b,c,depth+1);}
         return;
       }
-      for(const p of [a,b,c]) {
+      // Clip mapped coverage to the existing terrain patch. Never stretch its
+      // imagery or leave map polygons floating beyond the displayed ground.
+      let clipped=[a,b,c];
+      for(const [axis,edge,sign] of [['x',-extent.width/2,1],['x',extent.width/2,-1],['y',-extent.depth/2,1],['y',extent.depth/2,-1]] as const){
+        const output:THREE.Vector2[]=[];
+        for(let i=0;i<clipped.length;i++){
+          const p=clipped[i],q=clipped[(i+1)%clipped.length];
+          const pInside=(p[axis]-edge)*sign>=0,qInside=(q[axis]-edge)*sign>=0;
+          if(pInside)output.push(p);
+          if(pInside!==qInside)output.push(p.clone().lerp(q,(edge-p[axis])/(q[axis]-p[axis])));
+        }
+        clipped=output;if(clipped.length<3)return;
+      }
+      for(let i=1;i<clipped.length-1;i++)for(const p of [clipped[0],clipped[i],clipped[i+1]]) {
         const y=height(p.x,p.y)+2.5;
         positions.push(p.x,y,p.y);bounds.expandByPoint(new THREE.Vector3(p.x,y,p.y));
       }

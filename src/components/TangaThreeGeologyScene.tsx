@@ -1649,7 +1649,7 @@ function createTerrainPatchGeometry(mode: GeologyMode) {
   const segmentsX = 176;
   const segmentsY = 140;
   const width = TERRAIN_PATCH_WIDTH;
-  const depth = mode === 'subsurface' ? 12000 : TERRAIN_PATCH_DEPTH;
+  const depth = TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
@@ -1702,7 +1702,7 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
   const segmentsX = 384;
   const segmentsY = 526;
   const width = TERRAIN_PATCH_WIDTH;
-  const depth = mode === 'subsurface' ? 12000 : TERRAIN_PATCH_DEPTH;
+  const depth = TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
   const uvs: number[] = [];
   const colors: number[] = [];
@@ -3193,7 +3193,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if(response.ok){
             const data=await response.json() as GeologySurfaceData;
             if(cancelled)return;
-            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,(x,z)=>terrainSurfaceY(terrainResources,x,-z));
+            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,(x,z)=>terrainSurfaceY(terrainResources,x,-z),{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH});
             geologySurface=mapped.group;tagDeckLayer(geologySurface,'context');stage.add(geologySurface);
             geologySurface.children.forEach(mesh=>pickables.push(mesh));
             if(!mapped.bounds.isEmpty()) {mapped.bounds.getCenter(geologyPlanTarget);mapped.bounds.getSize(geologyPlanExtent);}
