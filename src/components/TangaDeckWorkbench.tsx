@@ -4176,7 +4176,9 @@ export default function TangaDeckWorkbench() {
     };
   }, []);
 
-  const sceneCallouts = sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile, relief);
+  const sceneCallouts = activeMode === 'ranking' && !isExploreMode
+    ? []
+    : sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile, relief);
   const projectedSceneCallouts = useMemo<ProjectedSceneCallout[]>(() => {
     const viewport = new WebMercatorViewport({
       width: stageSize.width,
@@ -4300,7 +4302,8 @@ export default function TangaDeckWorkbench() {
     // that four ranked graphite projects — Mahenge, Epanko, Bunyu and Tanga —
     // sit in the same country, which the deck's own peer data already proves.
     const isCountryScene = activeMode === 'tanzania';
-    if ((activeMode !== 'ranking' && !isCountryScene) || stageSize.width === 0) return [];
+    if ((activeMode !== 'ranking' || !isExploreMode) && !isCountryScene) return [];
+    if (stageSize.width === 0) return [];
     const map = mapInstance;
     if (!map) return [];
 
@@ -4400,7 +4403,7 @@ export default function TangaDeckWorkbench() {
     // `mapLoadState` is a dependency because `mapRef` is not reactive: without
     // it this memo would evaluate once while the map was still null and never
     // recompute, leaving the globe permanently unlabelled.
-  }, [activeMode, graphiteRows, stageSize.width, stageSize.height, viewState, activePeerKey, mapInstance, mapCameraTick]);
+  }, [activeMode, isExploreMode, graphiteRows, stageSize.width, stageSize.height, viewState, activePeerKey, mapInstance, mapCameraTick]);
 
   const pinnedMapLabels = useMemo(() => {
     if (!mapLabelSources.length || stageSize.width === 0) return [];
