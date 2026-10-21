@@ -8,6 +8,9 @@ export const dynamic = 'force-dynamic';
 const STREAMABLE_ASSETS = new Set([
   'height.bin',
   'texture_rgb_8192.png',
+  'geologicalModel.glb',
+  'assay_data.geojson',
+  'lithology_data.geojson',
   'media/tanga-google-earth-intro-corrected-preview.mp4',
 ]);
 

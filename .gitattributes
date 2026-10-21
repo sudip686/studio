@@ -11,3 +11,8 @@ public/height.bin filter=lfs diff=lfs merge=lfs -text
 public/BlockModel.geojson filter=lfs diff=lfs merge=lfs -text
 
 # All other small assets (png, jpg, json, geojson, kmz) are regular files
+
+# These bounded presentation rasters ship with their metadata. Vercel's Git
+# integration does not hydrate LFS pointers; each is smaller than 6 MB.
+public/survey_*_hires.bin -filter -diff -merge -text
+public/terrain_context_512.bin -filter -diff -merge -text

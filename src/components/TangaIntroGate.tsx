@@ -129,7 +129,8 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
 
       {showIntro ? (
         <section
-          className={`tanga-intro${isFinishing ? ' is-finishing' : ''}`}
+          className={`tanga-intro${introState === 'checking' ? ' is-checking' : ''}${isFinishing ? ' is-finishing' : ''}`}
+          aria-hidden={introState === 'checking'}
           style={{'--tanga-intro-duration': `${introDuration}s`} as CSSProperties}
           aria-label="Tanga cinematic intro"
         >
@@ -163,9 +164,11 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
           {showOverlayCopy ? (
             <>
               <div className="tanga-intro__copy">
-                <span>[TANGA GRAPHITE]</span>
-                <h1>From coast to resource</h1>
-                <p>Global context gives way to Tanzania, Tanga Port, and the project area.</p>
+                <span>TANZANIA · AN INTERACTIVE PROJECT STORY</span>
+                <h1>Tanga Graphite</h1>
+                <p>Explore the landscape, the drilling and the work behind the estimate.</p>
+                <button className="tanga-intro__enter" type="button" onClick={completeIntro}>Enter the project <span aria-hidden="true">↗</span></button>
+                <div className="tanga-intro__story-route" aria-label="Presentation structure"><span>01 · Place &amp; scale</span><span>02 · The evidence</span><span>03 · The next stage</span></div>
               </div>
             </>
           ) : null}
@@ -184,7 +187,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
 
           {videoUnavailable ? (
             <div className="tanga-intro__notice">
-              Draft intro video not found yet. Opening the presentation...
+              Opening the interactive project…
             </div>
           ) : null}
 

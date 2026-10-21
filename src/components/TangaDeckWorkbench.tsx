@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
@@ -27,6 +27,9 @@ import DeckHoverGuide from './DeckHoverGuide';
 import EvidenceReplay from './EvidenceReplay';
 import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {TangaChapterStoryPanel, TangaEvidenceDrawer, TangaMilestoneStage} from './TangaStoryPanels';
+import TangaPeerBenchmark from './TangaPeerBenchmark';
+import TangaStoryCue from './TangaStoryCue';
+import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
 import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {
@@ -293,6 +296,7 @@ const HYPOTHETICAL_MINE_POINTS = [
 ];
 
 const MODE_LABELS: Record<WorkbenchMode, string> = {
+  work_completed: 'Work completed',
   ranking: 'Graphite peers',
   tanzania: 'Tanzania context',
   project: 'Project focus',
@@ -307,6 +311,7 @@ const MODE_LABELS: Record<WorkbenchMode, string> = {
 };
 
 const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
+  work_completed: [{label: 'Evidence', value: 'Survey · drilling · MRE · testwork'}],
   ranking: [
     {label: 'Basis', value: 'M&I contained graphite'},
     {label: 'Peer set', value: 'Top 10 public projects'},
@@ -456,20 +461,22 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
 };
 
 const CHAPTER_GUIDANCE: Record<WorkbenchMode, {focus: string; bridge: string}> = {
-  ranking: {focus: 'Use the four dated milestones to show the progression from field evidence to estimation and testwork. Select each milestone and distinguish observation from interpretation.', bridge: 'Start with the terrain captured by the aerial survey.'},
-  tanzania: {focus: 'Orient the audience from country to coast to project. Allow the camera to settle before introducing the next scale.', bridge: 'Now move from regional context to the footprint we are using.'},
-  project: {focus: 'Trace the existing project boundary. It is the unchanged presentation constraint, not a newly verified legal survey.', bridge: 'Within this footprint, the ground controls how development could fit.'},
-  topography: {focus: 'Read ridges, slopes and valleys from an oblique view. Distinguish observed relief from engineering assumptions about access and drainage.', bridge: 'The surface is only the beginning; the geological interpretation sits beneath it.'},
-  subsurface: {focus: 'Follow the TGF002 sample crosswalk through petrography, drillhole and assay records. Explain that interpreted contacts extend between observations.', bridge: 'Scale from this named sample to the full interpreted model.'},
+  work_completed: {focus: 'Inspect the four dated evidence milestones.', bridge: 'Read the surveyed landscape before going underground.'},
+  ranking: {focus: 'Start with the published ten-project benchmark, then introduce the reported Tanga MRE. Tanga places fifth within this dated comparison set by contained graphite; this is not a current census of every deposit.', bridge: 'See the source milestones behind the Tanga estimate.'},
+  tanzania: {focus: 'Orient the audience from country to coast to project. Allow the camera to settle before introducing the next scale.', bridge: 'With the location established, compare Tanga on a consistent reported-graphite measure.'},
+  project: {focus: 'Trace the existing project boundary. It is the unchanged presentation constraint, not a newly verified legal survey.', bridge: 'First, place Tanga within Tanzania and the coastal region.'},
+  topography: {focus: 'Read ridges, slopes and valleys from an oblique view. Distinguish observed relief from engineering assumptions about access and drainage.', bridge: 'Now follow the drillholes that sample beneath this measured surface.'},
+  subsurface: {focus: 'Follow the TGF002 sample crosswalk through petrography, drillhole and assay records. Explain that interpreted contacts extend between observations.', bridge: 'Use this geological framework to read the reported estimate and grade distribution.'},
   drillholes: {focus: 'Show the recorded drill traces and the source core example. Separate sampled evidence from the spaces between holes.', bridge: 'The holes provide observations for the geological interpretation.'},
   resource: {focus: 'Rotate the registered grade blocks and explain the legend. A 3% display threshold is not an economic cutoff; the visual model alone does not establish reserves.', bridge: 'Next, use this spatial pattern to illustrate a possible mining concept.'},
-  mine_planning: {focus: 'Read the admitted pit crests, benches and plant location together. These are presentation-grade geometric concepts inside the existing boundary, not optimised or engineered designs.', bridge: 'Follow the material from a conceptual excavation into the processing sequence.'},
+  mine_planning: {focus: 'Read the admitted pit crests, benches and plant location together. These are presentation-grade geometric concepts inside the existing boundary, not optimised or engineered designs.', bridge: 'Next, examine the laboratory testwork behind the processing questions.'},
   metallurgy: {focus: 'Distinguish concentrate carbon, graphite recovery and flake-size distribution. Follow the illustrative liberation, flotation, dewatering and characterisation sequence; deck summaries remain pending laboratory-report verification.', bridge: 'Producing a concentrate is one step; connecting the site to logistics is the next.'},
   accessibility: {focus: 'Move from the site to transport connections. Show the geographic relationship without implying that access, capacity or development permissions are secured.', bridge: 'Bring the evidence and remaining development decisions back into one closing view.'},
   comparison: {focus: 'Close on the evidence gaps that matter: dataset reconciliation, study confidence and development constraints. Invite discussion around those next decisions.', bridge: 'Open Sources & basis or switch to Explore for detailed inspection.'},
 };
 
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
+  work_completed: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   ranking: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.35, pitch: 32, bearing: -12},
   project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
@@ -652,6 +659,7 @@ function sceneStateText(state: SceneLoadState) {
 }
 
 const MODE_PROMPT_HINTS: Record<WorkbenchMode, string[]> = {
+  work_completed: ['work', 'timeline', 'survey', 'drilling', 'MRE'],
   ranking: ['top', 'projects', 'resource', 'project'],
   tanzania: ['project', 'topography', 'route'],
   project: ['topography', 'route', 'power', 'rail', 'drillholes'],
@@ -674,35 +682,41 @@ const INFO_BEFORE: Partial<Record<WorkbenchMode, InfoSlideId>> = {};
 const STORY_STEPS: StoryStep[] = [
   {mode: 'project', act: '01', label: 'Meet Tanga', command: 'show project area', tone: '#c7551b'},
   {mode: 'tanzania', act: '02', label: 'Place it on the map', command: 'show Tanzania overview', tone: '#a89c94'},
-  {mode: 'ranking', act: '03', label: 'Work completed', command: 'show project work timeline', tone: '#a89c94'},
-  {mode: 'topography', act: '04', label: 'Read the landscape', command: 'show topography of the area', tone: '#a89c94'},
-  {mode: 'drillholes', act: '05', label: 'Follow a recorded hole', command: 'show me the drillholes', tone: '#c7551b'},
-  {mode: 'subsurface', act: '06', label: 'Reveal the host rock', command: 'show subsurface', tone: '#c7551b'},
-  {mode: 'resource', act: '07', label: 'Understand the model', command: 'show resource model', tone: '#c7551b'},
-  {mode: 'mine_planning', act: '08', label: 'Fit a concept to ground', command: 'show mine plan', tone: '#c7551b'},
-  {mode: 'metallurgy', act: '09', label: 'Examine the testwork', command: 'show metallurgy', tone: '#41200e'},
-  {mode: 'accessibility', act: '10', label: 'Connect to the port', command: 'show road route to Tanga port', tone: '#c7551b'},
-  {mode: 'comparison', act: '11', label: 'Evidence to decisions', command: 'show next decisions', tone: '#b9954b'},
+  {mode: 'ranking', act: '03', label: 'The global peer field', command: 'show graphite ranking', tone: '#a89c94'},
+  {mode: 'work_completed', act: '04', label: 'Work completed', command: 'show project work timeline', tone: '#a89c94'},
+  {mode: 'topography', act: '05', label: 'Read the landscape', command: 'show topography of the area', tone: '#a89c94'},
+  {mode: 'drillholes', act: '06', label: 'Follow a recorded hole', command: 'show me the drillholes', tone: '#c7551b'},
+  {mode: 'subsurface', act: '07', label: 'Reveal the host rock', command: 'show subsurface', tone: '#c7551b'},
+  {mode: 'resource', act: '08', label: 'Understand the model', command: 'show resource model', tone: '#c7551b'},
+  {mode: 'mine_planning', act: '09', label: 'Fit a concept to ground', command: 'show mine plan', tone: '#c7551b'},
+  {mode: 'metallurgy', act: '10', label: 'Examine the testwork', command: 'show metallurgy', tone: '#41200e'},
+  {mode: 'accessibility', act: '11', label: 'Connect to the port', command: 'show road route to Tanga port', tone: '#c7551b'},
+  {mode: 'comparison', act: '12', label: 'Evidence to decisions', command: 'show next decisions', tone: '#b9954b'},
 ];
 
-// A short, presentation-ready route through seven distinct questions. The full
-// technical sequence remains available in the chapter index and normal tour.
-const EXECUTIVE_ROUTE: WorkbenchMode[] = ['tanzania', 'ranking', 'topography', 'drillholes', 'subsurface', 'resource', 'comparison'];
+// The guided route covers the complete evidence-to-decisions narrative.
+const EXECUTIVE_ROUTE: WorkbenchMode[] = STORY_STEPS.map(step => step.mode);
 
 // Authored camera beats. A scene is the narrative chapter; a shot is a
 // deliberate camera/evidence composition inside that chapter. Advancing a
 // shot keeps the current map/Three.js scene mounted and preserves layer state.
 const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
+  work_completed: [
+    {id: 'drilling', label: 'Diamond drilling', detail: 'The sampled observations', view: VIEW_STATES.work_completed},
+    {id: 'survey', label: 'Aerial survey', detail: 'A spatial reference for the project', view: VIEW_STATES.work_completed},
+    {id: 'resource', label: 'Reported estimate', detail: 'The published scale and grade basis', view: VIEW_STATES.work_completed},
+    {id: 'testwork', label: 'Flotation testwork', detail: 'Laboratory response across composites', view: VIEW_STATES.work_completed},
+  ],
   ranking: [
-    {id: 'milestones', label: 'Evidence milestones', detail: 'Show the work completed against the project footprint', view: VIEW_STATES.project},
-    {id: 'project-close', label: 'Project evidence', detail: 'Bring the surveyed project area forward', view: {...VIEW_STATES.project, zoom: 13.35, pitch: 54, bearing: 28}},
+    {id: 'baseline', label: 'Ten reported projects', detail: 'Start with the published global M&I contained-graphite benchmark', view: VIEW_STATES.ranking},
+    {id: 'tanga-enters', label: 'Tanga enters at fifth', detail: 'Insert 7.31 Mt from the Tanga Indicated MRE into the same measure', view: VIEW_STATES.ranking},
   ],
   tanzania: [
     {id: 'country', label: 'Country overview', detail: 'Place the project within Tanzania and the East African coast', view: VIEW_STATES.tanzania},
     {id: 'tanga', label: 'Tanga region', detail: 'Push toward the project and coastal corridor', view: {...VIEW_STATES.tanzania, longitude: 38.2, latitude: -5.4, zoom: 6.15, pitch: 42, bearing: -15}},
   ],
   project: [
-    {id: 'licence', label: 'Licence overview', detail: 'Frame the full controlled land position', view: VIEW_STATES.project},
+    {id: 'licence', label: 'Project overview', detail: 'Frame the provisional project boundary', view: VIEW_STATES.project},
     {id: 'tested-ground', label: 'Tested ground', detail: 'Close on the boundary and drill coverage', view: {...VIEW_STATES.project, zoom: 13.35, pitch: 54, bearing: 28}},
   ],
   topography: [
@@ -734,11 +748,10 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'resetView'},
     {id: 'north-pit', label: 'North pit', detail: 'Inspect the northern conceptual excavation', threeAction: 'northPit'},
     {id: 'south-pit', label: 'South pit', detail: 'Inspect the southern conceptual excavation', threeAction: 'southPit'},
-    {id: 'plant', label: 'Receiving & processing', detail: 'Illustrative haulage and larger plant complex', threeAction: 'plantDetail'},
+    {id: 'plant', label: 'Processing plant', detail: 'Inspect six connected illustrative processing areas', threeAction: 'plantDetail'},
   ],
   comparison: [
-    {id: 'peers', label: 'Peer comparison', detail: 'Tanga against the public peer field', view: VIEW_STATES.comparison},
-    {id: 'tanzania-peers', label: 'Regional peers', detail: 'Close on the East African comparison set', view: {...VIEW_STATES.comparison, longitude: 35.4, latitude: -8.6, zoom: 4.15, pitch: 34, bearing: -10}},
+    {id: 'decisions', label: 'Next study decisions', detail: 'Close on evidence reconciliation and development questions', view: VIEW_STATES.comparison},
   ],
 };
 
@@ -746,14 +759,15 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
 // scene visibly advances toward the investment case. ─────────────────────
 type StoryAct = {id: string; label: string; theme: string; numeral: string; thesis: string};
 const STORY_ACTS: StoryAct[] = [
-  {id: 'opportunity', label: 'The Opportunity', theme: '#8fb4d6', numeral: 'I', thesis: 'A large flake-graphite asset in a proven province.'},
-  {id: 'asset', label: 'The Asset', theme: '#d96a2a', numeral: 'II', thesis: 'Geology, drilling and a spatially registered model.'},
-  {id: 'value', label: 'The Value', theme: '#e0a94f', numeral: 'III', thesis: 'From a mining concept to testwork and logistics.'},
+  {id: 'opportunity', label: 'Place & scale', theme: '#8fb4d6', numeral: 'I', thesis: 'Locate Tanga and establish a consistent basis for comparison.'},
+  {id: 'asset', label: 'The evidence', theme: '#d96a2a', numeral: 'II', thesis: 'Follow the survey, drilling and geology into the reported estimate.'},
+  {id: 'value', label: 'The next stage', theme: '#e0a94f', numeral: 'III', thesis: 'Connect the concept, testwork and infrastructure to the next study decisions.'},
 ];
 const MODE_ACT: Record<WorkbenchMode, string> = {
+  work_completed: 'asset',
   ranking: 'opportunity',
   tanzania: 'opportunity',
-  project: 'asset',
+  project: 'opportunity',
   topography: 'asset',
   accessibility: 'value',
   drillholes: 'asset',
@@ -770,6 +784,7 @@ function actIndexForMode(mode: WorkbenchMode) {
 // Investor "why this matters" — plain-English context surfaced by the Ctrl+I
 // inspector so a non-technical viewer instantly grasps the value of each scene.
 const MODE_INVESTOR_ANGLE: Record<WorkbenchMode, {headline: string; points: string[]}> = {
+  work_completed: {headline: 'Work behind the estimate', points: ['Survey, drilling, estimation and testwork are separately dated source milestones']},
   ranking: {
     headline: 'Where Tanga sits in the global graphite field',
     points: ['Bars show contained graphite vs the top public peers', 'Tanga slots in at #5 once the resource is revealed', 'A large-scale asset in a proven graphite province'],
@@ -1581,7 +1596,7 @@ function sceneCalloutsForMode(
       // The destination is where the port and rail pins already sit, so a
       // callout anchored there landed on top of both of them.
       {id: 'route', label: `${routeProfile.distanceLabel} / ${routeProfile.durationLabel}`, detail: `${routeProfile.source === 'osrm' ? 'Road geometry' : 'Indicative route'} to ${routeProfile.targetLabel}`, boxX: 38, boxY: 43, tone: targetTone, anchor: {...routeCorridorMidpoint(routeTarget), elevationOffset: 420}},
-      {id: 'power', label: 'Hale + New Pangani', detail: powerGridDistanceSummary(), boxX: 66, boxY: 49, tone: '#41200e', anchor: {lon: 38.636, lat: -5.326, elevationOffset: 440}, offset: {x: 118, y: -84}},
+      ...POWER_GRID_NODES.map((node, index) => ({id: `power-${node.id}`, label: node.shortName, detail: `${node.distanceKm.toFixed(1)} km direct · hydro / grid node`, boxX: 66, boxY: 38 + index * 22, tone: '#a89c94', anchor: {lon: node.lon, lat: node.lat}})),
     ];
   }
   if (mode === 'ranking') {
@@ -1591,7 +1606,7 @@ function sceneCalloutsForMode(
   }
   if (mode === 'comparison') {
     return [
-      {id: 'comparison', label: 'Tanga peer slot', detail: '#5 by contained graphite with metallurgy support', boxX: 45, boxY: 38, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 90000}, offset: {x: 104, y: -88}},
+      {id: 'comparison', label: 'Tanga · next study stage', detail: 'Reconcile evidence · validate assumptions · advance studies', boxX: 45, boxY: 38, tone: '#c7551b', anchor: {...PROJECT_CENTER}, offset: {x: 104, y: -88}},
     ];
   }
   if (mode === 'resource') {
@@ -2061,7 +2076,7 @@ export default function TangaDeckWorkbench() {
   const [isExploreMode, setExploreMode] = useState(false);
   const [activeShotIndex, setActiveShotIndex] = useState(0);
   const [geologySectionShown, setGeologySectionShown] = useState(false);
-  const [selectedMilestoneId, setSelectedMilestoneId] = useState('survey');
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState('drilling');
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
   const [resourceFocus, setResourceFocus] = useState<ResourceFocus>('Indicated');
   const [viewState, setViewState] = useState<DeckViewState>(VIEW_STATES[DEFAULT_MODE]);
@@ -2081,6 +2096,18 @@ export default function TangaDeckWorkbench() {
   const [villages, setVillages] = useState<GeoJsonFeature[]>([]);
   const [vegetation, setVegetation] = useState<GeoJsonFeature[]>([]);
   const [roadFeatures, setRoadFeatures] = useState<GeoJsonFeature[]>([]);
+  const [boundaryAnchor, setBoundaryAnchor] = useState<{lon: number; lat: number} | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/generated/boundaries.geojson').then(response => response.json()).then(payload => {
+      const ring = payload.features?.find((feature: any) => feature.properties?.layer === 'Project boundary')?.geometry?.coordinates?.[0];
+      if (!cancelled && Array.isArray(ring) && ring.length) {
+        const point = ring[Math.floor(ring.length / 4)];
+        if (Number.isFinite(point?.[0]) && Number.isFinite(point?.[1])) setBoundaryAnchor({lon: point[0], lat: point[1]});
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [mapLoadState, setMapLoadState] = useState<SceneLoadState>('loading');
@@ -2115,6 +2142,8 @@ export default function TangaDeckWorkbench() {
   const [storyHeroState, setStoryHeroState] = useState<StoryHeroState>('playing');
   const [contextReady, setContextReady] = useState(false);
   const [resourceHasBeenShown, setResourceHasBeenShown] = useState(false);
+  const [peerMreRevealed, setPeerMreRevealed] = useState(false);
+  useEffect(() => { if (activeMode === 'ranking') setPeerMreRevealed(false); }, [activeMode]);
   const [threeSceneRequested, setThreeSceneRequested] = useState(false);
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
   const [selectedPeerProject, setSelectedPeerProject] = useState<GraphitePeerProjectRow | null>(null);
@@ -2215,7 +2244,7 @@ export default function TangaDeckWorkbench() {
     () => routeElevationProfile(activeRoutePath, routeInfo, routeTarget),
     [activeRoutePath, routeInfo, routeTarget]
   );
-  const tangaRankingInserted = resourceHasBeenShown;
+  const tangaRankingInserted = activeMode === 'ranking' ? peerMreRevealed || activeShotIndex > 0 : resourceHasBeenShown;
   const graphiteRows = useMemo(() => graphitePeerRows(tangaRankingInserted), [tangaRankingInserted]);
   const maxContainedGraphite = useMemo(
     () => graphiteRows.reduce((max, p) => Math.max(max, p.containedGraphiteMt || 0), 0) || 1,
@@ -3155,7 +3184,7 @@ export default function TangaDeckWorkbench() {
   // Sampled once the topography scene is reached. Without it that slide has
   // no relief at all — which is its entire subject.
   useEffect(() => {
-    if (activeMode !== 'topography' || reliefRaster) return;
+    if (activeMode !== 'topography' || reliefRaster || threeVisible) return;
 
     let cancelled = false;
     loadHiresDem().then((dem) => {
@@ -3166,7 +3195,7 @@ export default function TangaDeckWorkbench() {
     return () => {
       cancelled = true;
     };
-  }, [activeMode, reliefRaster]);
+  }, [activeMode, reliefRaster, threeVisible]);
 
   // Follow the map camera while it moves, coalesced to one update per frame so
   // a fly-to does not push a state change per event.
@@ -4032,17 +4061,17 @@ export default function TangaDeckWorkbench() {
     ].filter(Boolean) as any[];
   }, [activeMode, activeRoutePath, contextReady, graphiteRows, heightAt, isExploreMode, labels, localContextMode, roadFeatures, roadPaths, routeInfo, routeProfile.distanceLabel, routeProfile.durationLabel, routeTarget, activePeerKey, drillCollars, reliefRaster, tangaRankingInserted, vegetation, villages]);
 
-  const currentSummary = activeMode === 'ranking' && !isExploreMode
+  const currentSummary = activeMode === 'work_completed' && !isExploreMode
     ? 'Survey, drilling, resource estimation and testwork are separate milestones in the evidence base.'
     : activeMode === 'comparison' && !isExploreMode
       ? 'A closing view of the evidence assembled and the decisions that would strengthen the next study stage.'
       : modeSummary(activeMode, routeTarget, resourceFocus, tangaRankingInserted);
-  const currentHeadline = activeMode === 'ranking' && !isExploreMode
+  const currentHeadline = activeMode === 'work_completed' && !isExploreMode
     ? 'Work completed'
     : activeMode === 'comparison' && !isExploreMode
       ? 'Evidence to decisions'
       : modeHeadline(activeMode, resourceFocus, tangaRankingInserted);
-  const currentFacts = activeMode === 'ranking' && !isExploreMode
+  const currentFacts = activeMode === 'work_completed' && !isExploreMode
     ? [{label: 'Drilling', value: '100 diamond holes'}, {label: 'Terrain', value: '2025 aerial survey'}, {label: 'Studies', value: 'MRE + testwork'}]
     : activeMode === 'comparison' && !isExploreMode
       ? [{label: 'Assembled', value: 'Field evidence'}, {label: 'Interpret', value: 'Geology + model'}, {label: 'Next', value: 'Validation'}]
@@ -4182,20 +4211,34 @@ export default function TangaDeckWorkbench() {
     };
   }, []);
 
-  const sceneCallouts = activeMode === 'ranking' && !isExploreMode
+  const sceneCallouts = threeVisible || (activeMode === 'ranking' && !isExploreMode)
     ? []
-    : sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile, relief);
-  const projectedSceneCallouts = useMemo<ProjectedSceneCallout[]>(() => {
-    const viewport = new WebMercatorViewport({
-      width: stageSize.width,
-      height: stageSize.height,
-      longitude: viewState.longitude,
-      latitude: viewState.latitude,
-      zoom: viewState.zoom,
-      pitch: viewState.pitch,
-      bearing: viewState.bearing,
+    : sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile, relief).flatMap(callout => {
+      if (callout.id === 'aoi') return boundaryAnchor ? [{...callout, anchor: boundaryAnchor}] : [];
+      if (callout.id === 'route' && activeRoutePath.length) {
+        const half = pathDistanceMeters(activeRoutePath) / 2;
+        let distance = 0, point = activeRoutePath[0];
+        for (let index = 1; index < activeRoutePath.length; index++) {
+          distance += haversineMeters([activeRoutePath[index - 1][0], activeRoutePath[index - 1][1]], [activeRoutePath[index][0], activeRoutePath[index][1]]);
+          point = activeRoutePath[index];
+          if (distance >= half) break;
+        }
+        return [{...callout, anchor: {lon: point[0], lat: point[1]}}];
+      }
+      return [callout];
     });
-
+  const projectMapAnchor = useCallback((lon: number, lat: number) => {
+    if (!mapInstance) return null;
+    const centre = mapInstance.getCenter();
+    const radians = Math.PI / 180;
+    const cosine = Math.sin(lat * radians) * Math.sin(centre.lat * radians)
+      + Math.cos(lat * radians) * Math.cos(centre.lat * radians) * Math.cos((lon - centre.lng) * radians);
+    if (cosine <= 0) return null;
+    const point = mapInstance.project([lon, lat]);
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.x > stageSize.width || point.y < 0 || point.y > stageSize.height) return null;
+    return point;
+  }, [mapInstance, mapCameraTick, stageSize.width, stageSize.height]);
+  const projectedSceneCallouts = useMemo<ProjectedSceneCallout[]>(() => {
     return sceneCallouts.map((callout) => {
       const boxPixelX = stageSize.width * callout.boxX / 100;
       const boxPixelY = stageSize.height * callout.boxY / 100;
@@ -4208,16 +4251,10 @@ export default function TangaDeckWorkbench() {
           // elevationOffsets (up to 160 km) which, on a pitched map, throw the
           // projected anchor far from the actual location — so the leader line
           // pointed at empty map. Clamp to a small lift so it sits on the zone.
-          const anchorZ = heightAt(callout.anchor.lon, callout.anchor.lat)
-            + clamp(callout.anchor.elevationOffset ?? 0, 0, 300);
-          const projected = viewport.project([
-            callout.anchor.lon,
-            callout.anchor.lat,
-            anchorZ,
-          ]);
-          if (Number.isFinite(projected[0]) && Number.isFinite(projected[1])) {
-            anchorPixelX = clamp(projected[0], 18, stageSize.width - 18);
-            anchorPixelY = clamp(projected[1], 76, stageSize.height - 32);
+          const projected = projectMapAnchor(callout.anchor.lon, callout.anchor.lat);
+          if (projected) {
+            anchorPixelX = projected.x;
+            anchorPixelY = projected.y;
           }
         } catch {
           anchorPixelX = null;
@@ -4232,8 +4269,8 @@ export default function TangaDeckWorkbench() {
         anchorPixelX,
         anchorPixelY,
       };
-    });
-  }, [heightAt, sceneCallouts, stageSize.height, stageSize.width, viewState.bearing, viewState.latitude, viewState.longitude, viewState.pitch, viewState.zoom]);
+    }).filter(callout => !callout.anchor || callout.anchorPixelX !== null);
+  }, [projectMapAnchor, sceneCallouts, stageSize.height, stageSize.width, viewState.bearing, viewState.latitude, viewState.longitude, viewState.pitch, viewState.zoom]);
 
   // ── Pinned map labels ──────────────────────────────────────────────────────
   // The map's place labels (licence, marker, mine facilities, villages, power,
@@ -4249,7 +4286,7 @@ export default function TangaDeckWorkbench() {
       out.push({id, text, lon, lat, z: heightAt(lon, lat) + lift, tone});
     };
     if (activeMode === 'project' || activeMode === 'topography') {
-      push('lbl-license', 'PROVISIONAL PROJECT BOUNDARY', PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, 260, '#f0b64a');
+      if (boundaryAnchor) push('lbl-license', 'PROVISIONAL PROJECT BOUNDARY', boundaryAnchor.lon, boundaryAnchor.lat, 0, '#f0b64a');
     }
     if (activeMode === 'project') {
       // Processing plant and product stockpile pins are gone from this scene:
@@ -4285,7 +4322,7 @@ export default function TangaDeckWorkbench() {
       }
     }
     return out;
-  }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel]);
+  }, [activeMode, heightAt, villages, labels, routeTarget, routeProfile.distanceLabel, boundaryAnchor]);
 
   /**
    * Peer-project labels drawn on the globe for the ranking scene.
@@ -4347,7 +4384,7 @@ export default function TangaDeckWorkbench() {
         } catch {
           point = null;
         }
-        if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+        if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.x > stageSize.width || point.y < 0 || point.y > stageSize.height) return null;
 
         const key = peerProjectKey(project);
         return {
@@ -4418,10 +4455,6 @@ export default function TangaDeckWorkbench() {
       width: stageSize.width, height: stageSize.height,
       longitude: canon.longitude, latitude: canon.latitude, zoom: canon.zoom, pitch: canon.pitch, bearing: canon.bearing,
     });
-    const liveVp = new WebMercatorViewport({
-      width: stageSize.width, height: stageSize.height,
-      longitude: viewState.longitude, latitude: viewState.latitude, zoom: viewState.zoom, pitch: viewState.pitch, bearing: viewState.bearing,
-    });
     const positioned = mapLabelSources.map((source) => {
       let boxPixelX = stageSize.width / 2;
       let boxPixelY = stageSize.height / 2;
@@ -4435,14 +4468,14 @@ export default function TangaDeckWorkbench() {
       let anchorPixelX: number | null = null;
       let anchorPixelY: number | null = null;
       try {
-        const p = liveVp.project([source.lon, source.lat, source.z]);
-        if (Number.isFinite(p[0]) && Number.isFinite(p[1])) {
-          anchorPixelX = clamp(p[0], 8, stageSize.width - 8);
-          anchorPixelY = clamp(p[1], 70, stageSize.height - 24);
+        const p = projectMapAnchor(source.lon, source.lat);
+        if (p) {
+          anchorPixelX = p.x;
+          anchorPixelY = p.y;
         }
       } catch { /* no pointer */ }
       return {...source, boxPixelX, boxPixelY, anchorPixelX, anchorPixelY};
-    });
+    }).filter(label => label.anchorPixelX !== null);
 
     // Keep chips clear of the chrome: the top bar / act ribbon, the bottom pager,
     // and the docked right-hand data panel — so no label is hidden behind a panel.
@@ -4475,7 +4508,7 @@ export default function TangaDeckWorkbench() {
       placed.push(label);
     });
     return positioned;
-  }, [mapLabelSources, activeMode, stageSize.width, stageSize.height, viewState.longitude, viewState.latitude, viewState.zoom, viewState.pitch, viewState.bearing]);
+  }, [mapLabelSources, projectMapAnchor, activeMode, stageSize.width, stageSize.height, viewState.longitude, viewState.latitude, viewState.zoom, viewState.pitch, viewState.bearing]);
 
   const safeMapChrome = useMemo(() => {
     const width = stageSize.width, height = stageSize.height;
@@ -4594,6 +4627,7 @@ export default function TangaDeckWorkbench() {
     try { window.localStorage?.setItem('tanga:coachSeen', '1'); } catch { /* ignore */ }
     const clamped = clamp(index, 0, STORY_STEPS.length - 1);
     const targetStep = STORY_STEPS[clamped];
+    if (targetStep.mode === 'work_completed') setSelectedMilestoneId('drilling');
     const defaults = storyStepDefaults(targetStep.mode);
     setActiveShotIndex(0);
     setGeologySectionShown(false);
@@ -4608,6 +4642,7 @@ export default function TangaDeckWorkbench() {
     const shots = STORY_SHOTS[mode];
     const nextIndex = clamp(requestedIndex, 0, Math.max(0, shots.length - 1));
     const shot = shots[nextIndex];
+    if (mode === 'work_completed') setSelectedMilestoneId(shot.id);
     setActiveShotIndex(nextIndex);
     if (shot.threeAction === 'revealSection') setGeologySectionShown(true);
     if (shot.threeAction === 'resetView' || shot.threeAction === 'restoreSection') setGeologySectionShown(false);
@@ -4671,7 +4706,7 @@ export default function TangaDeckWorkbench() {
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
   const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
   const transitionCardCount = nextChapterMode && INFO_BEFORE[nextChapterMode] ? 1 : 0;
-  const shotDwellSec = (isExecutiveTour ? 30 : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
+  const shotDwellSec = (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
   // Annotation density, cycled with Ctrl+A:
   //   key → authored scene callouts plus the three strongest drill intercepts
@@ -5077,7 +5112,7 @@ export default function TangaDeckWorkbench() {
         storyHeroVisible && 'tanga-deck--story-hero-active',
         activeMode === 'ranking' && isExploreMode && 'tanga-deck--ranking',
         activeMode === 'comparison' && isExploreMode && 'tanga-deck--comparison',
-        activeMode === 'ranking' && !isExploreMode && 'tanga-deck--work-completed-story',
+        activeMode === 'work_completed' && !isExploreMode && 'tanga-deck--work-completed-story',
         activeMode === 'comparison' && !isExploreMode && 'tanga-deck--decision-story',
         isLayersOpen && 'tanga-deck--layers-open',
         isNotesOpen && 'tanga-deck--notes-open',
@@ -5097,9 +5132,9 @@ export default function TangaDeckWorkbench() {
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
           viewState={viewState as any}
-          controller
-          layers={layers}
-          effects={[TANGA_LIGHTING]}
+          controller={!threeVisible}
+          layers={threeVisible ? [] : layers}
+          effects={threeVisible ? [] : [TANGA_LIGHTING]}
           useDevicePixels={1}
           onViewStateChange={({viewState: nextViewState, interactionState}: any) => {
             const userGesture = Boolean(
@@ -5150,6 +5185,7 @@ export default function TangaDeckWorkbench() {
           onLoadState={handleThreeLoadState}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
+          inspectionMode={isExploreMode}
           onAssayFacts={setAssayFacts}
         />
       )}
@@ -5708,7 +5744,7 @@ export default function TangaDeckWorkbench() {
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
-          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the three minute thirty second executive route" title="Executive route · 3 min 30 sec · 7 chapters">Executive tour · 3½ min</button>
+          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Complete project story · ${EXECUTIVE_STORY_SECONDS / 60} minutes · 12 chapters`}>Guided story · 4½ min</button>
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
@@ -5724,13 +5760,14 @@ export default function TangaDeckWorkbench() {
           <button
             type="button"
             className="tanga-deck__pager-btn tanga-deck__pager-speed"
+            disabled={isExecutiveTour}
             onClick={() => setIsAutoplayMenuOpen((prev) => !prev)}
-            aria-label={`Chapter duration: ${autoplaySec} seconds`}
+            aria-label={`Chapter duration: ${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec} seconds`}
             aria-haspopup="menu"
             aria-expanded={isAutoplayMenuOpen}
-            title={`${autoplaySec}s per chapter · ${STORY_STEPS.length * autoplaySec / 60} minute tour — click to change`}
+            title={isExecutiveTour ? 'Guided story uses chapter-specific timing' : `${autoplaySec}s per chapter · ${STORY_STEPS.length * autoplaySec / 60} minute tour — click to change`}
           >
-            {autoplaySec}s
+            {isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec}s
           </button>
           {isAutoplayMenuOpen && (
             <div className="tanga-deck__speed-menu" role="menu">
@@ -6073,8 +6110,10 @@ export default function TangaDeckWorkbench() {
       </section>
 
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
-      {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
-      {!isExploreMode && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={setSelectedMilestoneId}/ >}
+      {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
+      {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
+      {!isExploreMode && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}} onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand('plantDetail');} : undefined}/ >}
+      {!isExploreMode && !isCoverScene && !storyHeroVisible && ['topography','drillholes','subsurface','resource','mine_planning'].includes(activeMode) && <TangaStoryCue mode={activeMode} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Review the evidence'} onContinue={handleManualNext}/>}
 
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">

@@ -5,10 +5,6 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
-import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import proj4 from 'proj4';
 import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
 import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit} from '@/lib/deck/mine-scene';
@@ -170,6 +166,8 @@ const CHROME_SELECTORS = [
   // on the source-data panel and the grade legend — which is how the
   // resource scene ended up with a callout sitting 46% over its own panel.
   '.tanga-deck__data-panel',
+  '.tanga-story-panel',
+  '.tanga-story-cue',
   '.tanga-deck__insight-panel',
   '.tanga-deck__ranking',
   '.tanga-three__grade-legend',
@@ -227,6 +225,7 @@ type ThreeCameraCommand = {
   id: number;
   action: 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
+  stage?: string;
 };
 
 type TangaThreeGeologySceneProps = {
@@ -243,6 +242,7 @@ type TangaThreeGeologySceneProps = {
    */
   labelDensity?: LabelDensity;
   layerSettings?: DeckLayerSettings;
+  inspectionMode?: boolean;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
@@ -397,6 +397,7 @@ type TerrainMeta = {
   width: number;
   height: number;
   elevation_m: {min: number; max: number};
+  context_grid?: {width: number; height: number; file: string};
   survey_surface?: {
     valid_output_fraction?: number;
     source_cell_size_m?: number[];
@@ -412,7 +413,6 @@ type TangaTerrainResources = {
   surveyHeightData: Float32Array | null;
   surveyCoverageData: Uint8Array | null;
   surveySlopeData: Float32Array | null;
-  texture: THREE.Texture;
   quality: AssetQuality;
 };
 type TerrainDisplay = 'elevation' | 'slope';
@@ -447,15 +447,13 @@ const PROJECT_UTM_CENTER = (() => {
   const [easting, northing] = proj4('WGS84', 'EPSG:32737', [PROJECT_CENTER.lon, PROJECT_CENTER.lat]) as [number, number];
   return {easting, northing};
 })();
-const METERS_PER_DEGREE_LAT = 110_540;
-const METERS_PER_DEGREE_LON = 111_320 * Math.cos((PROJECT_CENTER.lat * Math.PI) / 180);
 const VERTICAL_EXAGGERATION = 1;
 const LOCAL_VERTICAL_DATUM = 700;
 const RESOURCE_SCENE_Y_MIN = -122;
 const RESOURCE_SCENE_Y_MAX = 118;
 const RESOURCE_BLOCK_SURFACE_CLEARANCE = 32;
 const DRILL_TRACE_SURFACE_CLEARANCE = 9;
-const DRILL_COLLAR_SURFACE_LIFT = 13;
+const DRILL_COLLAR_SURFACE_LIFT = 1;
 const SURFACE_Y = 0;
 const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, -60, 0);
 
@@ -470,15 +468,31 @@ const ASSET_BASE_URL = (process.env.NEXT_PUBLIC_ASSET_BASE_URL || '').replace(/\
 // missing the object or unreachable. This means the app works whether or not
 // every asset has been uploaded to R2 yet — no hard dependency on the bucket.
 async function fetchAsset(path: string, init?: RequestInit): Promise<Response> {
-  const local = await cachedDeckAsset(assetUrl(path), init);
-  if (local.ok) return local;
+  const usable = async (response: Response) => {
+    if (!response.ok || response.headers.get('content-type')?.includes('text/html')) return false;
+    if (/\.(bin|glb)(\?|$)/.test(path)) {
+      // A successful HTTP status can still be a Git LFS pointer on Vercel.
+      const reader = response.clone().body?.getReader();
+      if (reader) {
+        const {value} = await reader.read();
+        void reader.cancel();
+        if (value && new TextDecoder().decode(value.subarray(0, 80)).startsWith('version https://git-lfs.github.com/')) return false;
+      }
+    }
+    return true;
+  };
+  let local: Response | null = null;
+  try {
+    local = await cachedDeckAsset(assetUrl(path), init);
+    if (await usable(local)) return local;
+  } catch { /* Try the public asset origin when the same-origin request fails. */ }
   if (ASSET_BASE_URL) {
     try {
       const remote = await cachedDeckAsset(`${ASSET_BASE_URL}${path}`, init);
-      if (remote.ok) return remote;
+      if (await usable(remote)) return remote;
     } catch { /* fall through to local */ }
   }
-  return local;
+  throw new Error(`Asset unavailable or invalid: ${path.split('?')[0]}${local ? ` (${local.status})` : ''}`);
 }
 async function loadTextureWithFallback(path: string): Promise<THREE.Texture> {
   const loader = new THREE.TextureLoader();
@@ -497,8 +511,8 @@ async function loadTextureWithFallback(path: string): Promise<THREE.Texture> {
 // the ~7.6 km patch + Esri imagery) — replaces the coarse ~217 m/px region grid
 // so the Three.js scenes read smooth and crisp. Generated by
 // scripts/gen_hires_terrain.py + gen_hires_texture.py.
-const TERRAIN_META_PATH = '/terrain_hires_meta.json?v=survey-2026-10-21';
-const TERRAIN_HEIGHT_PATH = '/height_hires.bin?v=survey-2026-10-21';
+const TERRAIN_META_PATH = '/terrain_hires_meta.json?v=registered-grid-v2';
+const TERRAIN_HEIGHT_PATH = '/terrain_context_512.bin?v=registered-grid-v2';
 const TERRAIN_TEXTURE_PATHS: Record<AssetQuality, string> = {
   preview: '/terrain_texture_hires.jpg?v=survey-2026-10-21',
   standard: '/terrain_texture_hires.jpg?v=survey-2026-10-21',
@@ -555,6 +569,13 @@ const NICE_SCALE_METERS = [25, 50, 100, 200, 500, 1000, 2000, 5000];
 let blockPromise: Promise<ResourceBlock[]> | null = null;
 let drillPromise: Promise<DrillSegment[]> | null = null;
 const terrainPromises = new Map<AssetQuality, Promise<TangaTerrainResources>>();
+let terrainTexturePromise: Promise<THREE.Texture> | null = null;
+function loadTerrainTexture() {
+  return terrainTexturePromise ??= loadTextureWithFallback(TERRAIN_TEXTURE_PATHS.standard).catch(error => {
+    terrainTexturePromise = null;
+    throw error;
+  });
+}
 
 try {
   if (!(proj4 as any).defs['EPSG:32737']) {
@@ -565,23 +586,18 @@ try {
 }
 
 function localPoint(lon: number, lat: number, elevation = 0) {
+  const [easting, northing] = proj4('WGS84', 'EPSG:32737', [lon, lat]) as [number, number];
   return new THREE.Vector3(
-    (lon - PROJECT_CENTER.lon) * METERS_PER_DEGREE_LON,
+    easting - PROJECT_UTM_CENTER.easting,
     (elevation - LOCAL_VERTICAL_DATUM) * VERTICAL_EXAGGERATION,
-    -(lat - PROJECT_CENTER.lat) * METERS_PER_DEGREE_LAT
+    -(northing - PROJECT_UTM_CENTER.northing)
   );
 }
 
-function localLonLatFromPlane(x: number, planeY: number) {
-  return {
-    lon: PROJECT_CENTER.lon + x / METERS_PER_DEGREE_LON,
-    lat: PROJECT_CENTER.lat + planeY / METERS_PER_DEGREE_LAT,
-  };
-}
-
 function sampleTerrainAtLocal(resources: TangaTerrainResources, x: number, planeY: number, lift = 0, verticalScale = VERTICAL_EXAGGERATION) {
-  const {lon, lat} = localLonLatFromPlane(x, planeY);
-  const [easting, northing] = proj4('WGS84', 'EPSG:32737', [lon, lat]) as [number, number];
+  // All meshes share metre-valued UTM offsets. No projection per terrain vertex.
+  const easting = PROJECT_UTM_CENTER.easting + x;
+  const northing = PROJECT_UTM_CENTER.northing + planeY;
   const {bounds_utm, width, height} = resources.meta;
   const {minX, maxX, minY, maxY} = bounds_utm;
   const u = (easting - minX) / Math.max(1, maxX - minX);
@@ -595,27 +611,32 @@ function sampleTerrainAtLocal(resources: TangaTerrainResources, x: number, plane
     };
   }
 
-  const px = u * (width - 1);
-  const py = v * (height - 1);
+  // Raster bounds describe cell edges; samples are at cell centres.
+  const px = clamp(u * width - 0.5, 0, width - 1);
+  const py = clamp(v * height - 0.5, 0, height - 1);
   const x0 = Math.floor(px);
   const y0 = Math.floor(py);
   const x1 = Math.min(x0 + 1, width - 1);
   const y1 = Math.min(y0 + 1, height - 1);
-  const tx = px - x0;
-  const ty = py - y0;
   const nearestIndex = Math.round(py) * width + Math.round(px);
   const surveyIndexes = [y0 * width + x0, y0 * width + x1, y1 * width + x0, y1 * width + x1];
   const isSurveyed = Boolean(resources.surveyCoverageData?.[nearestIndex]
     && resources.surveyCoverageData
     && surveyIndexes.every((index) => resources.surveyCoverageData![index] === 1));
   const sourceHeights = isSurveyed && resources.surveyHeightData ? resources.surveyHeightData : resources.heightData;
-  const h00 = sourceHeights[y0 * width + x0];
-  const h10 = sourceHeights[y0 * width + x1];
-  const h01 = sourceHeights[y1 * width + x0];
-  const h11 = sourceHeights[y1 * width + x1];
-  const top = h00 * (1 - tx) + h10 * tx;
-  const bottom = h01 * (1 - tx) + h11 * tx;
-  const terrainHeight = top * (1 - ty) + bottom * ty;
+  const grid = isSurveyed ? {width, height} : (resources.meta.context_grid ?? {width, height});
+  const gx = clamp(u * grid.width - 0.5, 0, grid.width - 1);
+  const gy = clamp(v * grid.height - 0.5, 0, grid.height - 1);
+  const ix = Math.floor(gx), iy = Math.floor(gy);
+  const jx = Math.min(ix + 1, grid.width - 1), jy = Math.min(iy + 1, grid.height - 1);
+  const h00 = sourceHeights[iy * grid.width + ix];
+  const h10 = sourceHeights[iy * grid.width + jx];
+  const h01 = sourceHeights[jy * grid.width + ix];
+  const h11 = sourceHeights[jy * grid.width + jx];
+  const fx = gx - ix, fy = gy - iy;
+  const top = h00 * (1 - fx) + h10 * fx;
+  const bottom = h01 * (1 - fx) + h11 * fx;
+  const terrainHeight = top * (1 - fy) + bottom * fy;
 
   return {
     y: (terrainHeight - LOCAL_VERTICAL_DATUM) * verticalScale + lift,
@@ -666,13 +687,14 @@ function registeredDrillPoint(
 
 function collarSurfacePoint(segment: DrillSegment, resources: TangaTerrainResources | null, lift = DRILL_COLLAR_SURFACE_LIFT) {
   const point = drillPointFromCoords(segment.from);
-  point.y += lift;
-  void resources;
+  // A collar symbol marks the surface, while the drill trajectory keeps its
+  // original surveyed RL and inclination. Never translate or clamp assay data.
+  point.y = terrainSurfaceY(resources, point.x, -point.z) + Math.min(lift, 1);
   return point;
 }
 
-function loadTangaTerrainResources(renderer: THREE.WebGLRenderer, quality: AssetQuality) {
-  const existingPromise = terrainPromises.get(quality);
+function loadTangaTerrainResources() {
+  const existingPromise = terrainPromises.get('standard');
   if (existingPromise) return existingPromise;
 
   const optionalBinary = (path: string) => fetchAsset(path, {cache: 'force-cache'})
@@ -687,39 +709,28 @@ function loadTangaTerrainResources(renderer: THREE.WebGLRenderer, quality: Asset
         if (!response.ok) throw new Error(`Height grid failed with ${response.status}`);
         return response.arrayBuffer();
       }),
-      loadTextureWithFallback(TERRAIN_TEXTURE_PATHS[quality]),
-      optionalBinary('/survey_height_hires.bin?v=survey-2026-10-21'),
-      optionalBinary('/survey_coverage_hires.bin?v=survey-2026-10-21'),
-      optionalBinary('/survey_slope_hires.bin?v=survey-2026-10-21'),
-    ]).then(([meta, heightBuffer, texture, surveyHeightBuffer, surveyCoverageBuffer, surveySlopeBuffer]) => {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.wrapS = THREE.ClampToEdgeWrapping;
-      texture.wrapT = THREE.ClampToEdgeWrapping;
-      texture.generateMipmaps = true;
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy?.() ?? 8, 16);
-      texture.needsUpdate = true;
+      optionalBinary('/survey_height_hires.bin?v=registered-grid-v2'),
+      optionalBinary('/survey_coverage_hires.bin?v=registered-grid-v2'),
+    ]).then(([meta, heightBuffer, surveyHeightBuffer, surveyCoverageBuffer]) => {
       const gridSize = meta.width * meta.height;
+      const contextSize = (meta.context_grid?.width ?? meta.width) * (meta.context_grid?.height ?? meta.height);
+      if (heightBuffer.byteLength !== contextSize * 4) {
+        throw new Error('Terrain height grid does not match its metadata');
+      }
       const surveyHeightData = surveyHeightBuffer && surveyHeightBuffer.byteLength === gridSize * 4
         ? new Float32Array(surveyHeightBuffer)
         : null;
       const surveyCoverageData = surveyCoverageBuffer && surveyCoverageBuffer.byteLength === gridSize
         ? new Uint8Array(surveyCoverageBuffer)
         : null;
-      const surveySlopeData = surveySlopeBuffer && surveySlopeBuffer.byteLength === gridSize * 4
-        ? new Float32Array(surveySlopeBuffer)
-        : null;
-      if (!surveyHeightData || !surveyCoverageData || !surveySlopeData) {
-        console.warn('Survey surface assets incomplete; using regional terrain with an explicit fallback label.');
-      }
-      return {meta, heightData: new Float32Array(heightBuffer), surveyHeightData, surveyCoverageData, surveySlopeData, texture, quality};
+      if (!surveyHeightData || !surveyCoverageData) throw new Error('Survey grid unavailable or incomplete; retry terrain loading');
+      return {meta, heightData: new Float32Array(heightBuffer), surveyHeightData, surveyCoverageData, surveySlopeData: null as Float32Array | null, quality: 'standard' as AssetQuality};
     }).catch((error) => {
-      terrainPromises.delete(quality);
+      terrainPromises.delete('standard');
       throw error;
     });
 
-  terrainPromises.set(quality, terrainPromise);
+  terrainPromises.set('standard', terrainPromise);
   return terrainPromise;
 }
 
@@ -1679,11 +1690,10 @@ const TERRAIN_SLOPE_RAMP = [
 ];
 
 function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mode: GeologyMode, display: TerrainDisplay) {
-  // The 2048 × 1940 terrain raster is represented by a ~7 m triangulation so
-  // close camera views retain real ridgelines without uploading every raster
-  // cell to the GPU.
-const segmentsX = 1024;
-const segmentsY = 1402;
+  // Sample the source surface without projecting millions of vertices. This
+  // caps the terrain at 404k triangles (previously 2.87m) across every chapter.
+  const segmentsX = 384;
+  const segmentsY = 526;
   const width = TERRAIN_PATCH_WIDTH;
   const depth = TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
@@ -1696,7 +1706,7 @@ const segmentsY = 1402;
     for (let column = 0; column <= segmentsX; column += 1) {
       const x = (column / segmentsX - 0.5) * width;
       const verticalScale = mode === 'topography' ? 1 : VERTICAL_EXAGGERATION;
-      const sample = sampleTerrainAtLocal(resources, x, planeY, mode === 'subsurface' ? 18 : 4, verticalScale);
+      const sample = sampleTerrainAtLocal(resources, x, planeY, 0, verticalScale);
       positions.push(x, sample.y, -planeY);
       uvs.push(sample.u, sample.v);
       if (mode === 'topography') {
@@ -1767,8 +1777,8 @@ function createSurveyCoverageOutline(resources: TangaTerrainResources) {
   const {minX, maxX, minY, maxY} = resources.meta.bounds_utm;
   const width = resources.meta.width;
   const height = resources.meta.height;
-  const dx = (maxX - minX) / (width - 1);
-  const dy = (maxY - minY) / (height - 1);
+  const dx = (maxX - minX) / width;
+  const dy = (maxY - minY) / height;
   const positions: number[] = [];
   const append = (row: number, column: number, xOffset: number, northOffset: number) => {
     const index = row * width + column;
@@ -1947,9 +1957,12 @@ export default function TangaThreeGeologyScene({
   onLoadState,
   labelDensity = 'key',
   layerSettings = DEFAULT_LAYER_SETTINGS,
+  inspectionMode = false,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const [inspectionOpen, setInspectionOpen] = useState(false);
+  useEffect(() => setInspectionOpen(false), [mode]);
   const controlsRef = useRef<OrbitControls | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
   const gradeFocusMaterialsRef=useRef<THREE.Material[]>([]);
@@ -1982,6 +1995,10 @@ export default function TangaThreeGeologyScene({
   const spotlightRef=useRef('');spotlightRef.current=spotlight;
   const [journeyHoles,setJourneyHoles]=useState<string[]>([]),[journeyHole,setJourneyHole]=useState(''),[journeyReadout,setJourneyReadout]=useState('');
   const [terrainDisplay, setTerrainDisplay] = useState<TerrainDisplay>('elevation');
+  const terrainDisplayRef = useRef(terrainDisplay);
+  terrainDisplayRef.current = terrainDisplay;
+  const updateTerrainDisplayRef = useRef<((display: TerrainDisplay) => void) | null>(null);
+  useEffect(() => { updateTerrainDisplayRef.current?.(terrainDisplay); }, [terrainDisplay]);
   const [terrainProfile, setTerrainProfile] = useState<number[]>([]);
   const [terrainProfilePosition, setTerrainProfilePosition] = useState(50);
   const terrainProfilePositionRef = useRef(50);
@@ -2243,7 +2260,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const evidenceLines:THREE.LineSegments[]=[];
     let storyMotionStart=0,consumedReplay=0,lastStoryBeat=-1;
     let calloutsForProjection = threeCallouts(mode, resourceFocus, null);
+    let siteOverviewCallouts: ThreeCallout[] = [];
     const calloutAnchors = new Map<string, THREE.Vector3>();
+    const calloutObjects = new Map<string, THREE.Object3D>();
     const terrainSurfaceMaterials: THREE.MeshStandardMaterial[] = [];
     // Depth-only twins of the terrain; hidden while the surface is glass.
     const terrainOccluders: THREE.Mesh[] = [];
@@ -2286,7 +2305,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     // Render at up to 2× device pixels so the high-res draped satellite texture
     // stays crisp (the terrain is the hero) instead of softening at 1.5×.
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setPixelRatio(Math.min(mode === 'topography' ? 1.25 : 1, window.devicePixelRatio || 1));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2294,7 +2313,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // contrast/saturation grade then adds punch. Tuned by measuring canvas
     // luminance (~220 was washed; target ~185 with more tonal range).
     renderer.toneMappingExposure = mode === 'topography' ? 0.9 : 1.02;
-    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = mode === 'mine_planning';
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
@@ -2312,19 +2331,23 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     controls.enableZoom = true;
     controls.enablePan = true;
     controls.rotateSpeed = 0.86;
-    controls.zoomSpeed = 1.02;
-    controls.panSpeed = 0.58;
+    controls.zoomSpeed = 1.3;
+    controls.panSpeed = 0.85;
     controls.screenSpacePanning = true;
     controls.minPolarAngle = 0.04;
     controls.maxPolarAngle = Math.PI - 0.04;
     controls.target.copy(DEFAULT_CAMERA_TARGET);
     controls.maxDistance = 16000;
-    controls.minDistance = 100;
+    controls.minDistance = 25;
     controls.update();
     controlsRef.current = controls;
     let userTookControl = false;
     let userGestured = false;
+    let interacting = false;
+    let lastInteractionAt = -Infinity;
     const onControlStart = () => {
+      interacting = true;
+      lastInteractionAt = performance.now();
       userGestured = true;
       userTookControl = true;
       cameraTween = null;
@@ -2335,7 +2358,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       window.dispatchEvent(new Event('tanga:manual-exploration'));
       renderer.domElement.classList.add('is-interacting');
     };
-    const onControlEnd = () => renderer.domElement.classList.remove('is-interacting');
+    const onControlEnd = () => {
+      interacting = false;
+      lastInteractionAt = performance.now();
+      renderer.domElement.classList.remove('is-interacting');
+    };
     controls.addEventListener('start', onControlStart);
     controls.addEventListener('end', onControlEnd);
 
@@ -2391,6 +2418,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const normalizedDirection = direction.normalize();
 
       if (command.action === 'resetView') {
+        if (mode === 'mine_planning') calloutsForProjection = siteOverviewCallouts;
+        controls.maxPolarAngle = Math.PI - 0.04;
         surfaceCameraView = 'default';
         applyTerrainSurfaceView();
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 1.45, cameraShot.fov);
@@ -2421,11 +2450,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
 
       if(command.action==='plantDetail'&&processPlant){
-        const centre=processPlant.position.clone().add(new THREE.Vector3(0,40,0));
-        const position=centre.clone().add(new THREE.Vector3(1000,780,1060));
-        stage.localToWorld(centre);stage.localToWorld(position);scheduleCameraTween(position,centre,2,42);return;
+        setStoryPlaying(false); setMiningBeat(3); setInspectionOpen(true);
+        const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
+        const selected=stages?.find(item=>item.id===command.stage);
+        calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:item.point,kind:'story' as const}));
+        for(const callout of calloutsForProjection){calloutAnchors.set(callout.id,new THREE.Vector3(...callout.anchor));calloutObjects.set(callout.id,processPlant);}
+        const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
+        const position=centre.clone().add(selected?new THREE.Vector3(290,230,310):new THREE.Vector3(1000,780,1060));
+        scheduleCameraTween(position,centre,1.3,42);return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
+        setStoryPlaying(false); setMiningBeat(2);
+        calloutsForProjection = siteOverviewCallouts;
         const pits=[...(sitePlan?.pits??[])].sort((a,b)=>a.centre[1]-b.centre[1]);
         const pit=pits[command.action==='northPit'?0:1];
         if(!pit){setStatus('Pit detail is not ready; return to the overview and retry');return;}
@@ -2457,6 +2493,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
 
       if (command.action === 'bottomView') {
+        controls.maxPolarAngle = Math.PI - 0.04;
         surfaceCameraView = 'bottom';
         applyTerrainSurfaceView();
         const bottomTarget = new THREE.Vector3(0, mode === 'resource' ? -260 : -250, -70);
@@ -2633,7 +2670,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       terrainLayer.add(terrainOccluder);
       applyTerrainSurfaceView();
     };
-    addProceduralTerrain();
     let terrainResources: TangaTerrainResources | null = null;
     let surveyProfile: TerrainProfilePoint[] = [];
     let terrainProfileMarker: THREE.Mesh | null = null;
@@ -2641,10 +2677,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const applyTexturedTerrain = async (quality: AssetQuality) => {
       try {
         reportLoadState('loading', 'loading', quality, `Loading ${quality} terrain`);
-        const resources = await loadTangaTerrainResources(renderer, quality);
+        const [resources, sourceTexture] = await Promise.all([
+          loadTangaTerrainResources(),
+          mode === 'topography' ? Promise.resolve(null) : loadTerrainTexture(),
+        ]);
         if (cancelled) return null;
         terrainResources = resources;
-        if (mode === 'topography' && (!resources.surveyHeightData || !resources.surveyCoverageData || !resources.surveySlopeData)) {
+        if (mode === 'topography' && (!resources.surveyHeightData || !resources.surveyCoverageData)) {
           surveyProfile = [];
           setTerrainProfile([]);
         }
@@ -2674,8 +2713,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             surveyProfile = Array.from({length: 101}, (_unused, index) => {
               const column = Math.round(bestStart + (bestEnd - bestStart) * index / 100);
               const cell = bestRow * width + column;
-              const easting = minX + column / (width - 1) * (maxX - minX);
-              const northing = maxY - bestRow / (resources.meta.height - 1) * (maxY - minY);
+              const easting = minX + (column + 0.5) / width * (maxX - minX);
+              const northing = maxY - (bestRow + 0.5) / resources.meta.height * (maxY - minY);
               return {x: easting - PROJECT_UTM_CENTER.easting, north: northing - PROJECT_UTM_CENTER.northing, elevation: resources.surveyHeightData![cell]};
             });
             setTerrainProfile(surveyProfile.map((point) => point.elevation));
@@ -2689,7 +2728,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         terrainMeshes.length = 0;
         terrainOccluders.length = 0;
         terrainSurfaceMaterials.length = 0;
-        const terrainTexture = resources.texture.clone();
+        const terrainTexture = sourceTexture?.clone() ?? null;
+        if (terrainTexture) {
         terrainTexture.colorSpace = THREE.SRGBColorSpace;
         terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
         terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
@@ -2698,8 +2738,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         terrainTexture.magFilter = THREE.LinearFilter;
         terrainTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy?.() ?? 8, 16);
         terrainTexture.needsUpdate = true;
+        }
 
-const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terrainDisplay);
+        const geometryStartedAt = performance.now();
+        const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terrainDisplayRef.current);
+        host.dataset.terrainBuildMs = String(Math.round(performance.now() - geometryStartedAt));
+        host.dataset.terrainTriangles = String((terrainGeometry.index?.count ?? 0) / 3);
+        host.dataset.terrainGrid = `${resources.meta.context_grid?.width}×${resources.meta.context_grid?.height}`;
+        host.dataset.surveyReady = String(Boolean(resources.surveyHeightData && resources.surveyCoverageData));
         if (mode === 'mine_planning' && sitePlan) carvePit(terrainGeometry, sitePlan.pits);
         const texturedTerrain = new THREE.Mesh(
           terrainGeometry,
@@ -2721,6 +2767,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
             emissiveIntensity: 0.03,
             alphaTest: 0,
             side: THREE.DoubleSide,
+            forceSinglePass: true,
             vertexColors: mode === 'topography',
             depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
             depthTest: true,
@@ -2733,6 +2780,27 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         texturedTerrain.receiveShadow = true;
         texturedTerrain.renderOrder = 20;
         terrainLayer.add(texturedTerrain);
+        if (mode === 'topography') {
+          const updateDisplay = async (display: TerrainDisplay) => {
+            if (display === 'slope' && !resources.surveySlopeData) {
+              const response = await fetchAsset('/survey_slope_hires.bin?v=registered-grid-v2', {cache: 'force-cache'});
+              const buffer = await response.arrayBuffer();
+              if (buffer.byteLength !== resources.meta.width * resources.meta.height * 4) throw new Error('Slope grid dimensions do not match the terrain');
+              resources.surveySlopeData = new Float32Array(buffer);
+            }
+            if (cancelled || display !== terrainDisplayRef.current) return;
+            const next = createTexturedTerrainPatchGeometry(resources, mode, display);
+            const previous = texturedTerrain.geometry;
+            texturedTerrain.geometry = next;
+            previous.dispose();
+            host.dataset.terrainDisplay = display;
+          };
+          updateTerrainDisplayRef.current = display => void updateDisplay(display).catch(error => {
+            if (!cancelled) setStatus(error instanceof Error ? error.message : 'Terrain display unavailable');
+          });
+          host.dataset.terrainDisplay = 'elevation';
+          if (terrainDisplayRef.current === 'slope') updateTerrainDisplayRef.current('slope');
+        }
         if (mode === 'topography') {
           const coverageGeometry = createSurveyCoverageOutline(resources);
           if (coverageGeometry) {
@@ -2754,20 +2822,14 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           terrainProfileMarker.renderOrder = 42;
           terrainLayer.add(terrainProfileMarker);
         }
-        const texturedOccluder = new THREE.Mesh(
-          terrainGeometry.clone(),
-          new THREE.MeshBasicMaterial({ color: 0x000000, depthWrite: true, depthTest: true, colorWrite: false, side: THREE.DoubleSide })
-        );
-        texturedOccluder.renderOrder = 21;
         terrainMeshes.push(texturedTerrain);
-        terrainOccluders.push(texturedOccluder);
-        terrainLayer.add(texturedOccluder);
         applyTerrainSurfaceView();
         reportLoadState('loading', 'ready', quality, `${quality} terrain ready`);
         return resources;
-      } catch {
-        reportLoadState('degraded', 'degraded', quality, 'Procedural terrain fallback active');
-        return null;
+      } catch (error) {
+        // Do not put accurate drill traces over a fabricated or mismatched
+        // surface. The caller displays a recoverable load error instead.
+        throw error;
       }
     };
 
@@ -2784,6 +2846,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       scaleFrom = 0.94,
       yOffset = 0
     ) => {
+      // Fade registered objects in place. Scaling or lifting drill/model
+      // geometry breaks its agreement with the survey during the reveal.
+      scaleFrom = 1;
+      yOffset = 0;
       const materialStates = materialsForObject(object).map((material) => {
         const opacity = typeof material.opacity === 'number' ? material.opacity : 1;
         material.userData.deckBaseOpacity ??= opacity;
@@ -2815,7 +2881,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       // Download independent geology inputs while terrain initialises. Capture
       // failures immediately so an early rejection cannot become unhandled.
       const earlyGeology=mode==='subsurface'?fetchAsset('/geologicalModel.glb',{cache:'force-cache'}).catch(()=>null):null;
-      const earlyDrills=loadDrillholes().then(data=>({data,error:null}),error=>({data:null,error}));
+      const earlyDrills=mode==='topography'?Promise.resolve({data:[] as DrillSegment[],error:null}):loadDrillholes().then(data=>({data,error:null}),error=>({data:null,error}));
       setStatus('Drawing preview terrain surface');
       const resources = await applyTexturedTerrain(assetQuality);
       if (cancelled) return;
@@ -2897,6 +2963,29 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         registerReveal(boundaryGroup, 0.42, 1.2, 0.97);
       }
 
+      if (mode === 'topography') {
+        // Choose surveyed cells from the actual elevation surface. A ridge
+        // label cannot be attached to an invented, fixed-height coordinate.
+        const surveyed = resources?.surveyHeightData;
+        const coverage = resources?.surveyCoverageData;
+        if (resources && surveyed && coverage) {
+          let high = -1, middle = -1;
+          for (let i = 0; i < surveyed.length; i++) if (coverage[i]) {
+            if (high < 0 || surveyed[i] > surveyed[high]) high = i;
+            if (middle < 0 || Math.abs(surveyed[i] - 700) < Math.abs(surveyed[middle] - 700)) middle = i;
+          }
+          for (const [id, index] of [['terrain-ridges', high], ['terrain-drainage', middle]] as const) {
+            if (index < 0) continue;
+            const {bounds_utm: bounds, width, height} = resources.meta;
+            const x = bounds.minX + ((index % width) + .5) / width * (bounds.maxX - bounds.minX) - PROJECT_UTM_CENTER.easting;
+            const north = bounds.maxY - (Math.floor(index / width) + .5) / height * (bounds.maxY - bounds.minY) - PROJECT_UTM_CENTER.northing;
+            calloutAnchors.set(id, new THREE.Vector3(x, terrainSurfaceY(resources, x, north), -north));
+          }
+        }
+        setStatus('Measured survey terrain ready');
+        reportLoadState('ready', 'ready', resources?.quality ?? assetQuality, 'Measured survey terrain ready');
+        return;
+      }
       setStatus(mode === 'resource' ? `Loading ${resourceFocusLabel(resourceFocus).toLowerCase()} resource blocks` : mode === 'mine_planning' ? 'Loading pit shell and resource blocks' : mode === 'metallurgy' ? 'Loading drillhole intervals for metallurgy reveal' : 'Loading drillhole traces');
       reportLoadState('loading', resources ? 'ready' : 'degraded', resources?.quality ?? assetQuality, 'Loading drillholes and resource data');
       const [drillholes, blocks] = await Promise.all([
@@ -2928,7 +3017,6 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         let unitCount = 0;
         const modelBounds = new THREE.Box3();
         // Reuse the exact CRS converter instead of rebuilding it for every vertex.
-        const geologyProjection=proj4('EPSG:32737','WGS84');
         gltf.scene.updateMatrixWorld(true);
         gltf.scene.traverse(object => {
           if (!(object instanceof THREE.Mesh)) return;
@@ -2938,15 +3026,14 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           const positions = geometry.getAttribute('position');
           for (let i = 0; i < positions.count; i++) {
             // Blender export axes: UTM easting, elevation, negative northing.
-            const [lon, lat] = geologyProjection.forward([positions.getX(i), -positions.getZ(i)]);
-            positions.setXYZ(i,(lon-PROJECT_CENTER.lon)*METERS_PER_DEGREE_LON,(positions.getY(i)-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION,-(lat-PROJECT_CENTER.lat)*METERS_PER_DEGREE_LAT);
+            positions.setXYZ(i,positions.getX(i)-PROJECT_UTM_CENTER.easting,(positions.getY(i)-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION,positions.getZ(i)+PROJECT_UTM_CENTER.northing);
           }
           geometry.computeVertexNormals(); geometry.computeBoundingSphere(); geometry.computeBoundingBox();
           const isHost = object.name.includes('GRSC');
           const unitColor=isHost?0xc7551b:[0x648d9b,0xb6a57c,0x8b89ac,0x658e75,0xa37970,0x6f9caa,0x92947a][unitCount%7];
           const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
             color: unitColor, transparent: true,
-            opacity: isHost ? .9 : .16, depthWrite: isHost, side: THREE.DoubleSide, roughness: .72,
+            opacity: isHost ? .9 : .16, depthWrite: isHost, side: THREE.DoubleSide, forceSinglePass: true, roughness: .72,
           }));
           mesh.name = object.name;
           mesh.userData.tooltipItems=[{title:object.name.replace(/_/g,' '),rows:[isHost?'Interpreted graphitic-schist host unit.':'Interpreted surrounding rock unit.','Modelled contact geometry, not direct observations everywhere.'],tone:`#${mesh.material.color.getHexString()}`}];
@@ -2954,6 +3041,11 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           geologyMeshes.push(mesh);
           modelBounds.expandByObject(mesh);
           tagDeckLayer(mesh, 'blocks'); stage.add(mesh); unitCount++;
+          if (isHost) {
+            const vertex = geometry.index?.getX(Math.floor(geometry.index.count / 2)) ?? Math.floor(positions.count / 2);
+            calloutAnchors.set('cutaway', new THREE.Vector3().fromBufferAttribute(positions, vertex));
+            calloutObjects.set('cutaway', mesh);
+          }
         });
         host.dataset.geologyUnits = String(unitCount);
         host.dataset.geologyBounds = JSON.stringify({min:modelBounds.min.toArray(), max:modelBounds.max.toArray()});
@@ -2964,8 +3056,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         }
         const span = Math.max(extent.x, extent.z);
         cameraShot.target.copy(centre);
-        cameraShot.to.copy(centre).add(new THREE.Vector3(span*.7, span*.95, span*.95));
-        cameraShot.from.copy(centre).add(new THREE.Vector3(-span*.5, span*.85, span*.85));
+        cameraShot.to.copy(centre).add(new THREE.Vector3(span*.85, span*.4, span*.85));
+        cameraShot.from.copy(centre).add(new THREE.Vector3(-span*.65, span*.45, span*.8));
         cameraShot.mid.copy(cameraShot.from).lerp(cameraShot.to, .5);
         cameraShot.targetMid.copy(centre);
         cameraShot.drift.set(8, 3, 8);
@@ -3062,28 +3154,32 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           const holeSegments = segmentsByHole.get(intercept.holeId) ?? [];
           const host = holeSegments.find(
             (segment) => segment.depthFrom <= midDepth && segment.depthTo >= midDepth
-          ) ?? holeSegments[0];
+          );
           if (!host) return false;
 
           const start = registeredDrillPoint(host, 'from', terrainResources, drillSurfaceOffsets);
           const end = registeredDrillPoint(host, 'to', terrainResources, drillSurfaceOffsets);
-          calloutAnchors.set(callout.id, start.clone().lerp(end, 0.5));
+          const fraction = clamp((midDepth - host.depthFrom) / Math.max(.001, host.depthTo - host.depthFrom), 0, 1);
+          calloutAnchors.set(callout.id, start.clone().lerp(end, fraction));
           return true;
         })
         .map(({callout}) => callout);
 
       calloutsForProjection = [...storyCallouts, ...anchoredInterceptLabels];
       if (shownDrillholes.length) {
-        const highCarbonSegment = shownDrillholes.reduce((best, segment) => (
+        const bestIntercept = assayFacts?.best;
+        const midDepth = bestIntercept ? (bestIntercept.fromM + bestIntercept.toM) / 2 : null;
+        const matchingBest = bestIntercept && midDepth !== null ? drillholes.find(segment => segment.holeId === bestIntercept.holeId && segment.depthFrom <= midDepth && segment.depthTo >= midDepth) : null;
+        const highCarbonSegment = matchingBest ?? shownDrillholes.reduce((best, segment) => (
           segment.carbon > best.carbon ? segment : best
         ), shownDrillholes[0]);
         const highStart = registeredDrillPoint(highCarbonSegment, 'from', terrainResources, drillSurfaceOffsets);
         const highEnd = registeredDrillPoint(highCarbonSegment, 'to', terrainResources, drillSurfaceOffsets);
-        const assayAnchor = highStart.clone().add(highEnd).multiplyScalar(0.5);
-        calloutAnchors.set('assays', assayAnchor);
-        calloutAnchors.set('volume', assayAnchor.clone().lerp(new THREE.Vector3(0, -360, 0), 0.38));
+        const fraction = matchingBest && midDepth !== null ? clamp((midDepth - matchingBest.depthFrom) / Math.max(.001, matchingBest.depthTo - matchingBest.depthFrom), 0, 1) : .5;
+        const assayAnchor = highStart.clone().lerp(highEnd, fraction);
+        if (!bestIntercept || matchingBest) calloutAnchors.set('assays', assayAnchor);
+        calloutAnchors.set('volume', assayAnchor.clone());
       }
-      calloutAnchors.set('cutaway', new THREE.Vector3(-820, terrainSurfaceY(terrainResources, -820, -620, 22), 620));
       const tubeGeometry = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
       const traceMesh = new THREE.InstancedMesh(
         tubeGeometry,
@@ -3195,6 +3291,11 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         if (!current || segment.depthFrom < current.depthFrom) collarByHole.set(segment.holeId, segment);
       });
       const collarSegments = Array.from(collarByHole.values()).slice(0, mode === 'resource' ? 120 : 220);
+      const residuals = collarSegments.filter(segment => segment.depthFrom === 0).map(segment => {
+        const point = drillPointFromCoords(segment.from);
+        return point.y - terrainSurfaceY(terrainResources, point.x, -point.z);
+      });
+      host.dataset.drillSurfaceResidual = JSON.stringify({count: residuals.length, min: Math.min(...residuals), max: Math.max(...residuals)});
       const collarAnchorSegment = collarSegments[Math.floor(collarSegments.length * 0.46)] ?? collarSegments[0];
       if (collarAnchorSegment) {
         calloutAnchors.set('collars', collarSurfacePoint(collarAnchorSegment, terrainResources, 18));
@@ -3361,15 +3462,12 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         const focusOpacity = activeFocus === 'LowTGC' ? 0.84 : activeFocus === 'LowUncertainty' ? 0.88 : 0.94;
         const voxelScale = 1;
         if (sampled.length) {
-          const blockAnchor = sampled
-            .slice(0, Math.min(160, sampled.length))
-            .reduce((total, block) => total.add(new THREE.Vector3(
-              block.x,
-              resourceBlockCenterY(block, voxelScale, terrainResources),
-              block.z
-            )), new THREE.Vector3())
-            .multiplyScalar(1 / Math.min(160, sampled.length));
+          const representative = sampled[Math.floor(sampled.length / 2)];
+          const blockAnchor = new THREE.Vector3(representative.x, representative.y, representative.z);
           const gradeAnchorBlock = sampled.reduce((best, block) => block.carbon > best.carbon ? block : best, sampled[0]);
+          if (mode === 'resource') calloutsForProjection = calloutsForProjection.map(callout => callout.id === 'grade'
+            ? {...callout, label: `${gradeAnchorBlock.carbon.toFixed(2)}% TGC model cell`, detail: 'Highest displayed block grade · model estimate'}
+            : callout.id === 'blocks' ? {...callout, detail: `${sampled.length.toLocaleString()} displayed source cells`} : callout);
           calloutAnchors.set('blocks', blockAnchor);
           calloutAnchors.set('grade', new THREE.Vector3(
             gradeAnchorBlock.x,
@@ -3528,6 +3626,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
             tagDeckLayer(plant, 'context');
             stage.add(plant);
             processPlant=plant;
+            host.dataset.plantDetail = JSON.stringify({sourceMeshes:plant.userData.detailMeshCount,drawMeshes:plant.userData.batchedMeshCount,stages:plant.userData.processStages.length});
             processMarker=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshBasicMaterial({color:0xffb760}));plant.add(processMarker);
             const boundary:Point2[]=(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z];});
             const end:Point2=[x-CONCEPT.plantWidth/2-10,z+CONCEPT.plantDepth*.25];
@@ -3578,6 +3677,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
             cameraShot.targetMid.copy(cameraShot.target);
             cameraShot.drift.set(8, 3, 8);
             calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const}));
+            siteOverviewCallouts = calloutsForProjection;
             for(const label of calloutsForProjection)calloutAnchors.set(label.id,new THREE.Vector3(...label.anchor));
           }
         }
@@ -3606,7 +3706,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured) {
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.2, cameraShot.fov);
       }
-      const shouldUpgradeTerrain = !cancelled && (resources?.quality ?? assetQuality) === 'preview';
+        const shouldUpgradeTerrain = !cancelled && (resources?.quality ?? assetQuality) === 'preview';
       if (shouldUpgradeTerrain) {
         const upgrade = async () => {
           const upgradedResources = await applyTexturedTerrain('standard');
@@ -3631,13 +3731,21 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       }
     });
 
-    const onPointerMove = (event: PointerEvent) => {
+    let lastPickAt = -Infinity;
+    let pickTimer: ReturnType<typeof setTimeout> | undefined;
+    const pickAtPointer = (event: PointerEvent) => {
       if (!hostRef.current || !pickables.length) return;
+      if (event.buttons || interacting || performance.now() - lastInteractionAt < 180) {
+        setHoverTooltip(null);
+        return;
+      }
+      const now = performance.now();
+      if (now - lastPickAt < 100) return;
+      lastPickAt = now;
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      if(event.buttons){setHoverTooltip(null);return;}
       const visiblePickables=pickables.filter(object=>{for(let p:THREE.Object3D|null=object;p;p=p.parent)if(!p.visible)return false;return true;});
       const [hit] = raycaster.intersectObjects(visiblePickables, false).filter(hit=>{
         const material=(hit.object as THREE.Mesh).material;
@@ -3663,7 +3771,19 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       });
     };
 
+    const onPointerMove = (event: PointerEvent) => {
+      clearTimeout(pickTimer);
+      if (event.buttons || interacting) {
+        setHoverTooltip(null);
+        return;
+      }
+      // Only intersect the dense geology/instanced drills once the pointer
+      // settles. Continuous mouse movement must stay available to navigation.
+      pickTimer = setTimeout(() => pickAtPointer(event), 120);
+    };
+
     const onPointerLeave = () => {
+      clearTimeout(pickTimer);
       renderer.domElement.classList.remove('is-picking', 'is-interacting');
       setHoverTooltip(null);
     };
@@ -3671,24 +3791,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
-    // ── Bloom (VRIFY-style emissive glow) ────────────────────────────────────
-    // The high-grade assay drillholes, collars and block-model cells already
-    // carry strong emissive materials; a high-threshold UnrealBloom pass makes
-    // only those bright elements glow, leaving the terrain/imagery untouched.
-    // Kept cheap: threshold 0.82 (few pixels qualify), modest strength/radius,
-    // and OutputPass carries the ACES tonemapping + sRGB the direct render did.
-    const composer = new EffectComposer(renderer);
-    composer.setPixelRatio(renderer.getPixelRatio());
-    composer.setSize(host.clientWidth, host.clientHeight);
-    composer.addPass(new RenderPass(scene, camera));
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(host.clientWidth, host.clientHeight),
-      0.34, // strength — a soft halo, not a blob
-      0.4,  // radius — tight so glow hugs the source
-      0.92  // threshold — only the very brightest emissive cores bloom
-    );
-    composer.addPass(bloomPass);
-    composer.addPass(new OutputPass());
+    // Direct ACES render: preserve readable colours without a second scene
+    // pass plus full-screen bloom on every drag/zoom frame.
 
     const resize = () => {
       if (!hostRef.current) return;
@@ -3698,8 +3802,6 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       if(mode==='metallurgy')camera.setViewOffset(w,h,Math.min(200,w*.16),0,w,h);
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
-      composer.setSize(w, h);
-      bloomPass.setSize(w, h);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -3741,6 +3843,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           if(callout.kind==='intercept'||keyLabelsTaken>=2)return false;
           keyLabelsTaken++;return true;
         }
+        if(density==='key'&&callout.id.startsWith('plant-')) {
+          if(keyLabelsTaken>=3)return false;
+          keyLabelsTaken++;return true;
+        }
         if (callout.kind !== 'intercept') return true;
         if (interceptsTaken >= interceptBudget) return false;
         interceptsTaken += 1;
@@ -3751,8 +3857,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       const byId = new Map<string, {callout: ThreeCallout; anchorPixelX: number; anchorPixelY: number}>();
 
       visible.forEach((callout) => {
-        const anchorWorld = (calloutAnchors.get(callout.id) ?? new THREE.Vector3(...callout.anchor)).clone();
-        stage.localToWorld(anchorWorld);
+        const anchor = calloutAnchors.get(callout.id);
+        if (!anchor) return;
+        const anchorWorld = anchor.clone();
+        (calloutObjects.get(callout.id) ?? stage).localToWorld(anchorWorld);
         const projected = anchorWorld.project(camera);
         const rawAnchorX = (projected.x * 0.5 + 0.5) * width;
         const rawAnchorY = (-projected.y * 0.5 + 0.5) * height;
@@ -3761,16 +3869,16 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           !Number.isFinite(rawAnchorY) ||
           projected.z < -1 ||
           projected.z > 1 ||
-          rawAnchorX < -96 ||
-          rawAnchorX > width + 96 ||
-          rawAnchorY < -96 ||
-          rawAnchorY > height + 96
+          rawAnchorX < 0 ||
+          rawAnchorX > width ||
+          rawAnchorY < 0 ||
+          rawAnchorY > height
         ) {
           return;
         }
 
-        const anchorPixelX = clamp(rawAnchorX, 34, width - 34);
-        const anchorPixelY = clamp(rawAnchorY, 86, height - 44);
+        const anchorPixelX = rawAnchorX;
+        const anchorPixelY = rawAnchorY;
         const isIntercept = callout.kind === 'intercept';
         const size = isIntercept ? INTERCEPT_LABEL_SIZE : STORY_LABEL_SIZE;
 
@@ -3830,13 +3938,13 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       if (!width || !height) return;
 
       stage.updateMatrixWorld(true);
-      const baseLocal = controls.target.clone();
-      const baseWorld = baseLocal.clone();
-      const northWorld = baseLocal.clone().add(new THREE.Vector3(0, 0, -900));
-      const eastWorld = baseLocal.clone().add(new THREE.Vector3(1000, 0, 0));
-      stage.localToWorld(baseWorld);
-      stage.localToWorld(northWorld);
-      stage.localToWorld(eastWorld);
+      const baseWorld = controls.target.clone();
+      const sampleMeters = Math.max(1, Math.min(20, camera.position.distanceTo(controls.target) * .01));
+      const northDirection = new THREE.Vector3(0, 0, -1).transformDirection(stage.matrixWorld);
+      const groundNormal = new THREE.Vector3(0, 1, 0).transformDirection(stage.matrixWorld);
+      const screenRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).projectOnPlane(groundNormal).normalize();
+      const northWorld = baseWorld.clone().addScaledVector(northDirection, sampleMeters);
+      const eastWorld = baseWorld.clone().addScaledVector(screenRight, sampleMeters);
 
       const baseScreen = projectToScreen(baseWorld, width, height);
       const northScreen = projectToScreen(northWorld, width, height);
@@ -3857,16 +3965,16 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       let scaleDetail = DEFAULT_NAV_INSTRUMENT.scaleDetail;
 
       if (baseScreen && eastScreen) {
-        const pixelsPer1000m = Math.hypot(eastScreen.x - baseScreen.x, eastScreen.y - baseScreen.y);
-        const pixelsPerMeter = pixelsPer1000m / 1000;
+        const samplePixels = Math.hypot(eastScreen.x - baseScreen.x, eastScreen.y - baseScreen.y);
+        const pixelsPerMeter = samplePixels / sampleMeters;
         if (Number.isFinite(pixelsPerMeter) && pixelsPerMeter > 0.0001) {
           const targetMeters = 118 / pixelsPerMeter;
           const niceMeters = NICE_SCALE_METERS.reduce((best, value) => (
             Math.abs(value - targetMeters) < Math.abs(best - targetMeters) ? value : best
           ), NICE_SCALE_METERS[0]);
           scaleLabel = formatScaleMeters(niceMeters);
-          scaleWidth = clamp(niceMeters * pixelsPerMeter, 64, 158);
-          scaleDetail = `camera ${Math.round(camera.position.distanceTo(controls.target) / 10) * 10} m`;
+          scaleWidth = niceMeters * pixelsPerMeter;
+          scaleDetail = 'local scale at camera focus';
         }
       }
 
@@ -3898,10 +4006,10 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
 
     const animate = () => {
       if (cancelled) return;
-      if(document.hidden){lastMotionElapsed=clock.getElapsedTime();frame=requestAnimationFrame(animate);return;}
+      if(document.hidden){lastMotionElapsed=clock.getElapsedTime();lastQualityFrame=performance.now();frame=requestAnimationFrame(animate);return;}
       const elapsed = clock.getElapsedTime();
       const qualityNow=performance.now(),frameMs=qualityNow-lastQualityFrame;lastQualityFrame=qualityNow;
-      if(elapsed>8){const ratio=resolutionGovernor.sample(frameMs);if(ratio!==renderer.getPixelRatio()){renderer.setPixelRatio(ratio);composer.setPixelRatio(ratio);}const scale=ratio.toFixed(2);if(host.dataset.renderScale!==scale)host.dataset.renderScale=scale;}
+      if(elapsed>2){const baseRatio=resolutionGovernor.sample(frameMs);const ratio=interacting||performance.now()-lastInteractionAt<250?Math.min(.8,baseRatio):baseRatio;if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);const scale=ratio.toFixed(2);if(host.dataset.renderScale!==scale)host.dataset.renderScale=scale;}
       const detail=detailOptions.current;
       if(mode==='subsurface'){
         stage.updateMatrixWorld(true);
@@ -3986,6 +4094,13 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         }
       }
       controls.update();
+      if (userGestured) {
+        const orbitView: SurfaceCameraView = camera.position.y < controls.target.y ? 'bottom' : 'default';
+        if (surfaceCameraView !== orbitView) {
+          surfaceCameraView = orbitView;
+          applyTerrainSurfaceView();
+        }
+      }
       const driftYaw = 0; // Hold the registered scene after its authored move.
       let rotationTweenActive = false;
       if (rotationTween) {
@@ -4060,12 +4175,15 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       }
       if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.28:0;mesh.material.opacity=(mesh.name.includes('GRSC')?.9:.16)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
 
-      const projectionTick = Math.floor(elapsed * 10);
+      const projectionTick = Math.floor(elapsed * (interacting || cameraTween || (!userTookControl && flyProgress < 1) || performance.now() - lastInteractionAt < 500 ? 30 : 10));
       if (projectionTick !== lastProjectionTick) {
         lastProjectionTick = projectionTick;
         if(haulTrucks[0])host.dataset.truckPosition=haulTrucks[0].mesh.position.toArray().map(v=>v.toFixed(2)).join(',');
         host.dataset.cameraMoving = String(Boolean(cameraTween) || (!userTookControl && flyProgress < 1));
         host.dataset.cameraDistance = String(Math.round(camera.position.distanceTo(controls.target)));
+        host.dataset.frameMs = frameMs.toFixed(1);
+        host.dataset.cameraPosition = camera.position.toArray().map(value => value.toFixed(1)).join(',');
+        host.dataset.cameraTarget = controls.target.toArray().map(value => value.toFixed(1)).join(',');
         projectCallouts();
         updateNavInstruments();
       }
@@ -4077,14 +4195,14 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           -profilePoint.north
         );
       }
-      if(mode==='mine_planning'||renderer.getPixelRatio()<=1)renderer.render(scene,camera);
-      else composer.render();
+      renderer.render(scene,camera);
       frame = requestAnimationFrame(animate);
     };
     animate();
 
     return () => {
       cancelled = true;
+      updateTerrainDisplayRef.current = null;
       gradeFocusMaterialsRef.current=[];
       displayReveal.reset();revealCommand.current=null;
       journeyCommand.current=null;journeyUpdate=null;
@@ -4093,14 +4211,16 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
       projectCalloutsRef.current = null;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      clearTimeout(pickTimer);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
       controls.removeEventListener('start', onControlStart);
       controls.removeEventListener('end', onControlEnd);
       controls.dispose();
-      composer.dispose();
+      environmentTexture.dispose();
       disposeObject(scene);
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
       controlsRef.current = null;
       groupRef.current = null;
@@ -4108,7 +4228,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         cameraCommandHandlerRef.current = null;
       }
     };
-  }, [assetQuality, cameraDropKey, mode, onLoadState, resourceFocus, terrainDisplay, visible]);
+  }, [assetQuality, cameraDropKey, mode, onLoadState, resourceFocus, visible]);
 
   // Apply the legend cross-highlight: fade every grade block that isn't the
   // hovered TGC grade back, so the hovered population stands alone in the model.
@@ -4195,7 +4315,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           : 'Drillhole volume';
 
   return (
-    <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`)} aria-hidden={!visible}>
+    <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
       {!sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
       {(/failed|unavailable|exceeded|could not|no contained/i.test(status)) && (
@@ -4235,7 +4355,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           rather than describing the rendering, which is the reason the layer
           was worth hiding on these scenes before. Density is governed by
           `labelDensity` — at the "off" tier the projection yields no items. */}
-      {visible && (!minimalViewerChrome || hasProjectedCallouts) && !(mode==='mine_planning'&&miningBeat===0&&focusedSource) && (
+      {visible && hasProjectedCallouts && !(mode==='mine_planning'&&miningBeat===0&&focusedSource) && (
         <section className="tanga-three__callout-layer" aria-label="Geology callouts">
           {hasProjectedCallouts && (
             <svg className="tanga-three__leader-svg" viewBox={`0 0 ${projectedFrame.width} ${projectedFrame.height}`} aria-hidden="true">
@@ -4319,6 +4439,18 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
             <small>{navInstrument.scaleDetail}</small>
           </div>
         </div>
+        <div className="tanga-three__camera-tools" role="group" aria-label="3D camera controls">
+          <button type="button" disabled={!sceneReady} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            cameraCommandHandlerRef.current?.({id: Date.now(), action: mode === 'topography' ? 'terrainProfile' : 'bottomView'});
+          }}>{mode === 'topography' ? 'Oblique view' : 'Below ground'}</button>
+          <button type="button" disabled={!sceneReady} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            cameraCommandHandlerRef.current?.({id: Date.now(), action: 'resetView'});
+          }}>Reset view</button>
+          <small>Drag to orbit · Shift + drag to pan · scroll to zoom</small>
+          {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{inspectionOpen ? 'Close inspection tools' : 'Inspection tools'}</button>}
+        </div>
         {mode==='resource'&&<details className="tanga-three-animation-tools"><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
           <>
@@ -4365,7 +4497,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
           <div className="tanga-three__terrain-tools" aria-label="Survey terrain tools">
             <div className="tanga-three__terrain-tools-head">
               <span>Survey surface · August 2025</span>
-              <small>DTM source 0.66 m · mesh ≈7.4 m · 1× vertical</small>
+              <small>DTM source 0.66 m · display mesh ≈20 m · 1× vertical</small>
             </div>
             <div className="tanga-three__terrain-switch" role="group" aria-label="Terrain display">
               <button type="button" aria-pressed={terrainDisplay === 'elevation'} onClick={() => setTerrainDisplay('elevation')}>Elevation</button>
@@ -4410,9 +4542,11 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on':'Solid pit view'}</button>
         <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
         <details><summary>Explore processing equipment</summary>
+          <button onClick={()=>{setPlantCutaway(true);setPlantProcess('all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>Inspect whole processing plant</button>
+          <div className="tanga-mine-story__steps">{[['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product silos']].map(([id,label])=><button key={id} onClick={()=>{setPlantCutaway(true);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:id});}}>{label}</button>)}</div>
           <button aria-pressed={plantCutaway} onClick={()=>{setPlantCutaway(v=>!v);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>{plantCutaway?'Restore plant roofs':'Cut away plant roofs'}</button>
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
-          <small>Full-size site coordinates; conceptual equipment and retaining platform, not an engineered facility.</small>
+          <small>Six connected process areas in site coordinates. Illustrative equipment and retaining platform; an engineered plant design is not supplied.</small>
         </details>
         <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Haul routes unavailable — animation withheld'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
@@ -4443,7 +4577,8 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
         <footer>TC = total carbon in concentrate; TGC = total graphitic carbon in feed/model. Feed assay and complete impurity/sieve tables are not connected here.<br/>Source: existing project-deck summaries (metallurgy and product_quality); original laboratory report verification pending.</footer>
       </section>}
       {mode === 'resource' && (
-        <div className="tanga-three__grade-legend" aria-label="TGC grade legend">
+        <details className="tanga-three__grade-legend" aria-label="TGC grade legend">
+          <summary>Read the grade colours · % TGC</summary>
           <div className="tanga-three__grade-head">
             <span>TGC Grade</span>
             <strong>{resourceFocusLabel(resourceFocus)} view</strong>
@@ -4476,7 +4611,7 @@ const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terr
               </li>
             ))}
           </ol>
-        </div>
+        </details>
       )}
     </section>
   );

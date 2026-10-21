@@ -4,6 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+await import('./verify-terrain-assets.mjs');
 const maxStaticAssetBytes = 25 * 1024 * 1024;
 const requiredR2Assets = new Set([
   'height.bin',
