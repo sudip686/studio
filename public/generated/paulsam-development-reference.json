@@ -1,0 +1,121 @@
+{
+  "source": "PaulSam Geo-Engineering, June 2023",
+  "sourceImageSha256": "f4c38575c91a28ea9b1fb6c46b4a621d17636bbac18e0e469abf64dd5aab6e4f",
+  "locator": "Figure 3.3 / PDF p.33; Tables 3.2, 3.3 and 5.5",
+  "crs": "EPSG:32737",
+  "registration": "Approximate image-grid tracing; not surveyed facility coordinates",
+  "calibration": {
+    "imageSize": [
+      1301,
+      1289
+    ],
+    "eastingTicks": [
+      [
+        261,
+        475000
+      ],
+      [
+        903,
+        480000
+      ]
+    ],
+    "northingTicks": [
+      [
+        508,
+        9470000
+      ],
+      [
+        993,
+        9465000
+      ]
+    ],
+    "roundingM": 25
+  },
+  "selectedSite": 2,
+  "selectionBasis": "Section 5.3.4 uses site 2 for its planning cost assumption; not a final site decision",
+  "sites": [
+    {
+      "id": 1,
+      "feedPixel": [
+        626,
+        685
+      ],
+      "dischargePixel": [
+        795,
+        752
+      ],
+      "reportedLengthM": 1570,
+      "reportedInclinationDeg": 30,
+      "feedUtm": [
+        477850,
+        9468175
+      ],
+      "dischargeUtm": [
+        479150,
+        9467475
+      ],
+      "tracedStraightLineM": 1476
+    },
+    {
+      "id": 2,
+      "feedPixel": [
+        438,
+        906
+      ],
+      "dischargePixel": [
+        574,
+        1120
+      ],
+      "reportedLengthM": 2150,
+      "reportedInclinationDeg": 24,
+      "feedUtm": [
+        476375,
+        9465900
+      ],
+      "dischargeUtm": [
+        477450,
+        9463700
+      ],
+      "tracedStraightLineM": 2449
+    },
+    {
+      "id": 3,
+      "feedPixel": [
+        729,
+        253
+      ],
+      "dischargePixel": [
+        909,
+        195
+      ],
+      "reportedLengthM": 1490,
+      "reportedInclinationDeg": 19,
+      "feedUtm": [
+        478650,
+        9472625
+      ],
+      "dischargeUtm": [
+        480050,
+        9473225
+      ],
+      "tracedStraightLineM": 1523
+    }
+  ],
+  "reportAllowances": {
+    "feedPointAreaM2": 15000,
+    "feedPointBuiltAreaM2": 1500,
+    "processingLandDimensionsM": [
+      250,
+      250
+    ],
+    "processingLevelledAreaM2": 20000,
+    "processingStorageOfficesM2": 7500,
+    "stuffingSiteAreaM2": 50000
+  },
+  "limits": [
+    "Facility footprints, equipment sizes and service locations are illustrative.",
+    "Image line lengths do not reproduce reported alignment estimates; candidate 2 traces approximately 2.45 km versus 2.15 km in the table. Reconcile before engineering.",
+    "No mine-to-feed road, tailings storage design, land rights or utility connections are established.",
+    "The report flags forest-reserve overlap; original boundaries and permissions require verification."
+  ]
+}

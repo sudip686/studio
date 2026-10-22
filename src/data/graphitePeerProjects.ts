@@ -216,7 +216,7 @@ export const TANGA_INSERT_PROJECT: GraphitePeerProject = {
   baselineRank: 0,
   project: 'Tanga Graphite',
   country: 'Tanzania',
-  company: 'Sakariya / local MRE',
+  company: 'Sakariya Mines & Minerals',
   owner: 'Sakariya Mines & Minerals',
   listing: 'Private / unlisted',
   status: 'MRE revealed in model',

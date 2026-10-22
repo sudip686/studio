@@ -14,18 +14,18 @@ export const BASKET_POSITIONS=MET_SAMPLES.map((_,i)=>[45+(i%3)*11, -9+Math.floor
 /** Laboratory testwork exhibit: illustrative instruments, not a production plant or lab protocol. */
 export function createMetallurgyPlant(){
   const root=new THREE.Group(),pickables:THREE.Mesh[]=[],rotors:THREE.Object3D[]=[],bubbles:THREE.Mesh[]=[],flows:{mesh:THREE.Mesh;path:THREE.Vector3[];offset:number}[]=[],bins:THREE.Mesh[]=[];
-  const steel=new THREE.MeshStandardMaterial({color:0x748d99,metalness:.65,roughness:.35});
-  const dark=new THREE.MeshStandardMaterial({color:0x233742,metalness:.6,roughness:.42});
+  const steel=new THREE.MeshStandardMaterial({color:0xb6c1c6,metalness:.65,roughness:.32});
+  const dark=new THREE.MeshStandardMaterial({color:0x35434b,metalness:.3,roughness:.5});
   const copper=new THREE.MeshStandardMaterial({color:0xc86d32,metalness:.55,roughness:.38});
   const teal=new THREE.MeshStandardMaterial({color:0x4aafaa,metalness:.4,roughness:.25});
-  const rock=new THREE.MeshStandardMaterial({color:0x343c42,metalness:.6,roughness:.6});
-  const glass=new THREE.MeshStandardMaterial({color:0xb6e4e8,transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide,roughness:.12});
+  const rock=new THREE.MeshStandardMaterial({color:0x465057,metalness:0,roughness:1});
+  const glass=new THREE.MeshStandardMaterial({color:0xd5edf2,transparent:true,opacity:.22,depthWrite:false,side:THREE.DoubleSide,roughness:.12});
   const white=new THREE.MeshStandardMaterial({color:0xe0e4df,roughness:.45,metalness:.1});
   function add(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,stage:number){const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.stage=stage;root.add(mesh);pickables.push(mesh);return mesh;}
   const box=(x:number,y:number,z:number,w:number,h:number,d:number,m:THREE.Material,s:number)=>add(new THREE.BoxGeometry(w,h,d),m,x,y,z,s);
   const cyl=(x:number,y:number,z:number,r:number,h:number,m:THREE.Material,s:number)=>add(new THREE.CylinderGeometry(r,r,h,32),m,x,y,z,s);
   function pipe(points:number[][],material:THREE.Material,stage:number,r=.3){return add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)),false,'catmullrom',0),32,r,6,false),material,0,0,0,stage);}
-  function stream(points:number[][],material:THREE.Material,stage:number,count=14){const path=points.map(p=>new THREE.Vector3(...p));for(let i=0;i<count;i++){const mesh=add(new THREE.IcosahedronGeometry(.42,0),material,0,0,0,stage);flows.push({mesh,path,offset:i/count});}}
+  function stream(points:number[][],material:THREE.Material,stage:number,count=14){const path=points.map(p=>new THREE.Vector3(...p));for(let i=0;i<count;i++){const mesh=add(new THREE.IcosahedronGeometry(.42,0),material,0,0,0,stage);mesh.userData.transfer=true;flows.push({mesh,path,offset:i/count});}}
   // Laboratory workbench, drawers and a shallow rock-sample tray.
   const base=box(6,-1,0,134,2,42,white,0);base.userData.stage=-1;
   for(const x of [-47,-23,1,25,49]){box(x,-7,0,19,10,26,dark,0).userData.stage=-1;for(const y of [-4,-7,-10]){box(x,y,13.1,17,2.4,.25,white,0).userData.stage=-1;box(x,y,13.4,5,.2,.2,steel,0).userData.stage=-1;}}
@@ -44,6 +44,11 @@ export function createMetallurgyPlant(){
     for(let i=0;i<10;i++){const b=add(new THREE.SphereGeometry(.16+i%3*.06,8,6),teal,x+Math.sin(i*2.4)*2,6,Math.cos(i*2.4)*2,2);b.userData.baseX=x;b.userData.phase=i/10;bubbles.push(b);}
   }
   stream([[-12,6,0],[-5,7,0],[2,7,0],[9,7,0],[19,7,0]],teal,2);
+  for(const x of [-5,2,9]){
+    for(let i=0;i<6;i++)box(x,9.6+i*.3,0,2.25,.12,2.25,dark,2);
+    for(const z of [-3,3])for(const side of [-1,1])cyl(x+side*2,.1,z,.35,.4,dark,2);
+    cyl(x,11.8,0,.55,.5,steel,2);
+  }
   // Filter flask / funnel, vacuum line and a small bench drying oven.
   add(new THREE.CylinderGeometry(1.2,3.5,6,24),glass,20,3.5,0,3);
   cyl(20,7,0,.7,2,glass,3);add(new THREE.CylinderGeometry(3.5,.7,3,24,1,true),white,20,9.5,0,3);
@@ -67,7 +72,7 @@ export function createMetallurgyPlant(){
   cyl(7,2.5,-11,2.5,5,glass,2);pipe([[2,4,0],[2,3,-11],[7,3,-11]],teal,2,.15);
   function update(t:number){
     t=Number.isFinite(t)?Math.max(0,t):0;
-    rotors.forEach((r,i)=>{if(i===0)r.rotation.y=t*.6;else r.rotation.y=t*(i===4?.18:.7);});
+    rotors.forEach((r,i)=>{if(i===0){r.rotation.set(0,0,Math.PI/2);r.rotateY(t*.6);}else r.rotation.y=t*(i===4?.18:.7);});
     bubbles.forEach((b,i)=>{b.position.y=5.8+((t*.24+b.userData.phase)%1)*3;b.scale.setScalar(.6+((t*.24+i/10)%1)*.7);});
     for(const f of flows){if(f.path.length<2)continue;const v=((t*.12+f.offset)%1)*(f.path.length-1),i=Math.min(f.path.length-2,Math.max(0,Math.floor(v)));f.mesh.position.copy(f.path[i]).lerp(f.path[i+1],v-i);f.mesh.rotation.set(t,f.offset*6,t*.4);}
     bins.forEach(b=>{b.position.y=2.5+.06*Math.sin(t);});

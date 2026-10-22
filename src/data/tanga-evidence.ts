@@ -30,12 +30,15 @@ export const CHAPTER_SOURCES: Record<TangaChapterId, EvidenceSource[]> = {
     {title: 'Derived slope display', locator: 'Computed from DTM elevations and source pixel spacing · degrees', qualification: 'The supplied SLOPE.tif is not displayed because its numeric units are not documented.'},
   ],
   accessibility: [
+    {title:'PaulSam transportation and logistics study',locator:'June 2023 · Figure 3.5 / PDF p.36; §§3.3, 5.3 and 6',qualification:'Historical proposed transfer chain and candidate stuffing locations. No surveyed CFS parcel, approved alignment, current road capacity or commercial logistics agreement is established.'},
     {title: 'Road and infrastructure context', locator: 'OpenStreetMap features and routed path', qualification: 'Indicative geography and route distance do not establish access rights, infrastructure capacity, or a project connection.'},
   ],
   drillholes: [
     {title: 'AMC Tanga Graphite Mineral Resource Estimate', locator: 'Final report · 19 December 2025 · drilling §3.2; Figure 3.9', qualification: 'The core photograph is report evidence and is not asserted to be the selected 3D hole.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
   ],
   subsurface: [
+      {title:'Tanga project geological map', locator:'Existing project asset · original coordinate grid and lithology legend', qualification:'Original sheet plus derived transparent rock polygons. Printed UTM grid provides approximate registration; map datum, source date and contacts require independent verification. Soil is omitted; no image contacts are extruded into the existing model.', href:'/geology_map.jpg'},
+      {title:'AMC MRE · Regional geological map', locator:'19 December 2025 · Figure 2.1 · PDF p.18 / report p.8 · after Geological Survey of Tanzania, 2015', qualification:'Regional Tanzania context at 1:10,000,000; not the detailed project map or a source for extruded 3D contacts.', href:'/presentation-assets/mre-regional-geology.jpg'},
     {title: 'Merged petrography report · Tanga Graphite Project', locator: 'Sample crosswalk: TGF002 / TGDD1009 / 18.25–18.38 m; assay ID TD0058', qualification: 'A traceable sample record. The 3D geological surfaces remain interpreted between observation points.'},
     {title: 'Photomicrograph', locator: 'TGF002 · TGDD1009 · 18.25–18.38 m', qualification: 'Source micrograph reproduced without adding a scale or changing its interpretation.', href: '/presentation-assets/petrography-tgdd1009-18m.jpg'},
   ],
@@ -43,9 +46,12 @@ export const CHAPTER_SOURCES: Record<TangaChapterId, EvidenceSource[]> = {
     {title: 'AMC Tanga Graphite Mineral Resource Estimate', locator: 'Final report · effective date 1 November 2025 · final 19 December 2025 · Table I', qualification: 'Published report values and classification; app block counts or display filters are not a new resource statement.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
   ],
   mine_planning: [
+    {title:'Illustrative waste and water facilities',locator:'Procedural concept geometry screened against displayed terrain and current facility / pit footprints',qualification:'No source facility design or approved location is supplied. Dimensions are illustrative, not storage capacity or a hydrological / stability result. Lowland ground uses regional terrain context. Water connections are concept pipes, not validated routes.'},
+    {title:'PaulSam transportation and logistics study',locator:'June 2023 · Figure 3.3 / PDF p.33; Tables 3.3, 5.3 and 5.5',qualification:'Feed point and lowland discharge digitised approximately from the UTM 37S map. Option 2 is a planning assumption, not a final site selection. Facility geometry is illustrative.',href:'/presentation-assets/paulsam-conveyor-sites.jpg'},
     {title: 'Internal concept geometry', locator: 'Existing block-model coordinates and provisional project boundary', qualification: 'Presentation concept only; not an optimised mine design, reserve, schedule, cost estimate, or permitted facility.'},
   ],
   metallurgy: [
+    {title:'Global Sustainable Eco-Solutions · Graphite report for SMMPL',locator:'12 April 2025 · PDF pp.2, 15–16, 25, 46, 169–172',qualification:'120 samples received, 40 selected for characterisation, 23 for thin sections. Microscopy and spectroscopy do not establish commercial product or battery qualification.'},
     {title: 'IMO flotation testwork report', locator: 'Final report Rev. 0 · December 2025', qualification: 'Reported laboratory results; do not infer product qualification or commercial performance.', href: '/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf'},
     {title: 'AMC Mineral Resource Estimate', locator: 'Final report · Table II · flake and concentrate summaries', qualification: 'Composite results vary; carbon grade, recovery and flake fraction are distinct measures.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
   ],
@@ -84,9 +90,9 @@ export const WORK_MILESTONES = [
   },
   {
     id: 'testwork',
-    date: 'December 2025',
-    title: 'Flotation testwork',
-    detail: 'A final Rev. 0 testwork report records results across optimisation and variability composites.',
+    date: 'April–December 2025',
+    title: 'Characterisation & flotation',
+    detail: 'The April characterisation report and December flotation report document complementary sample and processing evidence.',
     image: '/presentation-assets/metallurgy-samples.jpg',
     imageAlt: 'Photographs of project metallurgy testwork samples',
     source: 'IMO Flotation Testwork · Final Report Rev. 0',

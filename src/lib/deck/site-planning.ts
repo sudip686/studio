@@ -3,7 +3,7 @@ export type Point2 = [number, number];
 export type PlanningBlock = {x: number; y: number; z: number; dx: number; dy: number; dz: number; carbon: number};
 export type CandidatePit = {ring: Point2[]; centre: Point2; surface: number; floor: number; depth: number; support: number};
 export type SitePlan = {pits: CandidatePit[]; plant: Point2 | null; rejected: number; audit: string[]};
-export const CONCEPT = {threshold: 3, cell: 25, bench: 10, berm: 6.36, batterDegrees: 70, plantWidth: 960, plantDepth: 672};
+export const CONCEPT = {threshold: 3, cell: 25, bench: 10, berm: 6.36, batterDegrees: 70, plantWidth: 200, plantDepth: 140};
 const cross = (a: Point2, b: Point2, c: Point2) => (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
 export function inside(p: Point2, ring: Point2[]) {
   let hit = false;

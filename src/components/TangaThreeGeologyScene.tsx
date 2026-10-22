@@ -1,5 +1,7 @@
 'use client';
 
+import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
+
 import {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
@@ -7,10 +9,15 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import proj4 from 'proj4';
 import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit} from '@/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
+import {buildGeologySurface,type GeologySurfaceData} from '@/lib/deck/geology-surface';
+import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
+import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
+import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import MetallurgyVisualStory from './MetallurgyProcessExhibit';
+import {modelRockUnit} from '@/lib/deck/geology-palette';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import GeologyCrossSections from './GeologyCrossSections';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
@@ -18,7 +25,6 @@ import {assetUrl} from '@/lib/asset-url';
 import {createSceneReveal,type RevealAction} from '@/lib/deck/scene-reveal';
 import {sectionWorld,type SectionSource,type SectionDefinition} from '@/lib/deck/cross-section';
 import {cameraEase,createResolutionGovernor} from '@/lib/deck/presentation-motion';
-import {LITHOLOGY_COLOR_MAP} from '@/lib/boreholes/colors';
 import {
   bestPerHole,
   computeIntercepts,
@@ -146,6 +152,8 @@ const CHROME_SELECTORS = [
   '.tanga-deck__planning-note',
   '.tanga-deck__notes',
   '.tanga-three__metallurgy',
+  '.tanga-surface-control',
+  '.tanga-geology-surface-legend',
   '.tanga-mine-story',
   '.tanga-geology-section',
   '.tanga-cross-launch',
@@ -168,6 +176,7 @@ const CHROME_SELECTORS = [
   '.tanga-deck__data-panel',
   '.tanga-story-panel',
   '.tanga-story-cue',
+  '.tanga-evidence-sequence',
   '.tanga-deck__insight-panel',
   '.tanga-deck__ranking',
   '.tanga-three__grade-legend',
@@ -223,7 +232,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'resetView' | 'terrainProfile' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
   stage?: string;
 };
@@ -243,6 +252,8 @@ type TangaThreeGeologySceneProps = {
   labelDensity?: LabelDensity;
   layerSettings?: DeckLayerSettings;
   inspectionMode?: boolean;
+  onInspectEvidence?: () => void;
+  onSiteFacilities?: (ids:string[])=>void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
@@ -417,21 +428,6 @@ type TangaTerrainResources = {
 };
 type TerrainDisplay = 'elevation' | 'slope';
 type TerrainProfilePoint = {x: number; north: number; elevation: number};
-
-const TGC_GRADE_BINS = [
-  {key: 'very-high', label: 'Very high', range: '>=8% TGC', detail: 'highest grade blocks', min: 8, color: '#ef4444'},
-  {key: 'high', label: 'High', range: '6-8% TGC', detail: 'priority graphite zone', min: 6, color: '#f97316'},
-  {key: 'medium', label: 'Medium', range: '4-6% TGC', detail: 'continuous mineralisation', min: 4, color: '#facc15'},
-  {key: 'low', label: 'Low', range: '1-4% TGC', detail: 'lower grade halo', min: 1, color: '#2dd4bf'},
-  {key: 'trace', label: 'Trace', range: '<1% TGC', detail: 'background / dilution', min: 0, color: '#7dd3fc'},
-] as const;
-
-const ASSAY_INTERVAL_BINS = [
-  {key: 'very-high', label: '>8% TGC', detail: 'very high graphite interval', min: 8, color: '#9d00ff'},
-  {key: 'high', label: '6-8% TGC', detail: 'high-grade interval', min: 6, color: '#ff1616'},
-  {key: 'medium', label: '3-6% TGC', detail: 'mineralised interval', min: 3, color: '#ff9f0a'},
-  {key: 'low', label: '1-3% TGC', detail: 'lower-grade halo', min: 1, color: '#fff200'},
-] as const;
 
 const THREE_STORY_FLOW = [
   {mode: 'drillholes', label: 'Collars', detail: 'on surface'},
@@ -742,10 +738,6 @@ function tgcGradeBin(value: number) {
   return TGC_GRADE_BINS.find((bin) => value >= bin.min) ?? TGC_GRADE_BINS[TGC_GRADE_BINS.length - 1];
 }
 
-function lithologyColor(value: string) {
-  return new THREE.Color(LITHOLOGY_COLOR_MAP[value] ?? LITHOLOGY_COLOR_MAP.UNKNOWN ?? '#cccccc');
-}
-
 function lithologyLabel(value: string) {
   return value && value !== 'nan' ? value : 'Unknown lithology';
 }
@@ -852,7 +844,7 @@ function terrainOpacityForView(mode: GeologyMode, view: SurfaceCameraView) {
   // The default three-quarter view, where most of the deck is presented.
   if (mode === 'subsurface') return 0.28;
   if (mode === 'drillholes') return 0.42;
-  if (mode === 'resource') return 0.62;
+  if (mode === 'resource') return 0.32;
 if (mode === 'mine_planning') return 1;
   return 1;
 }
@@ -1219,7 +1211,7 @@ function threeCallouts(
       {
         id: 'cutaway',
         label: 'Interpreted geology',
-        detail: 'Seven supplied units · copper highlights graphitic schist',
+        detail: 'Seven supplied units · colours correspond to source map',
         x: 40, y: 31, tone: '#7dd3fc', anchor: [-780, 36, -650], side: 'right', kind: 'story',
       },
       {
@@ -1290,7 +1282,7 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
   if (mode === 'subsurface') {
     return [
       {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff', binKey: 'very-high'},
-      {label: 'GRSC interpretation', detail: 'Copper graphitic-schist unit', tone: '#c7551b'},
+      {label: 'GRSC interpretation', detail: 'Pale-grey graphitic-schist unit', tone: '#d8d8e1'},
       {label: 'Collars', detail: 'One collar per drillhole on surface', tone: '#eaffff'},
     ];
   }
@@ -1700,6 +1692,8 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
   const uvs: number[] = [];
   const colors: number[] = [];
   const indices: number[] = [];
+  const surveyedVertices:boolean[]=[];
+  let omittedSourceSeamTriangles=0;
 
   for (let row = 0; row <= segmentsY; row += 1) {
     const planeY = (row / segmentsY - 0.5) * depth;
@@ -1708,6 +1702,7 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
       const verticalScale = mode === 'topography' ? 1 : VERTICAL_EXAGGERATION;
       const sample = sampleTerrainAtLocal(resources, x, planeY, 0, verticalScale);
       positions.push(x, sample.y, -planeY);
+      surveyedVertices.push(Boolean(sample.surveyed));
       uvs.push(sample.u, sample.v);
       if (mode === 'topography') {
         if (!sample.surveyed) {
@@ -1759,7 +1754,12 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
       const b = vertexIndex(column + 1, row);
       const c = vertexIndex(column + 1, row + 1);
       const d = vertexIndex(column, row + 1);
-      indices.push(a, b, d, b, c, d);
+      // Different elevation sources have no verified common vertical datum.
+      // Never invent a steep wall by bridging their coverage edge.
+      if(surveyedVertices[a]===surveyedVertices[b]&&surveyedVertices[b]===surveyedVertices[d])indices.push(a,b,d);
+      else omittedSourceSeamTriangles++;
+      if(surveyedVertices[b]===surveyedVertices[c]&&surveyedVertices[c]===surveyedVertices[d])indices.push(b,c,d);
+      else omittedSourceSeamTriangles++;
     }
   }
 
@@ -1768,6 +1768,7 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   if (mode === 'topography') geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
+  geometry.userData.omittedSourceSeamTriangles=omittedSourceSeamTriangles;
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -1958,10 +1959,13 @@ export default function TangaThreeGeologyScene({
   labelDensity = 'key',
   layerSettings = DEFAULT_LAYER_SETTINGS,
   inspectionMode = false,
+  onInspectEvidence,
+  onSiteFacilities,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [inspectionOpen, setInspectionOpen] = useState(false);
+  const inspectionActiveRef=useRef(false);inspectionActiveRef.current=inspectionMode||inspectionOpen;
   useEffect(() => setInspectionOpen(false), [mode]);
   const controlsRef = useRef<OrbitControls | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
@@ -1994,6 +1998,12 @@ export default function TangaThreeGeologyScene({
   const [spotlight,setSpotlight]=useState('');
   const spotlightRef=useRef('');spotlightRef.current=spotlight;
   const [journeyHoles,setJourneyHoles]=useState<string[]>([]),[journeyHole,setJourneyHole]=useState(''),[journeyReadout,setJourneyReadout]=useState('');
+  const resetSurfaceRef=useRef<(()=>void)|null>(null);
+  const [surfaceOpacity, setSurfaceOpacity] = useState<number|null>(null);
+  const [authoredSurfaceOpacity,setAuthoredSurfaceOpacity]=useState(1);
+  useEffect(()=>{if(surfaceOpacity===null)resetSurfaceRef.current?.();},[surfaceOpacity]);
+  const surfaceOpacityRef=useRef<number|null>(null);surfaceOpacityRef.current=surfaceOpacity;
+  useEffect(()=>{setSurfaceOpacity(null);},[mode]);
   const [terrainDisplay, setTerrainDisplay] = useState<TerrainDisplay>('elevation');
   const terrainDisplayRef = useRef(terrainDisplay);
   terrainDisplayRef.current = terrainDisplay;
@@ -2014,8 +2024,8 @@ export default function TangaThreeGeologyScene({
   const [evidenceHoleIds,setEvidenceHoleIds]=useState<string[]>([]);
   const [focusedSource,setFocusedSource]=useState<string|null>(null);
   const evidenceFocusRef=useRef<((holeId:string)=>void)|null>(null);
-  const [miningBeat,setMiningBeat]=useState(0);
-  const [storyPlaying,setStoryPlaying]=useState(true);
+  const [miningBeat,setMiningBeat]=useState(3);
+  const [storyPlaying,setStoryPlaying]=useState(false);
   const [storyReplay,setStoryReplay]=useState(0);
   const [evidenceVisible,setEvidenceVisible]=useState(true);
   const miningStoryOptions=useRef({beat:0,playing:true,replay:0,holes:true});
@@ -2069,6 +2079,7 @@ export default function TangaThreeGeologyScene({
     if (!visible || !hostRef.current) return;
 
     let cancelled = false;
+    consumedCameraCommandIdRef.current=0;
     const sceneStartedAt = performance.now();
     const reportLoadState = (
       sceneState: SceneLoadState,
@@ -2111,10 +2122,13 @@ export default function TangaThreeGeologyScene({
     // makes a subsurface view read as a deposit rather than as floating shapes.
     // Left transparent (background = null) would show the page's black through,
     // which is what flattened the scene before.
-    scene.background = new THREE.Color(SKY_COLOR);
+    const subsurfaceStudio = ['drillholes','subsurface','resource'].includes(mode);
+    const sceneSky = subsurfaceStudio ? 0x3c4650 : SKY_COLOR;
+    scene.background = new THREE.Color(sceneSky);
     // Fog tinted to the sky so distant ground fades into the horizon instead of
     // ending on a hard cut.
-    scene.fog = new THREE.Fog(SKY_COLOR, 4600, 12000);
+    const authoredFog = new THREE.Fog(sceneSky, 4600, 12000);
+    scene.fog = authoredFog;
 
     const depthGridGroup = new THREE.Group();
     depthGridGroup.name = 'depth-grid';
@@ -2244,6 +2258,26 @@ export default function TangaThreeGeologyScene({
 const cameraShot = cameraShotForMode(mode, lowCamera);
     let sitePlan: SitePlan | null = null;
     let processPlant: THREE.Group | null = null;
+    let developmentInfrastructure: THREE.Group | null = null;
+    let siteCampus:THREE.Group|null=null;
+    let campusFacilities:CampusFacility[]=[];
+    let mineCampusReady=false;
+    if(mode==='mine_planning')onSiteFacilities?.([]);
+    let developmentMarker: THREE.Mesh | null = null;
+    let feedAnchor: THREE.Vector3 | null = null;
+    let facilityFocused = false;
+    let geologyPlan = false;
+    let geologyOblique = false;
+    let geologyDepthBlend = 1;
+    let geologyBlendTime = 0;
+    let geologySurface:THREE.Group|null=null;
+    let geologySurfaceOpacity=0;
+    let geologySectionLocator:THREE.Group|null=null;
+    const geologyPlanTarget=new THREE.Vector3();
+    let geologyModelReady = false;
+    let recoverPlanFog = false;
+    const geologyPlanExtent = new THREE.Vector3(2500, 0, 5000);
+    const planProjection = new THREE.OrthographicCamera();
     let processMarker: THREE.Mesh | null = null;
     let plantDetailKey='';
     const targetMeshes: THREE.InstancedMesh<THREE.BoxGeometry,THREE.MeshBasicMaterial>[]=[];
@@ -2272,8 +2306,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
-      const opacity = terrainOpacityForView(mode, surfaceCameraView);
+      const opacity = geologyPlan || geologyOblique ? .92 : terrainOpacityForView(mode, surfaceCameraView);
       const isGlass = opacity < 1;
+      setAuthoredSurfaceOpacity(opacity);
       terrainSurfaceMaterials.forEach((material) => {
         material.visible = true;
         material.opacity = opacity;
@@ -2293,11 +2328,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         occluder.visible = false;
       });
     };
+    resetSurfaceRef.current=applyTerrainSurfaceView;
     const registerTerrainSurfaceMaterial = (material: THREE.MeshStandardMaterial) => {
+      if (subsurfaceStudio) {
+        material.onBeforeCompile = shader => {
+          shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\nfloat groundLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));\ndiffuseColor.rgb = mix(vec3(groundLuma), diffuseColor.rgb, 0.18);');
+        };
+        material.customProgramCacheKey = () => 'tanga-muted-subsurface-ground-v1';
+      }
       terrainSurfaceMaterials.push(material);
       applyTerrainSurfaceView();
     };
-    const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 1, 26000);
+    const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 1, mode === 'subsurface' ? 65000 : 26000);
     camera.fov = cameraShot.fov;
     camera.position.copy(cameraShot.from);
     camera.updateProjectionMatrix();
@@ -2308,12 +2350,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     renderer.setPixelRatio(Math.min(mode === 'topography' ? 1.25 : 1, window.devicePixelRatio || 1));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Lower exposure so the bright satellite terrain doesn't wash out; a CSS
-    // contrast/saturation grade then adds punch. Tuned by measuring canvas
-    // luminance (~220 was washed; target ~185 with more tonal range).
-    renderer.toneMappingExposure = mode === 'topography' ? 0.9 : 1.02;
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    // Neutral daylight keeps mapped category hues distinct.
+    renderer.toneMappingExposure = mode === 'topography' ? 1.12 : 1.15;
     renderer.shadowMap.enabled = mode === 'mine_planning';
+    if(mode==='mine_planning'){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;}
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
@@ -2337,7 +2378,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     controls.minPolarAngle = 0.04;
     controls.maxPolarAngle = Math.PI - 0.04;
     controls.target.copy(DEFAULT_CAMERA_TARGET);
-    controls.maxDistance = 16000;
+    controls.maxDistance = mode === 'subsurface' ? 34000 : 16000;
     controls.minDistance = 25;
     controls.update();
     controlsRef.current = controls;
@@ -2389,8 +2430,32 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let stageBaseRotation = rotationKeyRef.current * Math.PI / 2;
     let stageVerticalBaseRotation = 0;
 
+    const leaveGeologyPlan = (quiet = false) => {
+      if (!geologyPlan) return;
+      geologyPlan = false; scene.fog = authoredFog; controls.enableRotate = true;
+      const departureDistance = camera.position.distanceTo(controls.target);
+      authoredFog.near = Math.max(4600, departureDistance * 1.1);
+      authoredFog.far = Math.max(12000, departureDistance * 2);
+      recoverPlanFog = true;
+      controls.minPolarAngle = .04; controls.maxPolarAngle = Math.PI - .04;
+      controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; controls.touches.ONE = THREE.TOUCH.ROTATE;
+      camera.updateProjectionMatrix();
+      surfaceCameraView = 'default'; applyTerrainSurfaceView();
+      host.dataset.geologyProjection = 'perspective';
+      if (!quiet) window.dispatchEvent(new Event('tanga:geology-perspective'));
+    };
     const scheduleCameraTween = (toPosition: THREE.Vector3, toTarget: THREE.Vector3, duration = 1.35, toFov = camera.fov) => {
+      leaveGeologyPlan();
       userTookControl = true;
+      if((mode==='subsurface'||mode==='resource')&&camera.aspect<1)toPosition=toTarget.clone().add(toPosition.clone().sub(toTarget).multiplyScalar(1.2/camera.aspect));
+      if((mode==='subsurface'||mode==='resource'||(mode==='mine_planning'&&facilityFocused))&&camera.aspect<1){
+        // Centre facility detail in the phone's free canvas above its inspector.
+        const forward=toTarget.clone().sub(toPosition).normalize();
+        const right=forward.clone().cross(camera.up).normalize();
+        const screenUp=right.cross(forward).normalize();
+        const shift=screenUp.multiplyScalar(-toPosition.distanceTo(toTarget)*Math.tan(THREE.MathUtils.degToRad(toFov/2))*.11);
+        toPosition=toPosition.clone().add(shift);toTarget=toTarget.clone().add(shift);
+      }
       cameraTween = {
         start: clock.getElapsedTime(),
         duration: reducedMotion.matches ? .001 : duration,
@@ -2404,6 +2469,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     };
 
     const consumeCameraCommand = (command: ThreeCameraCommand) => {
+      if (['geologyPlan','geologyTilt','geologyDepth'].includes(command.action) && mode === 'subsurface' && !geologyModelReady) return;
+      if(mode==='mine_planning'&&!mineCampusReady&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','northPit','southPit'].includes(command.action))return;
       // Local inspection buttons use independent IDs; don't let them suppress
       // subsequent commands from the shared presentation toolbar.
       if(command===cameraCommandRef.current){
@@ -2411,6 +2478,64 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         consumedCameraCommandIdRef.current = command.id;
       }
 
+      if (command.action === 'geologyPlan' && mode === 'subsurface') {
+        geologyPlan = true; geologyOblique = false; geologyDepthBlend=0; scene.fog = null;
+        cameraTween = null;
+        userTookControl = true;
+        controls.enableRotate = false; controls.minPolarAngle = 0; controls.maxPolarAngle = 0;
+        controls.mouseButtons.LEFT = THREE.MOUSE.PAN; controls.touches.ONE = THREE.TOUCH.PAN;
+        setSectionEnabled(false);
+        explodedRef.current = false; setExploded(false); separation = 0;
+        stageBaseRotation = 0; stageVerticalBaseRotation = 0;
+        rotationTween = null; verticalRotationTween = null; stage.rotation.set(0, 0, 0);
+        controls.target.copy(geologyPlanTarget);
+        const halfHeight = Math.max(geologyPlanExtent.z / 1.3, geologyPlanExtent.x / (camera.aspect * 1.04)) * 1.08;
+        const distance = Math.min(controls.maxDistance, Math.max(1800, halfHeight / Math.tan(THREE.MathUtils.degToRad(42 / 2))));
+        camera.position.copy(geologyPlanTarget).add(new THREE.Vector3(0, distance, .01));
+        camera.fov = 42;
+        controls.update();
+        surfaceCameraView = 'top'; applyTerrainSurfaceView();
+        host.dataset.geologyProjection = 'orthographic';
+        host.dataset.geologyStage = 'plan';
+        setStatus('Digitized rock polygons on terrain · north-up · approximate source-grid registration');
+        return;
+      }
+      if (command.action === 'geologyTilt' && mode === 'subsurface') {
+        // The orthographic plan and perspective overhead view have matching
+        // spans. Tilt the mapped surface before showing a separate model.
+        leaveGeologyPlan(true);
+        geologyOblique = true; scene.fog = null;
+        stageBaseRotation = 0; stageVerticalBaseRotation = 0; stage.rotation.set(0,0,0);
+        setSectionEnabled(false);
+        explodedRef.current=false;setExploded(false);separation=0;
+        scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.8, cameraShot.fov);
+        applyTerrainSurfaceView();
+        host.dataset.geologyStage = 'mapped-relief';
+        setStatus('Mapped rock polygons follow the unchanged terrain · drag to inspect relief');
+        return;
+      }
+      if (command.action === 'geologyDepth' && mode === 'subsurface') {
+        const retainFrame = geologyOblique;
+        leaveGeologyPlan(true); geologyOblique = false;
+        setAuthoredSurfaceOpacity(terrainOpacityForView(mode,surfaceCameraView));
+        if (retainFrame) cameraTween=null;
+        setSectionEnabled(false);explodedRef.current=false;setExploded(false);separation=0;
+        if (!retainFrame) scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),2,cameraShot.fov);
+        // Retain the oblique frame while the terrain roof and mapped colours
+        // fade. The source model is never extruded, displaced or rescaled.
+        host.dataset.geologyStage = 'interpreted-depth';
+        setStatus('Same viewpoint · separate interpreted volumes · true vertical scale');
+        return;
+      }
+      // Dolly and pan retain the measured plan. Authored 3D commands restore
+      // perspective before the camera tilts; source geometry never changes.
+      if (geologyPlan && command.action !== 'zoomIn' && command.action !== 'zoomOut') {
+        leaveGeologyPlan();
+      }
+      if (!['zoomIn','zoomOut','orbit360','rotateDegrees'].includes(command.action)) {
+        if (geologyOblique) window.dispatchEvent(new Event('tanga:geology-perspective'));
+        geologyOblique = false;
+      }
       const target = controls.target.clone();
       const direction = camera.position.clone().sub(target);
       if (direction.lengthSq() < 1) direction.copy(cameraShot.to).sub(cameraShot.target);
@@ -2418,6 +2543,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const normalizedDirection = direction.normalize();
 
       if (command.action === 'resetView') {
+        facilityFocused=false;
         if (mode === 'mine_planning') calloutsForProjection = siteOverviewCallouts;
         controls.maxPolarAngle = Math.PI - 0.04;
         surfaceCameraView = 'default';
@@ -2449,17 +2575,53 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return;
       }
 
+      if(command.action==='developmentOverview'){
+        facilityFocused=false;
+        setStoryPlaying(false);setMiningBeat(3);calloutsForProjection=siteOverviewCallouts;
+        scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);return;
+      }
+      if(command.action==='feedPoint'&&feedAnchor){
+        facilityFocused=true;
+        setStoryPlaying(false);setMiningBeat(3);
+        const centre=stage.localToWorld(feedAnchor.clone());
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,1.5,42);
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed');return;
+      }
+      if(command.action==='tailingsView'||command.action==='wasteView'||command.action==='campusView'){
+        const selected=campusFacilities.filter(f=>command.action==='wasteView'?f.id==='waste':command.action==='tailingsView'?f.id==='tailings':f.id!=='waste');
+        if(!selected.length){setStatus('Facility withheld: no illustrative footprint passed the display checks');return;}
+        facilityFocused=true;setStoryPlaying(false);setMiningBeat(3);
+        const bounds=new THREE.Box3();for(const f of selected)for(const [x,z] of f.footprint)bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,f.level+8,z)));
+        if(command.action==='campusView'&&processPlant)bounds.expandByObject(processPlant);
+        const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+        const span=Math.max(size.x,size.z,300);
+        const offset=command.action==='campusView'?new THREE.Vector3(0,span*2.4,span*.12):new THREE.Vector3(span*.85,span*.8,span*.95);
+        if(command.action==='tailingsView'||command.action==='wasteView')offset.multiplyScalar(1.35);
+        offset.multiplyScalar(Math.max(1,.65/camera.aspect));
+        scheduleCameraTween(centre.clone().add(offset),centre,1.8,42);
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id.startsWith('facility-')&&(command.action==='wasteView'?item.id==='facility-waste':command.action==='tailingsView'?item.id==='facility-tailings':item.id!=='facility-waste')||(command.action==='campusView'&&item.id==='development-plant'));
+        return;
+      }
+      if(command.action==='siteServices'&&processPlant){
+        facilityFocused=true;
+        setStoryPlaying(false);setMiningBeat(3);
+        const centre=processPlant.localToWorld(new THREE.Vector3(...(processPlant.userData.siteServices as [number,number,number])));
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,1.5,42);
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant');return;
+      }
       if(command.action==='plantDetail'&&processPlant){
-        setStoryPlaying(false); setMiningBeat(3); setInspectionOpen(true);
+        facilityFocused=true;
+        setStoryPlaying(false); setMiningBeat(3);
         const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
         const selected=stages?.find(item=>item.id===command.stage);
-        calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:item.point,kind:'story' as const}));
+        calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:({feed:'01 · Feed & crushing',milling:'02 · Milling',flotation:'03 · Flotation',thickening:'04 · Thickening',dewatering:'05 · Dewatering',product:'06 · Product handling'} as Record<string,string>)[item.id]??item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:item.point,kind:'story' as const}));
         for(const callout of calloutsForProjection){calloutAnchors.set(callout.id,new THREE.Vector3(...callout.anchor));calloutObjects.set(callout.id,processPlant);}
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
-        const position=centre.clone().add(selected?new THREE.Vector3(290,230,310):new THREE.Vector3(1000,780,1060));
+        const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
         scheduleCameraTween(position,centre,1.3,42);return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
+        facilityFocused=false;
         setStoryPlaying(false); setMiningBeat(2);
         calloutsForProjection = siteOverviewCallouts;
         const pits=[...(sitePlan?.pits??[])].sort((a,b)=>a.centre[1]-b.centre[1]);
@@ -2557,19 +2719,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // geology and grade colours close to their source legend colours.
     const isTerrainView = mode === 'topography';
     const isModelView = mode === 'resource' || mode === 'subsurface';
-    scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x343a36 : 0x303d47, isTerrainView ? 0.48 : 0.82));
+    scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x343a36 : 0x303d47, isTerrainView ? 0.75 : 1.12));
     // Low raking key across the mapped ridges: the land stays dimensional
     // without suggesting a different sun position or changing elevation.
-    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : 0xfff1d8, isTerrainView ? 1.2 : mode === 'mine_planning' ? 1.45 : 1.7);
+    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : 0xfff1d8, isTerrainView ? 1.5 : mode === 'mine_planning' ? 1.8 : 1.65);
     key.position.set(isTerrainView ? 1800 : 900, isTerrainView ? 1050 : 1800, isTerrainView ? 1150 : 1200);
     key.castShadow = true;
     // Cool fill from opposite side — keeps shadowed slopes readable without
     // washing out the terrain. No shadow casting on the fill (perf + softness).
-    const fill = new THREE.DirectionalLight(isModelView ? 0xd9e2e8 : 0xa8c5ff, isTerrainView ? 0.28 : mode === 'mine_planning' ? 0.42 : 0.52);
+    const fill = new THREE.DirectionalLight(isModelView ? 0xd9e2e8 : 0xa8c5ff, isTerrainView ? 0.42 : mode === 'mine_planning' ? 0.72 : 0.7);
     fill.position.set(-1200, 900, -800);
     scene.add(fill);
     // Rim light behind + above — separates ridges from the dark background.
-    const rimLight = new THREE.DirectionalLight(0xffffff, isTerrainView ? 0.12 : isModelView ? 0.46 : 0.4);
+    const rimLight = new THREE.DirectionalLight(0xffffff, isTerrainView ? 0.22 : isModelView ? 0.6 : 0.5);
     rimLight.position.set(0, 1600, -2000);
     scene.add(rimLight);
     key.shadow.mapSize.set(2048, 2048);
@@ -2583,6 +2745,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     key.shadow.normalBias = 1.5;
     key.shadow.camera.updateProjectionMatrix();
     scene.add(key);
+    if(mode==='mine_planning')scene.add(key.target);
+    let mineShadowRadius=4200;
+    let lastMineShadowKey='';
+    const mineLightOffset=new THREE.Vector3(900,1800,1200);
     // Decorative colour accents. Both kept subtle so the overhead sun always
     // wins on the terrain *top*. Previously an amber PointLight sat BELOW the
     // surface (y=-220) at high intensity, lighting the underside brighter than
@@ -2746,7 +2912,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         host.dataset.terrainTriangles = String((terrainGeometry.index?.count ?? 0) / 3);
         host.dataset.terrainGrid = `${resources.meta.context_grid?.width}×${resources.meta.context_grid?.height}`;
         host.dataset.surveyReady = String(Boolean(resources.surveyHeightData && resources.surveyCoverageData));
-        if (mode === 'mine_planning' && sitePlan) carvePit(terrainGeometry, sitePlan.pits);
+        if (mode === 'mine_planning' && sitePlan) {
+          carvePit(terrainGeometry, sitePlan.pits);
+          const pad=processPlant?.userData.conceptPad as ConceptPad|undefined;if(pad)gradeConceptPad(terrainGeometry,pad);
+        }
         const texturedTerrain = new THREE.Mesh(
           terrainGeometry,
           new THREE.MeshStandardMaterial({
@@ -3004,6 +3173,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const p=localPoint(lon,lat,elevation);return {x:p.x,y:p.y,z:p.z,dx,dy,dz,carbon};
         });
         sitePlan = planSite(footprintBlocks, boundary, (x, z) => terrainSurfaceY(terrainResources, x, -z), 'north-south');
+        if(mode==='mine_planning'){
+          sitePlan.plant=[DEVELOPMENT_SITE.dischargeUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.dischargeUtm[1]];
+          sitePlan.audit=sitePlan.audit.filter(item=>!item.startsWith('Plant footprint')&&!item.startsWith('No admissible plant'));
+          sitePlan.audit.push('Lowland candidate 2 from PaulSam Figure 3.3; approximate map-grid registration, outside the provisional mine boundary', '250 × 250 m land allowance from Table 5.3; internal facility layout illustrative');
+        }
         sitePlan.audit.push(`RF 1 sample footprint reference · ${reference.provenance.sourceTimestamp} · not full extraction`);
         host.dataset.siteAudit = JSON.stringify(sitePlan.audit);
         host.dataset.sitePlan = JSON.stringify(sitePlan);
@@ -3030,13 +3204,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           }
           geometry.computeVertexNormals(); geometry.computeBoundingSphere(); geometry.computeBoundingBox();
           const isHost = object.name.includes('GRSC');
-          const unitColor=isHost?0xc7551b:[0x648d9b,0xb6a57c,0x8b89ac,0x658e75,0xa37970,0x6f9caa,0x92947a][unitCount%7];
+          const unit=modelRockUnit(object.name);
           const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-            color: unitColor, transparent: true,
-            opacity: isHost ? .9 : .16, depthWrite: isHost, side: THREE.DoubleSide, forceSinglePass: true, roughness: .72,
+            color:unit.color, emissive:unit.color, emissiveIntensity:.08,
+            transparent:true, opacity:1, depthWrite:true, side:THREE.DoubleSide,
+            forceSinglePass:true, roughness:.8, metalness:0, envMapIntensity:.45, toneMapped:true,
           }));
           mesh.name = object.name;
-          mesh.userData.tooltipItems=[{title:object.name.replace(/_/g,' '),rows:[isHost?'Interpreted graphitic-schist host unit.':'Interpreted surrounding rock unit.','Modelled contact geometry, not direct observations everywhere.'],tone:`#${mesh.material.color.getHexString()}`}];
+          mesh.userData.tooltipItems=[{title:unit.label,rows:[unit.basis,'Interpreted contact geometry, not observed everywhere.'],tone:unit.color}];
           pickables.push(mesh);
           geologyMeshes.push(mesh);
           modelBounds.expandByObject(mesh);
@@ -3051,12 +3226,27 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         host.dataset.geologyBounds = JSON.stringify({min:modelBounds.min.toArray(), max:modelBounds.max.toArray()});
         const centre = modelBounds.getCenter(new THREE.Vector3());
         const extent = modelBounds.getSize(new THREE.Vector3());
+        geologyPlanExtent.copy(extent);
+        geologyPlanTarget.copy(centre);
+        try {
+          const response=await fetch('/generated/geology-surface-polygons.json');
+          if(response.ok){
+            const data=await response.json() as GeologySurfaceData;
+            if(cancelled)return;
+            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,(x,z)=>terrainSurfaceY(terrainResources,x,-z),{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
+            geologySurface=mapped.group;tagDeckLayer(geologySurface,'context');stage.add(geologySurface);
+            geologySurface.children.forEach(mesh=>pickables.push(mesh));
+            if(!mapped.bounds.isEmpty()) {mapped.bounds.getCenter(geologyPlanTarget);mapped.bounds.getSize(geologyPlanExtent);}
+            host.dataset.geologySurfaceUnits=String(mapped.group.children.length);
+            host.dataset.geologySurfaceBasis='Digitized project map; approximate printed-grid registration';
+          }
+        } catch {host.dataset.geologySurfaceBasis='Map overlay unavailable; existing model retained';}
         if (!Number.isFinite(extent.length()) || Math.abs(centre.x) > 10000 || Math.abs(centre.z) > 10000) {
           throw new Error('Geological registration failed: model bounds outside local project coordinates');
         }
         const span = Math.max(extent.x, extent.z);
         cameraShot.target.copy(centre);
-        cameraShot.to.copy(centre).add(new THREE.Vector3(span*.85, span*.4, span*.85));
+        cameraShot.to.copy(centre).add(new THREE.Vector3(span*.7, span*.32, span*.85));
         cameraShot.from.copy(centre).add(new THREE.Vector3(-span*.65, span*.45, span*.8));
         cameraShot.mid.copy(cameraShot.from).lerp(cameraShot.to, .5);
         cameraShot.targetMid.copy(centre);
@@ -3064,7 +3254,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const crossHeight=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
         const crossBoundary:Point2[]=(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z];});
         setCrossSource({units:geologyMeshes.map(mesh=>({name:mesh.name,color:`#${mesh.material.color.getHexString()}`,geometry:mesh.geometry})),drills:drillholes.map(d=>({...d,from:drillPointFromCoords(d.from).toArray() as [number,number,number],to:drillPointFromCoords(d.to).toArray() as [number,number,number]})),blocks,pits:sitePlan?.pits??[],boundary:crossBoundary,height:crossHeight});
-        const locator=new THREE.Group();locator.name='Active cross-section locator';stage.add(locator);
+        const locator=new THREE.Group();locator.name='Active cross-section locator';geologySectionLocator=locator;stage.add(locator);
         crossViewRef.current=(definition,flat,moveCamera=true)=>{
           if(cancelled)return;
           explodedRef.current=false;setExploded(false);separation=0;geologyMeshes.forEach(mesh=>mesh.position.y=0);
@@ -3215,9 +3405,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         lithologyGroups.set(key, [...(lithologyGroups.get(key) ?? []), segment]);
       });
       Array.from(lithologyGroups.entries()).forEach(([lithology, segments]) => {
-        const baseColor = lithology === 'GRSC'
-          ? new THREE.Color('#1ce6d0')
-          : lithologyColor(lithology).lerp(new THREE.Color('#e2e8f0'), 0.12);
+        const baseColor = new THREE.Color(lithology==='UNKNOWN'?'#9da9ae':modelRockUnit(lithology).color);
         const material = new THREE.MeshStandardMaterial({
           color: baseColor,
           emissive: baseColor.clone().multiplyScalar(0.22),
@@ -3452,7 +3640,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             bounds.expandByPoint(new THREE.Vector3(b.x-b.dx/2,b.y-b.dz/2,b.z-b.dy/2));
             bounds.expandByPoint(new THREE.Vector3(b.x+b.dx/2,b.y+b.dz/2,b.z+b.dy/2));
           }
-          const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*1.05+200;
+          const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*1.5+200;
           bounds.getCenter(cameraShot.target);
           cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.85,distance*.55,distance*.12));
           cameraShot.from.copy(cameraShot.to).multiplyScalar(1.1);
@@ -3622,45 +3810,47 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (sitePlan.plant) {
             const plant = buildConcentrator();
             const [x, z] = sitePlan.plant;
-            const level=placeConcentrator(plant,x,z,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz));
+            const level=placeConcentrator(plant,x,z,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz),{width:250,depth:250});
+            for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,plant.userData.conceptPad as ConceptPad);
             tagDeckLayer(plant, 'context');
             stage.add(plant);
             processPlant=plant;
+            const mappedFeed:Point2=[DEVELOPMENT_SITE.feedUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.feedUtm[1]];
+            const apron=proposeFeedApron(mappedFeed,[x,z],sitePlan.pits,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz));
+            if(!apron)throw new Error('No conflict-free feed apron near the mapped candidate; do not render a facility over a pit');
+            const feed=apron.point;
+            const siteHeight=(px:number,pz:number)=>conceptPadHeight(plant.userData.conceptPad as ConceptPad,px,pz,terrainSurfaceY(terrainResources,px,-pz));
+            developmentInfrastructure=buildDevelopmentInfrastructure(feed,[x,z],siteHeight,level);
+            tagDeckLayer(developmentInfrastructure,'context');stage.add(developmentInfrastructure);
+            feedAnchor=new THREE.Vector3(...(developmentInfrastructure.userData.feedAnchor as [number,number,number]));
+            developmentMarker=new THREE.Mesh(new THREE.SphereGeometry(3,8,6),new THREE.MeshBasicMaterial({color:0xf3c389}));developmentInfrastructure.add(developmentMarker);
+            host.dataset.developmentReference=JSON.stringify({site:2,mappedFeedUtm:DEVELOPMENT_SITE.feedUtm,proposedFeedUtm:[Math.round(feed[0]+PROJECT_UTM_CENTER.easting),Math.round(PROJECT_UTM_CENTER.northing-feed[1])],feedOffsetM:Math.round(apron.offsetM),plantUtm:DEVELOPMENT_SITE.dischargeUtm,registration:'Approximate map tracing; feed apron offset clear of concept pits · EPSG:32737',reportedLengthM:2150,source:DEVELOPMENT_SOURCE});
+            sitePlan.audit.push(`Proposed feed apron shifted ${Math.round(apron.offsetM)} m from the old map marker to clear current conceptual pits; corridor screened against pit envelopes only`);
+            host.dataset.siteAudit=JSON.stringify(sitePlan.audit);
             host.dataset.plantDetail = JSON.stringify({sourceMeshes:plant.userData.detailMeshCount,drawMeshes:plant.userData.batchedMeshCount,stages:plant.userData.processStages.length});
-            processMarker=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshBasicMaterial({color:0xffb760}));plant.add(processMarker);
-            const boundary:Point2[]=(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z];});
-            const end:Point2=[x-CONCEPT.plantWidth/2-10,z+CONCEPT.plantDepth*.25];
-            const height=(px:number,pz:number)=>terrainSurfaceY(terrainResources,px,-pz);
-            const gates:Point2[]=[end,[x-CONCEPT.plantWidth/2-20,z-CONCEPT.plantDepth/2-20],[x+CONCEPT.plantWidth/2+20,z],[x,z+CONCEPT.plantDepth/2+20]];
-            const obstacles=[...sitePlan.pits,{ring:rectangle([x,z],CONCEPT.plantWidth,CONCEPT.plantDepth),centre:[x,z] as Point2,surface:level,floor:level,depth:0,support:0}];
-            const routeAudit:{pit:number;reason:string;admitted:boolean}[]=[];
-            const routePits=sitePlan.pits;
-            setHaulCount(0);setHaulStatus('loading');
-            // Optional deterministic route search must not delay the authored
-            // camera, pit inspection or scene-ready state. It already yields.
-            void (async()=>{
-            for(const pit of routePits){
-              const starts=pit.ring.map(p=>{const dx=p[0]-pit.centre[0],dz=p[1]-pit.centre[1],l=Math.hypot(dx,dz);return [p[0]+dx/l*65,p[1]+dz/l*65] as Point2;}).sort((a,b)=>Math.hypot(a[0]-end[0],a[1]-end[1])-Math.hypot(b[0]-end[0],b[1]-end[1]));
-              let route:THREE.Vector3[]|null=null;
-              let reason='';
-              for(const gate of gates){
-                const admittedStarts=starts.filter(p=>contained(rectangle(p,18,18),boundary)&&!obstacles.some(o=>overlaps(rectangle(p,18,18),o.ring))).sort((a,b)=>Math.hypot(a[0]-gate[0],a[1]-gate[1])-Math.hypot(b[0]-gate[0],b[1]-gate[1])).slice(0,2);
-                for(const start of admittedStarts){route=await planHaulRoute(start,gate,boundary,obstacles,height,value=>{reason=value;},()=>cancelled);if(cancelled)return;if(route)break;}
-                if(route)break;
-              }
-              routeAudit.push({pit:pit.centre[1],reason,admitted:Boolean(route)});
-              host.dataset.haulAudit=JSON.stringify(routeAudit);
-              if(!route)continue;
-              const road=buildHaulRoad(route);tagDeckLayer(road,'context');stage.add(road);
-              const receiving=route[route.length-1];
-              const apron=new THREE.Mesh(new THREE.ConeGeometry(8,6,16),new THREE.MeshStandardMaterial({color:0x75604b}));
-              apron.position.copy(receiving).add(new THREE.Vector3(0,3,0));tagDeckLayer(apron,'context');stage.add(apron);
-              const length=route.slice(1).reduce((sum,p,i)=>sum+p.distanceTo(route[i]),0);
-              for(let i=0;i<2;i++){const truck=buildHaulTruck();tagDeckLayer(truck,'context');stage.add(truck);haulTrucks.push({mesh:truck,points:route,length,offset:i*.5});}
+            if(terrainResources){
+              const utm=terrainResources.meta.bounds_utm;
+              const campus=buildMineSiteCampus({plant:[x,z],plantLevel:level,feed,pits:sitePlan.pits,boundary:(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z] as Point2;}),
+                bounds:{minX:utm.minX-PROJECT_UTM_CENTER.easting,maxX:utm.maxX-PROJECT_UTM_CENTER.easting,minZ:PROJECT_UTM_CENTER.northing-utm.maxY,maxZ:PROJECT_UTM_CENTER.northing-utm.minY},
+                height:siteHeight,surveyed:(px,pz)=>Boolean(sampleTerrainAtLocal(terrainResources!,px,-pz).surveyed)});
+              siteCampus=campus.root;campusFacilities=campus.facilities;tagDeckLayer(siteCampus,'context');stage.add(siteCampus);
+              siteCampus.traverse(object=>{if(object instanceof THREE.Mesh){
+                if(!object.userData.tooltipItems)object.userData.tooltipItems=[{title:'Illustrative site service detail',rows:['Parked equipment and concept pipes; no validated route, operating schedule or utility connection.'],tone:'#c9ad7d'}];
+                pickables.push(object);
+              }});
+              host.dataset.siteFacilities=JSON.stringify(campus.facilities.map(f=>({...f,utm:[f.point[0]+PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-f.point[1]]})));
+              host.dataset.siteFacilityOmissions=JSON.stringify(campus.omissions);
+              onSiteFacilities?.(campus.facilities.map(f=>f.id));
+              sitePlan.audit.push('Waste / tailings / water footprints are illustrative display placements, not sourced facility designs; no capacity or siting suitability established',...campus.omissions);
+              host.dataset.siteAudit=JSON.stringify(sitePlan.audit);
             }
-            setHaulCount(haulTrucks.length);host.dataset.haulTrucks=String(haulTrucks.length);
-            setHaulStatus('ready');applyDeckLayers(stage,layerSettingsRef.current);
-            })().catch(()=>{if(!cancelled)setHaulStatus('failed');});
+
+            processMarker=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshBasicMaterial({color:0xffb760}));plant.add(processMarker);
+            // PaulSam separates mine-to-feed haulage from the downhill conveyor.
+            // Do not invent a pit-to-lowland haul road through the licence edge.
+            setHaulCount(0);setHaulStatus('ready');
+            host.dataset.haulTrucks='0';
+            host.dataset.haulRoutes=JSON.stringify([{admitted:false,reason:'No surveyed mine-to-feed haul road supplied; indicative conveyor shown separately'}]);
             // Ground-level receiving apron: internal pit ramps and pad access remain unengineered.
           }
           const pit = sitePlan.pits[0];
@@ -3668,8 +3858,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (pit) {
             const bounds=new THREE.Box3();
             for(const p of sitePlan.pits)for(const [x,z] of p.ring)bounds.expandByPoint(new THREE.Vector3(x,p.surface-p.depth*.25,z));
-            if(sitePlan.plant){const [x,z]=sitePlan.plant;const y=processPlant?.position.y??0;for(const sign of [-1,1])bounds.expandByPoint(new THREE.Vector3(x+sign*CONCEPT.plantWidth/2,y,z+sign*CONCEPT.plantDepth/2));}
+            if(sitePlan.plant){const [x,z]=sitePlan.plant;const y=processPlant?.position.y??0;for(const sign of [-1,1])bounds.expandByPoint(new THREE.Vector3(x+sign*125,y,z+sign*125));}
             const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*.9+250;
+            for(const f of campusFacilities)for(const [x,z] of f.footprint)bounds.expandByPoint(new THREE.Vector3(x,f.level,z));
             bounds.getCenter(cameraShot.target);
             cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.8, distance*.85, distance*.18));
             cameraShot.from.copy(cameraShot.target).add(new THREE.Vector3(-distance, distance, distance*1.3));
@@ -3677,6 +3868,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             cameraShot.targetMid.copy(cameraShot.target);
             cameraShot.drift.set(8, 3, 8);
             calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const}));
+            if(feedAnchor&&sitePlan.plant&&processPlant){
+              calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story'});
+              calloutsForProjection.push({id:'development-plant',label:'Lowland processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story'});
+            }
+            for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell · concept',water:'Settling / reclaim · concept','raw-water':'Raw-water pond · concept',waste:'Waste-rock benches · concept'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story'});
             siteOverviewCallouts = calloutsForProjection;
             for(const label of calloutsForProjection)calloutAnchors.set(label.id,new THREE.Vector3(...label.anchor));
           }
@@ -3703,7 +3899,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         object.userData.tooltipItems=[{title:object.name||(plantPart?'Processing plant equipment':'Mining concept'),rows:[target?'Above-threshold model cells explain the target; not ore reserves.':pit?'Conceptual benched pit envelope; not an optimised or engineered excavation.':'Illustrative concentrator equipment; dimensions and capacity are conceptual.'],tone:'#dfa066'}];
         pickables.push(object);
       });
-      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured) {
+      if(mode==='mine_planning'){
+        mineCampusReady=true;
+        const pending=cameraCommandRef.current;
+        if(pending&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','northPit','southPit'].includes(pending.action))consumeCameraCommand(pending);
+      }
+      if (mode === 'subsurface') {
+        geologyModelReady = true;
+        if (cameraCommandRef.current && ['geologyPlan','geologyTilt','geologyDepth'].includes(cameraCommandRef.current.action)) consumeCameraCommand(cameraCommandRef.current);
+      }
+      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured && !geologyPlan && !facilityFocused) {
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.2, cameraShot.fov);
       }
         const shouldUpgradeTerrain = !cancelled && (resources?.quality ?? assetQuality) === 'preview';
@@ -3745,7 +3950,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
+      raycaster.setFromCamera(pointer, geologyPlan ? planProjection : camera);
       const visiblePickables=pickables.filter(object=>{for(let p:THREE.Object3D|null=object;p;p=p.parent)if(!p.visible)return false;return true;});
       const [hit] = raycaster.intersectObjects(visiblePickables, false).filter(hit=>{
         const material=(hit.object as THREE.Mesh).material;
@@ -3807,6 +4012,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     observer.observe(host);
 
     let frame = 0;
+    let lastControlsElapsed=0;
     let lastProjectionTick = -1;
     const ease = cameraEase;
     const resolutionGovernor=createResolutionGovernor(renderer.getPixelRatio());
@@ -3822,7 +4028,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       stage.updateMatrixWorld(true);
 
       const density = labelDensityRef.current;
-      if (density === 'off') {
+      if (density === 'off' || geologyPlan || geologyOblique || (mode==='mine_planning'&&!layerSettingsRef.current.context.visible)) {
         setProjectedFrame({width, height, items: []});
         return;
       }
@@ -3837,13 +4043,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       let interceptsTaken = 0;
       let keyLabelsTaken = 0;
       const visible = calloutsForProjection.filter((callout) => {
+        if(callout.id.startsWith('section-end-')&&!inspectionActiveRef.current&&!detailOptions.current.sectionEnabled)return false;
         // In key mode, story labels explain the model; detailed intercepts
         // remain available in the explicit All labels tier.
+        if(density==='key'&&mode==='mine_planning'&&!facilityFocused){
+          if(!['pit-0','pit-1','development-feed','development-plant'].includes(callout.id))return false;
+        }
         if(density==='key'&&mode==='resource'){
           if(callout.kind==='intercept'||keyLabelsTaken>=2)return false;
           keyLabelsTaken++;return true;
         }
         if(density==='key'&&callout.id.startsWith('plant-')) {
+          if(calloutsForProjection.length>1&&!['plant-feed','plant-flotation','plant-product'].includes(callout.id))return false;
           if(keyLabelsTaken>=3)return false;
           keyLabelsTaken++;return true;
         }
@@ -3859,6 +4070,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       visible.forEach((callout) => {
         const anchor = calloutAnchors.get(callout.id);
         if (!anchor) return;
+        let owner:THREE.Object3D|null=calloutObjects.get(callout.id)??stage;
+        while(owner){if(!owner.visible)return;owner=owner.parent;}
         const anchorWorld = anchor.clone();
         (calloutObjects.get(callout.id) ?? stage).localToWorld(anchorWorld);
         const projected = anchorWorld.project(camera);
@@ -3899,9 +4112,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // Confine them to the part of the host the viewer can actually see.
       const stageBounds = visibleStage(hostRef.current, width, height);
 
+      const keepOutRects=chromeKeepOutRects(hostRef.current,width,height);
+      if(mode==='mine_planning'&&facilityFocused&&processPlant&&density==='key'){
+        // Keep the actual process equipment readable. Leaders retain their
+        // projected anchors while boxes fan onto the surrounding free space.
+        const areas=processPlant.userData.processStages as Array<{point:[number,number,number]}>|undefined;
+        const pixels=(areas??[]).map(area=>processPlant!.localToWorld(new THREE.Vector3(...area.point)).project(camera)).filter(p=>p.z>=-1&&p.z<=1);
+        if(pixels.length){
+          const xs=pixels.map(p=>(p.x*.5+.5)*width),ys=pixels.map(p=>(-.5*p.y+.5)*height);
+          keepOutRects.push({x:Math.min(...xs)-55,y:Math.min(...ys)-45,width:Math.max(...xs)-Math.min(...xs)+110,height:Math.max(...ys)-Math.min(...ys)+90});
+        }
+      }
       const {placed} = placeLabels(candidates, stageBounds, {
         padding: 10,
-        keepOutRects: chromeKeepOutRects(hostRef.current, width, height),
+        keepOutRects,
+        offsetDistances:mode==='mine_planning'&&facilityFocused?[90,160,240,340,460,600]:undefined,
       });
 
       const items: ProjectedThreeCallout[] = [];
@@ -4054,11 +4279,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const storyAge=Math.max(0,motionTime-storyMotionStart);
       const beat=story.playing?(reducedMotion.matches?3:Math.min(3,Math.floor(storyAge/4))):story.beat;
       if(mode==='mine_planning'){
+        for(const mesh of [...terrainMeshes,...terrainOccluders])showConceptTerrain(mesh.geometry,layerSettingsRef.current.context.visible);
         if(beat!==lastStoryBeat){lastStoryBeat=beat;setMiningBeat(beat);}
         host.dataset.miningBeat=String(beat);
-        evidenceGroup.visible=story.holes&&layerSettingsRef.current.context.visible;
+        evidenceGroup.visible=(!facilityFocused||beat<3)&&story.holes&&layerSettingsRef.current.context.visible;
         evidenceLines.forEach(line=>{const count=line.geometry.getAttribute('position').count;line.geometry.setDrawRange(0,beat===0&&story.playing&&!reducedMotion.matches?Math.floor(Math.min(1,storyAge/2.5)*count/2)*2:count);});
         if(processPlant)processPlant.visible=beat>=3&&layerSettingsRef.current.context.visible;
+        if(developmentInfrastructure)developmentInfrastructure.visible=beat>=3&&layerSettingsRef.current.context.visible;
+        if(siteCampus)siteCampus.visible=beat>=3&&layerSettingsRef.current.context.visible;
       }
       for(const item of haulTrucks){
         item.mesh.visible=beat>=3&&layerSettingsRef.current.context.visible;
@@ -4066,12 +4294,17 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const at=routePosition(item.points,(returning?2-phase:phase)*item.length);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
-      targetMeshes.forEach(mesh=>{mesh.visible=beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat>=2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
+      targetMeshes.forEach(mesh=>{mesh.visible=(!facilityFocused||beat<3)&&beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat>=2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;m.transparent=true;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5);m.opacity=(presentationOptions.current.targetXray ? .45 : 1)*reveal*layerSettingsRef.current.context.opacity;m.depthWrite=!presentationOptions.current.targetXray;});
       if (processPlant && processMarker) {
         const points = processPlant.userData.flow as THREE.Vector3[];
         const phase = (motionTime / 3) % (points.length - 1), index = Math.floor(phase);
         processMarker.position.lerpVectors(points[index], points[index+1], phase-index);
+      }
+      if(developmentInfrastructure&&developmentMarker){
+        const points=developmentInfrastructure.userData.flow as THREE.Vector3[];
+        const phase=(motionTime/600)%(1),at=phase*(points.length-1),index=Math.floor(at);
+        developmentMarker.position.lerpVectors(points[index],points[index+1],at-index);
       }
       const flyProgress = reducedMotion.matches?1:ease(Math.min(1, elapsed / cameraShot.flySeconds));
       if (cameraTween) {
@@ -4093,6 +4326,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           controls.target.z += Math.cos(elapsed * 0.1) * 16 * settle;
         }
       }
+      controls.dampingFactor=1-Math.exp(-Math.min(.2,Math.max(0,elapsed-lastControlsElapsed))*5);
+      lastControlsElapsed=elapsed;
       controls.update();
       if (userGestured) {
         const orbitView: SurfaceCameraView = camera.position.y < controls.target.y ? 'bottom' : 'default';
@@ -4173,14 +4408,50 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           material.userData.highlightOpacity=next;
           material.opacity=next*(layer?layerSettingsRef.current[layer].opacity:1)*(material.userData.revealProgress??1);
       }
-      if(mode==='subsurface')for(const mesh of geologyMeshes){const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.setHex(active?0x8d531d:0);mesh.material.emissiveIntensity=active?.28:0;mesh.material.opacity=(mesh.name.includes('GRSC')?.9:.16)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.18:1);}
+      const geologyBlendAlpha=1-Math.exp(-Math.max(0,elapsed-geologyBlendTime)*3.6);
+      geologyBlendTime=elapsed;
+      if(geologySurface){
+        const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??.9):0;
+        geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,geologyBlendAlpha);
+        geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.context.visible;
+        geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.context.opacity;});
+      }
+      const mappedSurface = geologyPlan || geologyOblique;
+      geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);
+      if(geologySectionLocator)geologySectionLocator.visible=!mappedSurface&&(inspectionActiveRef.current||detail.sectionEnabled);
+      if(mode==='subsurface') {
+        for(const material of terrainSurfaceMaterials) material.opacity=THREE.MathUtils.lerp(.92,terrainOpacityForView(mode,surfaceCameraView),geologyDepthBlend)*layerSettingsRef.current.terrain.opacity;
+        for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.copy(mesh.material.color);mesh.material.emissiveIntensity=active?.25:.08;mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
+      }
 
+      if (recoverPlanFog && !geologyPlan) {
+        authoredFog.near = THREE.MathUtils.lerp(authoredFog.near, 4600, .04);
+        authoredFog.far = THREE.MathUtils.lerp(authoredFog.far, 12000, .04);
+        if (authoredFog.far - 12000 < 1) {authoredFog.near = 4600; authoredFog.far = 12000; recoverPlanFog = false;}
+      }
+      if (geologyPlan) {
+        // Use a real parallel projection while retaining OrbitControls' existing
+        // dolly/pan distances. Its perspective pan span equals this ortho span.
+        const halfHeight = camera.position.distanceTo(controls.target) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        planProjection.left = -halfHeight * camera.aspect; planProjection.right = halfHeight * camera.aspect;
+        planProjection.top = halfHeight; planProjection.bottom = -halfHeight;
+        planProjection.near = camera.near; planProjection.far = camera.far;
+        planProjection.updateProjectionMatrix();
+        planProjection.matrixWorld.copy(camera.matrixWorld);
+        planProjection.matrixWorldInverse.copy(camera.matrixWorldInverse);
+        camera.projectionMatrix.copy(planProjection.projectionMatrix);
+        camera.projectionMatrixInverse.copy(planProjection.projectionMatrixInverse);
+      }
       const projectionTick = Math.floor(elapsed * (interacting || cameraTween || (!userTookControl && flyProgress < 1) || performance.now() - lastInteractionAt < 500 ? 30 : 10));
       if (projectionTick !== lastProjectionTick) {
         lastProjectionTick = projectionTick;
         if(haulTrucks[0])host.dataset.truckPosition=haulTrucks[0].mesh.position.toArray().map(v=>v.toFixed(2)).join(',');
         host.dataset.cameraMoving = String(Boolean(cameraTween) || (!userTookControl && flyProgress < 1));
         host.dataset.cameraDistance = String(Math.round(camera.position.distanceTo(controls.target)));
+        if (mode === 'subsurface') {
+          host.dataset.geologyDepthOpacity=geologyDepthBlend.toFixed(3);
+          host.dataset.geologySurfaceOpacity=geologySurfaceOpacity.toFixed(3);
+        }
         host.dataset.frameMs = frameMs.toFixed(1);
         host.dataset.cameraPosition = camera.position.toArray().map(value => value.toFixed(1)).join(',');
         host.dataset.cameraTarget = controls.target.toArray().map(value => value.toFixed(1)).join(',');
@@ -4194,6 +4465,32 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           (profilePoint.elevation - LOCAL_VERTICAL_DATUM) + 14,
           -profilePoint.north
         );
+      }
+      if(mode==='mine_planning'){
+        key.target.position.copy(controls.target);key.position.copy(controls.target).add(mineLightOffset);
+        const radius=Math.round(clamp(camera.position.distanceTo(controls.target)*.65,350,4200)/25)*25;
+        if(radius!==mineShadowRadius){mineShadowRadius=radius;key.shadow.camera.left=-radius;key.shadow.camera.right=radius;key.shadow.camera.top=radius;key.shadow.camera.bottom=-radius;key.shadow.camera.updateProjectionMatrix();}
+        key.shadow.normalBias=facilityFocused ? .15 : .6;
+        const shadowKey=[controls.target.x.toFixed(1),controls.target.y.toFixed(1),controls.target.z.toFixed(1),radius,stage.rotation.x.toFixed(3),stage.rotation.y.toFixed(3),stage.children.length,beat,facilityFocused,plantDetailKey,processPlant?.visible,siteCampus?.visible,pitSurfaces[0]?.visible].join(':');
+        if(shadowKey!==lastMineShadowKey){lastMineShadowKey=shadowKey;renderer.shadowMap.needsUpdate=true;}
+
+      }
+      // Apply the absolute surface control after authored views and layer fades.
+      for(const material of terrainSurfaceMaterials){
+        const opacity=surfaceOpacityRef.current;
+        if(opacity!==null){
+          const transparent=opacity<.999;
+          if(material.transparent!==transparent){material.transparent=transparent;material.needsUpdate=true;}
+          material.opacity=opacity;material.depthWrite=!transparent;
+        }
+      }
+      if(terrainSurfaceMaterials[0])host.dataset.surfaceOpacity=terrainSurfaceMaterials[0].opacity.toFixed(3);
+      // Portrait framing can place the entire deposit beyond a fixed fog range.
+      // Keep the camera focus clear, including direct jumps into model depth.
+      if(scene.fog===authoredFog){
+        const focusDistance=camera.position.distanceTo(controls.target);
+        authoredFog.near=Math.max(4600,focusDistance*1.15);
+        authoredFog.far=Math.max(12000,focusDistance*2.2);
       }
       renderer.render(scene,camera);
       frame = requestAnimationFrame(animate);
@@ -4219,6 +4516,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.dispose();
       environmentTexture.dispose();
       disposeObject(scene);
+      key.shadow.map?.dispose();
+      key.shadow.mapPass?.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
@@ -4317,6 +4616,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
   return (
     <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
+      {mode!=='metallurgy' && <div className="tanga-surface-control" onKeyDown={event=>event.stopPropagation()}>
+        <label htmlFor="tanga-surface-opacity">Surface opacity <output>{surfaceOpacity===null?`Auto · ${Math.round(authoredSurfaceOpacity*100)}%`:`${Math.round(surfaceOpacity*100)}%`}</output></label>
+        <input id="tanga-surface-opacity" aria-label="Surface opacity" type="range" min="0" max="100" step="1" value={Math.round((surfaceOpacity??authoredSurfaceOpacity)*100)} onChange={event=>{setSurfaceOpacity(Number(event.target.value)/100);window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
+        <div><span>Transparent</span><button type="button" onClick={()=>setSurfaceOpacity(null)} title="Restore the authored surface opacity for this view">Auto</button><span>Opaque</span></div>
+      </div>}
       {!sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
       {(/failed|unavailable|exceeded|could not|no contained/i.test(status)) && (
         <p role="alert" className="tanga-three__load-error">{status}. Try another scene, then return to retry.</p>
@@ -4392,8 +4696,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 '--callout-tone': callout.tone,
               } as any}
             >
-              <span>{mode==='mine_planning'&&miningBeat<2 ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
-              {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2 ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
+              <span>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
+              {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
             </div>
           ))}
         </section>
@@ -4448,7 +4752,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             window.dispatchEvent(new Event('tanga:manual-exploration'));
             cameraCommandHandlerRef.current?.({id: Date.now(), action: 'resetView'});
           }}>Reset view</button>
-          <small>Drag to orbit · Shift + drag to pan · scroll to zoom</small>
+          <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
           {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{inspectionOpen ? 'Close inspection tools' : 'Inspection tools'}</button>}
         </div>
         {mode==='resource'&&<details className="tanga-three-animation-tools"><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
@@ -4516,7 +4820,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                   <strong>{selectedProfileElevation?.toFixed(0)} m</strong>
                   <input aria-label="Terrain profile cursor" type="range" min="0" max="100" value={terrainProfilePosition} onChange={(event) => setTerrainProfilePosition(Number(event.target.value))} />
                 </label>
-                <small className="tanga-three__terrain-provenance">Survey DTM covers 17% of this tile; the rest uses regional DEM. Cursor follows the surveyed profile. Vertical datum is not stated in the source metadata.</small>
+                <small className="tanga-three__terrain-provenance">Survey DTM covers 17% of this tile; the rest uses regional DEM. Cursor follows the surveyed profile. Vertical datum is unstated; the survey/context join is left unbridged.</small>
               </>
             ) : (
               <p className="tanga-three__terrain-provenance">Survey surface is unavailable. Showing the regional elevation layer; retry after the terrain assets load.</p>
@@ -4525,10 +4829,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         )}
       </section>
       {mode === 'mine_planning' && <section className="tanga-mine-story" aria-label="Mining targets and animation">
-        <h2>Why these pits?</h2>
+        <h2>{miningBeat>=3?'Processing & site services':'Why these pits?'}</h2>
         <div className="tanga-mine-story__steps" aria-label="Mining camera presets">
           {(['northPit','southPit','resetView'] as const).map((action,index)=><button key={action} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(index===2?3:2);setFocusedSource(null);cameraCommandHandlerRef.current?.({id:Date.now(),action});}}>{['North pit','South pit','Whole site'][index]}</button>)}
         </div>
+        {miningBeat<3&&<>
         {focusedSource&&<p aria-live="polite">{focusedSource}<br/><small>Trace colour: white context, teal ≥4.5%, copper ≥5% TGC.</small></p>}
         <div className="tanga-mine-story__steps" aria-label="Evidence to concept sequence">
           {['01 · Drill evidence','02 · Grade targets','03 · Pit concept','04 · Processing'].map((label,index)=><button key={label} aria-pressed={miningBeat===index} onClick={()=>{setStoryPlaying(false);setMiningBeat(index);}}>{label}</button>)}
@@ -4541,14 +4846,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <small>{targetCount.toLocaleString()} source cells · original size and position<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on':'Solid pit view'}</button>
         <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
-        <details><summary>Explore processing equipment</summary>
+        </>}
+        <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
           <button onClick={()=>{setPlantCutaway(true);setPlantProcess('all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>Inspect whole processing plant</button>
           <div className="tanga-mine-story__steps">{[['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product silos']].map(([id,label])=><button key={id} onClick={()=>{setPlantCutaway(true);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:id});}}>{label}</button>)}</div>
           <button aria-pressed={plantCutaway} onClick={()=>{setPlantCutaway(v=>!v);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>{plantCutaway?'Restore plant roofs':'Cut away plant roofs'}</button>
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
-          <small>Six connected process areas in site coordinates. Illustrative equipment and retaining platform; an engineered plant design is not supplied.</small>
+          <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
-        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Haul routes unavailable — animation withheld'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
+        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Mine-to-feed road requires survey; map-traced conveyor is shown separately'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
@@ -4561,11 +4867,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <label>North–south section position<input aria-label="Geology section position" type="range" min="0" max="100" value={sectionPosition} disabled={!sectionEnabled} onChange={e=>setSectionPosition(Number(e.target.value))}/></label>
         <button aria-pressed={hostOnly} onClick={()=>setHostOnly(v=>!v)}>{hostOnly?'Show all rock units':'Isolate GRSC host unit'}</button>
         <label>Evidence spotlight<select aria-label="Geology spotlight unit" value={spotlight} onChange={e=>{setSpotlight(e.target.value);setHostOnly(false);}}><option value="">All units · no spotlight</option>{crossSource?.units.map(unit=><option key={unit.name} value={unit.name}>{unit.name.replace(/_/g,' ')}</option>)}</select></label>
-        <p>Copper: interpreted GRSC unit. Muted colours: surrounding units. Drill traces provide sampling context; interpreted contacts are not measured everywhere.</p>
+        <p>Pale grey: graphitic schist. Rock colours follow the map where names correspond. Unspecified schist and soil use neutral colours. Interpreted contacts are not observed everywhere.</p>
         <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
-      {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}
+      {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)} onInspectEvidence={onInspectEvidence}/>}
       {mode === 'metallurgy' && <section className="tanga-met-report" aria-label="Metallurgy testwork summary">
         <header><small>DECK SUMMARY · LAB REPORT VERIFICATION PENDING</small><h2>Carbon. Recovery. Flake.</h2></header>
         <MetallurgySampleExplorer/>
