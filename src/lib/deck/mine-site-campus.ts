@@ -20,13 +20,13 @@ export function buildMineSiteCampus(options:Options) {
   const facilities:CampusFacility[]=[],omissions:string[]=[];
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
   const materials={
-    earth:new THREE.MeshStandardMaterial({color:0x695944,roughness:1,side:THREE.DoubleSide}),
-    bench:new THREE.MeshStandardMaterial({color:0x88755c,roughness:1,side:THREE.DoubleSide}),
-    rock:new THREE.MeshStandardMaterial({color:0x656059,roughness:1,side:THREE.DoubleSide}),
-    beach:new THREE.MeshStandardMaterial({color:0x6c6d67,roughness:1,side:THREE.DoubleSide}),
-    liner:new THREE.MeshStandardMaterial({color:0x303d3c,roughness:.95,side:THREE.DoubleSide}),
-    water:new THREE.MeshStandardMaterial({color:0x416e6b,roughness:.23,metalness:.15,side:THREE.DoubleSide}),
-    fresh:new THREE.MeshStandardMaterial({color:0x487e88,roughness:.24,metalness:.12,side:THREE.DoubleSide}),
+    earth:new THREE.MeshStandardMaterial({color:0x8b775e,roughness:1,side:THREE.DoubleSide}),
+    bench:new THREE.MeshStandardMaterial({color:0xa28b6c,roughness:1,side:THREE.DoubleSide}),
+    rock:new THREE.MeshStandardMaterial({color:0x857e71,roughness:1,side:THREE.DoubleSide}),
+    beach:new THREE.MeshStandardMaterial({color:0xa5a397,roughness:1,side:THREE.DoubleSide}),
+    liner:new THREE.MeshStandardMaterial({color:0x3e4e50,roughness:.95,side:THREE.DoubleSide}),
+    water:new THREE.MeshStandardMaterial({color:0x4a8b8b,roughness:.23,metalness:.15,side:THREE.DoubleSide}),
+    fresh:new THREE.MeshStandardMaterial({color:0x579aa4,roughness:.24,metalness:.12,side:THREE.DoubleSide}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
     concrete:new THREE.MeshStandardMaterial({color:0xb1aa96,roughness:1}),
   };

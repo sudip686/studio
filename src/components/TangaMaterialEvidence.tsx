@@ -7,8 +7,8 @@ const FIGURES=[
   {id:'preparation',label:'Sample preparation',image:'graphite-lab-workflow.jpg',caption:'Laboratory separation and size fractions · Figure 2 · PDF p.16',detail:'The report describes crushing, sieving, water separation, collection, filtration and drying. This laboratory workflow is distinct from an industrial flowsheet.'},
 ] as const;
 
-export default function TangaMaterialEvidence({onClose}:{onClose:()=>void}){
-  const dialog=useRef<HTMLDialogElement>(null),[index,setIndex]=useState(0),figure=FIGURES[index];
+export default function TangaMaterialEvidence({onClose,initialIndex=0}:{onClose:()=>void;initialIndex?:number}){
+  const dialog=useRef<HTMLDialogElement>(null),[index,setIndex]=useState(initialIndex),figure=FIGURES[index];
   useEffect(()=>{dialog.current?.showModal();return()=>dialog.current?.close();},[]);
   return <dialog ref={dialog} className="tanga-material-evidence" aria-labelledby="material-evidence-heading" onClose={onClose} onClick={event=>{if(event.target===event.currentTarget)dialog.current?.close();}}>
     <header><div><span>REPORT EVIDENCE · 12 APRIL 2025</span><h2 id="material-evidence-heading">Inside the graphite samples</h2><p>Global Sustainable Eco-Solutions · Graphite report for SMMPL</p></div><button type="button" aria-label="Close material evidence" onClick={()=>dialog.current?.close()}>×</button></header>

@@ -1,115 +1,129 @@
 'use client';
+
 import {useEffect,useRef,useState} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
-import {createMetallurgyPlant,MET_GROUPS,PROCESS_STAGES,BASKET_POSITIONS} from '@/lib/deck/metallurgy-plant';
+import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
+import {createMetallurgyPlant,MET_GROUPS} from '@/lib/deck/metallurgy-plant';
+import {cameraEase} from '@/lib/deck/presentation-motion';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import TangaMaterialEvidence from './TangaMaterialEvidence';
-import {createMetallurgyInspection,inspectionCameraPose} from '@/lib/deck/metallurgy-inspection';
-import {cameraEase,createResolutionGovernor} from '@/lib/deck/presentation-motion';
 
+const STAGE_COPY=[
+  {title:'Start with the material.',question:'What did the laboratory receive?',detail:'Graphite-bearing rock is examined before preparation. The source report includes actual sample microscopy and preparation photographs.',label:'Rock sample'},
+  {title:'Liberate the graphite.',question:'Can graphite separate from the host rock?',detail:'Crushing and milling illustrate particle liberation. Laboratory conditions and flake preservation need their own test records.',label:'Preparation'},
+  {title:'Test the separation response.',question:'How does the sample respond to flotation?',detail:'Bench cells illustrate graphite separation. Recovery is a reported test result; the bubbles do not calculate a yield.',label:'Flotation'},
+  {title:'Recover the test concentrate.',question:'What is collected for measurement?',detail:'Filtration and drying illustrate preparation of a concentrate for analysis. This is a laboratory exhibit, separate from the proposed mine plant.',label:'Dewatering'},
+  {title:'Read three different measurements.',question:'Carbon, recovery and size answer different questions.',detail:'Concentrate carbon describes composition. Recovery describes graphite recovered from feed. The coarse fraction describes a sieve-size result.',label:'Characterisation'},
+] as const;
+
+/** A focused instrument exhibit; equipment is illustrative, results are sourced separately. */
 export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvidence}:{paused:boolean;onToggle:()=>void;onInspectEvidence?:()=>void}){
-  const host=useRef<HTMLDivElement>(null),pausedRef=useRef(paused),command=useRef<(n:number)=>void>();
-  const [materialEvidence,setMaterialEvidence]=useState(false);
-  const [stage,setStage]=useState(-1),[group,setGroup]=useState(0),[evidence,setEvidence]=useState(false),[error,setError]=useState('');
-  const [tip,setTip]=useState<{x:number;y:number;text:string}|null>(null);
-  const [comparison,setComparison]=useState(1);
-  const [tour,setTour]=useState(false);
-  useEffect(()=>{const stop=()=>{if(document.hidden)setTour(false);};document.addEventListener('visibilitychange',stop);return()=>document.removeEventListener('visibilitychange',stop);},[]);
+  const host=useRef<HTMLDivElement>(null),command=useRef<(stage:number)=>void>();
+  const pausedRef=useRef(paused);pausedRef.current=paused;
+  const [stage,setStage]=useState(2),[group,setGroup]=useState(0),[error,setError]=useState('');
+  const [figureIndex,setFigureIndex]=useState(0);
+  const [materialEvidence,setMaterialEvidence]=useState(false),[evidence,setEvidence]=useState(false);
   const groupRef=useRef(group);groupRef.current=group;
-  useEffect(()=>{
-    if(!tour||paused)return;
-    if(matchMedia('(prefers-reduced-motion: reduce)').matches){setTour(false);return;}
-    const timer=setTimeout(()=>{if(document.hidden||stage>=4){setTour(false);return;}command.current?.(stage+1);},stage===4?10000:7000);
-    return()=>clearTimeout(timer);
-  },[tour,paused,stage]);
-  const inspectionRef=useRef<(mode:'flake'|'sieve'|'compare'|null)=>void>();
-  const [inspectionMode,setInspectionMode]=useState<'flake'|'sieve'|'compare'|null>(null);
-  pausedRef.current=paused;
+  useEffect(()=>{command.current?.(stage);},[group,stage]);
   useEffect(()=>{
     const el=host.current;if(!el)return;
     let renderer:THREE.WebGLRenderer;
-    try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch{setError('3D renderer unavailable. Reported test results remain available.');return;}
-    renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
-    renderer.domElement.setAttribute('aria-label','Interactive graphite metallurgical testwork bench. Drag to orbit, scroll to zoom; stage buttons provide keyboard access.');el.appendChild(renderer.domElement);
-    const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(36,1,.1,1000),plant=createMetallurgyPlant();scene.add(plant.root);
-    const replacedMaterials=new Set<THREE.Material>();
-    plant.pickables.forEach(mesh=>{if(mesh.material instanceof THREE.MeshStandardMaterial){replacedMaterials.add(mesh.material);mesh.material=mesh.material.clone();}});
-    const inspection=createMetallurgyInspection();scene.add(inspection.root);
-    const labels=BASKET_POSITIONS.map(([x,z],i)=>{const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;const material=new THREE.SpriteMaterial({map:texture,depthTest:false});const sprite=new THREE.Sprite(material);sprite.position.set(x,9,z);sprite.scale.set(10,2.5,1);sprite.userData.testGroup=i;sprite.userData.stage=4;sprite.renderOrder=20;scene.add(sprite);return {canvas,texture,material,sprite};});
-    labels.forEach(({canvas,texture},i)=>{const ctx=canvas.getContext('2d')!;ctx.fillStyle='#132a32';ctx.fillRect(0,0,512,128);ctx.strokeStyle='#58c8bd';ctx.lineWidth=5;ctx.strokeRect(3,3,506,122);ctx.fillStyle='#fff';ctx.font='bold 47px sans-serif';ctx.textAlign='center';ctx.fillText(MET_GROUPS[i].id,256,78);texture.needsUpdate=true;});
-    scene.add(new THREE.HemisphereLight(0xe5f3ff,0x303943,1.35));
-    for(const [x,y,z,c,intensity] of [[-35,75,40,0xffead4,2.5],[40,35,-30,0xa4d6dc,1.5]]){const light=new THREE.DirectionalLight(c,intensity);light.position.set(x,y,z);scene.add(light);}
-    const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minDistance=25;controls.maxDistance=240;controls.maxPolarAngle=Math.PI*.48;
-    const fullPosition=()=>{const c=new THREE.PerspectiveCamera(36,Math.max(1,el.clientWidth)/Math.max(1,el.clientHeight),.1,1000),centre=new THREE.Vector3(0,1,0),direction=new THREE.Vector3(.12,.3,1).normalize();let distance=150;
-      for(let i=0;i<5;i++){c.position.copy(centre).addScaledVector(direction,distance);c.lookAt(centre);c.updateMatrixWorld();let extent=0;for(const x of [-61,73])for(const y of [-12,14])for(const z of [-21,21]){const p=new THREE.Vector3(x,y,z).project(c);extent=Math.max(extent,Math.abs(p.x),Math.abs(p.y));}distance*=extent*1.13;}
-      return centre.clone().addScaledVector(direction,distance);
-    };
-    let target=new THREE.Vector3(0,1,0),destination=fullPosition(),tween=true,userOrbit=false,selectedStage=-1;
-    let dirty=true;
-    const invalidate=()=>{dirty=true;};
-    controls.addEventListener('change',invalidate);
-    // Keep the existing basket arrangement, but frame its complete footprint.
-    const stagePosition=(n:number,x:number)=>new THREE.Vector3(x+(n===4?5:9),n===4?30:20,Math.max(n===4?57:38,(n===4?40:30)/camera.aspect));
-    camera.position.copy(destination);controls.target.copy(target);
-    let detailMode:'flake'|'sieve'|'compare'|null=null,detailTime=0;
-    const frameInspection=()=>{if(!detailMode)return;const pose=inspectionCameraPose(detailMode,camera.aspect);target.copy(pose.target);destination.copy(pose.position);tween=true;dirty=true;};
-    inspectionRef.current=mode=>{if(mode)setTour(false);detailMode=mode;detailTime=pausedRef.current||matchMedia('(prefers-reduced-motion: reduce)').matches?6:0;setInspectionMode(mode);inspection.show(mode);inspection.update(detailTime);plant.root.visible=!mode;labels.forEach((l,i)=>l.sprite.visible=!mode&&i===groupRef.current);frameInspection();dirty=true;userOrbit=false;setTip(null);};
-    command.current=n=>{inspectionRef.current?.(null);selectedStage=n;setStage(n);const x=PROCESS_STAGES[n]?.x??0;target=new THREE.Vector3(x,n<0?1:4,0);destination=n<0?fullPosition():stagePosition(n,x);tween=true;userOrbit=false;dirty=true;setTip(null);};
-    const start=()=>{tween=false;userOrbit=true;setTour(false);setTip(null);window.dispatchEvent(new Event('tanga:manual-exploration'));};controls.addEventListener('start',start);
-    const resize=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();dirty=true;if(!userOrbit){if(detailMode){frameInspection();}else{destination=selectedStage<0?fullPosition():stagePosition(selectedStage,PROCESS_STAGES[selectedStage].x);tween=true;}}};const observer=new ResizeObserver(resize);observer.observe(el);resize();
-    const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let down=false,lastPick=0,downAt=[0,0];
-    const basketClick=(event:PointerEvent)=>{if(detailMode||Math.hypot(event.clientX-downAt[0],event.clientY-downAt[1])>6)return;const r=el.getBoundingClientRect();pointer.set((event.clientX-r.left)/r.width*2-1,-(event.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects([...plant.pickables,...labels.filter(l=>l.sprite.visible).map(l=>l.sprite)],false)[0];const index=hit?.object.userData.testGroup;if(Number.isInteger(index)&&MET_GROUPS[index]){setGroup(index);setEvidence(true);command.current?.(4);}};
-    const pick=(event:PointerEvent)=>{if(down||performance.now()-lastPick<60)return;lastPick=performance.now();const r=el.getBoundingClientRect();pointer.set((event.clientX-r.left)/r.width*2-1,-(event.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects([...plant.pickables,...labels.filter(l=>l.sprite.visible).map(l=>l.sprite)],false)[0];const n=hit?.object.userData.stage;const item=PROCESS_STAGES[n],sample=MET_GROUPS[hit?.object.userData.testGroup];el.style.cursor=sample?'pointer':item?'help':'grab';setTip(item?{x:Math.max(8,Math.min(r.width-260,event.clientX-r.left+16)),y:Math.max(8,Math.min(r.height-110,event.clientY-r.top+14)),text:sample?`${sample.id}: ${sample.basis}. Click for results.`:`${item.title}. ${item.brief}`} :null);};
-    const pointerDown=(event:PointerEvent)=>{down=true;downAt=[event.clientX,event.clientY];setTip(null);};const up=()=>{down=false;};const leave=()=>setTip(null);
-    const safePick=(event:PointerEvent)=>{if(detailMode){setTip(null);return;}pick(event);};
-    el.addEventListener('pointermove',safePick);el.addEventListener('pointerdown',pointerDown);el.addEventListener('pointerup',basketClick);window.addEventListener('pointerup',up);el.addEventListener('pointerleave',leave);
-    const reduced=matchMedia('(prefers-reduced-motion: reduce)');let frame=0,last=performance.now(),time=0;
-    const governor=createResolutionGovernor(renderer.getPixelRatio());
-    let tweenAge=0,wasTweening=false;
-    let lastHighlight='',lastTelemetry=0,renderCount=0;
-    const tweenPosition=new THREE.Vector3(),tweenTarget=new THREE.Vector3(),lastDestination=new THREE.Vector3();
-    const draw=(now:number)=>{const delta=Math.max(0,Math.min(.05,(now-last)/1000));last=now;const visible=el.getClientRects().length>0&&!document.hidden;
-      if(visible){if(!pausedRef.current&&!reduced.matches){time+=delta;if(detailMode){detailTime+=delta;inspection.update(detailTime);}else plant.update(time);}
-        if(tween){if(!wasTweening||!lastDestination.equals(destination)){tweenAge=0;tweenPosition.copy(camera.position);tweenTarget.copy(controls.target);lastDestination.copy(destination);}tweenAge+=delta;const progress=reduced.matches?1:cameraEase(tweenAge/1.35);camera.position.lerpVectors(tweenPosition,destination,progress);controls.target.lerpVectors(tweenTarget,target,progress);if(progress===1)tween=false;}wasTweening=tween;
-        const highlight=`${selectedStage}:${groupRef.current}:${detailMode}`;
-        if(highlight!==lastHighlight){
-          lastHighlight=highlight;dirty=true;
-          plant.pickables.forEach(mesh=>{if(!(mesh.material instanceof THREE.MeshStandardMaterial))return;const active=selectedStage>=0&&mesh.userData.stage===selectedStage;const selected=mesh.userData.testGroup===groupRef.current&&selectedStage===4;mesh.material.emissive.setHex(selected?0x935122:active?0x165351:0);mesh.material.emissiveIntensity=selected?.4:active?.15:0;});
-          // One legible label, not seven overlapping billboards. All baskets
-          // remain selectable in 3D and through the existing result buttons.
-          labels.forEach((label,i)=>{label.sprite.visible=!detailMode&&i===groupRef.current;label.material.opacity=1;});
-        }
-        if(time>8){const ratio=governor.sample(delta*1000);if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);}
-        controls.update();
-        if(dirty||tween||(!pausedRef.current&&!reduced.matches)){renderer.render(scene,camera);renderCount++;dirty=false;}
-        if(now-lastTelemetry>=250){lastTelemetry=now;el.dataset.processTime=time.toFixed(2);el.dataset.inspectionTime=detailTime.toFixed(2);el.dataset.cameraDistance=camera.position.distanceTo(controls.target).toFixed(1);el.dataset.userOrbit=String(userOrbit);el.dataset.renderCount=String(renderCount);}
-      }frame=requestAnimationFrame(draw);
+    try{renderer=new THREE.WebGLRenderer({antialias:true});}catch{setError('3D equipment unavailable. Reported test summaries and source images remain available.');return;}
+    renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+    renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.NeutralToneMapping;renderer.toneMappingExposure=1.05;
+    renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    renderer.domElement.setAttribute('role','img');renderer.domElement.setAttribute('aria-label','Illustrative laboratory equipment in 3D. Drag to orbit or scroll to zoom. Select a stage to frame an instrument.');
+    el.appendChild(renderer.domElement);
+    const scene=new THREE.Scene();scene.background=new THREE.Color('#d9e2e5');
+    const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment(),environment=pmrem.fromScene(room,.04);room.dispose();scene.environment=environment.texture;
+    const camera=new THREE.PerspectiveCamera(36,1,.1,1000),controls=new OrbitControls(camera,renderer.domElement);
+    controls.enableDamping=true;controls.minDistance=15;controls.maxDistance=200;controls.maxPolarAngle=Math.PI*.49;
+    const plant=createMetallurgyPlant();scene.add(plant.root);
+    const plinth=new THREE.Group();scene.add(plinth);
+    const cabinetMaterial=new THREE.MeshStandardMaterial({color:0xf1f3f0,roughness:.5,metalness:.05});
+    const topMaterial=new THREE.MeshStandardMaterial({color:0xb8c4c9,roughness:.4,metalness:.55});
+    const floorMaterial=new THREE.MeshStandardMaterial({color:0xc7d0d3,roughness:1});
+    const floor=new THREE.Mesh(new THREE.PlaneGeometry(500,500),floorMaterial);floor.rotation.x=-Math.PI/2;floor.position.y=-8;floor.receiveShadow=true;scene.add(floor);
+    scene.add(new THREE.HemisphereLight(0xffffff,0x7a8791,1.25));
+    const key=new THREE.DirectionalLight(0xfffcf5,2);key.position.set(-30,70,45);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-100;key.shadow.camera.right=100;key.shadow.camera.top=70;key.shadow.camera.bottom=-70;key.shadow.camera.far=250;key.shadow.normalBias=.12;scene.add(key);
+    const fill=new THREE.DirectionalLight(0xe5f2ff,.7);fill.position.set(45,20,-35);scene.add(fill);
+    const target=new THREE.Vector3(),destination=new THREE.Vector3(),fromPosition=new THREE.Vector3(),fromTarget=new THREE.Vector3();
+    let selected=2,userOrbit=false,cameraStarted=performance.now(),tween=true,dirty=true,ready=false,last=performance.now(),time=0,frame=0;
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+    function cabinet(bounds:THREE.Box3){
+      for(const child of [...plinth.children]){plinth.remove(child);if(child instanceof THREE.Mesh)child.geometry.dispose();}
+      const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+      const w=Math.max(20,size.x+5),d=Math.max(16,size.z+5);
+      const base=new THREE.Mesh(new THREE.BoxGeometry(w,6,d),cabinetMaterial);base.position.set(centre.x,-4,centre.z);base.castShadow=true;base.receiveShadow=true;plinth.add(base);
+      const top=new THREE.Mesh(new THREE.BoxGeometry(w+1,.6,d+1),topMaterial);top.position.set(centre.x,-.65,centre.z);top.receiveShadow=true;plinth.add(top);
+      for(const x of [-.25,.25]){const handle=new THREE.Mesh(new THREE.BoxGeometry(Math.min(6,w*.15),.2,.35),topMaterial);handle.position.set(centre.x+x*w,-2,centre.z+d/2+.2);plinth.add(handle);}
+      bounds.expandByObject(plinth);
+    }
+    function frameStage(n:number){
+      selected=n;const bounds=new THREE.Box3();
+      plant.pickables.forEach(mesh=>{
+        mesh.visible=mesh.userData.stage===n&&!mesh.userData.transfer&&(mesh.userData.testGroup===undefined||mesh.userData.testGroup===groupRef.current);
+        if(mesh.visible)bounds.expandByObject(mesh);
+      });
+      cabinet(bounds);target.copy(bounds.getCenter(new THREE.Vector3()));
+      const direction=new THREE.Vector3(.55,.42,1).normalize();let distance=Math.max(25,bounds.getSize(new THREE.Vector3()).length());
+      const fit=new THREE.PerspectiveCamera(36,camera.aspect,.1,1000);
+      for(let i=0;i<5;i++){
+        fit.position.copy(target).addScaledVector(direction,distance);fit.lookAt(target);fit.updateMatrixWorld();let extent=0;
+        for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){const point=new THREE.Vector3(x,y,z).project(fit);extent=Math.max(extent,Math.abs(point.x),Math.abs(point.y));}
+        distance*=extent/0.84;
+      }
+      destination.copy(target).addScaledVector(direction,distance);fromPosition.copy(camera.position);fromTarget.copy(controls.target);cameraStarted=performance.now();tween=true;dirty=true;userOrbit=false;
+      if(!ready){camera.position.copy(destination);controls.target.copy(target);ready=true;tween=false;}
+      renderer.domElement.setAttribute('aria-label',`${STAGE_COPY[n].label}: illustrative laboratory equipment in 3D. Drag to orbit, scroll to zoom.`);
+      el!.dataset.stage=String(n);el!.dataset.visibleInstruments=String(plant.pickables.filter(m=>m.visible).length);
+    }
+    command.current=frameStage;
+    const resize=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();if(!userOrbit)frameStage(selected);dirty=true;};
+    const observer=new ResizeObserver(resize);observer.observe(el);resize();
+    const change=()=>{dirty=true;};const start=()=>{tween=false;userOrbit=true;window.dispatchEvent(new Event('tanga:manual-exploration'));};
+    controls.addEventListener('change',change);controls.addEventListener('start',start);
+    const draw=(now:number)=>{
+      const wallDelta=Math.max(0,(now-last)/1000),dt=Math.min(.1,wallDelta);last=now;
+      controls.dampingFactor=1-Math.exp(-Math.min(.2,wallDelta)*5);
+      if(!document.hidden&&el.getClientRects().length){
+        if(!pausedRef.current&&!reduced.matches){time+=dt;plant.update(time);dirty=true;}
+        if(tween){const progress=reduced.matches?1:cameraEase((now-cameraStarted)/1100);camera.position.lerpVectors(fromPosition,destination,progress);controls.target.lerpVectors(fromTarget,target,progress);if(progress===1)tween=false;dirty=true;}
+        controls.update();if(dirty){renderer.render(scene,camera);dirty=false;}
+        el.dataset.cameraMoving=String(tween);el.dataset.processTime=time.toFixed(2);
+      }
+      frame=requestAnimationFrame(draw);
     };frame=requestAnimationFrame(draw);el.dataset.ready='true';
-    return()=>{cancelAnimationFrame(frame);observer.disconnect();controls.dispose();command.current=undefined;inspectionRef.current=undefined;labels.forEach(l=>{l.texture.dispose();l.material.dispose();});el.removeEventListener('pointermove',safePick);el.removeEventListener('pointerdown',pointerDown);el.removeEventListener('pointerup',basketClick);window.removeEventListener('pointerup',up);el.removeEventListener('pointerleave',leave);const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>(replacedMaterials);scene.traverse(o=>{if(o instanceof THREE.Mesh){geometries.add(o.geometry);(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>materials.add(m));}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
+    return()=>{
+      cancelAnimationFrame(frame);observer.disconnect();controls.dispose();command.current=undefined;
+      const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
+      scene.traverse(object=>{if(object instanceof THREE.Mesh){geometries.add(object.geometry);(Array.isArray(object.material)?object.material:[object.material]).forEach(m=>materials.add(m));}});
+      geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());environment.dispose();pmrem.dispose();key.shadow.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();
+    };
   },[]);
-  const result=MET_GROUPS[group];
-  return <section className="tanga-process-exhibit" aria-label="Animated graphite metallurgical testwork" data-inspection={inspectionMode??'bench'}>
-    <header><div><small>METALLURGICAL TESTWORK · ILLUSTRATIVE LAB EQUIPMENT</small><h2>Characterise the graphite.</h2></div><div className="tanga-process-actions"><button onClick={()=>{setTour(false);command.current?.(-1);}} data-deck-tip="Restore the full testwork bench after orbiting or zooming.">Full bench</button><button aria-pressed={tour} onClick={()=>{if(tour)setTour(false);else{if(paused)onToggle();command.current?.(0);setTour(true);}}}>{tour?'Stop guided testwork':'Guide through testwork'}</button><button onClick={onToggle} aria-pressed={paused}>{paused?'Play testwork':'Pause testwork'}</button><button onClick={()=>setEvidence(v=>!v)} aria-expanded={evidence}>Test evidence</button></div></header>
+  const result=MET_GROUPS[group],copy=STAGE_COPY[stage];
+  const sourceFigure=stage===1||stage===3
+    ? {index:2,image:'graphite-lab-workflow.jpg',label:'Laboratory preparation',locator:'Figure 2 · PDF p.16'}
+    : stage===0?{index:0,image:'graphite-tgf002-microscopy.jpg',label:'TGF002 · microscopy',locator:'Figure 4 · PDF p.25'}
+    : {index:1,image:'graphite-sem.jpg',label:'Concentrate morphology · SEM',locator:'Figure 45 · PDF p.46'};
+  return <section className="tanga-process-exhibit tanga-process-exhibit--focused" aria-label="Graphite laboratory testwork" data-inspection="bench">
+    <header><div><small>BENCH-SCALE TESTWORK · ILLUSTRATIVE EQUIPMENT</small><h2>{copy.title}</h2></div><div className="tanga-process-actions"><button type="button" onClick={()=>command.current?.(stage)}>Reset view</button><button type="button" onClick={onToggle} aria-pressed={paused}>{paused?'Play motion':'Pause motion'}</button></div></header>
+    <nav className="tanga-process-stages" aria-label="Testwork stages">{STAGE_COPY.map((item,i)=><button type="button" key={item.label} aria-label={`0${i+1} ${item.label}`} aria-pressed={stage===i} onClick={()=>{setStage(i);window.dispatchEvent(new Event('tanga:manual-exploration'));}}><b>0{i+1}</b><span className="tanga-process-label-long">{item.label}</span><span className="tanga-process-label-short" aria-hidden="true">{['Rock','Prepare','Float','Dry','Measure'][i]}</span></button>)}</nav>
     <div className="tanga-process-body">
-      <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>{error&&<p role="alert">{error}</p>}{tip&&<div className="tanga-process-tooltip" role="tooltip" style={{left:tip.x,top:tip.y}}>{tip.text}</div>}<div className="tanga-process-caption">{inspectionMode==='flake'?'Stylised layered graphite flake · not microscopy or measured particle geometry':inspectionMode==='sieve'?'Illustrative sieve motion · particle counts and mesh spacing do not represent measured fractions':inspectionMode==='compare'?`Left: ${result.id} · Right: ${MET_GROUPS[comparison].id} · Equal illustrative fill, not yield`:stage<0?'Sample → lab milling → flotation test → filtration → characterisation':PROCESS_STAGES[stage].brief}<small>Drag to orbit · scroll to zoom · use Full bench to return</small></div></div>
-      <aside className="tanga-process-results"><label>Reported test group<select aria-label="Processing test group" value={group} onChange={e=>{setTour(false);setGroup(Number(e.target.value));}}>{MET_GROUPS.map((g,i)=><option key={g.id} value={i}>{g.id}</option>)}</select></label>
-        <div className="tanga-inspection-actions" aria-label="Metallurgy inspection animations">
-          <button aria-pressed={inspectionMode==='flake'} onClick={()=>inspectionRef.current?.('flake')}>Inspect graphite flake</button>
-          <button aria-pressed={inspectionMode==='sieve'} onClick={()=>inspectionRef.current?.('sieve')}>Animate sieve stack</button>
-          <button aria-pressed={inspectionMode==='compare'} onClick={()=>inspectionRef.current?.('compare')}>Compare samples</button>
-        </div>
-        {inspectionMode==='compare'&&<div className="tanga-process-comparison"><label>Right-hand sample<select aria-label="Comparison sample" value={comparison} onChange={e=>{setComparison(Number(e.target.value));inspectionRef.current?.('compare');}}>{MET_GROUPS.map((g,i)=><option key={g.id} value={i}>{g.id}</option>)}</select></label><dl>{[result,MET_GROUPS[comparison]].map((g,i)=><div key={i}><dt>{i?'Right':'Left'} · {g.id}</dt><dd>TC: {g.carbon}</dd><dd>Recovery: {g.recovery}</dd><dd>+150 µm: {g.coarse}</dd></div>)}</dl><small>Groups may overlap individual samples. No additive totals or inferred missing values.</small></div>}
-        <div className="tanga-process-quality" data-deck-tip="TC describes concentrate composition, not feed grade. Recovery is the proportion of feed graphite recovered in testwork."><strong>{result.carbon}</strong><span>Concentrate carbon</span><b>{result.recovery} recovery</b></div>
-        <div className="tanga-process-basket-result" aria-live="polite" data-test-group={result.id}><strong>{result.id} · basic results</strong><p>+150 µm: {result.coarse}<br/>Finer fraction: {result.fine}</p><small>{result.basis}</small></div>
-        {MET_GROUPS.map((g,i)=><button key={g.id} className="tanga-process-bin" aria-pressed={group===i} onClick={()=>{setTour(false);setGroup(i);setEvidence(true);command.current?.(4);}} data-deck-tip={`Inspect ${g.id}: ${g.basis}. Not a production output.`}><i aria-hidden="true">▥</i><span>{g.id}<strong>Inspect test results</strong></span></button>)}
-        <p>Groups can overlap individual samples; results are not additive. Transfers and basket fill are illustrative.</p>
-        {evidence&&<div className="tanga-process-evidence"><MetallurgySampleExplorer key={group} initialIndex={group}/></div>}
+      <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>
+        <button type="button" className="tanga-process-source-figure" onClick={()=>{onInspectEvidence?.();setFigureIndex(sourceFigure.index);setMaterialEvidence(true);}}>
+          <small>SOURCE OBSERVATION ↗</small><img src={`/presentation-assets/${sourceFigure.image}`} alt={sourceFigure.label}/><strong>{sourceFigure.label}</strong><span>{sourceFigure.locator} · April 2025</span><em>Separate characterisation evidence; not linked to the selected test group.</em>
+        </button>{error&&<p role="alert">{error}</p>}<div className="tanga-process-caption"><span>{copy.question}</span><small>Drag to orbit · scroll to zoom</small></div></div>
+      <aside className="tanga-process-results">
+        <small className="tanga-process-kicker">0{stage+1} / 05 · {copy.label.toUpperCase()}</small><h3>Reported test response</h3>
+        <label>Reported test group<select aria-label="Processing test group" value={group} onChange={event=>setGroup(Number(event.target.value))}>{MET_GROUPS.map((item,i)=><option key={item.id} value={i}>{item.id}</option>)}</select></label>
+        <dl className="tanga-process-metrics" aria-live="polite"><div><dt>Concentrate carbon</dt><dd>{result.carbon}</dd></div><div><dt>Graphite recovery</dt><dd>{result.recovery}</dd></div><div><dt>Coarse fraction · +150 µm</dt><dd>{result.coarse}</dd></div></dl>
+        <button type="button" className="tanga-material-entry" onClick={()=>{onInspectEvidence?.();setFigureIndex(0);setMaterialEvidence(true);}}>View actual report images <span>Microscopy · SEM · preparation ↗</span></button>
+        <details open={evidence} onToggle={event=>setEvidence(event.currentTarget.open)}><summary>Result basis &amp; definitions</summary><p>{copy.detail}</p><p>{result.basis}. Groups may overlap individual samples; values are not additive.</p><MetallurgySampleExplorer key={group} initialIndex={group}/></details>
       </aside>
     </div>
-    <button type="button" className="tanga-material-entry" onClick={()=>{setTour(false);onInspectEvidence?.();setMaterialEvidence(true);}}>Explore the actual samples <span>Microscopy · SEM · laboratory preparation ↗</span></button>
-    {materialEvidence&&<TangaMaterialEvidence onClose={()=>setMaterialEvidence(false)}/>}
-    <nav className="tanga-process-stages" aria-label="Inspect testwork equipment">{PROCESS_STAGES.map((s,i)=><button key={s.id} aria-pressed={stage===i} data-deck-tip={s.brief} onClick={()=>{setTour(false);command.current?.(i);}}><b>0{i+1}</b>{s.title}</button>)}</nav>
-    <footer>Illustrative testwork sequence, not the verified laboratory protocol. Results: existing deck summaries; laboratory verification pending. TC, recovery and flake size measure different characteristics.</footer>
+    <footer>Equipment illustrates a testwork sequence. Results are existing deck summaries pending original laboratory-report verification; TC, recovery and flake size are separate measurements.</footer>
+    {materialEvidence&&<TangaMaterialEvidence initialIndex={figureIndex} onClose={()=>setMaterialEvidence(false)}/>}
   </section>;
 }

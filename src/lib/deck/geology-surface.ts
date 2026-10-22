@@ -4,7 +4,7 @@ type MapUnit = {properties:{unit:string;color:string};geometry:{type:'MultiPolyg
 export type GeologySurfaceData = {features:MapUnit[]};
 
 /** Derived map polygons only. No source model vertices are changed or extruded. */
-export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:number;northing:number}, height:(x:number,z:number)=>number, extent:{width:number;depth:number}) {
+export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:number;northing:number}, height:(x:number,z:number)=>number, extent:{width:number;depth:number;surveyed?:(x:number,z:number)=>boolean}) {
   const group = new THREE.Group();
   group.name = 'Digitized geological map · approximate grid registration';
   const bounds = new THREE.Box3();
@@ -13,12 +13,15 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     const toLocal=(p:number[])=>new THREE.Vector2(p[0]-origin.easting,origin.northing-p[1]);
     function triangle(a:THREE.Vector2,b:THREE.Vector2,c:THREE.Vector2,depth=0) {
       const ab=a.distanceToSquared(b),bc=b.distanceToSquared(c),ca=c.distanceToSquared(a);
-      if(Math.max(ab,bc,ca)>90*90 && depth<22) {
+      const sourceA=extent.surveyed?.(a.x,a.y);
+      const mixedSource=Boolean(extent.surveyed&&(extent.surveyed(b.x,b.y)!==sourceA||extent.surveyed(c.x,c.y)!==sourceA));
+      if((Math.max(ab,bc,ca)>90*90||(mixedSource&&Math.max(ab,bc,ca)>12*12)) && depth<22) {
         if(ab>=bc&&ab>=ca){const m=a.clone().lerp(b,.5);triangle(a,m,c,depth+1);triangle(m,b,c,depth+1);}
         else if(bc>=ca){const m=b.clone().lerp(c,.5);triangle(a,b,m,depth+1);triangle(a,m,c,depth+1);}
         else {const m=c.clone().lerp(a,.5);triangle(a,b,m,depth+1);triangle(m,b,c,depth+1);}
         return;
       }
+      if(mixedSource)return;
       // Clip mapped coverage to the existing terrain patch. Never stretch its
       // imagery or leave map polygons floating beyond the displayed ground.
       let clipped=[a,b,c];
@@ -48,7 +51,7 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     geometry.computeBoundingSphere();
-    const material=new THREE.MeshBasicMaterial({color:feature.properties.color,transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+    const material=new THREE.MeshBasicMaterial({color:feature.properties.color,transparent:true,opacity:.9,toneMapped:false,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=feature.properties.unit;
     mesh.renderOrder=30;

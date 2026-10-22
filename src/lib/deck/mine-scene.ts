@@ -5,7 +5,13 @@ import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
 export function buildConcentrator() {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x708590,metalness:0.55,roughness:0.45}),roof:new THREE.MeshStandardMaterial({color:0x243743,roughness:0.7}),copper:new THREE.MeshStandardMaterial({color:0xc7551b,roughness:0.5}),concrete:new THREE.MeshStandardMaterial({color:0x998b76,roughness:1}),water:new THREE.MeshStandardMaterial({color:0x267f88,metalness:0.2,roughness:0.2}),rock:new THREE.MeshStandardMaterial({color:0x544639,roughness:1})};
+  const materials={steel:new THREE.MeshStandardMaterial({color:0xb8c6cc,metalness:0.55,roughness:0.38}),roof:new THREE.MeshStandardMaterial({color:0x526c78,roughness:0.65}),copper:new THREE.MeshStandardMaterial({color:0xd2a544,metalness:.25,roughness:0.45}),concrete:new THREE.MeshStandardMaterial({color:0xb7b0a0,roughness:.95}),water:new THREE.MeshStandardMaterial({color:0x4a8b95,metalness:0.15,roughness:0.25}),rock:new THREE.MeshStandardMaterial({color:0x81735e,roughness:1})};
+  const cladding=new THREE.MeshStandardMaterial({color:0x9bafb7,roughness:.65,metalness:.25});
+  cladding.onBeforeCompile=shader=>{
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.94+0.06*smoothstep(-0.5,0.5,sin(vRoofPoint.x*4.0));');
+  };
+  cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
@@ -22,7 +28,7 @@ export function buildConcentrator() {
   function shed(name:string,x:number,z:number,w:number,d:number,h:number){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
     for(const sign of [-1,1]){
-      const roof=box(w,1.2,roofLength,x,h+rise/2,z+sign*d/4,materials.roof,name);
+      const roof=box(w,1.2,roofLength,x,h+rise/2,z+sign*d/4,cladding,name);
       roof.rotation.x=sign*Math.atan2(rise,d/2);
       roof.userData.plantRoof=true;
     }
@@ -132,34 +138,69 @@ export function buildConcentrator() {
   return root;
 }
 
-/** Presentation-only level platform; not an earthworks or retaining-wall design. */
+export type ConceptPad={x:number;z:number;width:number;depth:number;level:number;transition:number};
+
+function padBlend(pad:ConceptPad,x:number,z:number){
+  const distance=Math.max(0,Math.abs(x-pad.x)-pad.width/2,Math.abs(z-pad.z)-pad.depth/2);
+  const t=Math.min(1,distance/pad.transition);return 1-t*t*(3-2*t);
+}
+
+export function conceptPadHeight(pad:ConceptPad,x:number,z:number,sourceHeight:number){
+  const blend=padBlend(pad,x,z);return sourceHeight*(1-blend)+pad.level*blend;
+}
+
+/** An illustrative cut/fill display, never an engineered earthworks design.
+ * Median ground level avoids a tall plinth perched above the entire hillside. */
 export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:number,z:number)=>number,footprint?:{width:number;depth:number}) {
   const width=footprint?.width??CONCEPT.plantWidth,depth=footprint?.depth??CONCEPT.plantDepth;
-  let low=Infinity,high=-Infinity;
-  for(let dx=-width/2;dx<=width/2;dx+=5)for(let dz=-depth/2;dz<=depth/2;dz+=5){
-    const y=height(x+dx,z+dz);low=Math.min(low,y);high=Math.max(high,y);
-  }
-  const level=high+1.5;
-  // Follow the actual sampled perimeter rather than extending a deep box beneath
-  // every edge. This remains a retaining-platform illustration, not earthworks.
+  const levels:number[]=[];
+  for(let dx=-width/2;dx<=width/2;dx+=5)for(let dz=-depth/2;dz<=depth/2;dz+=5)levels.push(height(x+dx,z+dz));
+  levels.sort((a,b)=>a-b);
+  const level=levels[Math.floor(levels.length/2)]+1.5;
+  const pad:ConceptPad={x,z,width,depth,level,transition:30};
+  root.userData.conceptPad=pad;
   const vertices:number[]=[];
-  const corners:Point2[]=[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]];
-  for(let edge=0;edge<4;edge++){
-    const a=corners[edge],b=corners[(edge+1)%4],n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/5);
-    for(let i=0;i<n;i++){
-      const points=[i/n,(i+1)/n].map(t=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);
-      const [u,v]=points;
-      const top=(p:number[])=>[p[0]/root.scale.x,0,p[1]/root.scale.z];
-      const base=(p:number[])=>[p[0]/root.scale.x,(height(x+p[0],z+p[1])-level-2)/root.scale.y,p[1]/root.scale.z];
-      vertices.push(...top(u),...base(u),...top(v),...top(v),...base(u),...base(v));
+  const ring=(distance:number)=>[[-width/2-distance,-depth/2-distance],[width/2+distance,-depth/2-distance],[width/2+distance,depth/2+distance],[-width/2-distance,depth/2+distance]];
+  const vertex=(p:number[])=>[p[0]/root.scale.x,((height(x+p[0],z+p[1])*(1-padBlend(pad,x+p[0],z+p[1]))+level*padBlend(pad,x+p[0],z+p[1]))-level+.3)/root.scale.y,p[1]/root.scale.z];
+  for(let strip=0;strip<6;strip++){
+    const inner=ring(strip*5),outer=ring((strip+1)*5);
+    for(let edge=0;edge<4;edge++){
+      const next=(edge+1)%4,n=Math.ceil(Math.hypot(outer[next][0]-outer[edge][0],outer[next][1]-outer[edge][1])/5);
+      const point=(r:number[][],t:number)=>[r[edge][0]+(r[next][0]-r[edge][0])*t,r[edge][1]+(r[next][1]-r[edge][1])*t];
+      for(let i=0;i<n;i++){
+        const a=vertex(point(inner,i/n)),b=vertex(point(inner,(i+1)/n)),c=vertex(point(outer,i/n)),d=vertex(point(outer,(i+1)/n));
+        vertices.push(...a,...c,...b,...b,...c,...d);
+      }
     }
   }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();
-  const foundation=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0x625647,roughness:1,side:THREE.DoubleSide}));
-  foundation.name='Conceptual level platform foundation';
-  foundation.receiveShadow=true;root.add(foundation);
-  root.position.set(x,level,z);
-  return level;
+  const earthworks=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0x9b876e,roughness:1,side:THREE.DoubleSide}));
+  earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
+  root.position.set(x,level,z);return level;
+}
+
+function retainSourceTerrain(geometry:THREE.BufferGeometry){
+  const position=geometry.getAttribute('position');
+  if(position&&!geometry.userData.sourcePositions)geometry.userData.sourcePositions=new Float32Array(position.array);
+}
+function retainConceptTerrain(geometry:THREE.BufferGeometry){
+  geometry.userData.conceptPositions=new Float32Array(geometry.getAttribute('position').array);
+  geometry.userData.conceptVisible=undefined;
+}
+export function gradeConceptPad(geometry:THREE.BufferGeometry,pad:ConceptPad){
+  const position=geometry.getAttribute('position');if(!position)return;
+  retainSourceTerrain(geometry);
+  for(let i=0;i<position.count;i++){
+    const blend=padBlend(pad,position.getX(i),position.getZ(i));
+    if(blend>0)position.setY(i,position.getY(i)*(1-blend)+pad.level*blend);
+  }
+  position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();retainConceptTerrain(geometry);
+}
+export function showConceptTerrain(geometry:THREE.BufferGeometry,show:boolean){
+  if(!geometry.userData.sourcePositions||!geometry.userData.conceptPositions||geometry.userData.conceptVisible===show)return;
+  const position=geometry.getAttribute('position');
+  (position.array as Float32Array).set(show?geometry.userData.conceptPositions:geometry.userData.sourcePositions);
+  position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();geometry.userData.conceptVisible=show;
 }
 
 export function pitHeight(p:Point2,pit:CandidatePit) {
@@ -173,8 +214,9 @@ export function pitHeight(p:Point2,pit:CandidatePit) {
 }
 export function carvePit(geometry:THREE.BufferGeometry,pits:CandidatePit[]) {
   const position=geometry.getAttribute('position');if(!position)return;
+  retainSourceTerrain(geometry);
   for(let i=0;i<position.count;i++){const p:Point2=[position.getX(i),position.getZ(i)];for(const pit of pits){const y=pitHeight(p,pit);if(y!==null)position.setY(i,Math.min(position.getY(i),y));}}
-  position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();
+  position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();retainConceptTerrain(geometry);
 }
 /** Exact contour bands eliminate the staircase aliasing of a clipped XY grid. */
 export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>number) {
