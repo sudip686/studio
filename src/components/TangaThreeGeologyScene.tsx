@@ -4619,7 +4619,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(document.hidden){lastMotionElapsed=clock.getElapsedTime();lastQualityFrame=performance.now();host.dataset.haulMotion='paused';frame=requestAnimationFrame(animate);return;}
       const elapsed = clock.getElapsedTime();
       const qualityNow=performance.now(),frameMs=qualityNow-lastQualityFrame;lastQualityFrame=qualityNow;
-      if(elapsed>2){const baseRatio=resolutionGovernor.sample(frameMs);const inGesture=interacting||performance.now()-lastInteractionAt<350;const ratio=inGesture?Math.min(.6,baseRatio):baseRatio;if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);const scale=ratio.toFixed(2);if(host.dataset.renderScale!==scale)host.dataset.renderScale=scale;}
+      if(elapsed>2){
+        const inGesture=interacting||performance.now()-lastInteractionAt<350;
+        // Keep the draw-buffer scale fixed while the camera moves. Dropping
+        // to 0.6 during a drag and restoring the settled scale on release
+        // made colored blocks, pads, and thin terrain details visibly shimmer.
+        // Let the governor adapt only while the view is at rest; all scenes
+        // share this loop, so camera motion keeps a consistent raster scale.
+        const ratio=inGesture?renderer.getPixelRatio():resolutionGovernor.sample(frameMs);
+        if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);
+        const scale=ratio.toFixed(2);
+        if(host.dataset.renderScale!==scale)host.dataset.renderScale=scale;
+      }
       const detail=detailOptions.current;
       if(mode==='subsurface'){
         stage.updateMatrixWorld(true);

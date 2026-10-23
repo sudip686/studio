@@ -113,7 +113,10 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       target.set(0, 0, 0);
       const bounds = overviewBounds;
       const size = bounds.getSize(new THREE.Vector3());
-      target.y = bounds.min.y + size.y * .36;
+      // The campus has its water allowance and approach yard at the near edge.
+      // Bias the view toward the near edge to keep both in frame at desktop
+      // viewport sizes after fitting the full plant bounds.
+      target.y = bounds.min.y;
       const fitCamera = new THREE.PerspectiveCamera(camera.fov, camera.aspect, .1, 4000);
       let distance = Math.max(size.x, size.z) * .8;
       for (let iteration = 0; iteration < 5; iteration++) {
@@ -126,7 +129,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         }
         distance *= Math.max(.1, extent / .76);
       }
-      distance = Math.max(125, distance * .7);
+      // Keep the whole campus comfortably inside the canvas. Tighter .58/.64
+      // factors cropped the near-side water allowance at 1366 × 768.
+      distance = Math.max(125, distance * .68);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
     }
