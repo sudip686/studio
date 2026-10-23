@@ -6,7 +6,7 @@ import {DeckGL} from '@deck.gl/react';
 import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
-import {ArrowDown, ArrowUp, Box, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
+import {ArrowDown, ArrowUp, Box, Copy, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import proj4 from 'proj4';
@@ -29,11 +29,12 @@ import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {TangaChapterStoryPanel, TangaEvidenceDrawer, TangaMilestoneStage} from './TangaStoryPanels';
 import TangaPeerBenchmark from './TangaPeerBenchmark';
 import TangaStoryCue from './TangaStoryCue';
-import TangaGeologyMapStage from './TangaGeologyMapStage';
+import TangaGeologyMapStage, {type GeologyUnitSelection} from './TangaGeologyMapStage';
 import type {DevelopmentView} from '@/data/tanga-development';
 import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
 import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
+import {MAPPED_ROCK_UNITS} from '@/lib/deck/geology-palette';
 import {
   type CameraAction,
   type CommandIntent,
@@ -2019,6 +2020,26 @@ function fmtElapsed(ms: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function encodeLayerSettings(settings: DeckLayerSettings) {
+  return DECK_LAYERS.map(({id}) => `${id}:${settings[id].visible ? 1 : 0}:${Math.round(clamp(settings[id].opacity,0,1)*100)}`).join(',');
+}
+function decodeLayerSettings(value: string | null, drillingVisible: boolean): DeckLayerSettings | null {
+  if (!value) return null;
+  const parsed: Partial<DeckLayerSettings> = {};
+  for (const entry of value.split(',')) {
+    const [rawId, rawVisible, rawOpacity, extra] = entry.split(':');
+    if (extra !== undefined || !DECK_LAYERS.some(({id}) => id === rawId) || !['0','1'].includes(rawVisible)) return null;
+    const opacity = Number(rawOpacity);
+    if (!Number.isInteger(opacity) || opacity < 0 || opacity > 100) return null;
+    parsed[rawId as DeckLayerId] = {visible: rawVisible === '1', opacity: opacity / 100};
+  }
+  if (DECK_LAYERS.some(({id}) => !parsed[id])) return null;
+  return {...DEFAULT_LAYER_SETTINGS, ...parsed, drilling: parsed.drilling ?? {...DEFAULT_LAYER_SETTINGS.drilling, visible:drillingVisible}};
+}
+function layerSettingsAreModified(settings: DeckLayerSettings, drillingVisible: boolean) {
+  return DECK_LAYERS.some(({id}) => settings[id].visible !== (id === 'drilling' ? drillingVisible : true) || settings[id].opacity < 1);
+}
+
 // URL hash <-> scene id (deep-linkable slides, refresh-safe)
 const SCENE_HASH_KEY = 'tanga:lastScene';
 function readHashScene(): string | null {
@@ -2026,10 +2047,23 @@ function readHashScene(): string | null {
   const h = window.location.hash.replace(/^#/, '');
   return h || null;
 }
-function writeHashScene(mode: string) {
+function writeHashScene(mode: string, viewId?: string, peerKey?: string, featureId?: string, layers?: DeckLayerSettings) {
   if (typeof window === 'undefined') return;
-  if (window.location.hash === `#${mode}`) return;
-  history.replaceState(null, '', `#${mode}`);
+  const url = new URL(window.location.href);
+  url.hash = mode;
+  if (viewId) url.searchParams.set('view', viewId);
+  else url.searchParams.delete('view');
+  if (peerKey) url.searchParams.set('peer', peerKey);
+  else url.searchParams.delete('peer');
+  if (featureId) url.searchParams.set('feature', featureId);
+  else url.searchParams.delete('feature');
+  if (layers) url.searchParams.set('layers', encodeLayerSettings(layers));
+  else url.searchParams.delete('layers');
+  if (viewId || peerKey || featureId || layers) url.searchParams.set('v','1');
+  else url.searchParams.delete('v');
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  if (`${window.location.pathname}${window.location.search}${window.location.hash}` === next) return;
+  history.replaceState(null, '', next);
   try { window.localStorage?.setItem(SCENE_HASH_KEY, mode); } catch {}
 }
 function readStoredScene(): string | null {
@@ -2087,7 +2121,10 @@ export default function TangaDeckWorkbench() {
   const [activeMode, setActiveMode] = useState<WorkbenchMode>(DEFAULT_MODE);
   const [isExploreMode, setExploreMode] = useState(false);
   const [activeShotIndex, setActiveShotIndex] = useState(0);
+  const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
+  const restoredLayerSettingsRef = useRef<WorkbenchMode|null>(null);
   const [geologySectionShown, setGeologySectionShown] = useState(false);
+  const [selectedGeologyUnit, setSelectedGeologyUnit] = useState<GeologyUnitSelection|null>(null);
   const [availableMineFacilities,setAvailableMineFacilities]=useState<string[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState('drilling');
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
@@ -2158,6 +2195,8 @@ export default function TangaDeckWorkbench() {
   const [peerMreRevealed, setPeerMreRevealed] = useState(false);
   useEffect(() => { if (activeMode === 'ranking') setPeerMreRevealed(false); }, [activeMode]);
   const [threeSceneRequested, setThreeSceneRequested] = useState(false);
+  const [threeSceneRevision, setThreeSceneRevision] = useState(0);
+  const [shareStatus, setShareStatus] = useState('');
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
   const threeCameraSequenceRef=useRef(0);
   const [selectedPeerProject, setSelectedPeerProject] = useState<GraphitePeerProjectRow | null>(null);
@@ -4598,20 +4637,6 @@ export default function TangaDeckWorkbench() {
   // hash) always starts from the beginning — we intentionally do NOT silently
   // resume the last-seen scene from localStorage, which surprised the user.
   const restoredRef = useRef(false);
-  useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
-    const stored = readHashScene();
-    if (!stored) return;
-    const targetIndex = STORY_STEPS.findIndex((s) => s.mode === stored);
-    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) {
-      goToStoryIndex(targetIndex);
-    }
-  // Intentionally run once — restore is a one-shot on mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // On scene change: keep the URL and localStorage in sync.
-  useEffect(() => { writeHashScene(activeMode); }, [activeMode]);
 
   const goToStoryIndex = useCallback((index: number) => {
     setExploreMode(false);
@@ -4653,6 +4678,65 @@ export default function TangaDeckWorkbench() {
       issueThreeCameraCommand(shot.threeAction);
     }
   }, [issueThreeCameraCommand]);
+
+  // Chapter and authored-shot links remain compatible with the existing #chapter URLs.
+  // Unknown chapter, view and peer identifiers safely fall back to the chapter default.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const requestedMode = readHashScene();
+    const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
+    const targetMode = targetIndex >= 0 ? STORY_STEPS[targetIndex].mode : null;
+    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+    if (targetMode) {
+      const supportsVersionOneState = params.get('v') === '1';
+      const shotId = params.get('view');
+      const shotIndex = supportsVersionOneState && shotId ? STORY_SHOTS[targetMode].findIndex((shot) => shot.id === shotId) : -1;
+      if (shotIndex >= 0) applyStoryShot(targetMode, shotIndex);
+      if (supportsVersionOneState && targetMode === 'ranking') {
+        const peerKey = params.get('peer');
+        const peer = peerKey ? graphitePeerRows(true).find((row) => peerProjectKey(row) === peerKey) : null;
+        if (peer) selectPeerProject(peer);
+      }
+      if (supportsVersionOneState && targetMode === 'subsurface') {
+        const featureId = params.get('feature');
+        const unit = MAPPED_ROCK_UNITS.find((candidate) => candidate.label === featureId);
+        if (unit) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
+      }
+      if (supportsVersionOneState) {
+        const sharedLayers = decodeLayerSettings(params.get('layers'), targetMode !== 'mine_planning' && targetMode !== 'metallurgy');
+        if (sharedLayers) {restoredLayerSettingsRef.current=targetMode;setLayerSettings(sharedLayers);}
+      }
+    }
+  // Intentionally run once — restore is a one-shot on mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const activeShareViewId = activeShots[activeShotIndex]?.id;
+  const activeSharedFeature = activeMode === 'subsurface' ? selectedGeologyUnit?.title : undefined;
+  const sharedLayers = layerSettingsAreModified(layerSettings, activeMode !== 'mine_planning' && activeMode !== 'metallurgy') ? layerSettings : undefined;
+  useEffect(() => { writeHashScene(activeMode, activeShotIndex > 0 ? activeShareViewId : undefined, activeMode === 'ranking' ? selectedPeerKey : undefined, activeSharedFeature, sharedLayers); }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, activeSharedFeature, sharedLayers]);
+  const copyCurrentView = useCallback(async () => {
+    const url = new URL(window.location.href);
+    url.hash = activeMode;
+    if (activeShotIndex > 0 && activeShareViewId) url.searchParams.set('view', activeShareViewId);
+    else url.searchParams.delete('view');
+    if (activeMode === 'ranking' && selectedPeerKey) url.searchParams.set('peer', selectedPeerKey);
+    else url.searchParams.delete('peer');
+    if (activeMode === 'subsurface' && selectedGeologyUnit) url.searchParams.set('feature', selectedGeologyUnit.title);
+    else url.searchParams.delete('feature');
+    if (sharedLayers) url.searchParams.set('layers', encodeLayerSettings(sharedLayers));
+    else url.searchParams.delete('layers');
+    if (url.searchParams.has('view') || url.searchParams.has('peer') || url.searchParams.has('feature') || url.searchParams.has('layers')) url.searchParams.set('v','1');
+    else url.searchParams.delete('v');
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      setShareStatus('View link copied');
+    } catch {
+      setShareStatus('Copy unavailable. Copy the address bar link.');
+    }
+    window.setTimeout(() => setShareStatus(''), 3200);
+  }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, selectedGeologyUnit, sharedLayers]);
 
   const toggleGeologySection = useCallback(() => {
     const action: ThreeCameraAction = geologySectionShown ? 'restoreSection' : 'revealSection';
@@ -4712,7 +4796,6 @@ export default function TangaDeckWorkbench() {
   // Presenter layer controls, in the spirit of a GIS layers panel: in Q&A the
   // ask is usually "drop the blocks and show me just the holes", and changing
   // scene is too blunt an answer.
-  const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
   const [surfaceConceptView, setSurfaceConceptView] = useState(false);
   const preCompareLayersRef = useRef<DeckLayerSettings | null>(null);
   const toggleSurfaceConceptView = useCallback(() => {
@@ -4734,6 +4817,10 @@ export default function TangaDeckWorkbench() {
     }
   }, [activeMode, surfaceConceptView]);
   useEffect(() => {
+    if (restoredLayerSettingsRef.current) {
+      if (restoredLayerSettingsRef.current === activeMode) restoredLayerSettingsRef.current = null;
+      return;
+    }
     setLayerSettings(current => ({...current, drilling: {...current.drilling, visible: defaultDrillingVisible}}));
   }, [activeMode, defaultDrillingVisible]);
   const [isLayersOpen, setLayersOpen] = useState(false);
@@ -5168,6 +5255,7 @@ export default function TangaDeckWorkbench() {
 
       {threeSceneRequested && (
         <TangaThreeGeologyScene
+          key={`${threeMode}:${threeSceneRevision}`}
           visible={threeVisible}
           mode={threeMode}
           resourceFocus={resourceFocus}
@@ -5176,6 +5264,9 @@ export default function TangaDeckWorkbench() {
           cameraCommand={threeCameraCommand}
           assetQuality={assetQuality}
           onLoadState={handleThreeLoadState}
+          onRetry={() => { setThreeLoadReport(DEFAULT_THREE_LOAD_REPORT); setThreeSceneRevision((revision) => revision + 1); }}
+          selectedGeologyUnit={selectedGeologyUnit?.title}
+          onSelectGeologyUnit={setSelectedGeologyUnit}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
           inspectionMode={isExploreMode}
@@ -5667,8 +5758,12 @@ export default function TangaDeckWorkbench() {
       )}
 
       <button type="button" className="tanga-deck__explore-toggle" aria-pressed={isExploreMode}
-        onClick={() => {setExploreMode(!isExploreMode); setLayersOpen(false);}}>
-        {isExploreMode ? 'Return to presentation' : 'Explore evidence'}
+        onClick={() => {
+          const returningToStory = isExploreMode;
+          setExploreMode(!isExploreMode); setLayersOpen(false);
+          if (returningToStory) {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot(activeMode,activeShotIndex);}
+        }}>
+        {isExploreMode ? 'Return to story' : 'Explore evidence'}
       </button>
       {!isCoverScene && !isClosingScene && (
         <header className="tanga-deck__chapter-title">
@@ -5786,6 +5881,7 @@ export default function TangaDeckWorkbench() {
         <details key={activeMode} className="tanga-presentation-tools" onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
           <summary aria-label="Presentation tools" title="Presentation tools"><Layers size={16}/><span>Tools</span></summary>
           <div className="tanga-presentation-tools__grid">
+        <button type="button" className="tanga-deck__pager-btn tanga-deck__pager-btn--tool" onClick={copyCurrentView} aria-label="Copy link to this view" title="Copy a link to this chapter and authored view"><Copy size={16} strokeWidth={2.2}/></button>
         {threeVisible && activeMode !== 'metallurgy' && (
           <button
             type="button"
@@ -5872,6 +5968,7 @@ export default function TangaDeckWorkbench() {
           <HelpCircle size={16} strokeWidth={2.2} />
         </button>
           </div>
+          <span className="tanga-presentation-tools__status" role="status" aria-live="polite">{shareStatus}</span>
         </details>
       </nav>
 
@@ -6115,9 +6212,9 @@ export default function TangaDeckWorkbench() {
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
-      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 4 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
+      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 4 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
       {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id} availableDevelopment={availableMineFacilities} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}} onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined} onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}/ >}
-      {!isExploreMode && !isCoverScene && !storyHeroVisible && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} onContinue={handleManualNext} complete={isLastStory}/>}
+      {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} onContinue={handleManualNext} complete={isLastStory}/>}
 
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">

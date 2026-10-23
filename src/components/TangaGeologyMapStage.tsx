@@ -4,8 +4,10 @@ import {useRef, useState} from 'react';
 import {ArrowRight, ExternalLink, Minus, Plus} from 'lucide-react';
 import {MAPPED_ROCK_UNITS,MODEL_ROCK_UNITS} from '@/lib/deck/geology-palette';
 
+export type GeologyUnitSelection = {title:string;rows:string[];tone:string};
+
 /** Original map documents remain separate from the registered, interpreted model. */
-export default function TangaGeologyMapStage({step, ready, onAdvance, onStage}: {step: number; ready: boolean; onAdvance: () => void; onStage: (step:number)=>void}) {
+export default function TangaGeologyMapStage({step, ready, onAdvance, onStage, selectedUnit, onSelectUnit}: {step: number; ready: boolean; onAdvance: () => void; onStage: (step:number)=>void; selectedUnit:GeologyUnitSelection|null; onSelectUnit:(unit:GeologyUnitSelection|null)=>void}) {
   const [regional, setRegional] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [legendOpen,setLegendOpen]=useState(false);
@@ -39,18 +41,21 @@ export default function TangaGeologyMapStage({step, ready, onAdvance, onStage}: 
     {(step >= 1 && step <= 3) && <div className={`tanga-geology-surface-legend ${legendOpen?'is-open':''}`} aria-label={step===3?"Model rock types":"Mapped rock types"}>
       <header><strong>{step===3?'INTERPRETED MODEL':'MAPPED GEOLOGY'}</strong><small>{step===3?'7 model units':'7 map units'}</small></header>
       <button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>{step===3?'Model':'Map'} legend · 7 units {legendOpen?'−':'+'}</button>
-      <div>{(step===3?MODEL_ROCK_UNITS:MAPPED_ROCK_UNITS).map(({color,label})=><span key={label}><i style={{background:color}}/>{label}</span>)}</div>
+      <div>{(step===3?MODEL_ROCK_UNITS:MAPPED_ROCK_UNITS).map(({color,label})=>step===3
+        ? <span key={label}><i style={{background:color}}/>{label}</span>
+        : <button key={label} type="button" aria-pressed={selectedUnit?.title===label} onClick={()=>onSelectUnit(selectedUnit?.title===label?null:{title:label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:color})}><i style={{background:color}}/>{label}</button>)}</div>
       {step===3&&<p>Map colours match only where unit names resolve.</p>}
     </div>}
     <aside className="tanga-story-panel tanga-story-panel--map" aria-label="Geology map to model story">
       <div className="tanga-story-panel__eyebrow">GEOLOGICAL FRAMEWORK · {['01 / SOURCE','02 / OVERHEAD','03 / RELIEF','04 / DEPTH'][step]}</div>
       <h2>{['Begin with the map','Read the rock pattern','See the same rocks in relief','Look beneath the mapped surface'][step]}</h2>
-      <p className="tanga-story-panel__intro">{['Read the source rock units, coordinate grid and drilling evidence. Next, place the digitized areas against the terrain.','The map palette separates seven digitized surface units. Its reduced opacity keeps terrain context visible; hover an area to identify it.','Tilt the same map to read the terrain beneath it. Surface colours do not represent depth, thickness or dip.','The mapped surface fades while the separate 3D interpretation appears. Matching colours indicate named units only where the model labels resolve.'][step]}</p>
+      <p className="tanga-story-panel__intro">{['Read the source rock units, coordinate grid and drilling evidence. Next, place the digitized areas against the terrain.','The map palette separates seven digitized surface units. Select a polygon or legend unit to inspect its name and source basis.','Tilt the same map to read the terrain beneath it. Surface colours do not represent depth, thickness or dip.','The mapped surface fades while the separate 3D interpretation appears. Matching colours indicate named units only where the model labels resolve.'][step]}</p>
       <ol className="tanga-geology-map-sequence" aria-label="Map to model sequence">
         {['Source sheet','Mapped surface','Terrain relief','Interpreted depth'].map((label, i) => <li key={label} aria-current={step === i ? 'step' : undefined}><button type="button" disabled={!ready && i>0} onClick={()=>onStage(i)}><span>0{i + 1}</span>{label}</button></li>)}
       </ol>
       <div className="tanga-story-inline-note">{step<3 ? 'Source palette · transparent terrain context' : 'Matched names · unresolved units stay neutral · scale 1:1'}</div>
       <details className="tanga-geology-basis"><summary>Source &amp; interpretation limits</summary><p className="tanga-story-datum-note">{sheet ? (regional ? 'The MRE figure is regional context at 1:10,000,000. It is separate from the detailed project map and 3D interpretation.' : 'Original sheet retained. Coloured areas are digitized from its printed UTM grid; original geological shapefiles were not supplied.') : (step < 3 ? 'Derived polygons, approximately registered from the printed grid and clipped to displayed terrain. Datum and contacts need verification. Grab sampling is reported, but usable sample coordinates were not found.' : 'Mapped surface areas and modelled volumes are distinct interpretations. No mapped contacts are extruded into the model. Five named model units correspond to mapped colours; unspecified schist and soil remain distinct. Quartzite and kyanite-sillimanite schist have no resolved named volume.')}</p></details>
+      {selectedUnit && <section className="tanga-geology-selected-unit" aria-live="polite"><header><i style={{background:selectedUnit.tone}}/><strong>{selectedUnit.title}</strong><button type="button" onClick={()=>onSelectUnit(null)} aria-label="Clear selected map unit">×</button></header>{selectedUnit.rows.map(row=><p key={row}>{row}</p>)}</section>}
       <span className="tanga-geology-basis-tag">{step<3?'Approximate map registration':'Geological interpretation · not observed everywhere'}</span>
       <button type="button" className="tanga-story-panel__compare" onClick={onAdvance} disabled={!ready}>{!ready ? 'Preparing project model…' : ['Place the map on terrain','Tilt the mapped surface','Reveal interpreted depth','Inspect the sample evidence'][step]} <ArrowRight size={14}/></button>
     </aside>

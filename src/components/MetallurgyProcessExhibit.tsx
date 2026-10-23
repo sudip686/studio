@@ -37,7 +37,7 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
     el.appendChild(renderer.domElement);
     const scene=new THREE.Scene();scene.background=new THREE.Color('#d9e2e5');
     const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment(),environment=pmrem.fromScene(room,.04);room.dispose();scene.environment=environment.texture;
-    const camera=new THREE.PerspectiveCamera(36,1,.1,1000),controls=new OrbitControls(camera,renderer.domElement);
+    const camera=new THREE.PerspectiveCamera(30,1,.1,1000),controls=new OrbitControls(camera,renderer.domElement);
     controls.enableDamping=true;controls.minDistance=15;controls.maxDistance=200;controls.maxPolarAngle=Math.PI*.49;
     const plant=createMetallurgyPlant();scene.add(plant.root);
     const plinth=new THREE.Group();scene.add(plinth);
@@ -68,7 +68,7 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
       });
       cabinet(bounds);target.copy(bounds.getCenter(new THREE.Vector3()));
       const direction=new THREE.Vector3(.55,.42,1).normalize();let distance=Math.max(25,bounds.getSize(new THREE.Vector3()).length());
-      const fit=new THREE.PerspectiveCamera(36,camera.aspect,.1,1000);
+      const fit=new THREE.PerspectiveCamera(30,camera.aspect,.1,1000);
       for(let i=0;i<5;i++){
         fit.position.copy(target).addScaledVector(direction,distance);fit.lookAt(target);fit.updateMatrixWorld();let extent=0;
         for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){const point=new THREE.Vector3(x,y,z).project(fit);extent=Math.max(extent,Math.abs(point.x),Math.abs(point.y));}
@@ -112,14 +112,12 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
     <nav className="tanga-process-stages" aria-label="Testwork stages">{STAGE_COPY.map((item,i)=><button type="button" key={item.label} aria-label={`0${i+1} ${item.label}`} aria-pressed={stage===i} onClick={()=>{setStage(i);window.dispatchEvent(new Event('tanga:manual-exploration'));}}><b>0{i+1}</b><span className="tanga-process-label-long">{item.label}</span><span className="tanga-process-label-short" aria-hidden="true">{['Rock','Prepare','Float','Dry','Measure'][i]}</span></button>)}</nav>
     <div className="tanga-process-body">
       <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>
-        <button type="button" className="tanga-process-source-figure" onClick={()=>{onInspectEvidence?.();setFigureIndex(sourceFigure.index);setMaterialEvidence(true);}}>
-          <small>SOURCE OBSERVATION ↗</small><img src={`/presentation-assets/${sourceFigure.image}`} alt={sourceFigure.label}/><strong>{sourceFigure.label}</strong><span>{sourceFigure.locator} · April 2025</span><em>Separate characterisation evidence; not linked to the selected test group.</em>
-        </button>{error&&<p role="alert">{error}</p>}<div className="tanga-process-caption"><span>{copy.question}</span><small>Drag to orbit · scroll to zoom</small></div></div>
+        {error&&<p role="alert">{error}</p>}<div className="tanga-process-caption"><span>{copy.question}</span><small>Drag to orbit · scroll to zoom</small></div></div>
       <aside className="tanga-process-results">
         <small className="tanga-process-kicker">0{stage+1} / 05 · {copy.label.toUpperCase()}</small><h3>Reported test response</h3>
         <label>Reported test group<select aria-label="Processing test group" value={group} onChange={event=>setGroup(Number(event.target.value))}>{MET_GROUPS.map((item,i)=><option key={item.id} value={i}>{item.id}</option>)}</select></label>
         <dl className="tanga-process-metrics" aria-live="polite"><div><dt>Concentrate carbon</dt><dd>{result.carbon}</dd></div><div><dt>Graphite recovery</dt><dd>{result.recovery}</dd></div><div><dt>Coarse fraction · +150 µm</dt><dd>{result.coarse}</dd></div></dl>
-        <button type="button" className="tanga-material-entry" onClick={()=>{onInspectEvidence?.();setFigureIndex(0);setMaterialEvidence(true);}}>View actual report images <span>Microscopy · SEM · preparation ↗</span></button>
+        <button type="button" className="tanga-material-entry" onClick={()=>{onInspectEvidence?.();setFigureIndex(sourceFigure.index);setMaterialEvidence(true);}}>Open report evidence: {sourceFigure.label} <span>{sourceFigure.locator} · April 2025 · separate characterisation evidence ↗</span></button>
         <details open={evidence} onToggle={event=>setEvidence(event.currentTarget.open)}><summary>Result basis &amp; definitions</summary><p>{copy.detail}</p><p>{result.basis}. Groups may overlap individual samples; values are not additive.</p><MetallurgySampleExplorer key={group} initialIndex={group}/></details>
       </aside>
     </div>

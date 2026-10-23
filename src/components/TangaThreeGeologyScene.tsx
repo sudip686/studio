@@ -252,6 +252,9 @@ type TangaThreeGeologySceneProps = {
   layerSettings?: DeckLayerSettings;
   inspectionMode?: boolean;
   onInspectEvidence?: () => void;
+  onRetry?: () => void;
+  selectedGeologyUnit?: string | null;
+  onSelectGeologyUnit?: (unit: DrillPickInfo) => void;
   onSiteFacilities?: (ids:string[])=>void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
@@ -451,6 +454,13 @@ const DRILL_TRACE_SURFACE_CLEARANCE = 9;
 const DRILL_COLLAR_SURFACE_LIFT = 1;
 const SURFACE_Y = 0;
 const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, -60, 0);
+const MAPPED_UNIT_MODEL_NAMES:Record<string,string[]>={
+  'Graphitic schist':['GRSC'],
+  'Khondalite':['Khondalite'],
+  'Mafic granulite':['Granulite'],
+  'Quartzofeldspathic rock':['Quartz-Feldspathic'],
+  'Crystalline limestone':['Marble'],
+};
 
 // Large assets are served from Cloudflare R2 in production (set
 // NEXT_PUBLIC_ASSET_BASE_URL on Vercel) and from /public locally. This keeps
@@ -1962,6 +1972,9 @@ export default function TangaThreeGeologyScene({
   layerSettings = DEFAULT_LAYER_SETTINGS,
   inspectionMode = false,
   onInspectEvidence,
+  onRetry,
+  selectedGeologyUnit = null,
+  onSelectGeologyUnit,
   onSiteFacilities,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
@@ -1978,6 +1991,10 @@ export default function TangaThreeGeologyScene({
   const rotationKeyRef = useRef(rotationKey);
   const cameraCommandRef = useRef<ThreeCameraCommand | null>(cameraCommand ?? null);
   const cameraCommandHandlerRef = useRef<((command: ThreeCameraCommand) => void) | null>(null);
+  const selectedGeologyUnitRef = useRef(selectedGeologyUnit);
+  selectedGeologyUnitRef.current = selectedGeologyUnit;
+  const onSelectGeologyUnitRef = useRef(onSelectGeologyUnit);
+  onSelectGeologyUnitRef.current = onSelectGeologyUnit;
   const consumedCameraCommandIdRef = useRef(0);
   // VRIFY-style legend cross-highlight: hovering a TGC grade isolates that
   // grade in the model; clicking LOCKS the isolation so you can orbit with one
@@ -3874,8 +3891,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const bounds=new THREE.Box3();
             for(const p of sitePlan.pits)for(const [x,z] of p.ring)bounds.expandByPoint(new THREE.Vector3(x,p.surface-p.depth*.25,z));
             if(sitePlan.plant){const [x,z]=sitePlan.plant;const y=processPlant?.position.y??0;for(const sign of [-1,1])bounds.expandByPoint(new THREE.Vector3(x+sign*125,y,z+sign*125));}
-            const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*.9+250;
+            if(processPlant)bounds.expandByObject(processPlant);
             for(const f of campusFacilities)for(const [x,z] of f.footprint)bounds.expandByPoint(new THREE.Vector3(x,f.level,z));
+            // Frame from the final complete footprint. Previously distance was
+            // calculated before tailings, water and waste facilities were added,
+            // leaving the lowland campus at the bottom edge of the overview.
+            const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*1.5+500;
             bounds.getCenter(cameraShot.target);
             cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.8, distance*.85, distance*.18));
             cameraShot.from.copy(cameraShot.target).add(new THREE.Vector3(-distance, distance, distance*1.3));
@@ -3953,9 +3974,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     let lastPickAt = -Infinity;
     let pickTimer: ReturnType<typeof setTimeout> | undefined;
-    const pickAtPointer = (event: PointerEvent) => {
+    let selectionPointer: {x:number;y:number}|null = null;
+    const pickAtPointer = (event: PointerEvent, select = false) => {
       if (!hostRef.current || !pickables.length) return;
-      if (event.buttons || interacting || performance.now() - lastInteractionAt < 180) {
+      if (event.buttons || interacting || (!select && performance.now() - lastInteractionAt < 180)) {
         setHoverTooltip(null);
         return;
       }
@@ -3982,6 +4004,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
 
       renderer.domElement.classList.add('is-picking');
+      if (select && mode === 'subsurface' && geologySurface?.children.includes(hit.object) && tooltip) {
+        onSelectGeologyUnitRef.current?.(tooltip);
+        window.dispatchEvent(new Event('tanga:manual-exploration'));
+      }
       setHoverTooltip({
         x: clamp(event.clientX - rect.left + 16, 14, rect.width - 276),
         y: clamp(event.clientY - rect.top + 16, 76, rect.height - 156),
@@ -4004,12 +4030,22 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     const onPointerLeave = () => {
       clearTimeout(pickTimer);
+      selectionPointer = null;
       renderer.domElement.classList.remove('is-picking', 'is-interacting');
       setHoverTooltip(null);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      selectionPointer = event.button === 0 ? {x:event.clientX,y:event.clientY} : null;
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const start=selectionPointer;selectionPointer=null;
+      if(start&&Math.hypot(event.clientX-start.x,event.clientY-start.y)<5)pickAtPointer(event,true);
     };
 
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', onPointerLeave);
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
 
     // Direct ACES render: preserve readable colours without a second scene
     // pass plus full-screen bloom on every drag/zoom frame.
@@ -4429,14 +4465,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??GEOLOGY_SURFACE_DEFAULT_OPACITY):0;
         geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,geologyBlendAlpha);
         geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.context.visible;
-        geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.context.opacity;});
+        geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.context.opacity*(selectedGeologyUnitRef.current&&object.name!==selectedGeologyUnitRef.current ? .28 : 1);});
       }
       const mappedSurface = geologyPlan || geologyOblique;
       geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);
       if(geologySectionLocator)geologySectionLocator.visible=!mappedSurface&&(inspectionActiveRef.current||detail.sectionEnabled);
       if(mode==='subsurface') {
         for(const material of terrainSurfaceMaterials) material.opacity=THREE.MathUtils.lerp(.92,terrainOpacityForView(mode,surfaceCameraView),geologyDepthBlend)*layerSettingsRef.current.terrain.opacity;
-        for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=selected===mesh.name;mesh.material.emissive.copy(mesh.material.color);mesh.material.emissiveIntensity=active?.25:.08;mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(selected&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
+        const mappedNames=MAPPED_UNIT_MODEL_NAMES[selectedGeologyUnitRef.current??'']??[];
+        for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=selected?selected===mesh.name:mappedNames.some(name=>mesh.name.includes(name));const hasSelection=Boolean(selected||mappedNames.length);mesh.material.emissive.copy(mesh.material.color);mesh.material.emissiveIntensity=active?.25:.08;mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(hasSelection&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
       }
 
       if (recoverPlanFog && !geologyPlan) {
@@ -4526,6 +4563,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       clearTimeout(pickTimer);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
       controls.removeEventListener('start', onControlStart);
       controls.removeEventListener('end', onControlEnd);
       controls.dispose();
@@ -4638,7 +4677,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       </div>}
       {!sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
       {(/failed|unavailable|exceeded|could not|no contained/i.test(status)) && (
-        <p role="alert" className="tanga-three__load-error">{status}. Try another scene, then return to retry.</p>
+        <div role="alert" className="tanga-three__load-error"><span>{status}</span><button type="button" onClick={onRetry}>Retry this scene</button></div>
       )}
       {!minimalViewerChrome && (
         <>

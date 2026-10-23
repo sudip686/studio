@@ -997,6 +997,16 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-geology-surface-legend span{display:flex;align-items:center;gap:9px}
 .tanga-geology-surface-legend i{width:12px;height:12px;border:1px solid #ffffff64;border-radius:2px;flex-shrink:0;box-shadow:0 0 0 1px #08111770}
 .tanga-geology-surface-legend p{margin:2px 0 0;padding-top:7px;border-top:1px solid #dce6e91c;color:#aebfc8;font-size:8px;line-height:1.4}
+.tanga-geology-surface-legend{pointer-events:auto}
+.tanga-geology-surface-legend>div>button{display:flex;align-items:center;gap:9px;padding:3px 4px;margin:0 -4px;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.tanga-geology-surface-legend>div>button:hover,.tanga-geology-surface-legend>div>button[aria-pressed="true"]{background:#f4f7f20f;border-color:#d6e2e533}
+.tanga-geology-surface-legend>div>button:focus-visible{outline:2px solid #e4bb91;outline-offset:2px}
+.tanga-geology-selected-unit{margin:12px 0;padding:10px 12px;border-left:2px solid #b88e68;background:#e2e8e50c;border-radius:0 5px 5px 0}
+.tanga-geology-selected-unit header{display:flex;align-items:center;gap:8px;margin:0 0 5px}
+.tanga-geology-selected-unit header i{width:12px;height:12px;border:1px solid #fff7;border-radius:2px;flex:0 0 auto}
+.tanga-geology-selected-unit header strong{font-size:11px;color:#f1e4d5}
+.tanga-geology-selected-unit header button{margin-left:auto;padding:2px 6px;border:0;background:transparent;color:#c9d3d4;font-size:17px;cursor:pointer}
+.tanga-geology-selected-unit p{margin:3px 0;color:#c2ced0;font-size:10px;line-height:1.45}
 /* The comparison leaves a broad, unobstructed globe between two edge columns. */
 .tanga-peer-benchmark{inset:174px 24px 122px;display:grid;grid-template-columns:220px minmax(0,1fr) 352px;gap:24px;overflow:visible}
 .tanga-peer-benchmark__narrative{grid-column:1;align-self:start;max-width:220px;pointer-events:none}
@@ -1093,6 +1103,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-presentation-tools:not([open]) .tanga-presentation-tools__grid{display:none}
 .tanga-presentation-tools__grid .tanga-deck__pager-btn{display:flex!important;position:relative;width:64px!important;height:61px!important;border-radius:6px!important;padding:7px 4px 29px;flex-shrink:0}
 .tanga-presentation-tools__grid .tanga-deck__pager-btn::after{content:attr(title);position:absolute;bottom:5px;left:3px;right:3px;font-size:8px;line-height:1.15;text-align:center;max-height:20px;overflow:hidden;color:#bdcbd1}
+.tanga-presentation-tools__status{position:absolute;right:0;bottom:52px;z-index:2;padding:0 8px;color:#e9f0ef;font-size:10px;white-space:nowrap;pointer-events:none}
 .tanga-deck--present .tanga-deck__pager{gap:10px!important;padding:8px 12px!important}
 .tanga-deck--present .tanga-deck__pager-label{font-size:9px;letter-spacing:.08em}
 .tanga-geology-map-sheet{left:300px;right:400px;top:208px;bottom:104px;border-radius:8px;box-shadow:none}
@@ -1286,19 +1297,13 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-three__loading{z-index:28;background:#15242ef2;border:1px solid #819da650;padding:12px 20px;border-radius:8px;color:#d8e9ed}
 
 .tanga-deck[data-mode="mine_planning"] .tanga-deck__planning-note{left:24px;bottom:190px;max-width:232px;font-size:9px;line-height:1.4}
+.tanga-three.is-mine_planning .tanga-three__callout{max-width:264px!important}
 @media(max-width:700px){.tanga-deck[data-mode="mine_planning"] .tanga-deck__planning-note{top:166px;left:174px;right:12px;bottom:auto;max-width:none;font-size:8px;padding:7px 9px}}
 
-.tanga-process-exhibit--focused .tanga-process-source-figure{position:absolute;left:18px;top:18px;width:210px;display:grid;gap:7px;padding:12px;background:#f0f3f3ed;border:1px solid #b2c2c9;border-radius:6px;color:#314952;text-align:left;box-shadow:0 4px 16px #46566012;cursor:zoom-in}
-.tanga-process-source-figure small{font-size:8px;letter-spacing:.1em;color:#51737e}
-.tanga-process-source-figure img{display:block;width:100%;max-height:135px;object-fit:contain;background:#fff}
-.tanga-process-source-figure strong{font-size:11px;font-weight:550;color:#294752}
-.tanga-process-source-figure span{font-size:8px;color:#54727e}
-.tanga-process-source-figure em{font-size:8px;font-style:normal;line-height:1.4;color:#617680}
-.tanga-process-exhibit--focused .tanga-process-source-figure:hover{background:#fff;border-color:#6b9caa}
-@media(max-width:1100px){.tanga-process-exhibit--focused .tanga-process-source-figure{display:none}}
-
-.tanga-deck .tanga-process-exhibit--focused button.tanga-process-source-figure{background:#f0f3f3ed;border-color:#b2c2c9;color:#314952}
-.tanga-deck .tanga-process-source-figure small{color:#51737e}.tanga-deck .tanga-process-source-figure strong{color:#294752}.tanga-deck .tanga-process-source-figure span{color:#54727e}.tanga-deck .tanga-process-source-figure em{color:#617680}
+.tanga-three__load-error{z-index:32;display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100% - 32px));padding:12px 14px;border:1px solid #dfaa7a88;border-radius:8px;background:#17252df5;color:#f5e5d6;font-size:12px;line-height:1.4}
+.tanga-three__load-error button{flex:0 0 auto;min-height:40px;padding:8px 12px;border:1px solid #e0ad7e88;border-radius:5px;background:#382b25;color:#fff4e8;cursor:pointer;font:inherit}
+.tanga-three__load-error button:hover{background:#5c3d2d}
+.tanga-three__load-error button:focus-visible{outline:2px solid #f0bf92;outline-offset:2px}
 
 @media(max-width:700px){
  .tanga-surface-control{top:232px}

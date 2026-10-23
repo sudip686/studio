@@ -1,0 +1,180 @@
+# Tanga next phase: presentation quality and viewer reliability
+
+Date: 23 October 2026. Status: implementation in progress on `codex/tanga-investor-experience`.
+
+## Outcome
+
+Make Tanga feel like one professionally directed presentation: viewers understand the project, follow the evidence, and can explore without losing their place. Keep the existing Next.js, Cesium/MapLibre/deck.gl, Three.js and overlay-slot architecture. Extend the existing presentation controls instead of creating parallel controls.
+
+The next release should prioritize composition, legible evidence and predictable interaction. More geometry and animation are valuable only when they clarify a chapter's purpose.
+
+## Review basis and findings
+
+This plan combines the earlier reference review, a fresh Chrome review of the branch preview (closing chapter, geology source and mapped stages, metallurgy, peer comparison and mine overview), a fresh look at GeoLibre and VRIFY 24527 slide 12, and targeted source inspection. It is not a fresh exhaustive audit of every slide in every reference deck or a measured performance benchmark. Design and UI styling skills and the UI Expert critique were used.
+
+Observed opportunities:
+
+- Geology simultaneously presents chapter navigation, surface/drilling/geology/estimate navigation, four map/model stages, a story footer and a stage action. The map is readable, but the controls compete for attention. The mapped view has a narrow terrain image surrounded by broad grey space.
+- Metallurgy has a clearer sequence than before, but the flotation equipment occupies a small part of its pale canvas. The selected result and the separate SEM observation are visible together, even though the UI correctly states they are not linked.
+- The mine overview frames the pits prominently while the lowland plant and water facilities sit near the bottom edge and behind the lower overlays. Some facility label headings truncate.
+- The peer globe now fits between the panels. Preserve this improvement; further work should emphasize selection, hierarchy and the dated comparison basis.
+- The final chapter repeats similar wording in its callout, right panel and bottom cue. Give this chapter an explicit decision-oriented visual composition.
+- Source inspection confirms existing presentation/explore modes, layer search and opacity, projected label placement, scene load states, asset caching, resolution adaptation and chapter hash links. These are foundations to consolidate, not missing features to recreate.
+- The 3D error message currently asks the viewer to switch scenes and return. An in-place retry and an intelligible fallback would be better for a live meeting.
+- Chapter hashes currently restore the chapter; the map/model substage and selected object need an explicit share-state design.
+- Workbench and geology-scene files each contain thousands of lines. Extract the responsibilities touched by this work in small steps to make future UI changes less likely to break scene behavior.
+
+## Reference patterns to adapt
+
+| Reference | Useful pattern | Tanga application |
+|---|---|---|
+| [VRIFY Present](https://vrify.com/product/present) | Mix project context, source material and interactive 3D; move between prepared narrative and questions | Keep the guided story, then offer a clear return from exploration to its exact view |
+| [VRIFY 24527, slide 12](https://vrify.com/decks/24527) | Translucent categorical polygons over satellite context, anchored legend, restrained outlines | Improve the existing geology drape and its framing; retain source rock colors and show map registration limits |
+| [VRIFY 24303](https://vrify.com/decks/24303) | Stable geography while successive views change the evidence | Preserve orientation between mapped units, drilling and the separate geological interpretation |
+| [VRIFY 24464](https://vrify.com/decks/24464) | Regional-to-project-to-geology/drilling progression and visual comparisons | Give every authored view one question, one focal object and one takeaway |
+| [VRIFY 24534](https://vrify.com/decks/24534) | Facility relationships, fine annotation leaders, surface/subsurface contrast | Author mine-site overview and detail compositions around connected facilities |
+| [VRIFY 24631](https://vrify.com/decks/24631) | Map/target/resource sequence and independent legends | Keep legends stable while revealing different evidence |
+| [GeoLibre](https://web.geolibre.app/) | Named layers, compact selected-layer opacity, identify tool and orientation readouts | Consolidate existing layers into a compact inspector with selection, source and reset behavior |
+
+These are presentation and interaction references. Their geological assets, project claims and proprietary branding are not inputs to the Tanga model. Deck-specific observations other than the fresh 24527 review come from the previous review recorded in TANGA_PRESENTATION_FLOW_2026-10-22.md.
+
+## Visual direction
+
+Use restrained dark panels, warm white typography, the existing copper brand accent and bright natural satellite terrain. Geological colors remain categorical and independent of the brand accent. Reduce decorative gradients, repeated frames and overly small uppercase text.
+
+- Define one shared spacing, typography, panel, button and focus-state system in the existing design tokens/CSS.
+- Desktop default: one concise story panel, one compact instrument group, one navigation rail. Aim to keep at least 65–70% of the primary scene region free of opaque interface panels where the chapter permits.
+- Use a short active-view title and one sentence explaining its meaning. Detail belongs in the existing evidence disclosure.
+- Maintain one primary Continue action per authored view. Stage navigation and chapter navigation must look and behave differently.
+- On phones, use a compact bottom sheet that expands for evidence; do not shrink the desktop panel stack into the scene.
+- Use at least 16 px for ordinary explanatory text and 44 px touch targets. Small metadata is secondary and available in a larger evidence view.
+- Give each terrain view an authored daylight setup. Calibrate texture brightness and color handling before adding light intensity. Preserve rock-color distinctions and avoid clipped highlights.
+- Camera motion should establish a view, then stop. User input interrupts travel immediately. Reduced-motion users receive the same information without flight or autoplay.
+
+## Workstream checklist
+
+### A. Establish reliability and a measurable baseline — P0
+
+- [ ] Record first useful frame, scene-ready time, transfer size, frame times and failure modes for all 12 chapters on the current branch.
+- [ ] Audit survey, regional terrain, collars and mesh transforms against their coordinate/elevation metadata. Report unresolved vertical-reference differences; do not shift recorded drillholes to make them look attached.
+- [ ] Exercise orbit, below-ground camera, zoom, reset, direct chapter entry and rapid chapter switching. Fix active camera contention and stale scene updates where reproduced.
+- [ ] Introduce in-place scene retry, visible loading stages and a chapter-specific static fallback from the actual project scene. Keep explanation and navigation usable when WebGL or assets fail.
+- [ ] Make asset fetches deduplicate and cancel or ignore obsolete work safely; failed promises must be retryable. Check shared asset ownership before changing disposal.
+- [ ] Verify WebGL context loss/restoration, background-tab behavior and repeated scene revisits; restore the same authored state after recovery where possible.
+
+Acceptance: no unhandled error or stranded loading state in the agreed navigation/failure matrix; datum or coverage gaps are visible and documented rather than hidden by geometry edits.
+
+### B. Unify the presentation interface — P0
+
+- [ ] Inventory all existing panels and controls and consolidate duplicate information into the common overlay slots.
+- [ ] Merge the chapter-purpose cue and local Continue action into a single consistent story/navigation hierarchy.
+- [ ] Simplify the current 4m51s guided-story and separate per-chapter timing controls into a clear tour preset plus advanced timing settings.
+- [ ] Make the existing presentation/explore toggle explicit: explore pauses the story; Return to story restores the current authored shot and layer state.
+- [ ] Use measured panel bounds to reserve space for the model, camera target and labels on desktop/tablet/phone.
+- [ ] Consolidate scattered style overrides into semantic tokens as affected components are changed; keep a screenshot baseline for each chapter.
+
+Acceptance: no duplicated primary Continue action; no model focal point or selected label covered by a panel in the target viewport matrix; controls keep consistent positions and keyboard focus.
+
+### C. Make geology the signature interaction — P0/P1
+
+- [ ] Check digitized polygons against the source sheet, including fragmentation, holes, unit assignment and possible raster-label/line contamination. Do not smooth or invent geological contacts for visual effect.
+- [ ] Audit map registration using identifiable coordinate-grid control points. Record the transform and residuals; improve registration only where the source supports it.
+- [ ] Reframe the map footprint within the available canvas. Use registered surrounding imagery/terrain where available, and clearly distinguish survey coverage from regional context; do not bridge unverified elevation joins.
+- [ ] Keep source sheet → north-up mapped units → oblique mapped terrain → separate interpreted depth. Show a deliberate transition rather than implying that polygons are physically extruded into the existing model.
+- [ ] Add click/tap selection to the existing hover identification: highlight a unit, dim other units gently, and show its name, swatch, source and interpretation status in the shared inspector.
+- [x] Couple map/model highlighting only for verified unit-name mappings. Keep unmatched units explicitly distinct.
+- [ ] Put map-fill opacity beside the mapped-geology layer; retain terrain opacity as a separate clearly named control. The current two opacities must not be confused.
+- [ ] Include a fixed section view or section-plane interaction only where supported by the existing model. Label orientation and vertical scale; flag any exaggeration.
+- [ ] Add grab-sample markers only if report coordinates or a defensible map registration are available, with sample IDs and provenance.
+
+Acceptance: select a rock unit in plan, tilt, reveal the interpretation and return without losing orientation; its color and evidence basis remain understandable throughout. No invented sample locations or volume reconstruction.
+
+### D. Make annotations and selection consistent — P1
+
+- [ ] Extend the existing anchor/label placement system across map and Three.js views with stable feature IDs and explicit coordinate spaces.
+- [ ] Use one prominent selected annotation and a small number of contextual annotations per view. Collapse lower-priority labels instead of letting them fill the scene.
+- [ ] Reproject leaders during camera movement; hide labels behind the camera or outside coverage. Define occluded versus deliberate x-ray labels consistently.
+- [ ] Clicking a model object, legend row, peer row or map marker selects the same feature, with an equivalent keyboard/touch route.
+- [ ] Preserve complete facility names in the inspector even when compact map labels abbreviate them.
+
+Acceptance: marker endpoints stay attached at every camera preset and during zoom/resize; selection is reversible and never depends on hover alone.
+
+### E. Give every chapter a distinct visual job — P1
+
+| Chapter | Next improvement | Signature action / proof |
+|---|---|---|
+| 1. Meet Tanga | Strong project landscape, brief introduction, immediate entry into the story | One controlled approach to the project footprint; intro media can be skipped |
+| 2. Place it on the map | Clear country → region → project scale change | Stable locator inset as the camera approaches Tanga |
+| 3. Work completed | Make the documented work visible as a dated evidence timeline | Select a milestone to reveal its actual survey, drilling or report asset |
+| 4. Read the landscape | Explain relief using the measured surface | Select a supported transect and relate the profile to the 3D terrain; show coverage |
+| 5. Follow a recorded hole | Make recorded drilling understandable | Select one actual hole and follow intervals with depth/assay/lithology; keep the recorded trajectory |
+| 6. Reveal the host rock | Deliver the geology sequence in workstream C | Select one mapped rock unit and retain orientation into the interpreted depth view |
+| 7. Understand the model | Relate report totals to spatial representation | Show a model section or category reveal, with report totals distinguished from displayed/sampled blocks |
+| 8. Global peer field | Retain the clear globe; sharpen the comparison narrative | Show the dated peer list, introduce Tanga, highlight its position and link each peer to its source |
+| 9. Fit a concept to ground | Author a complete site composition before facility close-ups | Frame pit, feed, plant and water facilities together, then trace the proposed material/water relationships |
+| 10. Examine the testwork | Give actual evidence visual prominence | Larger instrument or source image beside one selected result group; distinguish TC, recovery and size fractions |
+| 11. Connect to the port | Make logistics legible | Follow the selected route and clearly distinguish route geometry, direct distance and estimates |
+| 12. Evidence to decisions | Replace repeated closing text with a decision map | Three clear study questions, each linked back to its supporting evidence and next work |
+
+- [ ] Create an authored-shot specification for each row: camera target, visible layers, one takeaway, interaction, source and fallback image.
+- [ ] Reduce the metallurgy canvas whitespace by fitting the selected instrument to the view. Use authentic report images as primary evidence when an illustrative model adds little explanatory value.
+- [x] Reframe mine overview using the complete pit, plant and facility footprint; keep close plant detail in its authored view.
+- [ ] Keep facility footprint and location status explicit: report candidate, approximate registration, or illustrative addition. Tailings/water geometry remains a concept until supported by engineering.
+- [ ] Keep peer comparison after resource. Verify the common metric, reporting date and category for every entry before asserting a rank. Any fifth-place claim is scoped to the selected benchmark unless a current comprehensive census supports it.
+- [ ] Trace metallurgy figures and any consent/qualification statements to the actual report wording and permissions before the investor release. Do not link SEM images to result groups without evidence.
+
+Acceptance: every chapter introduces a different question or dataset; advancing never merely changes the camera without adding meaning. The displayed data basis can be reached from the view.
+
+### F. Make sharing and delivery dependable — P1/P2
+
+- [x] Extend existing chapter URLs with a small versioned, validated view state: chapter, substage, selected peer/map unit and layer options. Preserve old hash links and provide safe defaults for invalid state.
+- [x] Add Copy this view and a deterministic Return to story. Avoid embedding private report content or unbounded camera data in links.
+- [ ] Refine preloading around the current and next authored views. Audit existing high-resolution image warmups before adding further downloads.
+- [ ] Apply device-appropriate resolution and asset detail while preserving source values. Load detailed plant meshes only for relevant close-ups.
+- [ ] Add a presenter readiness view for required assets, missing data and a validated set of fallback images. An optional predownload mode must state exactly which chapters/assets are ready; do not promise full offline maps.
+- [ ] Validate Vercel preview and Cloudflare Worker preview independently, including same-origin R2 requests, range requests where relevant, caching and stale service-worker behavior.
+- [ ] Check the intended investor link in a clean unauthenticated session. If access is protected, resolve the intended sharing method explicitly without silently changing protection settings.
+- [ ] Review the existing R2 development-URL dependency and plan a production asset domain if supported by the user's domain setup. Recheck current account state before any deployment changes.
+
+Acceptance: a shared link opens the intended view; missing assets produce a usable fallback; both runtime targets are checked before release. Build compatibility alone does not establish a working Cloudflare deployment.
+
+## Implementation order and release gates
+
+1. **Foundation:** A plus the UI inventory in B. Establish a real baseline and fix reproduced geometry/navigation failures first.
+2. **First visible release:** B, C and the shared annotation pieces of D. Deliver the unified shell and a polished geology experience together.
+3. **Full story release:** finish D and E across all 12 chapters, concentrating on mine-site framing and metallurgy evidence.
+4. **Delivery release:** F, cross-device checks, source review, deployment verification and a complete rehearsal.
+
+Keep checklist items open until evidence exists. Implement small commits on the existing project branch with before/after screenshots and a rollback point for each release. Extract shared scene loading, camera/state and label responsibilities only as needed for these changes; retain the current rendering architecture.
+
+## Proposed acceptance targets
+
+These are targets to measure during implementation, not claims about current performance. Record device/GPU, browser, viewport, network and cold/warm cache conditions with results.
+
+- Desktop UI and meaningful fallback/intro content within 2.5 seconds; target first usable project 3D within 8 seconds on a named reference laptop at 20 Mbps / 100 ms RTT. Budget and tune actual assets after the baseline.
+- Warm transition to the next prepared view within 1 second excluding deliberate camera travel.
+- During a 30-second orbit, target median 60 FPS on the reference desktop and p95 frame time at or below 33 ms; use a recorded mobile device with a 30 FPS target. Reduce display detail rather than change scientific data.
+- Repeated full-story navigation: three loops without context exhaustion, stale selections or retained scene resources growing continuously. Use renderer/resource counters where browser memory metrics are unavailable.
+- Layout snapshots at 1920×1080, 1366×768, 1024×768, 390×844 and 844×390. No hidden primary controls or clipped active feature.
+- Keyboard navigation, focus visibility, reduced motion, touch selection, dialog dismissal and readable contrast checked in each shared component and representative chapter.
+- Failure checks: missing model, failed texture, slow asset response, unavailable route service, context loss, direct substage link and quick previous/next actions.
+- Release checks: typecheck, required builds, focused regression tests for shared state/loading/label logic, current browser screenshots, verified source references and deployment-specific asset checks.
+
+## First implementation package
+
+Start with the measured viewer baseline, one consolidated story/navigation shell, and the geology sequence. This addresses the most visible repetition and protects the spatial behavior on which drilling, resource and mine planning depend. Follow with the mine overview and metallurgy compositions, then apply the shared patterns to the remaining chapters.
+
+## Implemented package and verification notes
+
+- [x] Add in-place retry for a failed Three.js scene. Retry remounts the current chapter scene and keeps the presenter in place.
+- [x] Save/restore authored shot, peer selection, mapped geology unit and validated layer visibility/opacity in version 1 links.
+- [x] Let a viewer select a mapped unit from the legend or by pointer selection on the map, see its evidence limits in the story panel, and dim the other polygons. Verified named links highlight only the matching interpreted model units; unmatched names remain separate.
+- [x] Remove the redundant bottom Continue cue from the four-step map/model story where the map panel already owns stage navigation.
+- [x] Keep metallurgy report figures accessible from the results inspector instead of placing a large source thumbnail over the equipment canvas; tighten the instrument framing.
+- [x] Make Explore → Return to story reapply the current authored camera/view without discarding layer settings; the local copy-link action reports success.
+- [x] Expand mine overview bounds to include the actual conceptual plant and illustrative facility footprints; use a wider, higher-angle overview and keep close-up actions separate.
+- [x] Confirm the local app builds the shared selection and links without browser console errors on the checked geology and mine views. MapLibre emitted graphics-buffer performance warnings in this environment; a controlled frame-rate benchmark has not been recorded.
+- [ ] Complete 12-chapter and responsive screenshot review; measure cold/warm load, transfer and frame-time budgets.
+- [ ] Validate scene retry against injected asset failures, WebGL context loss, stale requests and repeated scene revisits.
+- [ ] Inspect the new metallurgy camera fit after a clean reload and verify on narrow viewports.
+- [ ] Verify the final Vercel preview and a Cloudflare Worker preview independently; inspect public access and production R2 asset configuration.
