@@ -794,8 +794,23 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck--bright-room .tanga-story-panel__eyebrow,.tanga-deck--bright-room .tanga-story-image-caption span { color: #ffc092; }
 
 @media (max-width: 1200px) {
-  .tanga-milestone-stage { display: none; }
-  .tanga-deck--work-completed-story .tanga-story-feature { display: block; }
+  .tanga-deck--work-completed-story .tanga-milestone-stage {
+    display: block;
+    z-index: 8;
+    inset: 0;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    transform: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  .tanga-deck--work-completed-story .tanga-milestone-stage__caption,
+  .tanga-deck--work-completed-story .tanga-milestone-stage__tag { display: none; }
+  .tanga-deck--work-completed-story .tanga-milestone-stage__shade { background: linear-gradient(180deg,rgba(3,7,10,.42),rgba(3,7,10,.16) 35%,rgba(3,7,10,.44) 66%,rgba(3,7,10,.82)); }
+  .tanga-deck--work-completed-story .tanga-story-feature { display: none; }
   .tanga-deck--work-completed-story .tanga-deck__deck-stage { opacity: 0; }
 }
 .tanga-story-project-image { display: block; width: 100%; max-height: 186px; margin-top: 15px; object-fit: cover; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: #252a2d; }
