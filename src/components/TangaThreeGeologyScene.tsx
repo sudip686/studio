@@ -4206,6 +4206,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const ease = cameraEase;
     const resolutionGovernor=createResolutionGovernor(renderer.getPixelRatio());
     let lastQualityFrame=performance.now();
+    const onVisibilityChange=()=>{
+      lastMotionElapsed=clock.getElapsedTime();
+      lastQualityFrame=performance.now();
+      const evidenceOpen=host.closest('.tanga-deck')?.classList.contains('tanga-deck--present')===false;
+      const paused=presentationOptions.current.motionPaused||reducedMotion.matches||evidenceOpen||document.hidden;
+      host.dataset.haulMotion=paused?'paused':'playing';
+    };
+    document.addEventListener('visibilitychange',onVisibilityChange);
     const cameraPath = new THREE.CatmullRomCurve3([cameraShot.from, cameraShot.mid, cameraShot.to], false, 'catmullrom', 0.32);
     const targetPath = new THREE.CatmullRomCurve3([DEFAULT_CAMERA_TARGET.clone(), cameraShot.targetMid, cameraShot.target], false, 'catmullrom', 0.32);
     const projectCallouts = () => {
@@ -4420,7 +4428,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     const animate = () => {
       if (cancelled) return;
-      if(document.hidden){lastMotionElapsed=clock.getElapsedTime();lastQualityFrame=performance.now();frame=requestAnimationFrame(animate);return;}
+      if(document.hidden){lastMotionElapsed=clock.getElapsedTime();lastQualityFrame=performance.now();host.dataset.haulMotion='paused';frame=requestAnimationFrame(animate);return;}
       const elapsed = clock.getElapsedTime();
       const qualityNow=performance.now(),frameMs=qualityNow-lastQualityFrame;lastQualityFrame=qualityNow;
       if(elapsed>2){const baseRatio=resolutionGovernor.sample(frameMs);const ratio=interacting||performance.now()-lastInteractionAt<250?Math.min(.8,baseRatio):baseRatio;if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);const scale=ratio.toFixed(2);if(host.dataset.renderScale!==scale)host.dataset.renderScale=scale;}
@@ -4732,6 +4740,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       projectCalloutsRef.current = null;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      document.removeEventListener('visibilitychange',onVisibilityChange);
       clearTimeout(pickTimer);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);

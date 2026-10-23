@@ -71,7 +71,7 @@ Use restrained dark panels, warm white typography, the existing copper brand acc
   - [x] Cancel the deferred terrain-upgrade scheduler on scene teardown, guard its callback before it starts work, and catch upgrade failures so an existing surface remains ready where retained; otherwise expose the scene error for the existing retry/fallback path. Production build and rapid desktop chapter-switch smoke passed; the deferred-upgrade failure branch and forced network retry remain unexercised, so the parent item stays open.
 - [ ] Verify WebGL context loss/restoration, background-tab behavior and repeated scene revisits; restore the same authored state after recovery where possible.
   - [x] Simulated WebGL loss in mine planning: the chapter surfaced its static fallback and recovery message, then rebuilt to `data-ready=true` after context restore with the exact camera position and target preserved and no JavaScript errors.
-  - [ ] The Playwright tab selector did not change `document.hidden`, so background-tab pause/resume remains unverified; resource-count stability over repeated full chapter loops also remains open.
+  - [x] Background the live mine-planning tab by opening a second page: `document.hidden` became true, haul motion changed to paused, readiness and camera position held; closing the second page resumed motion with the same camera. Resource-count stability over repeated full chapter loops remains open.
 
 Acceptance: no unhandled error or stranded loading state in the agreed navigation/failure matrix; datum or coverage gaps are visible and documented rather than hidden by geometry edits.
 
