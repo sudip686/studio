@@ -185,7 +185,8 @@ Start with the measured viewer baseline, one consolidated story/navigation shell
 - [x] Confirm clean production builds for Next.js and OpenNext/Cloudflare, with no browser console errors on checked geology/mine/metallurgy views. MapLibre emitted graphics-buffer performance warnings; a controlled frame-rate benchmark has not been recorded.
 - [x] Fix the initial geology camera being replaced by a later generic startup tween, and delay Three.js `ready` until a populated frame has rendered and the authored camera move settles. Verified on the local production app and local Cloudflare Worker preview: desktop (1707×842) retained its 16.2° authored view; phone (390×844) used the 25° relief view; both had no horizontal page overflow, settled camera state, visible terrain/polygons, and first useful frame at about 4.1–4.6 seconds. The Worker run logged no browser errors; it did log graphics-buffer warnings.
 - [ ] Complete 12-chapter and responsive screenshot review; measure cold/warm load, transfer and frame-time budgets.
-- [ ] Validate scene retry against injected asset failures, WebGL context loss, stale requests and repeated scene revisits.
+- [ ] Validate scene retry against injected asset failures, stale requests and repeated scene revisits.
+  - [x] Simulated WebGL loss and restoration with `WEBGL_lose_context` in both the subsurface viewer and metallurgy exhibit; both surfaced recovery UI, rebuilt, and returned to ready with zero console errors. Local production browser check only.
 - [ ] Inspect the new metallurgy camera fit after a clean reload and verify on narrow viewports.
 - [ ] Verify the pushed Vercel preview and live Cloudflare deployment, inspect public access and production R2 asset configuration. The local Cloudflare preview passed; the hosted Vercel session currently redirects to login.
 

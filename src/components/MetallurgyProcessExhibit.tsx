@@ -21,15 +21,21 @@ const STAGE_COPY=[
 export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvidence}:{paused:boolean;onToggle:()=>void;onInspectEvidence?:()=>void}){
   const host=useRef<HTMLDivElement>(null),command=useRef<(stage:number)=>void>();
   const pausedRef=useRef(paused);pausedRef.current=paused;
-  const [stage,setStage]=useState(2),[group,setGroup]=useState(0),[error,setError]=useState('');
+  const [stage,setStage]=useState(2),[group,setGroup]=useState(0),[error,setError]=useState(''),[rendererAttempt,setRendererAttempt]=useState(0);
   const [figureIndex,setFigureIndex]=useState(0);
   const [materialEvidence,setMaterialEvidence]=useState(false),[evidence,setEvidence]=useState(false);
   const groupRef=useRef(group);groupRef.current=group;
   useEffect(()=>{command.current?.(stage);},[group,stage]);
   useEffect(()=>{
     const el=host.current;if(!el)return;
+    setError('');
     let renderer:THREE.WebGLRenderer;
     try{renderer=new THREE.WebGLRenderer({antialias:true});}catch{setError('3D equipment unavailable. Reported test summaries and source images remain available.');return;}
+    let contextLost=false;
+    const onContextLost=(event:Event)=>{event.preventDefault();contextLost=true;el.dataset.ready='false';setError('Graphics context lost. Laboratory exhibit unavailable until graphics recover.');};
+    const onContextRestored=()=>{if(!contextLost)return;contextLost=false;setError('Graphics restored; rebuilding the laboratory exhibit…');window.setTimeout(()=>setRendererAttempt(value=>value+1),0);};
+    renderer.domElement.addEventListener('webglcontextlost',onContextLost,false);
+    renderer.domElement.addEventListener('webglcontextrestored',onContextRestored,false);
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
     renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.NeutralToneMapping;renderer.toneMappingExposure=1.05;
     renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -90,18 +96,20 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
       if(!document.hidden&&el.getClientRects().length){
         if(!pausedRef.current&&!reduced.matches){time+=dt;plant.update(time);dirty=true;}
         if(tween){const progress=reduced.matches?1:cameraEase((now-cameraStarted)/1100);camera.position.lerpVectors(fromPosition,destination,progress);controls.target.lerpVectors(fromTarget,target,progress);if(progress===1)tween=false;dirty=true;}
-        controls.update();if(dirty){renderer.render(scene,camera);dirty=false;}
+        controls.update();if(dirty&&!contextLost){renderer.render(scene,camera);dirty=false;}
         el.dataset.cameraMoving=String(tween);el.dataset.processTime=time.toFixed(2);
       }
       frame=requestAnimationFrame(draw);
     };frame=requestAnimationFrame(draw);el.dataset.ready='true';
     return()=>{
       cancelAnimationFrame(frame);observer.disconnect();controls.dispose();command.current=undefined;
+      renderer.domElement.removeEventListener('webglcontextlost',onContextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored',onContextRestored);
       const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
       scene.traverse(object=>{if(object instanceof THREE.Mesh){geometries.add(object.geometry);(Array.isArray(object.material)?object.material:[object.material]).forEach(m=>materials.add(m));}});
       geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());environment.dispose();pmrem.dispose();key.shadow.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();
     };
-  },[]);
+  },[rendererAttempt]);
   const result=MET_GROUPS[group],copy=STAGE_COPY[stage];
   const sourceFigure=stage===1||stage===3
     ? {index:2,image:'graphite-lab-workflow.jpg',label:'Laboratory preparation',locator:'Figure 2 · PDF p.16'}
@@ -112,7 +120,7 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
     <nav className="tanga-process-stages" aria-label="Testwork stages">{STAGE_COPY.map((item,i)=><button type="button" key={item.label} aria-label={`0${i+1} ${item.label}`} aria-pressed={stage===i} onClick={()=>{setStage(i);window.dispatchEvent(new Event('tanga:manual-exploration'));}}><b>0{i+1}</b><span className="tanga-process-label-long">{item.label}</span><span className="tanga-process-label-short" aria-hidden="true">{['Rock','Prepare','Float','Dry','Measure'][i]}</span></button>)}</nav>
     <div className="tanga-process-body">
       <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>
-        {error&&<p role="alert">{error}</p>}<div className="tanga-process-caption"><span>{copy.question}</span><small>Drag to orbit · scroll to zoom</small></div></div>
+        {error&&<p role="alert">{error} <button type="button" onClick={()=>{setError('');setRendererAttempt(value=>value+1);}}>Retry 3D exhibit</button></p>}<div className="tanga-process-caption"><span>{copy.question}</span><small>Drag to orbit · scroll to zoom</small></div></div>
       <aside className="tanga-process-results">
         <small className="tanga-process-kicker">0{stage+1} / 05 · {copy.label.toUpperCase()}</small><h3>Reported test response</h3>
         <label>Reported test group<select aria-label="Processing test group" value={group} onChange={event=>setGroup(Number(event.target.value))}>{MET_GROUPS.map((item,i)=><option key={item.id} value={i}>{item.id}</option>)}</select></label>

@@ -2032,6 +2032,8 @@ export default function TangaThreeGeologyScene({
   const [lockedGrade, setLockedGrade] = useState<string | null>(null);
   const activeGrade = hoveredGrade ?? lockedGrade;
   const [status, setStatus] = useState('Preparing geology scene');
+  const onRetryRef = useRef(onRetry);
+  onRetryRef.current = onRetry;
   const [targetXray, setTargetXray] = useState(true);
   const [motionPaused, setMotionPaused] = useState(false);
   const [sectionEnabled,setSectionEnabled]=useState(false);
@@ -2397,6 +2399,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     camera.updateProjectionMatrix();
 
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+    let wasContextLost = false;
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      wasContextLost = true;
+      setStatus('WebGL context lost; the 3D scene is unavailable. Waiting for graphics recovery…');
+      setSceneReady(false);
+      onLoadState?.({scene: 'error', terrain: 'degraded', quality: assetQuality, message: 'WebGL context lost; retry the scene after graphics recover.'});
+    };
+    const onContextRestored = () => {
+      if (!wasContextLost) return;
+      setStatus('Graphics context restored; rebuilding the 3D scene…');
+      window.setTimeout(() => onRetryRef.current?.(), 0);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
+    renderer.domElement.addEventListener('webglcontextrestored', onContextRestored, false);
     // Render at up to 2× device pixels so the high-res draped satellite texture
     // stays crisp (the terrain is the hero) instead of softening at 1.5×.
     renderer.setPixelRatio(Math.min(mode === 'topography' ? 1.25 : 1, window.devicePixelRatio || 1));
@@ -4598,7 +4615,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         authoredFog.near=Math.max(4600,focusDistance*1.15);
         authoredFog.far=Math.max(12000,focusDistance*2.2);
       }
-      renderer.render(scene,camera);
+      if (!wasContextLost) renderer.render(scene,camera);
       if (pendingUsefulFrame && !cameraTween && (userTookControl || flyProgress >= 1) && renderer.info.render.calls > 0) {
         const firstFrame = pendingUsefulFrame;
         pendingUsefulFrame = null;
@@ -4626,6 +4643,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       controls.removeEventListener('start', onControlStart);
       controls.removeEventListener('end', onControlEnd);
       controls.dispose();
