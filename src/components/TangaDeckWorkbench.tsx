@@ -319,9 +319,9 @@ const MODE_LABELS: Record<WorkbenchMode, string> = {
 const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
   work_completed: [{label: 'Evidence', value: 'Survey · drilling · MRE · testwork'}],
   ranking: [
-    {label: 'Basis', value: 'M&I contained graphite'},
-    {label: 'Peer set', value: 'Top 10 public projects'},
-    {label: 'Tanga slot', value: '#5 after model'},
+    {label: 'Basis', value: 'Reported contained graphite'},
+    {label: 'Peer set', value: 'Selected 2023 benchmark'},
+    {label: 'Tanga slot', value: '#5 after Indicated MRE'},
   ],
   tanzania: [
     {label: 'Region', value: 'Tanga, NE Tanzania'},
@@ -373,7 +373,7 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
     {label: 'Fresh', value: '94.4% recovery'},
   ],
   comparison: [
-    {label: 'Peer slot', value: '#5 by M&I contained graphite'},
+    {label: 'Peer slot', value: '#5 in selected set'},
     {label: 'Metallurgy', value: '>97% TC concentrate'},
     {label: 'Logistics', value: 'Port / power / rail context'},
   ],
@@ -725,7 +725,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'testwork', label: 'Flotation testwork', detail: 'Laboratory response across composites', view: VIEW_STATES.work_completed},
   ],
   ranking: [
-    {id: 'baseline', label: 'Ten reported projects', detail: 'Start with the published global M&I contained-graphite benchmark', view: VIEW_STATES.ranking},
+    {id: 'baseline', label: 'Ten reported projects', detail: 'Start with the published contained-graphite benchmark', view: VIEW_STATES.ranking},
     {id: 'tanga-enters', label: 'Tanga enters at fifth', detail: 'Insert 7.31 Mt from the Tanga Indicated MRE into the same measure', view: VIEW_STATES.ranking},
   ],
   tanzania: [
@@ -812,7 +812,7 @@ const MODE_INVESTOR_ANGLE: Record<WorkbenchMode, {headline: string; points: stri
   work_completed: {headline: 'Work behind the estimate', points: ['Survey, drilling, estimation and testwork are separately dated source milestones']},
   ranking: {
     headline: 'Where Tanga sits in the selected peer field',
-    points: ['Bars compare reported M&I contained graphite on a common scale', 'Tanga enters at #5 within this selected dated benchmark', 'Different reporting dates and assumptions limit comparability'],
+    points: ['Bars compare reported contained graphite values in Mt', 'Tanga enters at #5 in this selected dated set using its Indicated contained graphite', 'Estimate dates and reported categories vary, so the set is not a like-for-like current census'],
   },
   tanzania: {
     headline: 'Locate the project in Tanzania',
@@ -943,7 +943,7 @@ const PEER_COMPARISON_METRICS = [
   {
     label: 'Peer position',
     value: '#5',
-    detail: `In this selected peer set · ${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(1)} Mt M&I contained graphite`,
+    detail: `In this selected set · ${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(2)} Mt Indicated contained graphite`,
   },
   {
     label: 'Resource scale',
@@ -1163,7 +1163,7 @@ function peerPopupRows(project: GraphitePeerProjectRow) {
     ['TGC', project.tgcGrade ?? 'Not in peer summary'],
     ['Flake distribution', project.flakeDistribution ?? 'Not cleanly disclosed in peer summary'],
     ['Total resource', project.totalResource ?? project.resource],
-    ['M&I resource', project.measuredIndicated ?? project.resource],
+    ['Reported contained graphite', project.reportedContainedBasis ?? project.resource],
     ['Metallurgy', project.metallurgy ?? 'Not in peer summary'],
     ['Source basis', project.sourceLabel],
   ];
@@ -1353,8 +1353,8 @@ function intentRunLabel(intent: CommandIntent) {
 function modeSummary(mode: WorkbenchMode, routeTarget: RouteTarget, focus: ResourceFocus, tangaInserted: boolean) {
   if (mode === 'ranking') {
     return tangaInserted
-      ? 'Tanga is inserted into the peer field after the resource reveal, using M&I contained graphite.'
-      : 'A globe-based peer ranking sets the graphite context before the Tanga resource is revealed.';
+      ? 'Tanga is inserted into the peer field after the resource reveal, using its Indicated contained-graphite figure.'
+      : 'A published 2023 selected-project benchmark sets the graphite context before the Tanga resource is revealed.';
   }
   if (mode === 'tanzania') return 'Tanga is highlighted inside Tanzania with a project marker.';
   if (mode === 'project') return 'Raised terrain, roads, villages, vegetation, and licence limits are active around the project.';
@@ -1420,14 +1420,14 @@ function factsForMode(mode: WorkbenchMode, focus: ResourceFocus) {
 function legendForMode(mode: WorkbenchMode, routeTarget: RouteTarget, focus: ResourceFocus): LegendItem[] {
   if (mode === 'ranking') {
     return [
-      {label: 'Peer projects', detail: 'M&I graphite ranking', tone: '#a89c94'},
+      {label: 'Peer projects', detail: 'Reported contained-graphite values', tone: '#a89c94'},
       {label: 'Tanzania peers', detail: 'Mahenge, Epanko, Bunyu', tone: '#c7551b'},
       {label: 'Tanga insert', detail: 'After resource reveal', tone: '#41200e'},
     ];
   }
   if (mode === 'comparison') {
     return [
-      {label: 'Tanga', detail: '#5 inserted peer slot', tone: '#c7551b'},
+      {label: 'Tanga', detail: '#5 in selected peer set', tone: '#c7551b'},
       {label: 'Tanzania peers', detail: 'Mahenge, Epanko, Bunyu', tone: '#b9954b'},
       {label: 'Metallurgy', detail: '>97% TC and 93-94% recovery', tone: '#f5f1eb'},
     ];
@@ -1673,7 +1673,7 @@ function sceneCalloutsForMode(
   }
   if (mode === 'ranking') {
     return [
-      {id: 'peer', label: 'Global peer field', detail: 'Top 10 public graphite projects before Tanga reveal', boxX: 45, boxY: 35, tone: '#a89c94'},
+      {id: 'peer', label: 'Global peer field', detail: 'Selected 10-project benchmark before Tanga reveal', boxX: 45, boxY: 35, tone: '#a89c94'},
     ];
   }
   if (mode === 'comparison') {
@@ -5282,7 +5282,7 @@ export default function TangaDeckWorkbench() {
       title = `#${props.displayRank ?? props.baselineRank} ${props.project ?? 'Graphite project'}`;
       rows.push(`${props.country ?? 'Unknown'} - ${props.owner ?? props.company ?? 'Operator'}`);
       rows.push(`Listed: ${props.listing ?? 'Not in peer summary'}`);
-      rows.push(`M&I: ${props.measuredIndicated ?? props.resource ?? 'M&I graphite basis'}`);
+      rows.push(`Reported contained graphite: ${props.reportedContainedBasis ?? props.resource ?? 'Basis not in selected benchmark summary'}`);
       if (props.tgcGrade) rows.push(`TGC: ${props.tgcGrade}`);
       if (props.flakeDistribution) rows.push(`Flake: ${props.flakeDistribution}`);
       rows.push(String(props.sourceLabel ?? 'Peer project source'));
@@ -6497,7 +6497,7 @@ export default function TangaDeckWorkbench() {
             <small>{selectedPeerProject.company} / {selectedPeerProject.country}</small>
           </div>
           <div className="tanga-deck__peer-popup-metric">
-            <span>M&I contained graphite</span>
+            <span>Reported contained graphite</span>
             <strong>{selectedPeerProject.containedGraphiteMt.toLocaleString(undefined, {maximumFractionDigits: 3})} Mt</strong>
             <small>{selectedPeerProject.status}</small>
           </div>
@@ -6524,10 +6524,10 @@ export default function TangaDeckWorkbench() {
         >
           <div className="tanga-deck__ranking-head">
             <span>{tangaRankingInserted ? 'Global Ranking' : 'Peer Context'}</span>
-            <strong>{tangaRankingInserted ? 'Tanga ranks #5 in this peer set' : 'Top 10 public graphite projects'}</strong>
+            <strong>{tangaRankingInserted ? 'Tanga ranks #5 in this peer set' : 'Selected 10-project 2023 benchmark'}</strong>
             <small>{tangaRankingInserted
-              ? 'By reported M&I contained graphite. Peer estimates may differ in effective date and reporting basis.'
-              : 'Ranked by reported M&I contained graphite. Select a project for ownership, grade, flake and metallurgy context.'}</small>
+              ? 'By reported contained graphite. Dates and reported categories vary; this is a selected comparison set.'
+              : 'Reported contained graphite in the published benchmark. Select a project to inspect its disclosed basis and source.'}</small>
           </div>
 
           <ol className="tanga-deck__ranking-list">
@@ -6591,7 +6591,7 @@ export default function TangaDeckWorkbench() {
                 <li className="is-win"><i>Metallurgy</i><b>&gt;97% TC</b><s>premium conc.</s><b>large-flake</b></li>
                 <li><i>Listing</i><b>Private</b><s>pre-market entry</s><b>ASX: BKT</b></li>
               </ul>
-              <p>In this selected peer set, Tanga ranks fifth by reported M&amp;I contained graphite. Port distance and metallurgical testwork are context, not demonstrated cost or product advantages.</p>
+              <p>In this selected peer set, Tanga ranks fifth by reported contained graphite, using its Indicated MRE figure. Port distance and metallurgical testwork are context, not demonstrated cost or product advantages.</p>
             </div>
           ) : (
             <div className="tanga-deck__ranking-foot">
@@ -6624,7 +6624,7 @@ export default function TangaDeckWorkbench() {
             <div className="tanga-deck__comparison-row is-head" role="row">
               <span>Rank</span>
               <span>Project</span>
-              <span>M&I graphite</span>
+              <span>Reported contained graphite</span>
               <span>Comparison note</span>
             </div>
             {comparisonRows.map((project) => (
