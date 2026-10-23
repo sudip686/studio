@@ -3,7 +3,6 @@
 import {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
-import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {cameraEase} from '@/lib/deck/presentation-motion';
 import {buildConcentrator} from '@/lib/deck/mine-scene';
 import MetallurgyEvidenceBoard from './MetallurgyEvidenceBoard';
@@ -63,10 +62,10 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#cbd3cf');
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const room = new RoomEnvironment();
-    const environment = pmrem.fromScene(room, .04);
-    room.dispose(); scene.environment = environment.texture;
+    // Use the same view-independent material palette as the shared 3D deck.
+    // Room reflections shift metal and cladding highlights as the plant is
+    // orbited, which can look like the process colors are flickering.
+    scene.environment = null;
     const camera = new THREE.PerspectiveCamera(34, 1, .1, 4000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = .075;
@@ -260,7 +259,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(entry => materials.add(entry)); } });
       geometries.forEach(geometry => geometry.dispose()); materials.forEach(entry => entry.dispose());
-      environment.dispose(); pmrem.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
   }, [rendererAttempt]);
 

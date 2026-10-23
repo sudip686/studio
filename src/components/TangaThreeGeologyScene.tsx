@@ -7,7 +7,6 @@ import {createPortal} from 'react-dom';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import proj4 from 'proj4';
 import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
 import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
@@ -329,6 +328,19 @@ type ThreeLegendItem = {
 };
 
 type SurfaceCameraView = 'default' | 'top' | 'bottom';
+
+/** Stable site-plan keys so a numbered callout keeps the same identity across
+ * overview, pit and facility views even when some features are occluded. */
+const MINE_SITE_CALLOUT_INDEX: Readonly<Record<string, string>> = {
+  'pit-0': '01',
+  'pit-1': '02',
+  'development-feed': '03',
+  'development-plant': '04',
+  'facility-tailings': '05',
+  'facility-water': '06',
+  'facility-raw-water': '07',
+  'facility-waste': '08',
+};
 
 type ProjectedThreeCallout = ThreeCallout & {
   anchorPixelX: number;
@@ -2556,12 +2568,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
-    // Image-based environment lighting: gives PBR surfaces (terrain, collars,
-    // blocks) real reflections/ambient so they read rich instead of matte-gray.
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const environmentTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = environmentTexture;
-    pmrem.dispose();
+    // Keep thematic colors stable while presenters orbit. A room environment
+    // map adds view-dependent reflections to standard materials, which makes
+    // resource cells, pads and equipment appear to change color with the
+    // camera. Fixed hemisphere/key/fill lights below retain form and shadows.
+    scene.environment = null;
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -4246,7 +4257,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const,occlusion:'scene' as const}));
             if(feedAnchor&&sitePlan.plant&&processPlant){
               calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
-              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story',occlusion:'scene'});
+              const plantBounds=new THREE.Box3().setFromObject(processPlant);
+              const plantTop=stage.worldToLocal(new THREE.Vector3((plantBounds.min.x+plantBounds.max.x)/2,plantBounds.max.y+12,(plantBounds.min.z+plantBounds.max.z)/2));
+              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:plantTop.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
             }
             for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell · concept',water:'Settling / reclaim · concept','raw-water':'Raw-water pond · concept',waste:'Waste-rock benches · concept'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story',occlusion:'scene'});
             siteOverviewCallouts = calloutsForProjection;
@@ -4546,7 +4559,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         ) {
           return;
         }
-        if(callout.occlusion==='scene'&&mode==='mine_planning'&&activeOccluders.length){
+        // A selected facility detail is an intentional x-ray annotation view:
+        // keep the selected feature named even when its own roof/embankment
+        // covers the anchor. Whole-site labels still use solid/terrain tests.
+        if(callout.occlusion==='scene'&&mode==='mine_planning'&&!facilityFocused&&activeOccluders.length){
           // Cast only to a point just short of the feature. The small tolerance
           // keeps a label attached to its own surface while hiding it behind a
           // nearer ridge, pit wall, or building during orbit and zoom.
@@ -4560,7 +4576,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if(calloutRaycaster.intersectObjects(activeOccluders,false).length)return;
           }
         }
-        if(callout.occlusion==='scene'&&mode==='mine_planning'&&terrainResources&&layerSettingsRef.current.terrain.visible&&terrainSurfaceMaterials.some(material=>material.visible&&material.opacity>.65)){
+        if(callout.occlusion==='scene'&&mode==='mine_planning'&&!facilityFocused&&terrainResources&&layerSettingsRef.current.terrain.visible&&terrainSurfaceMaterials.some(material=>material.visible&&material.opacity>.65)){
           // Terrain is checked against the same registered elevation samples
           // used to build the visible surface. This avoids triangle-scanning a
           // 512² mesh on every camera update while keeping ridge occlusion live.
@@ -5085,7 +5101,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.removeEventListener('start', onControlStart);
       controls.removeEventListener('end', onControlEnd);
       controls.dispose();
-      environmentTexture.dispose();
       disposeObject(scene);
       key.shadow.map?.dispose();
       key.shadow.mapPass?.dispose();
@@ -5282,7 +5297,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 '--callout-tone': callout.tone,
               } as any}
             >
-              <span>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
+              <span data-site-index={mode === 'mine_planning' ? MINE_SITE_CALLOUT_INDEX[callout.id] : undefined}>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
               {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
             </div>
           ))}

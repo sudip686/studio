@@ -98,7 +98,10 @@ export function buildMineSiteCampus(options:Options) {
       for(let x=-w/2;x<=w/2;x+=5)for(let z=-d/2;z<=d/2;z+=5){values.push(height(candidate.point[0]+x,candidate.point[1]+z));if(surveyed(candidate.point[0]+x,candidate.point[1]+z))coverage++;}
       const low=Math.min(...values),high=Math.max(...values),relief=high-low;if(!Number.isFinite(high)||relief>limit)continue;
       const level=high+1,point=candidate.point;
-      const f:CampusFacility={id,title,width:w,depth:d,point,level,relief,surveyFraction:coverage/values.length,footprint:rectangle(point,w,d),anchor:[point[0]+(id==='water'||id==='raw-water'?w/2-18:0),level+(id==='tailings'?12:id==='waste'?15:8.5),point[1]+(id==='tailings'?-d/2+38:id==='waste'?-15:0)]};
+      // Keep projected leaders above the highest embankment/pump geometry so
+      // the label survives its own facility's occlusion test in close views.
+      const anchorLift=id==='tailings'?25:id==='waste'?24:18;
+      const f:CampusFacility={id,title,width:w,depth:d,level,relief,surveyFraction:coverage/values.length,footprint:rectangle(point,w,d),point,anchor:[point[0]+(id==='water'||id==='raw-water'?w/2-18:0),level+anchorLift,point[1]+(id==='tailings'?-d/2+38:id==='waste'?-15:0)]};
       excluded.push(rectangle(point,w+50,d+50));facilities.push(f);return f;
     }
     return null;
@@ -128,7 +131,7 @@ export function buildMineSiteCampus(options:Options) {
       }
       cap(group,outer,materials.bench,'Waste-rock upper working surface');
       const topWidth=f.width-2*inset,topDepth=f.depth-2*inset,moundX=x-Math.min(30,topWidth*.2),moundZ=z-Math.min(15,topDepth*.2);
-      const mound=mesh(group,new THREE.ConeGeometry(8,4,12),materials.rock,'Illustrative active waste-rock tip');mound.scale.set(Math.min(3.5,topWidth/40),1,Math.min(1.3,topDepth/40));mound.position.set(moundX,y+17,moundZ);f.anchor=[moundX,y+19,moundZ];
+      const mound=mesh(group,new THREE.ConeGeometry(8,4,12),materials.rock,'Illustrative active waste-rock tip');mound.scale.set(Math.min(3.5,topWidth/40),1,Math.min(1.3,topDepth/40));mound.position.set(moundX,y+17,moundZ);f.anchor=[moundX,y+23,moundZ];
       for(let i=0;i<46;i++){
         const dx=Math.sin(i*17.37)*topWidth*.4,dz=Math.cos(i*11.1)*topDepth*.38;
         if(Math.hypot(dx,dz)<9||Math.hypot(dx-16,dz)<7)continue;
