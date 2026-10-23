@@ -72,7 +72,7 @@ Acceptance: no unhandled error or stranded loading state in the agreed navigatio
 - [ ] Inventory all existing panels and controls and consolidate duplicate information into the common overlay slots.
 - [ ] Merge the chapter-purpose cue and local Continue action into a single consistent story/navigation hierarchy.
 - [ ] Simplify the current 4m51s guided-story and separate per-chapter timing controls into a clear tour preset plus advanced timing settings.
-- [ ] Make the existing presentation/explore toggle explicit: explore pauses the story; Return to story restores the current authored shot and layer state.
+- [x] Make the existing presentation/explore toggle explicit: explore pauses the story; Return to story restores the current authored shot and layer state. Verified on the local production build with autoplay running: entering Explore stopped playback, remained on chapter 7 through a 1.2 s wait, and returning restored the authored view while preserving 55% surface opacity.
 - [ ] Use measured panel bounds to reserve space for the model, camera target and labels on desktop/tablet/phone.
 - [ ] Consolidate scattered style overrides into semantic tokens as affected components are changed; keep a screenshot baseline for each chapter.
 

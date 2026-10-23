@@ -5763,7 +5763,12 @@ export default function TangaDeckWorkbench() {
         onClick={() => {
           const returningToStory = isExploreMode;
           setExploreMode(!isExploreMode); setLayersOpen(false);
-          if (returningToStory) {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot(activeMode,activeShotIndex);}
+          // Exploring is a presenter pause: the narrative must not advance
+          // while someone is inspecting the evidence. Returning reapplies the
+          // authored shot but deliberately preserves the chosen layer state.
+          setIsAutoplay(false);
+          setIsExecutiveTour(false);
+          if (returningToStory) applyStoryShot(activeMode,activeShotIndex);
         }}>
         {isExploreMode ? 'Return to story' : 'Explore evidence'}
       </button>
