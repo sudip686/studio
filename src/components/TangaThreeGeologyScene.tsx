@@ -235,7 +235,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
   stage?: string;
 };
@@ -2143,31 +2143,14 @@ export default function TangaThreeGeologyScene({
     let cancelTerrainUpgrade: (() => void) | null = null;
     consumedCameraCommandIdRef.current=0;
     const sceneStartedAt = performance.now();
-    let firstUsefulFrameReported = false;
-    let pendingUsefulFrame: {scene: SceneLoadState; terrain: SceneLoadState; quality: AssetQuality; message: string} | null = null;
     const publishLoadState = (sceneState: SceneLoadState, terrainState: SceneLoadState, quality: AssetQuality, message: string) => {
       setSceneReady(sceneState === 'ready');
       onLoadState?.({scene: sceneState, terrain: terrainState, quality, message, elapsedMs: Math.round(performance.now() - sceneStartedAt)});
     };
-    const reportLoadState = (
-      sceneState: SceneLoadState,
-      terrainState: SceneLoadState,
-      quality: AssetQuality,
-      message: string
-    ) => {
-      // Data readiness can precede the first useful picture by the duration
-      // of the authored camera move. Keep controls in their loading state
-      // until populated geometry has rendered and that move has settled.
-      if (sceneState === 'ready' && mode !== 'metallurgy' && !firstUsefulFrameReported) {
-        pendingUsefulFrame = {scene: sceneState, terrain: terrainState, quality, message};
-        setSceneReady(false);
-        onLoadState?.({scene: 'loading', terrain: terrainState, quality, message: 'Rendering the authored view', elapsedMs: Math.round(performance.now() - sceneStartedAt)});
-        return;
-      }
-      if (sceneState !== 'ready') pendingUsefulFrame = null;
-      if (sceneState === 'ready') firstUsefulFrameReported = true;
-      publishLoadState(sceneState, terrainState, quality, message);
-    };
+    // Readiness follows usable scene data, not the optional cinematic camera
+    // move. The view can be interrupted immediately and a slow/suspended RAF
+    // must never leave the presentation controls disabled.
+    const reportLoadState = publishLoadState;
 
     reportLoadState('loading', 'loading', assetQuality, 'Drawing preview surface');
     evidenceFocusRef.current=null;
@@ -2183,8 +2166,8 @@ export default function TangaThreeGeologyScene({
     // mine viewer. Avoid loading and rendering an invisible industrial campus.
     if(['metallurgy'].includes(mode)){
       cameraCommandHandlerRef.current=null;
-      setStatus('Metallurgy product illustration and reported test summaries ready');
-      reportLoadState('ready','idle',assetQuality,'Illustrative product story; laboratory verification pending');
+      setStatus('Metallurgy laboratory results ready');
+      reportLoadState('ready','idle',assetQuality,'Eight composite results; IMO and AMC report basis');
       return;
     }
     const scene = new THREE.Scene();
@@ -2340,6 +2323,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let facilityFocused = false;
     let geologyPlan = false;
     let geologyOblique = false;
+    let sitePlanView = false;
     let geologyDepthBlend = 1;
     let geologyBlendTime = 0;
     let geologySurface:THREE.Group|null=null;
@@ -2587,7 +2571,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     const consumeCameraCommand = (command: ThreeCameraCommand) => {
       if (['geologyPlan','geologyTilt','geologyDepth'].includes(command.action) && mode === 'subsurface' && !geologyModelReady) return;
-      if(mode==='mine_planning'&&!mineCampusReady&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','northPit','southPit'].includes(command.action))return;
+      if(mode==='mine_planning'&&!mineCampusReady&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit'].includes(command.action))return;
       // Local inspection buttons use independent IDs; don't let them suppress
       // subsequent commands from the shared presentation toolbar.
       if(command===cameraCommandRef.current){
@@ -2671,10 +2655,46 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const currentDistance = clamp(direction.length(), controls.minDistance, controls.maxDistance);
       const normalizedDirection = direction.normalize();
 
+      if (command.action === 'sitePlan' && mode === 'mine_planning' && sitePlan?.pits.length) {
+        facilityFocused=false;setStoryPlaying(false);calloutsForProjection=siteOverviewCallouts;
+        sitePlanView=true;
+        const bounds=new THREE.Box3();
+        for(const pit of sitePlan.pits) for(const [x,z] of pit.ring) bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,pit.surface,z)));
+        const includeLocal=(x:number,z:number,y=0)=>bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,y,z)));
+        if(sitePlan.plant){const [x,z]=sitePlan.plant;for(const dx of [-300,300])for(const dz of [-300,300])includeLocal(x+dx,z+dz);}
+        for(const facility of campusFacilities) for(const [x,z] of facility.footprint) includeLocal(x,z,facility.level);
+        if(feedAnchor) bounds.expandByPoint(stage.localToWorld(feedAnchor.clone()));
+        if(processPlant){stage.updateMatrixWorld(true);bounds.expandByObject(processPlant);}
+        const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+        const span=Math.max(size.x,size.z,700);
+        centre.y+=60;
+        stage.updateMatrixWorld(true);
+        const north=new THREE.Vector3(0,0,-1).transformDirection(stage.matrixWorld);
+        const planNormal=new THREE.Vector3(0,1,0).transformDirection(stage.matrixWorld);
+        camera.up.copy(north);
+        controls.enableRotate=false;controls.minPolarAngle=0;controls.maxPolarAngle=0;
+        controls.target.copy(centre);
+        // Leave a safe frame for the chapter title, inspector and bottom pager
+        // so the pits and lowland process campus remain visible together.
+        scheduleCameraTween(centre.clone().addScaledVector(planNormal,span*2.05),centre,1.65,40);
+        setStatus('North-up engineering overview · conceptual footprints · scale in scene units');
+        return;
+      }
+
+      if (command.action === 'siteOblique' && mode === 'mine_planning') {
+        sitePlanView=false;
+        camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI-0.04;
+        facilityFocused=false;calloutsForProjection=siteOverviewCallouts;
+        scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);
+        setStatus('Oblique site overview · terrain and proposed facilities');
+        return;
+      }
+
       if (command.action === 'resetView') {
+        if(mode==='mine_planning')sitePlanView=false;
         facilityFocused=false;
         if (mode === 'mine_planning') calloutsForProjection = siteOverviewCallouts;
-        controls.maxPolarAngle = Math.PI - 0.04;
+        camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle = Math.PI - 0.04;
         surfaceCameraView = 'default';
         applyTerrainSurfaceView();
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 1.45, cameraShot.fov);
@@ -4054,7 +4074,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(mode==='mine_planning'){
         mineCampusReady=true;
         const pending=cameraCommandRef.current;
-        if(pending&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','northPit','southPit'].includes(pending.action))consumeCameraCommand(pending);
+        if(pending&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit'].includes(pending.action))consumeCameraCommand(pending);
       }
       if (mode === 'subsurface') {
         geologyModelReady = true;
@@ -4382,6 +4402,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const viewDirection = controls.target.clone().sub(camera.position);
         northAngleDeg = normalizeDegrees(THREE.MathUtils.radToDeg(Math.atan2(viewDirection.x, -viewDirection.z)));
       }
+      if(mode==='mine_planning'&&sitePlanView) northAngleDeg=0;
 
       let scaleLabel = DEFAULT_NAV_INSTRUMENT.scaleLabel;
       let scaleWidth = DEFAULT_NAV_INSTRUMENT.scaleWidth;
@@ -4717,13 +4738,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         renderer.setScissorTest(false);
         for (const mesh of terrainMeshes) showConceptTerrain(mesh.geometry, conceptSurfaceVisible);
       } else if (!wasContextLost) renderer.render(scene,camera);
-      if (pendingUsefulFrame && !cameraTween && (userTookControl || flyProgress >= 1) && renderer.info.render.calls > 0) {
-        const firstFrame = pendingUsefulFrame;
-        pendingUsefulFrame = null;
-        firstUsefulFrameReported = true;
-        host.dataset.firstUsefulFrameMs = String(Math.round(performance.now() - sceneStartedAt));
-        publishLoadState(firstFrame.scene, firstFrame.terrain, firstFrame.quality, firstFrame.message);
-      }
       frame = requestAnimationFrame(animate);
     };
     animate();
@@ -5067,6 +5081,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       </section>
       {mode === 'mine_planning' && <section className="tanga-mine-story" aria-label="Mining targets and animation">
         <h2>{miningBeat>=3?'Processing & site services':'Why these pits?'}</h2>
+        <div className="tanga-mine-story__orientation" role="group" aria-label="Site orientation">
+          <button disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'sitePlan'})}>North-up plan</button>
+          <button disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'siteOblique'})}>Oblique view</button>
+        </div>
         <div className="tanga-mine-story__steps" aria-label="Mining camera presets">
           {(['northPit','southPit','resetView'] as const).map((action,index)=><button key={action} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(index===2?3:2);setFocusedSource(null);cameraCommandHandlerRef.current?.({id:Date.now(),action});}}>{['North pit','South pit','Whole site'][index]}</button>)}
         </div>

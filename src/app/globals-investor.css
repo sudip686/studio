@@ -1391,3 +1391,74 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-story-compare-range{display:grid;gap:5px;margin-top:8px;padding:9px 10px;border:1px solid var(--story-line,#b8cbd12b);border-radius:6px;background:var(--story-surface,#111d25);color:var(--story-muted,#c5d1d5);font-size:9px;font-weight:650;letter-spacing:.06em;text-transform:uppercase}
 .tanga-story-compare-range input{width:100%;accent-color:var(--story-accent,#f1ae77);cursor:ew-resize}
 .tanga-story-compare-range :focus-visible{outline:2px solid var(--story-accent,#ffd0a7);outline-offset:3px}
+
+/* 23 October: geology becomes a field atlas, with the terrain remaining the canvas. */
+.tanga-deck:has(.tanga-geology-map-sheet),
+.tanga-deck:has(.tanga-geology-surface-legend){
+  --atlas-paper:#f2f0e8;--atlas-ink:#263b38;--atlas-muted:#65736b;--atlas-rule:#bdc5b8;--atlas-accent:#9b6a35;
+}
+.tanga-geology-map-sheet{
+  left:300px;right:390px;top:208px;bottom:104px;z-index:25;
+  border:1px solid #e3e2d8;border-radius:3px;background:#e9e8df;
+  box-shadow:0 14px 42px #101a1d35;
+}
+.tanga-geology-map-sheet__toolbar{align-items:center;padding:8px 12px;background:var(--atlas-paper);border-bottom:1px solid var(--atlas-rule)}
+.tanga-geology-map-sheet__toolbar [role=group]{gap:5px}
+.tanga-geology-map-sheet button{min-height:30px;border:1px solid var(--atlas-rule);border-radius:3px;padding:5px 9px;background:transparent;color:var(--atlas-ink);font-size:10px;font-weight:600}
+.tanga-geology-map-sheet button[aria-pressed=true]{border-color:var(--atlas-ink);background:var(--atlas-ink);color:#f4f1e8}
+.tanga-geology-map-sheet button:focus-visible,.tanga-geology-map-sheet a:focus-visible{outline:2px solid var(--atlas-accent);outline-offset:2px}
+.tanga-geology-map-sheet__source-tag{color:var(--atlas-muted);font-size:8px;letter-spacing:.14em}
+.tanga-geology-map-sheet__source-tag i{background:var(--atlas-accent);box-shadow:none}
+.tanga-geology-map-sheet__viewport{background:#e9e8df}
+.tanga-geology-map-sheet__viewport img{background:#f7f6ef}
+.tanga-geology-map-sheet footer{padding:7px 12px;background:var(--atlas-paper);color:var(--atlas-muted);font-size:9px;border-top:1px solid var(--atlas-rule)}
+.tanga-geology-map-sheet footer a{color:#315e54;font-weight:650}
+.tanga-deck--present .tanga-story-panel--map{
+  top:190px;right:24px;width:340px;max-height:calc(100svh - 315px);padding:18px 19px;
+  border:1px solid #d3d5c9;border-radius:3px;background:var(--atlas-paper);color:var(--atlas-ink);
+  box-shadow:0 14px 38px #0d181c2e;scrollbar-color:#a9afa2 #e6e5dc;
+}
+.tanga-story-panel--map .tanga-story-panel__eyebrow{color:#8d673b;font-size:8px;letter-spacing:.14em}
+.tanga-story-panel--map h2{color:var(--atlas-ink);font-family:Georgia,'Times New Roman',serif;font-size:25px;line-height:1.12;letter-spacing:-.025em}
+.tanga-story-panel--map .tanga-story-panel__intro,.tanga-story-panel--map .tanga-story-datum-note{color:#58675f;font-size:11px;line-height:1.5}
+.tanga-story-panel--map .tanga-geology-map-sequence{margin:12px 0}
+.tanga-story-panel--map .tanga-geology-map-sequence li{border-color:#c5c8bd;color:#778078;font-size:10px;padding:7px 0 7px 11px}
+.tanga-story-panel--map .tanga-geology-map-sequence li span{color:#8d673b;font-size:9px}
+.tanga-story-panel--map .tanga-geology-map-sequence li[aria-current=step]{border-color:#6e8770;color:var(--atlas-ink);background:linear-gradient(90deg,#758b7118,transparent)}
+.tanga-story-panel--map .tanga-geology-map-sequence button{color:inherit;font-size:inherit}
+.tanga-story-panel--map .tanga-story-inline-note,.tanga-story-panel--map .tanga-geology-basis-tag{color:#66756b;font-size:9px}
+.tanga-story-panel--map .tanga-geology-basis{border-top:1px solid #d1d4ca}
+.tanga-story-panel--map .tanga-geology-basis summary{color:#6c684d;font-size:10px}
+.tanga-story-panel--map .tanga-geology-basis p{color:#59675e;font-size:10px}
+.tanga-story-panel--map .tanga-geology-selected-unit{border-left-color:#8c6b3c;background:#e6e7dc}
+.tanga-story-panel--map .tanga-geology-selected-unit header strong{color:var(--atlas-ink)}
+.tanga-story-panel--map .tanga-geology-selected-unit header button{color:#53635c}
+.tanga-story-panel--map .tanga-geology-selected-unit p{color:#58675f}
+.tanga-story-panel--map .tanga-story-panel__compare{min-height:38px;border:1px solid #365d50;border-radius:3px;background:#365d50;color:#f7f4eb;font-size:10px;font-weight:650}
+.tanga-story-panel--map .tanga-story-panel__compare:hover:not(:disabled){background:#274a40}
+.tanga-geology-surface-legend{
+  left:24px;bottom:150px;width:220px;padding:11px 13px;gap:7px;
+  border:1px solid #d5d7ca;border-left:3px solid #768672;border-radius:2px;
+  background:#f2f0e8ed;color:#31433d;box-shadow:0 8px 28px #101a1d28;backdrop-filter:blur(8px);font-size:10px;
+}
+.tanga-geology-surface-legend header{border-color:#cdd1c5;padding-bottom:6px}
+.tanga-geology-surface-legend header strong{color:#80623b;font-size:8px}
+.tanga-geology-surface-legend header small{color:#718078}
+.tanga-geology-surface-legend i{border-color:#263b3855;box-shadow:none}
+.tanga-geology-surface-legend>div{gap:5px}
+.tanga-geology-surface-legend>div>button{color:#34443e;font-size:10px;padding:2px 4px}
+.tanga-geology-surface-legend>div>button:hover,.tanga-geology-surface-legend>div>button[aria-pressed=true]{background:#6d83731c;border-color:#6d837344}
+.tanga-geology-surface-legend p{border-color:#cdd1c5;color:#66736c}
+.tanga-deck:has(.tanga-geology-map-sheet) .tanga-three__nav-cluster{visibility:visible}
+.tanga-deck.tanga-deck--present .tanga-story-panel--map h2{color:var(--atlas-ink)!important}
+.tanga-deck--present .tanga-story-panel--map .tanga-story-panel__intro{color:#58675f}
+.tanga-deck--present .tanga-story-panel--map .tanga-geology-map-sequence li[aria-current=step]{background:#dce4d8;color:#263b38}
+.tanga-deck--present .tanga-story-panel--map .tanga-story-panel__compare{border-color:#365d50;background:#365d50;color:#f7f4eb}
+.tanga-deck:has(.tanga-metallurgy-board) .tanga-story-cue{display:none!important}
+.tanga-deck:has(.tanga-three.is-inspecting.is-mine_planning) .tanga-story-cue,
+.tanga-deck:has(.tanga-three.is-inspecting.is-mine_planning) .tanga-deck__planning-note{display:none!important}
+@media(max-width:1050px) and (min-width:761px){
+  .tanga-geology-map-sheet{left:270px;right:350px;top:194px;bottom:104px}
+  .tanga-deck--present .tanga-story-panel--map{right:16px;width:310px}
+  .tanga-geology-surface-legend{left:14px;bottom:135px;width:200px}
+}

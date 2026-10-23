@@ -34,6 +34,8 @@ const buildTarget = process.env.TANGA_BUILD_TARGET
       : 'Local Next.js');
 
 const nextConfig: NextConfig = {
+  // Keep the live desktop preview separate from Next/OpenNext release builds.
+  distDir: process.env.NODE_ENV === 'development' ? '.next-local' : '.next',
   env: {
     NEXT_PUBLIC_PRESENTATION_BUILD_REVISION: `${buildRevision.slice(0, 12)}${hasTrackedWorkingChanges ? '+dirty' : ''}`,
     NEXT_PUBLIC_PRESENTATION_BUILD_TARGET: buildTarget,

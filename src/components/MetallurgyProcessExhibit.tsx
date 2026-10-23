@@ -8,6 +8,7 @@ import {createMetallurgyPlant,MET_GROUPS} from '@/lib/deck/metallurgy-plant';
 import {cameraEase} from '@/lib/deck/presentation-motion';
 import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import TangaMaterialEvidence from './TangaMaterialEvidence';
+import MetallurgyEvidenceBoard from './MetallurgyEvidenceBoard';
 
 const STAGE_COPY=[
   {title:'Start with the material.',question:'What did the laboratory receive?',detail:'Graphite-bearing rock is examined before preparation. The source report includes actual sample microscopy and preparation photographs.',label:'Rock sample'},
@@ -23,10 +24,12 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
   const pausedRef=useRef(paused);pausedRef.current=paused;
   const [stage,setStage]=useState(2),[group,setGroup]=useState(0),[error,setError]=useState(''),[rendererAttempt,setRendererAttempt]=useState(0);
   const [figureIndex,setFigureIndex]=useState(0);
+  const [equipment,setEquipment]=useState(false);
   const [materialEvidence,setMaterialEvidence]=useState(false),[evidence,setEvidence]=useState(false);
   const groupRef=useRef(group);groupRef.current=group;
   useEffect(()=>{command.current?.(stage);},[group,stage]);
   useEffect(()=>{
+    if(!equipment)return;
     const el=host.current;if(!el)return;
     setError('');
     let renderer:THREE.WebGLRenderer;
@@ -41,9 +44,7 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
     renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     renderer.domElement.setAttribute('role','img');renderer.domElement.setAttribute('aria-label','Illustrative laboratory equipment in 3D. Drag to orbit or scroll to zoom. Select a stage to frame an instrument.');
     el.appendChild(renderer.domElement);
-    // Match the deck's dark geospatial stages. Light equipment and teal
-    // flotation surfaces read clearly against this instrument-bay backdrop.
-    const scene=new THREE.Scene();scene.background=new THREE.Color('#142630');
+    const scene=new THREE.Scene();scene.background=new THREE.Color('#e8ece6');
     const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment(),environment=pmrem.fromScene(room,.04);room.dispose();scene.environment=environment.texture;
     const camera=new THREE.PerspectiveCamera(24,1,.1,1000),controls=new OrbitControls(camera,renderer.domElement);
     controls.enableDamping=true;controls.minDistance=15;controls.maxDistance=200;controls.maxPolarAngle=Math.PI*.49;
@@ -51,13 +52,13 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
     const plinth=new THREE.Group();scene.add(plinth);
     const cabinetMaterial=new THREE.MeshStandardMaterial({color:0xf1f3f0,roughness:.5,metalness:.05});
     const topMaterial=new THREE.MeshStandardMaterial({color:0xb8c4c9,roughness:.4,metalness:.55});
-    const floorMaterial=new THREE.MeshStandardMaterial({color:0x263a42,roughness:.92});
+    const floorMaterial=new THREE.MeshStandardMaterial({color:0xd9dfd5,roughness:.92});
     const floor=new THREE.Mesh(new THREE.PlaneGeometry(500,500),floorMaterial);floor.rotation.x=-Math.PI/2;floor.position.y=-8;floor.receiveShadow=true;scene.add(floor);
     scene.add(new THREE.HemisphereLight(0xeaf2f4,0x43545d,.95));
     const key=new THREE.DirectionalLight(0xfffcf5,1.65);key.position.set(-30,70,45);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-100;key.shadow.camera.right=100;key.shadow.camera.top=70;key.shadow.camera.bottom=-70;key.shadow.camera.far=250;key.shadow.normalBias=.12;scene.add(key);
     const fill=new THREE.DirectionalLight(0xe5f2ff,.7);fill.position.set(45,20,-35);scene.add(fill);
     const target=new THREE.Vector3(),destination=new THREE.Vector3(),fromPosition=new THREE.Vector3(),fromTarget=new THREE.Vector3();
-    let selected=2,userOrbit=false,cameraStarted=performance.now(),tween=true,dirty=true,ready=false,last=performance.now(),time=0,frame=0;
+    let selected=stage,userOrbit=false,cameraStarted=performance.now(),tween=true,dirty=true,ready=false,last=performance.now(),time=0,frame=0;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)');
     function cabinet(bounds:THREE.Box3){
       for(const child of [...plinth.children]){plinth.remove(child);if(child instanceof THREE.Mesh)child.geometry.dispose();}
@@ -113,14 +114,15 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
       scene.traverse(object=>{if(object instanceof THREE.Mesh){geometries.add(object.geometry);(Array.isArray(object.material)?object.material:[object.material]).forEach(m=>materials.add(m));}});
       geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());environment.dispose();pmrem.dispose();key.shadow.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();
     };
-  },[rendererAttempt]);
+  },[rendererAttempt,equipment]);
   const result=MET_GROUPS[group],copy=STAGE_COPY[stage];
   const sourceFigure=stage===1||stage===3
     ? {index:2,image:'graphite-lab-workflow.jpg',label:'Laboratory preparation',locator:'Figure 2 · PDF p.16'}
     : stage===0?{index:0,image:'graphite-tgf002-microscopy.jpg',label:'TGF002 · microscopy',locator:'Figure 4 · PDF p.25'}
     : {index:1,image:'graphite-sem.jpg',label:'Concentrate morphology · SEM',locator:'Figure 45 · PDF p.46'};
+  if(!equipment)return <MetallurgyEvidenceBoard selected={group} onSelect={setGroup} onEquipment={()=>{setEquipment(true);window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>;
   return <section className="tanga-process-exhibit tanga-process-exhibit--focused" aria-label="Graphite laboratory testwork" data-inspection="bench">
-    <header><div><small>BENCH-SCALE TESTWORK · ILLUSTRATIVE EQUIPMENT</small><h2>{copy.title}</h2></div><div className="tanga-process-actions"><button type="button" onClick={()=>command.current?.(stage)}>Reset view</button><button type="button" onClick={onToggle} aria-pressed={paused}>{paused?'Play motion':'Pause motion'}</button></div></header>
+    <header><div><small>BENCH-SCALE TESTWORK · ILLUSTRATIVE EQUIPMENT</small><h2>{copy.title}</h2></div><div className="tanga-process-actions"><button type="button" onClick={()=>setEquipment(false)}>← Back to results</button><button type="button" onClick={()=>command.current?.(stage)}>Reset view</button><button type="button" onClick={onToggle} aria-pressed={paused}>{paused?'Play motion':'Pause motion'}</button></div></header>
     <nav className="tanga-process-stages" aria-label="Testwork stages">{STAGE_COPY.map((item,i)=><button type="button" key={item.label} aria-label={`0${i+1} ${item.label}`} aria-pressed={stage===i} onClick={()=>{setStage(i);window.dispatchEvent(new Event('tanga:manual-exploration'));}}><b>0{i+1}</b><span className="tanga-process-label-long">{item.label}</span><span className="tanga-process-label-short" aria-hidden="true">{['Rock','Prepare','Float','Dry','Measure'][i]}</span></button>)}</nav>
     <div className="tanga-process-body">
       <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>
@@ -131,7 +133,7 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
         <label>Variability composite<select aria-label="Select a variability composite" value={group} onChange={event=>setGroup(Number(event.target.value))}>{MET_GROUPS.map((item,i)=><option key={item.id} value={i}>{item.id}</option>)}</select></label>
         <dl className="tanga-process-metrics" aria-live="polite"><div><dt>Concentrate total carbon (TC)</dt><dd>{result.carbon}</dd></div><div><dt>Graphite recovery</dt><dd>{result.recovery}</dd></div><div><dt>Mass fraction above 150 µm</dt><dd>{result.coarse}</dd></div></dl>
         <button type="button" className="tanga-material-entry" onClick={()=>{onInspectEvidence?.();setFigureIndex(sourceFigure.index);setMaterialEvidence(true);}}>Open report evidence: {sourceFigure.label} <span>{sourceFigure.locator} · April 2025 · separate characterisation evidence ↗</span></button>
-        <details open={evidence} onToggle={event=>setEvidence(event.currentTarget.open)}><summary>Result basis &amp; definitions</summary><p>{copy.detail}</p><p>{result.basis}. Groups may overlap individual samples; values are not additive.</p><MetallurgySampleExplorer key={group} initialIndex={group}/></details>
+        <details open={evidence} onToggle={event=>setEvidence(event.currentTarget.open)}><summary>Result basis &amp; definitions</summary><p>{copy.detail}</p><p>{result.basis}. TC, recovery and coarse mass share have separate denominators.</p><MetallurgySampleExplorer key={group} initialIndex={group}/></details>
       </aside>
     </div>
     <footer>Equipment is illustrative. TC and recovery: IMO Final Report Rev. 0, Table 2. +150 µm mass fraction: AMC MRE, Table II. The reports classify TDM008 differently (IMO: “Fresh / Kaolin”; AMC: oxide / kaolinised). These are laboratory results, not operating performance or product qualification.</footer>
