@@ -2344,7 +2344,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const pitSurfaces:THREE.Mesh[]=[];
     const pitRamps:THREE.Mesh[]=[];
     const revealBlocks:THREE.InstancedMesh[]=[];
-    const geologyMeshes:THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>[]=[];
+    const geologyMeshes:THREE.Mesh<THREE.BufferGeometry,THREE.MeshLambertMaterial>[]=[];
     let separation=0;
     const sectionPlane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
     const sectionPlanes=[sectionPlane];
@@ -3432,10 +3432,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           geometry.computeVertexNormals(); geometry.computeBoundingSphere(); geometry.computeBoundingBox();
           const isHost = object.name.includes('GRSC');
           const unit=modelRockUnit(object.name);
-          const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+          // Interpreted unit colors are shared with the geological legend;
+          // use diffuse shading so their appearance does not pulse with view.
+          const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({
             color:unit.color, emissive:unit.color, emissiveIntensity:.08,
             transparent:true, opacity:1, depthWrite:true, side:THREE.DoubleSide,
-            forceSinglePass:true, roughness:.8, metalness:0, envMapIntensity:.45, toneMapped:true,
+            forceSinglePass:true, toneMapped:true,
           }));
           mesh.name = object.name;
           mesh.userData.tooltipItems=[{title:unit.label,rows:[unit.basis,'Interpreted contact geometry, not observed everywhere.'],tone:unit.color}];
@@ -3642,12 +3644,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       });
       Array.from(lithologyGroups.entries()).forEach(([lithology, segments]) => {
         const baseColor = new THREE.Color(lithology==='UNKNOWN'?'#9da9ae':modelRockUnit(lithology).color);
-        const material = new THREE.MeshStandardMaterial({
+        // Lithology colors are categorical evidence. Keep the legend color
+        // stable while orbiting; specular highlights made units pulse.
+        const material = new THREE.MeshLambertMaterial({
           color: baseColor,
           emissive: baseColor.clone().multiplyScalar(0.22),
           emissiveIntensity: lithology === 'GRSC' ? 0.34 : 0.16,
-          roughness: 0.36,
-          metalness: 0.08,
           transparent: true,
           opacity: lithology === 'GRSC' ? 0.3 : 0.2,
           depthWrite: false,
@@ -3680,12 +3682,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const color = new THREE.Color(bin.color);
         const mesh = new THREE.InstancedMesh(
           tubeGeometry,
-          new THREE.MeshStandardMaterial({
+          // Grade is encoded by color, so keep assay colors stable as the
+          // viewer orbits around the drill traces.
+          new THREE.MeshLambertMaterial({
             color,
             emissive: color,
             emissiveIntensity: bin.key === 'very-high' ? 0.64 : 0.42,
-            roughness: 0.24,
-            metalness: 0.12,
             transparent: true,
             opacity: mode === 'resource' ? 0.62 : 0.9,
             depthWrite: false,
