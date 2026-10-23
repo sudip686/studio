@@ -73,6 +73,7 @@ Use restrained dark panels, warm white typography, the existing copper brand acc
 - [ ] Verify WebGL context loss/restoration, background-tab behavior and repeated scene revisits; restore the same authored state after recovery where possible.
   - [x] Simulated WebGL loss in mine planning: the chapter surfaced its static fallback and recovery message, then rebuilt to `data-ready=true` after context restore with the exact camera position and target preserved and no JavaScript errors.
   - [x] Background the live mine-planning tab by opening a second page: `document.hidden` became true, haul motion changed to paused, readiness and camera position held; closing the second page resumed motion with the same camera. Resource-count stability over repeated full chapter loops remains open.
+  - [x] Repeat geology, drillhole and mine-planning scene entry six times in Chromium with WebGL context/loss instrumentation: all six transitions reached `data-ready=true` with one scene canvas; 7 scene contexts were created, 6 were explicitly lost during teardown, and 1 remained active for the final scene. Zero JavaScript errors. This verifies context lifecycle, not per-resource GPU memory. See `TANGA_SCENE_REVISIT_AUDIT_2026-10-23.md`.
 
 Acceptance: no unhandled error or stranded loading state in the agreed navigation/failure matrix; datum or coverage gaps are visible and documented rather than hidden by geometry edits.
 
