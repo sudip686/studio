@@ -768,7 +768,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'samples', label: 'Metallurgy overview', detail: 'Carbon, recovery and flake-size evidence', threeAction: 'resetView'},
   ],
   mine_planning: [
-    {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'sitePlan'},
+    {id: 'shell', label: 'Mine-plan overview', detail: 'Read the proposed site in its natural terrain setting', threeAction: 'siteOblique'},
     {id: 'north-pit', label: 'North pit', detail: 'Inspect the northern conceptual excavation', threeAction: 'northPit'},
     {id: 'south-pit', label: 'South pit', detail: 'Inspect the southern conceptual excavation', threeAction: 'southPit'},
     {id: 'waste',label: 'Waste-rock landform',detail:'Read illustrative benches and working areas',threeAction:'wasteView'},
@@ -2505,7 +2505,7 @@ export default function TangaDeckWorkbench() {
     setActiveShotIndex(0);
     setThreeCameraCommand(null);
     if (mode === 'subsurface') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'geologyPlan'});
-    else if (mode === 'mine_planning') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'sitePlan'});
+    else if (mode === 'mine_planning') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'siteOblique'});
     setActiveMode(mode);
     setStatusText(`Mode: ${MODE_LABELS[mode]}`);
     flyTo(mode, overrides.bearing);

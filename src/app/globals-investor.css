@@ -1585,3 +1585,15 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-process-exhibit--factory .tanga-factory-footer button{display:none}
 @media(max-width:1120px) and (min-width:701px){.tanga-deck .tanga-process-exhibit--factory{left:14px;right:14px;padding:12px;gap:8px}.tanga-process-exhibit--factory .tanga-factory-body{grid-template-columns:minmax(0,1fr) 240px;gap:9px}.tanga-process-exhibit--factory .tanga-process-actions button{padding-inline:7px;font-size:10px}.tanga-factory-inspector{padding:11px}}
 @media(max-width:700px){.tanga-deck .tanga-process-exhibit--factory{inset:154px 10px 154px;padding:8px;gap:6px;overflow:auto}.tanga-process-exhibit--factory .tanga-factory-header{align-items:flex-start;flex-wrap:wrap;gap:6px}.tanga-process-exhibit--factory .tanga-factory-header h2{font-size:17px}.tanga-process-exhibit--factory .tanga-process-actions{flex-wrap:wrap;justify-content:flex-start}.tanga-process-exhibit--factory .tanga-process-actions button{min-height:30px;padding:5px 7px;font-size:9px}.tanga-process-exhibit--factory .tanga-factory-stages{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}.tanga-process-exhibit--factory .tanga-factory-stages button{display:grid;justify-items:center;gap:3px;min-width:0;min-height:46px;padding:4px 2px;font-size:7px;text-align:center}.tanga-process-exhibit--factory .tanga-factory-body{grid-template-columns:1fr;grid-template-rows:minmax(170px,1fr) auto;gap:6px}.tanga-process-exhibit--factory .tanga-process-canvas{min-height:170px}.tanga-factory-inspector{padding:8px;max-height:150px}.tanga-factory-inspector h3{margin:4px 0;font-size:16px}.tanga-process-exhibit--factory .tanga-process-explanation{margin-bottom:5px;font-size:10px}.tanga-factory-flow{display:none}.tanga-process-exhibit--factory .tanga-factory-result{margin:2px 0 5px;padding:6px}.tanga-factory-result strong{font-size:16px}.tanga-factory-disclosure{padding-top:5px;font-size:8px}.tanga-process-exhibit--factory .tanga-factory-footer{gap:5px;flex-wrap:wrap;font-size:8px}.tanga-process-exhibit--factory .tanga-process-caption small{display:none}}
+
+/* Short desktop screens need room for the site qualification and both camera
+   presets without pushing the concept actions into a nested scroll area. */
+@media(min-width:761px) and (max-height:800px){
+  .tanga-deck--present .tanga-story-panel--concept{top:170px;max-height:calc(100svh - 300px);padding:16px}
+  .tanga-deck--present .tanga-story-panel--concept h2{margin:4px 0 6px;font-size:22px;line-height:1.08}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-story-panel__intro{font-size:11px;line-height:1.4}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-site-status-key{margin:3px 0;padding:4px 0}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-development-select{min-height:36px;margin:4px 0;padding-block:6px}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-development-source{margin:3px 0;padding:3px 0}
+  .tanga-deck--present .tanga-story-panel--concept :is(.tanga-story-panel__link,.tanga-story-panel__compare){min-height:36px;margin-top:5px;padding-block:7px}
+}

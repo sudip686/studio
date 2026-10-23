@@ -2606,7 +2606,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return;
       }
       if(command.action==='resetView'&&mode==='mine_planning'&&sitePlan?.pits.length){
-        consumeCameraCommand({id:Date.now()+1,action:'sitePlan'});
+        consumeCameraCommand({id:Date.now()+1,action:'siteOblique'});
         return;
       }
 
