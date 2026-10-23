@@ -56,6 +56,8 @@ Use restrained dark panels, warm white typography, the existing copper brand acc
 ### A. Establish reliability and a measurable baseline — P0
 
 - [ ] Record first useful frame, scene-ready time, transfer size, frame times and failure modes for all 12 chapters on the current branch.
+  - [x] Warm-cache, foreground Chromium baseline recorded at 390 × 844 and 1707 × 842 on Intel UHD Graphics; includes 12 chapter startup signals, 3D readiness markers and short RAF frame-pacing samples: `docs/TANGA_VIEWER_BASELINE_2026-10-23.md`.
+  - [ ] Repeat with cold cache and real network-transfer accounting; capture 30-second orbit distributions and failure/recovery behavior on the named laptop and physical phone. The warm browser run does not satisfy these checks.
 - [x] Audit survey, regional terrain, collars, resource blocks and interpreted mesh transforms against their coordinate/elevation metadata. Report unresolved vertical-reference and two-hole source discrepancies; do not shift recorded drillholes to make them look attached. Reproducible results: `docs/TANGA_SPATIAL_REGISTRATION_AUDIT_2026-10-23.md` and `scripts/audit_tanga_spatial_data.py`.
 - [ ] Exercise orbit, below-ground camera, zoom, reset, direct chapter entry and rapid chapter switching. The authored geology camera being overwritten by a generic startup tween was reproduced and fixed; initial 390 px and desktop chapter entry now retain their authored views. Remaining interaction and stale-update cases are unverified.
 - [ ] Introduce in-place scene retry, visible loading stages and a chapter-specific static fallback from the actual project scene. Keep explanation and navigation usable when WebGL or assets fail.
