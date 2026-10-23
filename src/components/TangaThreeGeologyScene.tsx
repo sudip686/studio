@@ -1359,7 +1359,10 @@ function loadLicenceBoundary(): Promise<Array<[number, number]> | null> {
   if (licenceBoundaryPromise) return licenceBoundaryPromise;
 
   licenceBoundaryPromise = fetchAsset('/generated/boundaries.geojson', {cache: 'force-cache'})
-    .then((response) => (response.ok ? response.json() : null))
+    .then((response) => {
+      if (!response.ok) throw new Error(`Project boundary unavailable: ${response.status}`);
+      return response.json();
+    })
     .then((payload) => {
       const features = Array.isArray(payload?.features) ? payload.features : [];
       const boundary = features.find((feature: any) => feature?.properties?.layer === 'Project boundary');
@@ -1370,7 +1373,11 @@ function loadLicenceBoundary(): Promise<Array<[number, number]> | null> {
         .map((point: any) => [Number(point?.[0]), Number(point?.[1])] as [number, number])
         .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
     })
-    .catch(() => null);
+    .catch(() => {
+      // Do not pin a transient network/server failure for the lifetime of the tab.
+      licenceBoundaryPromise = null;
+      return null;
+    });
 
   return licenceBoundaryPromise;
 }
@@ -1429,7 +1436,10 @@ function loadSurfaceRoads(): Promise<SurfaceRoad[]> {
   if (surfaceRoadPromise) return surfaceRoadPromise;
 
   surfaceRoadPromise = fetchAsset('/generated/roads.geojson', {cache: 'force-cache'})
-    .then((response) => (response.ok ? response.json() : null))
+    .then((response) => {
+      if (!response.ok) throw new Error(`Surface roads unavailable: ${response.status}`);
+      return response.json();
+    })
     .then((payload) => {
       const features = Array.isArray(payload?.features) ? payload.features : [];
       const roads: SurfaceRoad[] = [];
@@ -1446,7 +1456,11 @@ function loadSurfaceRoads(): Promise<SurfaceRoad[]> {
 
       return roads;
     })
-    .catch(() => []);
+    .catch(() => {
+      // This layer is optional, but a failed request should be retryable on revisit.
+      surfaceRoadPromise = null;
+      return [];
+    });
 
   return surfaceRoadPromise;
 }
@@ -1467,6 +1481,7 @@ function drapeLine(
 
 function loadDrillholes() {
   if (!drillPromise) {
+    let lithologyRequestFailed = false;
     drillPromise = Promise.all([
       fetchAsset('/assay_data.geojson', {cache: 'force-cache'})
         .then((response) => {
@@ -1474,8 +1489,11 @@ function loadDrillholes() {
           return response.json();
         }),
       fetchAsset('/lithology_data.geojson', {cache: 'force-cache'})
-        .then((response) => response.ok ? response.json() : null)
-        .catch(() => null),
+        .then((response) => {
+          if (!response.ok) { lithologyRequestFailed = true; return null; }
+          return response.json();
+        })
+        .catch(() => { lithologyRequestFailed = true; return null; }),
     ]).then(([assayPayload, lithologyPayload]) => {
       const lithologyFeatures = Array.isArray(lithologyPayload?.features) ? lithologyPayload.features : [];
       const lithologyByInterval = new Map<string, string>();
@@ -1484,7 +1502,8 @@ function loadDrillholes() {
         lithologyByInterval.set(drillKey(props), String(props.lithology ?? 'UNKNOWN'));
       });
 
-      const features = Array.isArray(assayPayload.features) ? assayPayload.features : [];
+      const features = Array.isArray(assayPayload?.features) ? assayPayload.features : null;
+      if (!features?.length) throw new Error('Drillhole assay data is missing or empty');
       return features.map((feature: any) => {
         const coords = feature.geometry?.coordinates ?? [];
         const props = feature.properties ?? {};
@@ -1498,6 +1517,16 @@ function loadDrillholes() {
           lithology: lithologyByInterval.get(drillKey(props)) ?? 'UNKNOWN',
         };
       }).filter((segment: DrillSegment) => Array.isArray(segment.from) && Array.isArray(segment.to));
+    }).then((segments) => {
+      // Assay intervals can still render without optional lithology; release the
+      // resolved cache so a later revisit retries the failed enrichment request.
+      if (lithologyRequestFailed) drillPromise = null;
+      return segments;
+    }).catch((error) => {
+      // Keep the shared in-flight request deduplicated, but allow a later chapter
+      // revisit to retry after a transient failure rather than reusing a rejection.
+      drillPromise = null;
+      throw error;
     });
   }
   return drillPromise;
