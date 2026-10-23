@@ -138,6 +138,8 @@ Acceptance: marker endpoints stay attached at every camera preset and during zoo
 - [x] Reframe mine overview using the complete pit, plant and facility footprint; keep close plant detail in its authored view.
 - [ ] Keep facility footprint and location status explicit: report candidate, approximate registration, or illustrative addition. Tailings/water geometry remains a concept until supported by engineering.
 - [ ] Keep peer comparison after resource. Verify the common metric, reporting date and category for every entry before asserting a rank. Any fifth-place claim is scoped to the selected benchmark unless a current comprehensive census supports it.
+  - [x] Scope the visible chart to reported contained graphite, label Tanga's insertion as Indicated, identify the 7 November 2023 benchmark, link the 11 March 2024 Epanko update and 19 December 2025 Tanga MRE, and qualify fifth place as within this selected set. Local desktop browser check confirmed Tanga at #5, Epanko selection opens its dated source link, and the selected-source card clears the presenter pager.
+  - [ ] Verify the effective date, resource category and primary disclosure for each of the other nine peer values before describing the comparison as uniformly M&I or like-for-like.
 - [ ] Trace metallurgy figures and any consent/qualification statements to the actual report wording and permissions before the investor release. Do not link SEM images to result groups without evidence.
 
 Acceptance: every chapter introduces a different question or dataset; advancing never merely changes the camera without adding meaning. The displayed data basis can be reached from the view.

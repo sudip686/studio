@@ -1051,6 +1051,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-peer-benchmark__selection strong,.tanga-peer-benchmark__selection span{display:block;font-size:11px}
 .tanga-peer-benchmark__selection span,.tanga-peer-benchmark__selection small{color:#9fb3bf;font-size:9px;margin-top:4px}
 .tanga-peer-benchmark__selection p{font-size:11px;line-height:1.45;color:#dfc5aa;margin:5px 0}
+.tanga-peer-benchmark__selection small{display:block}
+.tanga-peer-benchmark__selection a{display:block;width:max-content;margin-top:5px;color:#d6ac87;font-size:9px;text-decoration:underline;text-underline-offset:2px}
 .tanga-peer-benchmark footer{flex-shrink:0;font-size:9px;line-height:1.45;margin-top:9px}
 .tanga-peer-benchmark__select{display:none}
 @media(max-width:1050px){.tanga-peer-benchmark{grid-template-columns:170px minmax(0,1fr) 300px;gap:12px}.tanga-peer-benchmark h2{font-size:27px}}
@@ -1159,6 +1161,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-peer-benchmark__measure strong{display:block;font-size:36px;font-weight:550;color:#f1d6b1;letter-spacing:-.04em;margin:7px 0}
 .tanga-peer-benchmark__measure strong small{font-size:12px;color:#bccbd1;letter-spacing:0;display:inline-block;max-width:95px;line-height:1.3}
 .tanga-peer-benchmark__measure p{font-size:11px;color:#aebfc8;margin:5px 0}
+.tanga-peer-benchmark__measure>a{display:inline-block;margin-top:4px;color:#d6ac87;font-size:9px;text-decoration:underline;text-underline-offset:2px}
 .tanga-peer-pin{width:28px;min-width:28px;height:28px;font-size:11px;box-shadow:0 2px 9px #0006}
 .tanga-peer-benchmark__selection{padding-top:8px;margin-top:6px}
 .tanga-peer-benchmark__selection p{font-size:10px}

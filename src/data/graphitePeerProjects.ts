@@ -19,6 +19,27 @@ export type GraphitePeerProject = {
   isTanga?: boolean;
 };
 
+export type GraphitePeerEvidence = {
+  dateLabel: string;
+  href: string;
+  sourceLabel: string;
+};
+
+const PUBLISHED_BENCHMARK_HREF = 'https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/';
+const EPANKO_MRE_HREF = 'https://www.ecograf.com.au/wp-content/uploads/2024/03/06_EGR_ASX_127-Increase-in-MRE_11-March-2024.pdf';
+const TANGA_MRE_HREF = '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf';
+
+/** Trace the estimate used in the selected row without implying a current global census. */
+export function graphitePeerEvidence(project: Pick<GraphitePeerProject, 'project' | 'isTanga'>): GraphitePeerEvidence {
+  if (project.isTanga) {
+    return {dateLabel: 'Final MRE · 19 Dec 2025', href: TANGA_MRE_HREF, sourceLabel: 'AMC Tanga MRE'};
+  }
+  if (project.project === 'Epanko') {
+    return {dateLabel: 'MRE announced · 11 Mar 2024', href: EPANKO_MRE_HREF, sourceLabel: 'EcoGraf ASX release'};
+  }
+  return {dateLabel: 'Published benchmark · 7 Nov 2023', href: PUBLISHED_BENCHMARK_HREF, sourceLabel: 'Mining Intelligence / Costmine'};
+}
+
 export const GRAPHITE_PEER_PROJECTS: GraphitePeerProject[] = [
   {
     baselineRank: 1,
