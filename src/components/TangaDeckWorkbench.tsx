@@ -702,6 +702,17 @@ const STORY_STEPS: StoryStep[] = [
 
 // The guided route covers the complete evidence-to-decisions narrative.
 const EXECUTIVE_ROUTE: WorkbenchMode[] = STORY_STEPS.map(step => step.mode);
+// A short investor route through six already authored, evidence-backed views.
+// The route is six 15-second holds; scene loading can extend wall-clock time.
+const EXECUTIVE_HIGHLIGHTS = [
+  {mode:'project', shot:'licence'},
+  {mode:'drillholes', shot:'intercepts'},
+  {mode:'subsurface', shot:'framework'},
+  {mode:'resource', shot:'resource'},
+  {mode:'ranking', shot:'tanga-enters'},
+  {mode:'comparison', shot:'decisions'},
+] as const satisfies ReadonlyArray<{mode:WorkbenchMode; shot:string}>;
+const EXECUTIVE_HIGHLIGHTS_SECONDS = 90;
 
 // Authored camera beats. A scene is the narrative chapter; a shot is a
 // deliberate camera/evidence composition inside that chapter. Advancing a
@@ -4831,7 +4842,25 @@ export default function TangaDeckWorkbench() {
     setGeologySectionShown((shown) => !shown);
   }, [geologySectionShown, issueThreeCameraCommand]);
 
+  const [isExecutiveTour, setIsExecutiveTour] = useState(false);
+  const [isHighlightsTour, setIsHighlightsTour] = useState(false);
+  const [highlightStopIndex, setHighlightStopIndex] = useState(0);
+
   const handleExecutiveAdvance = useCallback(() => {
+    if (isHighlightsTour) {
+      const nextIndex = highlightStopIndex + 1;
+      const nextStop = EXECUTIVE_HIGHLIGHTS[nextIndex];
+      if (!nextStop) {
+        setIsAutoplay(false);
+        setIsExecutiveTour(false);
+        setIsHighlightsTour(false);
+        return;
+      }
+      setHighlightStopIndex(nextIndex);
+      const nextStoryIndex = STORY_STEPS.findIndex((step) => step.mode === nextStop.mode);
+      goToStoryIndex(nextStoryIndex);
+      return;
+    }
     if (activeShotIndex < activeShots.length - 1) {
       applyStoryShot(activeMode, activeShotIndex + 1);
       return;
@@ -4845,16 +4874,37 @@ export default function TangaDeckWorkbench() {
     }
     const nextIndex = STORY_STEPS.findIndex((step) => step.mode === nextMode);
     goToStoryIndex(nextIndex);
-  }, [activeMode, activeShotIndex, activeShots.length, applyStoryShot, goToStoryIndex]);
+  }, [activeMode, activeShotIndex, activeShots.length, applyStoryShot, goToStoryIndex, highlightStopIndex, isHighlightsTour]);
 
   const startExecutiveTour = useCallback(() => {
     const firstIndex = STORY_STEPS.findIndex((step) => step.mode === EXECUTIVE_ROUTE[0]);
     setIsAutoplay(false);
+    setIsHighlightsTour(false);
     setIsExecutiveTour(true);
     setPendingInfo(null);
     goToStoryIndex(firstIndex);
     window.setTimeout(() => setIsAutoplay(true), 0);
   }, [goToStoryIndex]);
+
+  const startExecutiveHighlights = useCallback(() => {
+    const firstStop = EXECUTIVE_HIGHLIGHTS[0];
+    const firstIndex = STORY_STEPS.findIndex((step) => step.mode === firstStop.mode);
+    setIsAutoplay(false);
+    setIsExecutiveTour(true);
+    setIsHighlightsTour(true);
+    setHighlightStopIndex(0);
+    setPendingInfo(null);
+    goToStoryIndex(firstIndex);
+    window.setTimeout(() => setIsAutoplay(true), 0);
+  }, [goToStoryIndex]);
+
+  useEffect(() => {
+    if (!isExecutiveTour || !isHighlightsTour) return;
+    const stop = EXECUTIVE_HIGHLIGHTS[highlightStopIndex];
+    if (!stop || activeMode !== stop.mode) return;
+    const shotIndex = STORY_SHOTS[stop.mode].findIndex((shot) => shot.id === stop.shot);
+    if (shotIndex >= 0 && activeShotIndex !== shotIndex) applyStoryShot(stop.mode, shotIndex);
+  }, [activeMode, activeShotIndex, applyStoryShot, highlightStopIndex, isExecutiveTour, isHighlightsTour]);
 
   // ── Presenter control layer ────────────────────────────────────────────
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -4864,13 +4914,14 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
-  const [isExecutiveTour, setIsExecutiveTour] = useState(false);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
   const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
   const transitionCardCount = nextChapterMode && INFO_BEFORE[nextChapterMode] ? 1 : 0;
-  const shotDwellSec = (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
+  const shotDwellSec = isHighlightsTour
+    ? EXECUTIVE_HIGHLIGHTS_SECONDS / EXECUTIVE_HIGHLIGHTS.length
+    : (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
   // Annotation density, cycled with Ctrl+A:
   //   key → authored scene callouts plus the three strongest drill intercepts
@@ -5778,7 +5829,7 @@ export default function TangaDeckWorkbench() {
           like a self-running pitch (great for a lobby / booth screen). */}
       {isAutoplay && !isCoverScene && (!isClosingScene || isExecutiveTour) && (
         <div className="tanga-deck__narration" role="status" aria-live="polite">
-          <span className="tanga-deck__narration-eyebrow">{isExecutiveTour ? `Executive route · ${STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}` : STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}</span>
+          <span className="tanga-deck__narration-eyebrow">{isExecutiveTour ? `${isHighlightsTour ? `Executive highlights ${highlightStopIndex + 1}/${EXECUTIVE_HIGHLIGHTS.length}` : 'Full story'} · ${STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}` : STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}</span>
           <p key={activeMode}>{CHAPTER_GUIDANCE[activeMode].bridge}</p>
         </div>
       )}
@@ -5952,15 +6003,16 @@ export default function TangaDeckWorkbench() {
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
           <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
+          <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
             style={{'--autoplay-dwell': `${shotDwellSec}s`} as any}
             key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}-${isAutoplay}`}
             onClick={toggleAutoplay}
-            aria-label={isExecutiveTour ? (isAutoplay ? 'Pause full guided story' : 'Resume full guided story') : (isAutoplay ? 'Pause current chapter playback' : 'Play current chapter views')}
+            aria-label={isExecutiveTour ? (isAutoplay ? `Pause ${isHighlightsTour ? 'executive highlights' : 'full guided story'}` : `Resume ${isHighlightsTour ? 'executive highlights' : 'full guided story'}`) : (isAutoplay ? 'Pause current chapter playback' : 'Play current chapter views')}
             aria-pressed={isAutoplay}
-            title={isAutoplay ? `Pause ${isExecutiveTour ? 'full story' : 'chapter playback'}  (P)` : `${isExecutiveTour ? 'Resume full story' : 'Play chapter views'}  (P)`}
+            title={isAutoplay ? `Pause ${isHighlightsTour ? 'executive highlights' : isExecutiveTour ? 'full story' : 'chapter playback'}  (P)` : `${isHighlightsTour ? 'Resume executive highlights' : isExecutiveTour ? 'Resume full story' : 'Play chapter views'}  (P)`}
           >
             {isAutoplay ? <Pause size={16} strokeWidth={2.4} /> : <Play size={16} strokeWidth={2.4} />}
           </button>
@@ -5969,12 +6021,12 @@ export default function TangaDeckWorkbench() {
             className="tanga-deck__pager-btn tanga-deck__pager-speed"
             disabled={isExecutiveTour}
             onClick={() => setIsAutoplayMenuOpen((prev) => !prev)}
-            aria-label={`Advanced chapter playback timing: ${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec} seconds`}
+            aria-label={isHighlightsTour ? `Executive highlights: ${EXECUTIVE_HIGHLIGHTS_SECONDS} seconds total` : `Advanced chapter playback timing: ${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec} seconds`}
             aria-haspopup="menu"
             aria-expanded={isAutoplayMenuOpen}
-            title={isExecutiveTour ? 'Full story uses authored chapter timings' : `Advanced chapter autoplay timing · ${autoplaySec}s per chapter — click to change`}
+            title={isHighlightsTour ? 'Executive highlights use six 15-second authored holds; scene loading can extend total time' : isExecutiveTour ? 'Full story uses authored chapter timings' : `Advanced chapter autoplay timing · ${autoplaySec}s per chapter — click to change`}
           >
-            {isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec}s
+            {isHighlightsTour ? `${EXECUTIVE_HIGHLIGHTS_SECONDS}s` : `${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec}s`}
           </button>
           {isAutoplayMenuOpen && (
             <div className="tanga-deck__speed-menu" role="menu">
@@ -6004,6 +6056,10 @@ export default function TangaDeckWorkbench() {
           <button type="button" onClick={startExecutiveTour}>
             <strong>Start full guided story</strong>
             <span>{Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s · 12 chapters</span>
+          </button>
+          <button type="button" onClick={startExecutiveHighlights}>
+            <strong>Start executive highlights</strong>
+            <span>Six authored views · about 90 seconds after scenes load</span>
           </button>
           <label>
             <span>Advanced chapter timing</span>

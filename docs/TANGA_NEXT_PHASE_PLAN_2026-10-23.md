@@ -162,6 +162,8 @@ Implementation details, priorities, reference evidence and acceptance conditions
   - [ ] Review phone/tablet layout later as requested.
 - [ ] **G2 · Same-camera comparison:** extend the current original-terrain comparison with a labelled draggable wipe for registered surface/concept or terrain/geology representations; preserve camera, scale, coverage and source limitations and provide a keyboard equivalent. Corresponds to BP11.
 - [ ] **G3 · Executive highlights:** add a clearly labelled short route through six existing authored shots, targeting approximately 90 seconds after assets are ready, with manual interruption and a return to the full 12-chapter story. Keep it distinct from per-chapter autoplay timing. Corresponds to BP12.
+  - [x] Add six authored stops for project boundary, recorded intercepts, interpreted geology, reported model, the Tanga peer benchmark and next study decisions. Six 15-second holds total 90 seconds; scene readiness can extend elapsed time. Keep the 12-chapter full story and its authored timings as a separate route.
+  - [x] Label the active highlight number, explain the duration and pause when the presenter takes manual control. Desktop production walkthrough visited all six stops, preserved the share URL at each shot, reached the closing decisions, and logged no JavaScript errors. Manual interruption and starting the full story afterward also worked.
 
 Acceptance: the new index, comparison and route reuse existing scene state, controls and caches; source limitations remain visible; new interactions pass the existing responsive, accessibility, failure and performance gates.
 

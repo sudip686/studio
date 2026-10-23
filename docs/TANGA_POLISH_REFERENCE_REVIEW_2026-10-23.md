@@ -83,6 +83,8 @@ The detailed workstream checkboxes remain authoritative in [the next-phase check
   - [ ] Defer phone/tablet review as requested.
 - [ ] **BP11 / G2:** Same-camera comparison wipe.
 - [ ] **BP12 / G3:** Six-shot executive highlights route.
+  - [x] Add the 90-second six-view route with authored shots, per-stop indicator, load-aware holds, manual interruption and a separate full-story restart.
+  - [x] Walk all six views in the desktop production build; the route ended on management decisions with no JavaScript errors.
 
 ## Chapter-by-chapter storyboard for the next pass
 
