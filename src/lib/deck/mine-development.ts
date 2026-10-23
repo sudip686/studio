@@ -32,7 +32,9 @@ export function buildDevelopmentInfrastructure(feed: [number,number], discharge:
   const steel=new THREE.MeshStandardMaterial({color:0x8e9aa0,metalness:.5,roughness:.55});
   const roof=new THREE.MeshStandardMaterial({color:0x273d46,roughness:.8});
   const copper=new THREE.MeshStandardMaterial({color:0xc57b43,metalness:.3,roughness:.5});
-  const concrete=new THREE.MeshStandardMaterial({color:0xa69b83,roughness:1});
+  // A hardstand is a mapped reference colour, not a reflective surface. Use
+  // an unlit palette material so its tone cannot shift while the site is orbited.
+  const concrete=new THREE.MeshBasicMaterial({color:0xa69b83,toneMapped:false});
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,material:THREE.Material,name:string)=>{
     const object=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);object.position.set(x,y,z);object.name=name;object.castShadow=true;object.receiveShadow=true;root.add(object);return object;
   };

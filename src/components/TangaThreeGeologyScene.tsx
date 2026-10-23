@@ -134,14 +134,25 @@ function applyDeckLayers(stage: THREE.Object3D, settings: DeckLayerSettings) {
     for (const material of materialsForObject(object)) {
       const m = material as THREE.Material & {opacity?: number; transparent?: boolean};
       if (typeof m.opacity !== 'number') continue;
-      if (m.userData.deckBaseOpacity === undefined) m.userData.deckBaseOpacity = m.opacity;
+      if (m.userData.deckBaseOpacity === undefined) {
+        m.userData.deckBaseOpacity = m.opacity;
+        m.userData.deckBaseTransparent = m.transparent;
+        if ('depthWrite' in m) m.userData.deckBaseDepthWrite = (m as THREE.Material & {depthWrite:boolean}).depthWrite;
+      }
       const base = m.userData.deckBaseOpacity as number;
       const next = base * setting.opacity;
       m.opacity = next;
-      // Only force transparency on: a material built opaque must be allowed
-      // back to opaque, or the terrain loses its depth write at full opacity.
-      if (next < 1) m.transparent = true;
-      m.needsUpdate = true;
+      const layerFaded = setting.opacity < 0.999;
+      const hasActiveHighlight = typeof m.userData.highlightTarget === 'number';
+      const transparent = layerFaded || hasActiveHighlight || Boolean(m.userData.deckBaseTransparent);
+      if (m.transparent !== transparent) {
+        m.transparent = transparent;
+        m.needsUpdate = true;
+      }
+      if ('depthWrite' in m) {
+        const baseDepthWrite = Boolean(m.userData.deckBaseDepthWrite);
+        (m as THREE.Material & {depthWrite:boolean}).depthWrite = layerFaded ? false : baseDepthWrite;
+      }
     }
   });
 }
@@ -3992,7 +4003,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           cameraShot.mid.copy(cameraShot.from).lerp(cameraShot.to,.5);
           cameraShot.targetMid.copy(cameraShot.target);
         }
-        const focusOpacity = activeFocus === 'LowTGC' ? 0.84 : activeFocus === 'LowUncertainty' ? 0.88 : 0.94;
         const voxelScale = 1;
         if (sampled.length) {
           const representative = sampled[Math.floor(sampled.length / 2)];
@@ -4022,11 +4032,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (!gradeBlocks.length || mode === 'mine_planning') return;
 
           const blockColor = new THREE.Color(bin.color);
-          // Grade is evidence, so keep its legend color fixed while orbiting.
+          // Grade is evidence. Keep each reported class at its exact palette
+          // colour: blending each of 155k cells with terrain behind it makes
+          // the same block read as a different shade as the camera reveals a
+          // different mix of near and far faces.
           const blockMaterial = new THREE.MeshBasicMaterial({
             color: blockColor,
-            transparent: true,
-            opacity: bin.key === 'trace' ? 0.42 : focusOpacity,
+            transparent: false,
+            opacity: 1,
             depthWrite: true,
             depthTest: true,
             toneMapped: false,
@@ -4145,7 +4158,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           for(const high of [false,true]){
             const subset=displayedTargets.filter(b=>(b.carbon>=5)===high);
             if(!subset.length)continue;
-            const material=new THREE.MeshBasicMaterial({color:high?0xe58b32:0x388e96,transparent:true,opacity:.85,depthTest:false,depthWrite:false});
+            // Mine-plan targets are categorical evidence; opaque fills keep
+            // their orange/teal classes stable over satellite terrain while
+            // orbiting. The explicit layer-opacity control can still fade them.
+            const material=new THREE.MeshBasicMaterial({color:high?0xe58b32:0x388e96,transparent:false,opacity:1,depthTest:false,depthWrite:false,toneMapped:false});
             const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,subset.length);
             mesh.name=high?'Target blocks ≥5% TGC':'Target blocks 4.5–5% TGC';mesh.renderOrder=40;
             const dummy=new THREE.Object3D();
@@ -4811,7 +4827,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       host.dataset.truckVisible=String(Boolean(haulTrucks[0]?.mesh.visible));
       // Grade targets get their own beat. Clear them as the pit is revealed so
       // conceptual benches and the internal haul-truck cue have a clean view.
-      targetMeshes.forEach(mesh=>{mesh.visible=beat===1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=.9*layerSettingsRef.current.blocks.opacity;});
+      targetMeshes.forEach(mesh=>{
+        mesh.visible=beat===1&&layerSettingsRef.current.blocks.visible;
+        mesh.material.depthTest=!presentationOptions.current.targetXray;
+        const opacity=layerSettingsRef.current.blocks.opacity,transparent=opacity<.999;
+        if(mesh.material.transparent!==transparent){mesh.material.transparent=transparent;mesh.material.needsUpdate=true;}
+        mesh.material.opacity=opacity;
+      });
       host.dataset.mineTargetBlocksVisible=String(targetMeshes.some(mesh=>mesh.visible));
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
       pitRamps.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
