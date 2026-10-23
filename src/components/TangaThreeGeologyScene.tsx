@@ -4082,7 +4082,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return;
       }
       const now = performance.now();
-      if (now - lastPickAt < 100) return;
+      // Hover picking is throttled, but an intentional click/tap must never
+      // be swallowed by a hover that landed just before pointer-up.
+      if (!select && now - lastPickAt < 100) return;
       lastPickAt = now;
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -4139,7 +4141,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     };
     const onPointerUp = (event: PointerEvent) => {
       const start=selectionPointer;selectionPointer=null;
-      if(start&&Math.hypot(event.clientX-start.x,event.clientY-start.y)<5)pickAtPointer(event,true);
+      if(start&&Math.hypot(event.clientX-start.x,event.clientY-start.y)<5){
+        // OrbitControls handles pointer-up on the same canvas and may still
+        // report an active gesture during this listener. Pick after it ends.
+        const selectionEvent={clientX:event.clientX,clientY:event.clientY,buttons:0} as PointerEvent;
+        window.setTimeout(()=>{if(!cancelled)pickAtPointer(selectionEvent,true);},0);
+      }
     };
 
     renderer.domElement.addEventListener('pointermove', onPointerMove);
