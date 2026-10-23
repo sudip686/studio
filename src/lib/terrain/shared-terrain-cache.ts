@@ -157,7 +157,7 @@ function resolveTerrainTexturePath(meta: TerrainMeta) {
       return textureName;
     }
 
-    return textureName.startsWith('/') ? textureName : `/${textureName}`;
+    return assetUrl(textureName);
   }
 
   return assetUrl('/terrain_texture_8k.jpg');

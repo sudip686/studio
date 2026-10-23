@@ -7,12 +7,26 @@ export const dynamic = 'force-dynamic';
 
 const STREAMABLE_ASSETS = new Set([
   'height.bin',
+  'height_hires.bin',
+  'height_preview_1024.bin',
+  'terrain_texture_8k.jpg',
   'texture_rgb_8192.png',
   'geologicalModel.glb',
   'assay_data.geojson',
   'lithology_data.geojson',
+  'resource_model.bin',
+  'media/tanga-first-slide-story-poster.jpg',
   'media/tanga-google-earth-intro-corrected-preview.mp4',
 ]);
+
+function contentTypeFor(key: string) {
+  if (key.endsWith('.json') || key.endsWith('.geojson')) return 'application/json; charset=utf-8';
+  if (key.endsWith('.jpg') || key.endsWith('.jpeg')) return 'image/jpeg';
+  if (key.endsWith('.png')) return 'image/png';
+  if (key.endsWith('.mp4')) return 'video/mp4';
+  if (key.endsWith('.glb')) return 'model/gltf-binary';
+  return 'application/octet-stream';
+}
 
 type RouteContext = {params: Promise<{asset: string[]}>};
 
@@ -40,6 +54,7 @@ async function assetResponse(request: Request, context: RouteContext) {
         const value = response.headers.get(header);
         if (value) responseHeaders.set(header, value);
       }
+      if (!responseHeaders.has('content-type')) responseHeaders.set('content-type', contentTypeFor(key));
       responseHeaders.set('x-content-type-options', 'nosniff');
       return new Response(response.body, {status: response.status, statusText: response.statusText, headers: responseHeaders});
     } catch {
@@ -50,7 +65,7 @@ async function assetResponse(request: Request, context: RouteContext) {
   try {
     const localFile = path.join(process.cwd(), 'public', ...asset);
     const body = await fs.readFile(localFile);
-    return new Response(body, {headers: {'cache-control': 'public, max-age=300', 'content-length': String(body.byteLength), 'content-type': key.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream', 'accept-ranges': 'none'}});
+    return new Response(body, {headers: {'cache-control': 'public, max-age=300', 'content-length': String(body.byteLength), 'content-type': contentTypeFor(key), 'accept-ranges': 'none'}});
   } catch {
     return NextResponse.json({error: 'Asset delivery is not configured.'}, {status: 404});
   }

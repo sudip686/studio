@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { Legend } from '@/components/ui/legend';
-import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData, ASSET_BASE_URL } from '@/lib/constants';
+import { LITHOLOGY_COLOR_MAP_CSS, geospatialViewerLithologyLegendData } from '@/lib/constants';
+import { assetUrl } from '@/lib/asset-url';
 import { DrillholeTooltip } from './ui/tooltip';
 import * as Cesium from 'cesium';
 
@@ -53,11 +54,11 @@ const GrandCanyonDrillholeViewer = ({ displayMode }: GrandCanyonDrillholeViewerP
       try {
         // 1) Load drillhole GeoJSON depending on displayMode
         const geojsonPath =
-          displayMode === 'lithology' ? '/lithology_data.geojson' : '/assay_data.geojson';
+          displayMode === 'lithology' ? assetUrl('/lithology_data.geojson') : assetUrl('/assay_data.geojson');
         
         const [geoJson, bm] = await Promise.all([
             fetch(geojsonPath).then(res => res.json()),
-            fetch(`${ASSET_BASE_URL}/BlockModel.geojson`).then(res => res.json())
+            fetch(assetUrl('/BlockModel.geojson')).then(res => res.json())
         ]);
 
         if (!isMounted) return;

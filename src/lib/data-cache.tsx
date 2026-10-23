@@ -116,16 +116,16 @@ const initialState: DataCache = {
 
 const resourceCandidates: Record<CacheResourceKey, string[]> = {
   lithology: [
-    '/lithology_data.geojson',
     '/api/lithology-data',
+    '/lithology_data.geojson',
   ],
   assay: [
-    '/assay_data.geojson',
     '/api/assay-data',
+    '/assay_data.geojson',
   ],
   blockModel: [
-    '/BlockModel.geojson',
     '/api/block-model',
+    '/BlockModel.geojson',
   ],
 };
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCesium } from '@/contexts/cesium-context';
 import { BlockModelTooltip } from './ui/tooltip';
+import { assetUrl } from '@/lib/asset-url';
 
 declare global {
     interface Window {
@@ -28,7 +29,7 @@ const ResourceModelViewer = () => {
     useEffect(() => {
         if (!ready || !viewer) return;
         (async () => {
-            const bmRes = await fetch('/BlockModel.geojson');
+            const bmRes = await fetch(assetUrl('/BlockModel.geojson'));
             const bm = await bmRes.json();
             setBlockModelData(bm);
             
@@ -40,7 +41,7 @@ const ResourceModelViewer = () => {
                 : (keys.includes("RescCalc") ? "RescCalc" : keys[0] ?? "");
             setSelectedProperty(preferred);
 
-            const assayRes = await fetch('/assay_data.geojson');
+            const assayRes = await fetch(assetUrl('/assay_data.geojson'));
             const assay = await assayRes.json();
             setAssayData(assay);
         })();
