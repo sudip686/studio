@@ -31,6 +31,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
   const [overview, setOverview] = useState(true);
   const [sample, setSample] = useState(0);
   const [showEvidence, setShowEvidence] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [error, setError] = useState('');
   const [rendererAttempt, setRendererAttempt] = useState(0);
   const stageRef = useRef(stage); stageRef.current = stage;
@@ -80,6 +81,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       if (Array.isArray(roof.material)) roof.material = roof.material.map(material => material.clone());
       else roof.material = roof.material.clone();
     });
+    // Fit the authored overview to the closed campus, never to lifted roofs or
+    // moving markers. Reset must recover one stable whole-plant composition.
+    const overviewBounds = new THREE.Box3().setFromObject(plant);
 
     const material = new THREE.MeshStandardMaterial({color: '#28373b', roughness: .75, metalness: .05});
     const flow = plant.userData.flow as THREE.Vector3[];
@@ -101,13 +105,16 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
     const direction = new THREE.Vector3(1.1, .86, 1.25).normalize();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); dirty = true; };
+    onMotionPreference();
+    reducedMotion.addEventListener('change', onMotionPreference);
     const roofState = new Map<RoofMesh, {y: number; opacity: number}>();
     roofs.forEach(roof => roofState.set(roof, {y: roof.position.y, opacity: 1}));
 
     function fitOverview(animate: boolean) {
       selected = stageRef.current;
       target.set(0, 0, 0);
-      const bounds = new THREE.Box3().setFromObject(plant);
+      const bounds = overviewBounds;
       const size = bounds.getSize(new THREE.Vector3());
       target.y = bounds.min.y + size.y * .36;
       const fitCamera = new THREE.PerspectiveCamera(camera.fov, camera.aspect, .1, 4000);
@@ -130,12 +137,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       selected = next;
       const item = PROCESS.find(candidate => candidate.id === next) ?? PROCESS[0];
       target.set(item.point[0], item.point[1], item.point[2]);
-      const distance = next === 'flotation' ? 82 : next === 'product' ? 88 : next === 'dewatering' ? 76 : 68;
-      const localDirection = new THREE.Vector3(.9, .62, 1.05).normalize();
+      const distance = next === 'flotation' ? 72 : next === 'product' ? 88 : next === 'dewatering' ? 62 : next === 'milling' ? 48 : 62;
+      // Look down through the opened roof, clear of the retained wall height.
+      const localDirection = new THREE.Vector3(.55, 1.15, .8).normalize();
       destination.copy(target).addScaledVector(localDirection, distance);
       moveCamera(animate, true);
     }
     function moveCamera(animate: boolean, throughRoof = false) {
+      const damping = controls.enableDamping;
+      controls.enableDamping = false; controls.update(); controls.enableDamping = damping;
       fromPosition.copy(camera.position); fromTarget.copy(controls.target);
       approachPosition.copy(target).addScaledVector(direction, throughRoof ? 155 : 0);
       if (throughRoof) approachPosition.y += 24;
@@ -144,6 +154,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       if (!tween) { camera.position.copy(destination); controls.target.copy(target); controls.update(); }
     }
     function updateRoofTargets() {
+      dirty = true;
       roofs.forEach(roof => {
         const selectedRoof = !overviewRef.current && openRoofRef.current && roof.userData.plantStage === stageRef.current;
         const baseY = roof.userData.roofBaseY ?? roof.position.y;
@@ -155,9 +166,14 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       });
     }
     viewCommand.current = {frameStage, fitOverview, updateRoofTargets};
+    let canvasWidth = 0, canvasHeight = 0;
     const resize = () => {
       const width = element.clientWidth, height = element.clientHeight;
       if (!width || !height) return;
+      // Evidence temporarily hides this same canvas. Returning at the same size
+      // should preserve the presenter's orbit rather than reframe the stage.
+      if (width === canvasWidth && height === canvasHeight) { dirty = true; return; }
+      canvasWidth = width; canvasHeight = height;
       renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix();
       if (overviewRef.current) fitOverview(false); else frameStage(stageRef.current, false);
       dirty = true;
@@ -167,7 +183,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const onStart = () => { tween = false; userOrbit = true; window.dispatchEvent(new Event('tanga:manual-exploration')); };
     controls.addEventListener('change', onChange); controls.addEventListener('start', onStart);
     const onContextLost = (event: Event) => { event.preventDefault(); contextLost = true; element.dataset.ready = 'false'; setError('Graphics context lost. The 3D factory will rebuild when graphics recover.'); };
-    const onContextRestored = () => { if (!contextLost) return; contextLost = false; setError('Graphics restored; rebuilding the factory…'); window.setTimeout(() => setRendererAttempt(value => value + 1), 0); };
+    const onContextRestored = () => { if (!contextLost) return; contextLost = false; setError('Graphics restored; rebuilding the factory…'); window.setTimeout(() => { if (!disposed) setRendererAttempt(value => value + 1); }, 0); };
     renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
     renderer.domElement.addEventListener('webglcontextrestored', onContextRestored, false);
 
@@ -186,16 +202,33 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         const animateProcess = !pausedRef.current && !reducedMotion.matches;
         if (animateProcess) elapsed += dt;
         markers.forEach(marker => marker.position.copy(pointOnFlow(elapsed * .045 + Number(marker.userData.phase))));
-        if (mill && animateProcess) mill.rotation.x += dt * .42;
+        // The drum's cylinder axis is local Y (its mounting rotates it onto X).
+        // Rotate around that axis, only while inspecting the open mill area.
+        if (mill && animateProcess && !overviewRef.current && selected === 'milling' && openRoofRef.current) mill.rotateY(dt * .42);
+        let roofMoving = false;
         roofs.forEach(roof => {
           const state = roofState.get(roof); if (!state) return;
-          roof.position.y += (state.y - roof.position.y) * Math.min(1, dt * 5);
-          roof.material = (Array.isArray(roof.material) ? roof.material : [roof.material]).map(current => {
+          const positionDelta = state.y - roof.position.y;
+          dirty ||= positionDelta !== 0;
+          if (Math.abs(positionDelta) > .01) {
+            roof.position.y = reducedMotion.matches ? state.y : roof.position.y + positionDelta * Math.min(1, dt * 5);
+            roofMoving = true;
+          } else roof.position.y = state.y;
+          (Array.isArray(roof.material) ? roof.material : [roof.material]).forEach(current => {
             const material = current as THREE.MeshStandardMaterial;
-            material.transparent = state.opacity < .99; material.opacity += (state.opacity - material.opacity) * Math.min(1, dt * 4);
-            material.depthWrite = material.opacity > .55; material.needsUpdate = true; return material;
+            const opacityDelta = state.opacity - material.opacity;
+            dirty ||= opacityDelta !== 0;
+            if (Math.abs(opacityDelta) > .001) {
+              material.opacity = reducedMotion.matches ? state.opacity : material.opacity + opacityDelta * Math.min(1, dt * 4);
+              roofMoving = true;
+            } else material.opacity = state.opacity;
+            const transparent = material.opacity < .999;
+            if (material.transparent !== transparent) { material.transparent = transparent; material.needsUpdate = true; }
+            material.depthWrite = material.opacity > .55;
           });
         });
+        element.dataset.roofSettled = String(!roofMoving);
+        dirty ||= roofMoving;
         if (tween && !userOrbit) {
           const progress = reducedMotion.matches ? 1 : cameraEase((now - cameraStart) / (cameraTour ? 2100 : 900));
           if (cameraTour && progress < .4) camera.position.lerpVectors(fromPosition, approachPosition, progress / .4);
@@ -206,8 +239,16 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           dirty = true;
         }
         controls.update();
-        if (!contextLost && (dirty || animateProcess || tween)) { renderer.render(scene, camera); dirty = false; }
+        if (!contextLost && (dirty || animateProcess || tween)) {
+          renderer.render(scene, camera); dirty = false;
+          element.dataset.cameraPosition = JSON.stringify(camera.position.toArray());
+          element.dataset.cameraTarget = JSON.stringify(controls.target.toArray());
+          element.dataset.processTime = elapsed.toFixed(3);
+          element.dataset.renderCount = String(renderer.info.render.frame);
+        }
       }
+      element.dataset.motion = document.hidden || !element.getClientRects().length ? 'hidden' : reducedMotion.matches ? 'reduced' : pausedRef.current ? 'paused' : 'playing';
+      element.dataset.cameraSettled = String(!tween);
       element.dataset.ready = contextLost ? 'false' : 'true';
       element.dataset.stage = selected;
       element.dataset.roofOpen = String(openRoofRef.current && !overviewRef.current);
@@ -217,6 +258,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); viewCommand.current = null;
+      reducedMotion.removeEventListener('change', onMotionPreference);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
@@ -234,15 +276,17 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
   const selected = PROCESS.find(item => item.id === stage) ?? PROCESS[0];
   const result = MET_GROUPS[sample];
-  if (showEvidence) return <MetallurgyEvidenceBoard selected={sample} onSelect={setSample} onEquipment={() => setShowEvidence(false)} onBack={() => setShowEvidence(false)} />;
-
-  return <section className="tanga-process-exhibit tanga-process-exhibit--factory" aria-label="Conceptual graphite processing facility" data-inspection="factory">
+  // Keep the scene host mounted while reading evidence. Its render loop sleeps
+  // when hidden, and the same renderer/camera resumes on return.
+  return <>
+    {showEvidence && <MetallurgyEvidenceBoard selected={sample} onSelect={setSample} onEquipment={() => setShowEvidence(false)} onBack={() => setShowEvidence(false)} />}
+    <section className="tanga-process-exhibit tanga-process-exhibit--factory" aria-label="Conceptual graphite processing facility" data-inspection="factory" style={showEvidence ? {display: 'none'} : undefined}>
     <header className="tanga-factory-header">
       <div><small>PROCESSING CONCEPT · ILLUSTRATIVE 3D FACILITY</small><h2>One connected process. Five areas to inspect.</h2></div>
       <div className="tanga-process-actions">
-        <button type="button" aria-label="Reset camera to whole-plant overview" title="Reset camera to whole-plant overview" onClick={() => { setOverview(true); setOpenRoof(false); overviewRef.current = true; openRoofRef.current = false; window.dispatchEvent(new Event('tanga:manual-exploration')); }}>Whole plant</button>
+        <button type="button" aria-label="Reset camera to whole-plant overview" title="Reset camera to whole-plant overview" onClick={() => { if (overviewRef.current) viewCommand.current?.fitOverview(true); setOverview(true); setOpenRoof(false); overviewRef.current = true; openRoofRef.current = false; window.dispatchEvent(new Event('tanga:manual-exploration')); }}>Whole plant</button>
         <button type="button" onClick={() => { setOverview(false); overviewRef.current = false; frameRoofToggle(); window.dispatchEvent(new Event('tanga:manual-exploration')); }}> {openRoof ? 'Close selected roof' : 'Open selected roof'}</button>
-        <button type="button" onClick={onToggle} aria-pressed={paused}>{paused ? 'Play process motion' : 'Pause process motion'}</button>
+        <button type="button" onClick={onToggle} aria-pressed={paused || reduceMotion} disabled={reduceMotion} title={reduceMotion ? 'Reduced motion is enabled in your device settings' : undefined}>{reduceMotion ? 'Motion reduced' : paused ? 'Play process motion' : 'Pause process motion'}</button>
         <button type="button" onClick={() => setShowEvidence(true)}>Lab results ↗</button>
       </div>
     </header>
@@ -265,7 +309,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       </aside>
     </div>
     <footer className="tanga-factory-footer"><span><i aria-hidden="true"/> Conceptual material route</span><span>Plant arrangement is illustrative · lab results do not establish plant-scale performance</span></footer>
-  </section>;
+  </section></>;
 
   function frameRoofToggle() {
     setOpenRoof(value => { const next = !value; openRoofRef.current = next; return next; });
