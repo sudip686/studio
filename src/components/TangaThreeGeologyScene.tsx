@@ -2718,10 +2718,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const planNormal=new THREE.Vector3(0,1,0).transformDirection(stage.matrixWorld);
         camera.up.copy(north);
         controls.enableRotate=false;controls.minPolarAngle=0;controls.maxPolarAngle=0;
+        // The lower story cue covers the bottom edge of the 3D viewport. Bias
+        // the plan target south so the lowland plant and service facilities sit
+        // above that overlay without pushing the northern pit under the title.
+        centre.addScaledVector(north,-span*.12);
         controls.target.copy(centre);
-        // Leave a safe frame for the chapter title, inspector and bottom pager
-        // so the pits and lowland process campus remain visible together.
-        scheduleCameraTween(centre.clone().addScaledVector(planNormal,span*2.05),centre,1.65,40);
+        // Leave a wider safe frame for the chapter title, side inspectors and
+        // bottom story/pager overlays so the pits and lowland campus remain
+        // visible together on compact desktop viewports.
+        scheduleCameraTween(centre.clone().addScaledVector(planNormal,span*2.25),centre,1.65,40);
         setStatus('North-up engineering overview · conceptual footprints · scale in scene units');
         return;
       }
