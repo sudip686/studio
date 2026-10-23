@@ -313,6 +313,8 @@ type ThreeCallout = {
   kind?: 'story' | 'intercept';
   /** Higher wins when two callouts compete for the same pixels. */
   priority?: number;
+  /** Small surface tags keep the mine overview readable while the site stays in view. */
+  compact?: boolean;
 };
 
 type ThreeLegendItem = {
@@ -4106,7 +4108,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const}));
             if(feedAnchor&&sitePlan.plant&&processPlant){
               calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story'});
-              calloutsForProjection.push({id:'development-plant',label:'Lowland processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story'});
+              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story'});
             }
             for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell · concept',water:'Settling / reclaim · concept','raw-water':'Raw-water pond · concept',waste:'Waste-rock benches · concept'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story'});
             siteOverviewCallouts = calloutsForProjection;
@@ -4389,9 +4391,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const anchorPixelX = rawAnchorX;
         const anchorPixelY = rawAnchorY;
         const isIntercept = callout.kind === 'intercept';
-        const size = isIntercept ? INTERCEPT_LABEL_SIZE : STORY_LABEL_SIZE;
+        const compactMineTag = mode === 'mine_planning' && density === 'key';
+        const projectedCallout = compactMineTag ? {...callout, compact: true} : callout;
+        const size = isIntercept ? INTERCEPT_LABEL_SIZE : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
 
-        byId.set(callout.id, {callout, anchorPixelX, anchorPixelY});
+        byId.set(callout.id, {callout: projectedCallout, anchorPixelX, anchorPixelY});
         candidates.push({
           id: callout.id,
           anchorPx: {x: anchorPixelX, y: anchorPixelY},
@@ -5047,7 +5051,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               className={classNames(
                 'tanga-three__callout',
                 `is-${callout.side ?? 'right'}`,
-                callout.kind === 'intercept' && 'tanga-three__callout--intercept'
+                callout.kind === 'intercept' && 'tanga-three__callout--intercept',
+                callout.compact && 'tanga-three__callout--compact'
               )}
               style={{
                 '--callout-x': hasProjectedCallouts ? `${(callout as ProjectedThreeCallout).boxPixelX}px` : `${callout.x}%`,

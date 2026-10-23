@@ -274,6 +274,7 @@ Design intent: retain the earlier natural world/terrain character the user prefe
 - [ ] Improve access roads, yard surfaces, drains and report-supported water/waste facilities. Show credible embankments and water surfaces for conceptual ponds; do not imply approved tailings engineering.
 - [ ] Add sparse, purposeful animation: one haulage movement along a credible ramp/road to feed handling and a connected conveyor transfer. No random traffic, flying vehicles or decorative motion. Pause and reduced-motion modes remain useful.
 - [ ] Frame pit, feed route and plant together before offering details. Use compact anchored labels, full names in the inspector and collision/occlusion handling that works while orbiting.
+  - [x] Reduce mine-planning key labels to compact 188 × 72 px camera-anchored cards in overview and plant detail; shorten the processing-site title while retaining its source context in the detail. Captured overview at 1707 × 842 and 1366 × 768, and plant detail at both sizes; all selected views reached ready with no browser errors. After orbit, 3 visible plant labels remained on-screen with no pairwise overlap. Collision-free placement is still limited to the existing projected-label declutter pass; dynamic geometry occlusion behavior remains open.
 - [ ] Verify realistic relative scale, terrain contact, whole-site fit, north-up/oblique/reset behavior and visible concept/source qualifications at both desktop sizes.
 
 ### R4 · Delivery sequence and desktop acceptance
