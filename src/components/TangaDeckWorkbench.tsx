@@ -861,6 +861,33 @@ function storyStepForMode(mode: WorkbenchMode) {
 
 // Scenes rendered by the Three.js model rather than the deck/map.
 const MODEL_MODES = new Set<WorkbenchMode>(['drillholes', 'subsurface', 'resource', 'mine_planning', 'metallurgy']);
+const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: string; note: string}>> = {
+  topography: {
+    src: '/presentation-assets/tanga-fallback-topography.jpg',
+    alt: 'Static view of the measured Tanga survey terrain and project boundary.',
+    note: 'Measured survey terrain · saved scene view',
+  },
+  drillholes: {
+    src: '/presentation-assets/tanga-fallback-drillholes.jpg',
+    alt: 'Static view of the Tanga project terrain with recorded drillhole collar markers.',
+    note: 'Recorded drillhole scene · saved view',
+  },
+  subsurface: {
+    src: '/presentation-assets/tanga-fallback-subsurface.jpg',
+    alt: 'Static view of the interpreted Tanga geological model beneath the mapped surface.',
+    note: 'Interpreted geology · saved scene view',
+  },
+  resource: {
+    src: '/presentation-assets/tanga-fallback-resource.jpg',
+    alt: 'Static view of displayed Tanga resource model blocks on the project terrain.',
+    note: 'Displayed resource model · saved scene view',
+  },
+  mine_planning: {
+    src: '/presentation-assets/tanga-fallback-mine-planning.jpg',
+    alt: 'Static view of the Tanga conceptual mine layout and illustrative site facilities.',
+    note: 'Conceptual mine layout · saved scene view',
+  },
+};
 function storyTravel(fromMode: WorkbenchMode, toMode: WorkbenchMode): SceneTransitionState['travel'] {
   const fromModel = MODEL_MODES.has(fromMode);
   const toModel = MODEL_MODES.has(toMode);
@@ -5276,6 +5303,13 @@ export default function TangaDeckWorkbench() {
           onSiteFacilities={setAvailableMineFacilities}
           onAssayFacts={setAssayFacts}
         />
+      )}
+
+      {threeVisible && threeLoadReport.scene === 'error' && STATIC_SCENE_FALLBACKS[activeMode] && (
+        <figure className="tanga-deck__static-scene-fallback" aria-label={`${MODE_LABELS[activeMode]} static scene fallback`}>
+          <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
+          <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> 3D unavailable</figcaption>
+        </figure>
       )}
 
       <div className="tanga-deck__shade" />

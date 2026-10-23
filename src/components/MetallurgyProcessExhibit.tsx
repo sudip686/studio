@@ -124,6 +124,7 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
     <nav className="tanga-process-stages" aria-label="Testwork stages">{STAGE_COPY.map((item,i)=><button type="button" key={item.label} aria-label={`0${i+1} ${item.label}`} aria-pressed={stage===i} onClick={()=>{setStage(i);window.dispatchEvent(new Event('tanga:manual-exploration'));}}><b>0{i+1}</b><span className="tanga-process-label-long">{item.label}</span><span className="tanga-process-label-short" aria-hidden="true">{['Rock','Prepare','Float','Dry','Measure'][i]}</span></button>)}</nav>
     <div className="tanga-process-body">
       <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>
+        {error&&<figure className="tanga-process-static-fallback"><img src="/presentation-assets/metallurgy-report-page.png" alt="Original metallurgy report analytical table page."/><figcaption>Original report excerpt · analytical table</figcaption></figure>}
         {error&&<p role="alert">{error} <button type="button" onClick={()=>{setError('');setRendererAttempt(value=>value+1);}}>Retry 3D exhibit</button></p>}<div className="tanga-process-caption"><span>{copy.question}</span><small>Drag to orbit · scroll to zoom</small></div></div>
       <aside className="tanga-process-results">
         <small className="tanga-process-kicker">0{stage+1} / 05 · {copy.label.toUpperCase()}</small><h3>Reported test response</h3>
