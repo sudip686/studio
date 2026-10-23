@@ -86,6 +86,9 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     mesh.renderOrder=feature.properties.unit==='Soil cover'?29:30;
     mesh.userData.surfaceOpacityScale=feature.properties.opacity??1;
     mesh.userData.geologicUnit=feature.properties.unit;
+    // Soil cover is a broad base overlay. If it overlaps an outcrop at the
+    // same registered elevation, let the more specific rock class win clicks.
+    mesh.userData.surfacePickPriority=feature.properties.unit==='Soil cover'?0:1;
     mesh.userData.tooltipItems=[{title:feature.properties.unit,rows:[feature.properties.basis??'Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:feature.properties.color}];
     group.add(mesh);
     if(outline.length){

@@ -2586,6 +2586,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         consumedCameraCommandIdRef.current = command.id;
       }
 
+      // Reset within geology must restore the currently authored composition.
+      // The shared default camera is the interpreted-depth shot; applying it
+      // from mapped relief silently hid the surface overlay while the story
+      // still labelled the view as relief. Reuse the stage's own camera action.
+      if(command.action==='resetView'&&mode==='subsurface'){
+        const stage=host.dataset.geologyStage;
+        const resetAction:ThreeCameraCommand['action']=detailOptions.current.sectionEnabled
+          ?'revealSection'
+          :stage==='plan'?'geologyPlan'
+          :stage==='mapped-relief'?'geologyTilt'
+          :'geologyDepth';
+        consumeCameraCommand({id:Date.now()+1,action:resetAction});
+        return;
+      }
+
       if (command.action === 'geologyPlan' && mode === 'subsurface') {
         geologyPlan = true; geologyOblique = false; geologyDepthBlend=0; scene.fog = null;
         // Reveal each source-map class in place over the terrain. This is a
@@ -2631,7 +2646,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const reliefPitch = THREE.MathUtils.degToRad(camera.aspect < .85 ? 25 : 50);
         const reliefFov = THREE.MathUtils.degToRad(camera.fov);
         const mappedSpan = Math.max(geologyPlanExtent.z, geologyPlanExtent.x / Math.max(.5, camera.aspect));
-        const reliefDistance = mappedSpan / (2 * Math.tan(reliefFov / 2)) * 2.15;
+        // Use a modest framing margin: the previous 2.15 factor left the map
+        // as a small island in the desktop canvas, especially at 1707 px.
+        const reliefDistance = mappedSpan / (2 * Math.tan(reliefFov / 2)) * 1.45;
         const reliefDirection = cameraShot.to.clone().sub(cameraShot.target);
         reliefDirection.y = 0;
         if (reliefDirection.lengthSq() < 1) reliefDirection.set(.7, 0, .85);
@@ -4165,13 +4182,27 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, geologyPlan ? planProjection : camera);
       const visiblePickables=pickables.filter(object=>{for(let p:THREE.Object3D|null=object;p;p=p.parent)if(!p.visible)return false;return true;});
-      const [hit] = raycaster.intersectObjects(visiblePickables, false).filter(hit=>{
+      const hits=raycaster.intersectObjects(visiblePickables, false).filter(hit=>{
         const material=(hit.object as THREE.Mesh).material;
         const materials=Array.isArray(material)?material:[material];
         return !materials.every(m=>m&&m.opacity<.02)&&!materials.some(m=>m?.clippingPlanes?.some(p=>p.distanceToPoint(hit.point)<0));
       });
-      const tooltipItems = hit?.object?.userData?.tooltipItems as DrillPickInfo[] | undefined;
-      const tooltip = tooltipItems?.[hit.instanceId ?? 0] ?? (tooltipItems?.length===1?tooltipItems[0]:undefined);
+      const tooltipForHit=(hit:typeof hits[number])=>{
+        const items=hit.object.userData?.tooltipItems as DrillPickInfo[]|undefined;
+        return items?.[hit.instanceId??0]??(items?.length===1?items[0]:undefined);
+      };
+      // Ignore outline segments with no inspector payload. For coplanar
+      // surface polygons, prefer an intersected rock outcrop over the broad
+      // Soil cover base so map clicks identify the visible specific unit.
+      const candidates=hits.filter(hit=>Boolean(tooltipForHit(hit)));
+      const surfaceHits=candidates.filter(hit=>geologySurface?.children.includes(hit.object));
+      const firstSurfaceHit=surfaceHits[0];
+      const rockHit=firstSurfaceHit?.object.userData.geologicUnit==='Soil cover'
+        ?surfaceHits.filter(hit=>Number(hit.object.userData.surfacePickPriority)>0&&Math.abs(hit.distance-firstSurfaceHit.distance)<=.75)
+          .sort((a,b)=>a.distance-b.distance)[0]
+        :undefined;
+      const hit=rockHit??candidates[0];
+      const tooltip=hit?tooltipForHit(hit):undefined;
 
       if (!hit || !tooltip) {
         renderer.domElement.classList.remove('is-picking');
