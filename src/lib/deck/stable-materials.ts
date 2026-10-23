@@ -33,12 +33,34 @@ export function stabilizeSceneMaterialAppearance(root: THREE.Object3D) {
         }
         material.userData.deckCameraStableColor = true;
         material.needsUpdate = true;
+      } else if (material instanceof THREE.MeshBasicMaterial) {
+        // Evidence palettes and mapped surfaces are authored colors. Keep
+        // them out of the renderer's tone curve so the same class never
+        // shifts hue/brightness when a view or scene exposure changes.
+        material.toneMapped = false;
+        material.dithering = false;
+        material.userData.deckCameraStableColor = true;
+        material.needsUpdate = true;
       } else if (material instanceof THREE.MeshPhongMaterial) {
         material.specular.setRGB(0, 0, 0);
         material.shininess = 0;
         material.userData.deckCameraStableColor = true;
         material.needsUpdate = true;
       }
+    }
+
+    // Grade cells and engineered pads are reference colors, not shadow
+    // receivers. Shadow-map filtering on large, coplanar instanced layers can
+    // shimmer as the camera moves, even when the sun and shadow frustum stay
+    // fixed. The terrain and plant structures retain their authored shadows.
+    if (
+      object.userData.deckLayer === 'blocks'
+      || /(?:plant pad|concept pad|illustrative cut and fill transition|terraced conceptual excavation|internal pit access ramp)/i.test(object.name)
+    ) {
+      const shadowOwner = object as THREE.Object3D & {castShadow?: boolean; receiveShadow?: boolean};
+      shadowOwner.castShadow = false;
+      shadowOwner.receiveShadow = false;
+      object.userData.deckCameraStableColor = true;
     }
   });
 }

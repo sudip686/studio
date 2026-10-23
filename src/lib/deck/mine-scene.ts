@@ -8,7 +8,7 @@ export function buildConcentrator() {
   // The pad is a neutral reference surface, not a mapped material. Keep its
   // color steady as the camera moves; the buildings, equipment and terrain
   // retain physically shaded materials for depth.
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d})};
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
   const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
@@ -36,22 +36,42 @@ export function buildConcentrator() {
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
+    const bayCount=Math.max(3,Math.min(7,Math.round(w/16)));
+    const bayWidth=w/bayCount;
     // A narrow, raised concrete footing gives the wall line a readable base
     // while staying flush with the shared site pad.
     box(w+1.5,.45,d+1.5,x,.225,z,materials.concrete,`${name} concrete footing`);
     for(const sign of [-1,1]){
-      const roof=box(w,1.2,roofLength,x,h+rise/2,z+sign*d/4,cladding,name);
-      roof.rotation.x=sign*Math.atan2(rise,d/2);
+      const slope=sign*Math.atan2(rise,d/2);
+      const roof=box(w+1,.55,roofLength+.9,x,h+rise/2,z+sign*d/4,cladding,name);
+      roof.rotation.x=slope;
       roof.userData.plantRoof=true;
       if(stage)roof.userData.plantStage=stage;
+      // Repeated portal rafters and eave members make the process halls read
+      // as steel-framed buildings at whole-campus scale, not smooth toy boxes.
+      for(let bay=0;bay<=bayCount;bay++){
+        const bayX=x-w/2+bay*bayWidth;
+        const rafter=box(.75,.8,roofLength,bayX,h+rise/2-.55,z+sign*d/4,materials.steel,`${name} portal rafter`);
+        rafter.rotation.x=slope;
+        if(sign===1)box(.65,.7,d-.8,bayX,h-.45,z,materials.copper,`${name} portal tie beam`);
+      }
+      box(w+1,.8,.8,x,h-.35,z+sign*d/2,materials.steel,`${name} eave girder`);
+      box(w+1,.4,.55,x,h+.05,z+sign*d/2,materials.roof,`${name} rain gutter`);
     }
-    for(let i=-w/2;i<=w/2;i+=w/4)for(const k of [-d/2,d/2])box(1.2,h,1.2,x+i,h/2,z+k,materials.copper);
-    const frontPortal=stage==='feed'&&x===-88?{x:-104,width:12,height:23}:stage==='dewatering'?{x:104,width:12,height:20}:null;
+    for(let i=0;i<=bayCount;i++)for(const k of [-d/2,d/2])box(.8,h,.8,x-w/2+i*bayWidth,h/2,z+k,materials.copper,`${name} portal column`);
+    const frontPortal=stage
+      ?{x:stage==='feed'&&x===-88?-104:stage==='dewatering'?104:x+(stage==='product'?18:0),width:stage==='feed'?12:stage==='product'?28:18,height:stage==='feed'?23:stage==='product'?21:Math.min(h-3,18)}
+      :null;
     if(frontPortal){
       const left=frontPortal.x-frontPortal.width/2-(x-w/2),right=x+w/2-(frontPortal.x+frontPortal.width/2);
       box(left,h,d*.04,x-w/2+left/2,h/2,z+d/2,materials.steel);
       box(right,h,d*.04,x+w/2-right/2,h/2,z+d/2,materials.steel);
       box(frontPortal.width,h-frontPortal.height,d*.04,frontPortal.x,(h+frontPortal.height)/2,z+d/2,materials.steel);
+      // A recessed, shadowed loading bay gives each process building a clear
+      // working face while keeping the roof cutaway as the primary interior view.
+      box(frontPortal.width,frontPortal.height,.15,frontPortal.x,frontPortal.height/2,z+d/2-.12,materials.interior,`${name} loading-bay recess`);
+      for(const side of [-1,1])box(.8,frontPortal.height+1,.9,frontPortal.x+side*(frontPortal.width/2+.45),frontPortal.height/2,z+d/2,materials.copper,`${name} portal jamb`);
+      box(frontPortal.width+1,.9,.9,frontPortal.x,frontPortal.height+.45,z+d/2,materials.copper,`${name} portal lintel`);
     }else box(w,h,d*.04,x,h/2,z+d/2,materials.steel);
     // Clerestory glazing and end walls give industrial buildings volume.
     for(const sign of [-1,1]){
