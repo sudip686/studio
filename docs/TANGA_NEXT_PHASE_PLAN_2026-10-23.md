@@ -87,6 +87,7 @@ Acceptance: no unhandled error or stranded loading state in the agreed navigatio
   - [x] Desktop 3D callouts: at 1707 × 842, the topography, drillholes, resource and mine-planning overview labels were all inside the viewport and outside the primary story panel. The remaining authored subsurface, facility detail and narrow-screen views are not covered by this measurement.
 - [ ] Consolidate scattered style overrides into semantic tokens as affected components are changed; keep a screenshot baseline for each chapter.
   - [x] Use the shared presentation accent, ink, muted, line and surface tokens for the new comparison wipe and slider rather than adding an isolated color set. Broader legacy override consolidation and per-chapter screenshot baselines remain open.
+  - [x] Match the desktop geology stage selectors to the preceding drilling chapter's dark control surfaces, warm-white text, copper active state, radius and focus treatment. Screenshot and browser check: `TANGA_GEOLOGY_PANEL_AUDIT_2026-10-23.md`.
 
 Acceptance: no duplicated primary Continue action; no model focal point or selected label covered by a panel in the target viewport matrix; controls keep consistent positions and keyboard focus.
 

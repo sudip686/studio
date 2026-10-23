@@ -39,3 +39,11 @@ Before captures: `.playwright-mcp/geology-panels-before-1366.png`, `geology-pane
 After captures: `.playwright-mcp/geology-panels-final-{plan,relief,depth}-selected-{1366,1707}.png`, `geology-panels-final-{plan,relief,depth}-tools-{1366,1707}.png`, `geology-panels-final-section-{1366,1707}.png`, `geology-panels-final-layers-1707.png` and `geology-panels-final-sources-1707.png`. The plain mapped entry capture is `geology-panels-final-plan-1366.png`.
 
 This audit covers desktop geology and the related shared utility popups. Phone/tablet redesign, other chapter compositions, frame-time budgets and hosted deployment acceptance remain in the main checklist.
+
+## Follow-up: match the preceding chapter's control treatment
+
+23 October 2026 · desktop local development browser · latest visual polish request.
+
+- Kept the geology story panel on the same shared presentation tokens as drilling: panel `#111b23` at 93% opacity, primary text `#f5f1eb`, supporting text `#b6c4cc`, Space Grotesk headings and copper actions.
+- Updated the three geology stage controls to use the same dark control surface, warm-white inactive text, 7 px control radius, clear copper active state and keyboard focus treatment as the presentation HUD. This makes the labels readable at a glance and the active stage more obvious.
+- Screenshot: `.playwright-mcp/geology-ui-aligned-ready.png` (1707 × 842). Ready desktop scene inspected after the transition; the scene, rail, map sequence and story panel all rendered without overlap. Browser reported zero JavaScript errors during the review.

@@ -1446,9 +1446,11 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
  .tanga-geology-story__header{flex:0 0 auto;padding:16px 18px 0}
  .tanga-geology-story__header h2{margin:8px 0 14px}
  .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:0;margin:0 0 14px;list-style:none}
- .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence li{padding:0;border:1px solid var(--geology-line);border-radius:5px;background:transparent;color:var(--geology-muted)}
- .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence li[aria-current=step]{border-color:#e2ad7877;background:#e2ad781a;color:var(--geology-text)}
- .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence button{display:grid;align-content:start;gap:5px;min-height:64px;padding:8px 7px;font-size:11px;line-height:1.35}
+ .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence li{padding:0;border:1px solid var(--geology-line);border-radius:7px;background:var(--geology-control-surface);color:var(--geology-control-text)}
+ .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence li[aria-current=step]{border-color:#e2ad78;background:#392b21;color:var(--geology-text);box-shadow:inset 0 0 0 1px #e2ad7826}
+ .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence button{display:grid;align-content:start;gap:5px;min-height:64px;padding:8px 7px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:11px;line-height:1.35;text-align:left}
+ .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence button:hover{background:#ffffff0a}
+ .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence button:focus-visible{outline:2px solid var(--geology-accent);outline-offset:1px}
  .tanga-deck[data-mode="subsurface"] .tanga-geology-map-sequence li span{color:var(--geology-accent);font-size:10px}
  .tanga-geology-story__body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 18px 12px;scrollbar-width:thin;scrollbar-color:#6f7f89 #172128}
  .tanga-geology-story__body .tanga-story-panel__intro{margin:0 0 12px}
