@@ -84,7 +84,11 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=feature.properties.unit;
     mesh.renderOrder=feature.properties.unit==='Soil cover'?29:30;
-    mesh.userData.surfaceOpacityScale=feature.properties.opacity??1;
+    // Soil cover is a broad, pale base unit. Keep it perceptible as mapped
+    // evidence without washing out the satellite texture or masking smaller
+    // outcrops; the source opacity remains preserved in the GeoJSON.
+    const presentationOpacity=feature.properties.unit==='Soil cover'?.52:1;
+    mesh.userData.surfaceOpacityScale=(feature.properties.opacity??1)*presentationOpacity;
     mesh.userData.geologicUnit=feature.properties.unit;
     // Soil cover is a broad base overlay. If it overlaps an outcrop at the
     // same registered elevation, let the more specific rock class win clicks.
