@@ -5877,16 +5877,16 @@ export default function TangaDeckWorkbench() {
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
-          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Complete project story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Guided story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
+          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
             style={{'--autoplay-dwell': `${shotDwellSec}s`} as any}
             key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}-${isAutoplay}`}
             onClick={toggleAutoplay}
-            aria-label={isAutoplay ? 'Pause autoplay' : 'Start autoplay'}
+            aria-label={isExecutiveTour ? (isAutoplay ? 'Pause full guided story' : 'Resume full guided story') : (isAutoplay ? 'Pause current chapter playback' : 'Play current chapter views')}
             aria-pressed={isAutoplay}
-            title={isAutoplay ? 'Pause autoplay  (P)' : 'Autoplay  (P)'}
+            title={isAutoplay ? `Pause ${isExecutiveTour ? 'full story' : 'chapter playback'}  (P)` : `${isExecutiveTour ? 'Resume full story' : 'Play chapter views'}  (P)`}
           >
             {isAutoplay ? <Pause size={16} strokeWidth={2.4} /> : <Play size={16} strokeWidth={2.4} />}
           </button>
@@ -5895,15 +5895,19 @@ export default function TangaDeckWorkbench() {
             className="tanga-deck__pager-btn tanga-deck__pager-speed"
             disabled={isExecutiveTour}
             onClick={() => setIsAutoplayMenuOpen((prev) => !prev)}
-            aria-label={`Chapter duration: ${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec} seconds`}
+            aria-label={`Advanced chapter playback timing: ${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec} seconds`}
             aria-haspopup="menu"
             aria-expanded={isAutoplayMenuOpen}
-            title={isExecutiveTour ? 'Guided story uses chapter-specific timing' : `${autoplaySec}s per chapter · ${STORY_STEPS.length * autoplaySec / 60} minute tour — click to change`}
+            title={isExecutiveTour ? 'Full story uses authored chapter timings' : `Advanced chapter autoplay timing · ${autoplaySec}s per chapter — click to change`}
           >
             {isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec}s
           </button>
           {isAutoplayMenuOpen && (
             <div className="tanga-deck__speed-menu" role="menu">
+              <div className="tanga-deck__speed-menu-heading" role="presentation">
+                <strong>Advanced timing</strong>
+                <span>Chapter playback only. The full story uses authored timings.</span>
+              </div>
               {([60, 90, 120] as const).map((sec) => (
                 <button
                   key={sec}
@@ -5922,6 +5926,21 @@ export default function TangaDeckWorkbench() {
         <details key={activeMode} className="tanga-presentation-tools" onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
           <summary aria-label="Presentation tools" title="Presentation tools"><Layers size={16}/><span>Tools</span></summary>
           <div className="tanga-presentation-tools__grid">
+        <section className="tanga-tour-mobile" aria-label="Guided presentation">
+          <button type="button" onClick={startExecutiveTour}>
+            <strong>Start full guided story</strong>
+            <span>{Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s · 12 chapters</span>
+          </button>
+          <label>
+            <span>Advanced chapter timing</span>
+            <select value={autoplaySec} onChange={(event) => setAutoplaySec(Number(event.target.value) as 60 | 90 | 120)} aria-label="Chapter autoplay duration">
+              <option value={60}>60 seconds per chapter</option>
+              <option value={90}>90 seconds per chapter</option>
+              <option value={120}>120 seconds per chapter</option>
+            </select>
+          </label>
+          <p>Timing applies to chapter playback. The full story follows authored timings.</p>
+        </section>
         <button type="button" className="tanga-deck__pager-btn tanga-deck__pager-btn--tool" onClick={copyCurrentView} aria-label="Copy link to this view" title="Copy a link to this chapter and authored view"><Copy size={16} strokeWidth={2.2}/></button>
         {threeVisible && activeMode !== 'metallurgy' && (
           <button

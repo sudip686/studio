@@ -894,6 +894,14 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck__pager .tanga-deck__pager-play { display:inline-flex!important; }
   .tanga-deck__pager-count { flex:1; min-width:0!important; }
   .tanga-deck__pager-track { width:auto!important; gap:4px; }
+  .tanga-presentation-tools__grid:has(.tanga-tour-mobile) { width:min(300px,calc(100vw - 24px)); grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .tanga-tour-mobile { display:grid; grid-column:1/-1; gap:9px; padding:2px 0 11px; border-bottom:1px solid #c9d8de26; color:#e7e9e7; }
+  .tanga-tour-mobile>button { display:grid; gap:4px; min-height:48px; padding:9px 11px; border:1px solid #d9a57766; border-radius:7px; background:#392b21; color:#f4e4d5; text-align:left; cursor:pointer; }
+  .tanga-tour-mobile>button strong { font-size:11px; font-weight:650; }
+  .tanga-tour-mobile>button span { color:#d2b59b; font-size:9px; }
+  .tanga-tour-mobile label { display:grid; grid-template-columns:1fr; gap:5px; color:#bdcbd1; font-size:9px; }
+  .tanga-tour-mobile select { width:100%; min-height:36px; padding:0 9px; border:1px solid #c9d8de35; border-radius:5px; background:#1c2933; color:#edf1ef; font:inherit; font-size:10px; }
+  .tanga-tour-mobile p { margin:0; color:#91a3ad; font-size:9px; line-height:1.4; }
   .tanga-peer-benchmark { bottom:112px; }
 }
 .tanga-intro.is-checking { visibility:hidden; }
