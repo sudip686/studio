@@ -1,7 +1,6 @@
 ﻿'use client';
 
 import {useEffect, useRef, useState, type CSSProperties, type ReactNode} from 'react';
-import {preloadGeologyAssets} from '@/lib/preload-geology';
 import {assetUrl} from '@/lib/asset-url';
 
 // Large media lives on Cloudflare R2 (NEXT_PUBLIC_ASSET_BASE_URL) in
@@ -33,14 +32,6 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   const [videoSrc, setVideoSrc] = useState(INTRO_VIDEO_SRC);
   const [videoUnavailable, setVideoUnavailable] = useState(false);
   const [introDuration, setIntroDuration] = useState(50);
-
-  useEffect(() => {
-    if (DEEP_LINK_HASH && DEEP_LINK_HASH !== 'ranking') return;
-    // Give the opening frame/video a head start, then warm geology while the
-    // visitor follows the early slides. No hidden WebGL scene is mounted.
-    const timer = window.setTimeout(() => { void preloadGeologyAssets(); }, 1500);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const completeIntro = () => {
     if (finishTimerRef.current !== null) return;

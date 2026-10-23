@@ -921,6 +921,12 @@ if (mode === 'mine_planning') return 1;
   return 1;
 }
 
+/** Authored surface opacity stays fixed while orbiting outside the subsurface chapter. */
+function terrainOpacityForPresentation(mode: GeologyMode, view: SurfaceCameraView, mappedSurface = false) {
+  if (mappedSurface) return .92;
+  return terrainOpacityForView(mode, mode === 'subsurface' ? view : 'default');
+}
+
 /** Blend the ground toward its under-surface view as the camera passes below
  * the horizon. A binary above/below test makes every terrain colour pop at
  * once while orbiting, so use a continuous pitch-based transition instead. */
@@ -2479,7 +2485,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
-      const opacity = geologyPlan || geologyOblique ? .92 : terrainOpacityForView(mode, surfaceCameraView);
+      const opacity = terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique);
       const isGlass = opacity < 1;
       setAuthoredSurfaceOpacity(opacity);
       terrainSurfaceMaterials.forEach((material) => {
@@ -2789,7 +2795,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (command.action === 'geologyDepth' && mode === 'subsurface') {
         const retainFrame = geologyOblique;
         leaveGeologyPlan(true); geologyOblique = false;
-        setAuthoredSurfaceOpacity(terrainOpacityForView(mode,surfaceCameraView));
+        setAuthoredSurfaceOpacity(terrainOpacityForPresentation(mode,surfaceCameraView,geologyPlan||geologyOblique));
         if (retainFrame) cameraTween=null;
         setSectionEnabled(false);explodedRef.current=false;setExploded(false);separation=0;
         if (!retainFrame) scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),2,cameraShot.fov);
@@ -3130,8 +3136,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // saturated grades are the only vivid thing on screen; a pale
           // surface competes with the data and washes the whole frame out.
           color: mode==='subsurface' ? 0x52616a : TERRAIN_GROUND_COLOR,
-          transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
-          opacity: terrainOpacityForView(mode, surfaceCameraView),
+          transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
+          opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
           alphaTest: 0,
           side: THREE.DoubleSide,
           vertexColors: true,
@@ -3139,7 +3145,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // lifting the whole surface toward white under the environment map.
           emissive: new THREE.Color('#241a12'),
           emissiveIntensity: 0.06,
-          depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
+          depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
           depthTest: true,
           polygonOffset: true,
           polygonOffsetFactor: 2,
@@ -3252,12 +3258,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             color: 0xffffff,
             colorWrite: true,
             toneMapped: false,
-            transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
-            opacity: terrainOpacityForView(mode, surfaceCameraView),
+            transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
+            opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
             alphaTest: 0,
             side: THREE.DoubleSide,
             forceSinglePass: true,
-            depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
+            depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
             depthTest: true,
             polygonOffset: true,
             polygonOffsetFactor: 2,
@@ -3265,15 +3271,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             : new THREE.MeshLambertMaterial({
             map: mode === 'topography' ? null : terrainTexture,
             color: 0xffffff,
-            transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
-            opacity: terrainOpacityForView(mode, surfaceCameraView),
+            transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
+            opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
             emissive: new THREE.Color('#000000'),
             emissiveIntensity: 0,
             alphaTest: 0,
             side: THREE.DoubleSide,
             forceSinglePass: true,
             vertexColors: mode === 'topography',
-            depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
+            depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
             depthTest: true,
             polygonOffset: true,
             polygonOffsetFactor: 2,
@@ -4985,9 +4991,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);
       if(geologySectionLocator)geologySectionLocator.visible=!mappedSurface&&(inspectionActiveRef.current||detail.sectionEnabled);
       {
+        // Only the subsurface chapter uses camera pitch to reveal the model
+        // beneath the surface. Applying that fade to resource and mine-plan
+        // scenes changed the apparent colour of terrain-backed evidence as
+        // presenters orbited, even though its palette was fixed. Hold those
+        // chapters at their authored opacity; their explicit opacity control
+        // remains available, while the subsurface cutaway still follows pitch.
         const cameraOpacity = (geologyPlan || geologyOblique)
           ? .92
-          : terrainOpacityForCamera(mode, surfaceCameraView, camera, controls.target);
+          : mode === 'subsurface'
+            ? terrainOpacityForCamera(mode, surfaceCameraView, camera, controls.target)
+            : terrainOpacityForView(mode, 'default');
+        host.dataset.cameraOpacityPolicy = mode === 'subsurface' ? 'subsurface pitch reveal' : 'chapter fixed';
         const geologyOpacity = mode === 'subsurface'
           ? THREE.MathUtils.lerp(.92, cameraOpacity, geologyDepthBlend)
           : cameraOpacity;
