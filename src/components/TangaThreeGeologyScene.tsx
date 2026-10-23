@@ -3228,11 +3228,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const resources = await applyTexturedTerrain(assetQuality);
       if (cancelled) return;
 
-      // Licence boundary, surveyed onto the terrain. Every 3D scene shows data
-      // sitting in the ground without ever saying whose ground it is; the
-      // outline is the cheapest way to answer that, and it ties these scenes
-      // back to the licence slide. Drawn as a soft halo under a bright core so
-      // it reads over both dark rock and bright satellite drape.
+      // Keep the licence ring available to mine-planning calculations below,
+      // but omit its graphic from the geology evidence scene. The mapped rock
+      // polygons and interpreted geology should be the only outlined subjects
+      // there; the extra gold perimeter competes with their contacts.
       const [licenceRing, surfaceRoads] = await Promise.all([
         loadLicenceBoundary(),
         loadSurfaceRoads(),
@@ -3267,7 +3266,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         registerReveal(roadGroup, 0.3, 1.2, 0.98);
       }
 
-      if (licenceRing && licenceRing.length >= 3) {
+      if (mode !== 'subsurface' && licenceRing && licenceRing.length >= 3) {
         const boundaryGroup = new THREE.Group();
         boundaryGroup.name = 'licence-boundary';
 

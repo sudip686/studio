@@ -1430,6 +1430,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-story-panel--map .tanga-geology-basis{border-top:1px solid #d1d4ca}
 .tanga-story-panel--map .tanga-geology-basis summary{color:#6c684d;font-size:10px}
 .tanga-story-panel--map .tanga-geology-basis p{color:#59675e;font-size:10px}
+.tanga-story-panel--map .tanga-geology-basis a{display:inline-flex;align-items:center;gap:5px;margin:4px 0 2px;color:#315e54;font-size:10px;font-weight:650;text-decoration:none}
+.tanga-story-panel--map .tanga-geology-basis a:hover{text-decoration:underline}
 .tanga-story-panel--map .tanga-geology-selected-unit{border-left-color:#8c6b3c;background:#e6e7dc}
 .tanga-story-panel--map .tanga-geology-selected-unit header strong{color:var(--atlas-ink)}
 .tanga-story-panel--map .tanga-geology-selected-unit header button{color:#53635c}

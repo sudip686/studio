@@ -754,8 +754,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'intercepts', label: 'Best intercepts', detail: 'Push into the strongest reported intervals', threeAction: 'zoomIn'},
   ],
   subsurface: [
-    {id: 'map', label: 'Geological map', detail: 'Read the original project map and MRE regional context'},
-    {id: 'plan', label: 'Mapped rock polygons', detail: 'Drape digitized rock areas over terrain in a north-up view', threeAction: 'geologyPlan'},
+    {id: 'plan', label: 'Mapped surface', detail: 'Read the mapped rock units draped over the 3D terrain in a north-up view', threeAction: 'geologyPlan'},
     {id: 'relief', label: 'Mapped terrain in relief', detail: 'Tilt the mapped surface while keeping rock polygons attached to the ground', threeAction: 'geologyTilt'},
     {id: 'framework', label: 'Interpreted depth', detail: 'Hold the viewpoint and reveal the separate geological model', threeAction: 'geologyDepth'},
     {id: 'section', label: 'Interpreted host', detail: 'Open a reversible section to read interpreted contacts', threeAction: 'revealSection'},
@@ -2504,6 +2503,7 @@ export default function TangaDeckWorkbench() {
     if (overrides.resourceFocus) setResourceFocus(overrides.resourceFocus);
     setActiveShotIndex(0);
     setThreeCameraCommand(null);
+    if (mode === 'subsurface') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'geologyPlan'});
     setActiveMode(mode);
     setStatusText(`Mode: ${MODE_LABELS[mode]}`);
     flyTo(mode, overrides.bearing);
@@ -4626,7 +4626,7 @@ export default function TangaDeckWorkbench() {
 
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
   useEffect(() => {
-    const restoreDepth = () => {if(activeMode === 'subsurface') setActiveShotIndex(index => index === 1 || index === 2 ? 3 : index);};
+    const restoreDepth = () => {if(activeMode === 'subsurface') setActiveShotIndex(index => index === 0 || index === 1 ? 2 : index);};
     window.addEventListener('tanga:geology-perspective', restoreDepth);
     return () => window.removeEventListener('tanga:geology-perspective', restoreDepth);
   }, [activeMode]);
@@ -6453,7 +6453,7 @@ export default function TangaDeckWorkbench() {
 
       {!isExploreMode && !isCoverScene && ['topography','drillholes','subsurface','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 Surface'],['drillholes','02 Drilling'],['subsurface','03 Geology'],['resource','04 Estimate']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
-      {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaChapterStoryPanel
+      {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaChapterStoryPanel
         chapter={activeMode as TangaChapterId}
         developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id}
         availableDevelopment={availableMineFacilities}
@@ -6471,8 +6471,8 @@ export default function TangaDeckWorkbench() {
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
-      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 4 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
-      {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory}/>}
+      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 3 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
+      {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory}/>}
 
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">
