@@ -24,7 +24,7 @@ import {cachedDeckAsset} from '@/lib/cached-deck-asset';
 import {assetUrl} from '@/lib/asset-url';
 import {createSceneReveal,type RevealAction} from '@/lib/deck/scene-reveal';
 import {sectionWorld,type SectionSource,type SectionDefinition} from '@/lib/deck/cross-section';
-import {cameraEase,createResolutionGovernor} from '@/lib/deck/presentation-motion';
+import {cameraEase} from '@/lib/deck/presentation-motion';
 import {
   bestPerHole,
   computeIntercepts,
@@ -844,15 +844,14 @@ function materialsForObject(object: THREE.Object3D) {
   return Array.from(materials);
 }
 
-/** Keep flat, evidence-coded colors independent of camera-distance haze. */
-function lockUnlitSceneColors(scene: THREE.Scene) {
+/** Keep every material free from camera-distance haze across all chapters. */
+function lockSceneMaterialFog(scene: THREE.Scene) {
   scene.traverse((object) => {
     const materialOwner = object as THREE.Object3D & {material?: THREE.Material | THREE.Material[]};
     for (const material of materialList(materialOwner.material)) {
-      if (material instanceof THREE.MeshBasicMaterial
-        || material instanceof THREE.LineBasicMaterial
-        || material instanceof THREE.SpriteMaterial) {
+      if ('fog' in material && material.fog) {
         material.fog = false;
+        material.needsUpdate = true;
       }
     }
   });
@@ -2528,9 +2527,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     };
     renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
     renderer.domElement.addEventListener('webglcontextrestored', onContextRestored, false);
-    // Render at up to 2× device pixels so the high-res draped satellite texture
-    // stays crisp (the terrain is the hero) instead of softening at 1.5×.
-    renderer.setPixelRatio(Math.min(mode === 'topography' ? 1.25 : 1, window.devicePixelRatio || 1));
+    // Keep a fixed draw-buffer scale through camera gestures and settled
+    // views. Frame-time adaptation made colored blocks, pads, and fine details
+    // shimmer as the resolution changed while the presenter orbited.
+    const renderPixelRatio = Math.min(mode === 'topography' ? 1.25 : 1, window.devicePixelRatio || 1);
+    renderer.setPixelRatio(renderPixelRatio);
+    host.dataset.renderScale = renderPixelRatio.toFixed(2);
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NeutralToneMapping;
@@ -3296,6 +3298,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         }
         terrainMeshes.push(texturedTerrain);
         applyTerrainSurfaceView();
+        lockSceneMaterialFog(scene);
         reportLoadState('loading', 'ready', quality, `${quality} terrain ready`);
         return resources;
       } catch (error) {
@@ -3456,6 +3459,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             calloutAnchors.set(id, new THREE.Vector3(x, terrainSurfaceY(resources, x, north), -north));
           }
         }
+        lockSceneMaterialFog(scene);
         setStatus('Measured survey terrain ready');
         reportLoadState('ready', 'ready', resources?.quality ?? assetQuality, 'Measured survey terrain ready');
         return;
@@ -4240,11 +4244,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           }
         }
 
+        lockSceneMaterialFog(scene);
         setStatus(mode === 'mine_planning'
           ? `${sitePlan?.pits.length ?? 0} conceptual excavations · provisional boundary · not optimised`
           : `${shownHoleCount} drillholes support ${sampled.length} ${resourceFocusLabel(activeFocus).toLowerCase()} blocks`);
         reportLoadState('ready', resources ? 'ready' : 'degraded', resources?.quality ?? assetQuality, `${shownHoleCount} drillholes / ${sampled.length} blocks ready`);
       } else {
+        lockSceneMaterialFog(scene);
         setStatus(mode === 'metallurgy'
           ? 'Illustrative concentrator ready · testwork is separate evidence'
           : `${shownHoleCount} drillholes / ${shownDrillholes.length} intervals in Three.js`);
@@ -4429,12 +4435,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let frame = 0;
     let lastControlsElapsed=0;
     let lastProjectionTick = -1;
+    let lastFrameAt = performance.now();
     const ease = cameraEase;
-    const resolutionGovernor=createResolutionGovernor(renderer.getPixelRatio());
-    let lastQualityFrame=performance.now();
     const onVisibilityChange=()=>{
       lastMotionElapsed=clock.getElapsedTime();
-      lastQualityFrame=performance.now();
+      lastFrameAt=performance.now();
       // Scene animations are also presenter-triggered in Explore mode; only an
       // explicit pause, reduced-motion preference or hidden tab stops them.
       const paused=presentationOptions.current.motionPaused||reducedMotion.matches||document.hidden;
@@ -4689,32 +4694,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // once construction is done — a scene rebuilt mid-presentation must come
     // back with whatever the presenter had switched off.
     applyDeckLayers(stage, layerSettingsRef.current);
-    // Flat grade, geology, assay and facility colors encode evidence. Fogging
-    // these materials based on camera distance made their hues pulse as the
-    // viewer orbited or zoomed. Keep the atmospheric fade for shaded terrain
-    // and structures, while preserving flat color keys across every chapter.
-    lockUnlitSceneColors(scene);
+    // This first pass protects anything already present; build() reapplies the
+    // rule after its asynchronously loaded scene objects have been added.
+    lockSceneMaterialFog(scene);
     projectCalloutsRef.current = projectCallouts;
     projectCallouts();
     updateNavInstruments();
 
     const animate = () => {
       if (cancelled) return;
-      if(document.hidden){lastMotionElapsed=clock.getElapsedTime();lastQualityFrame=performance.now();host.dataset.haulMotion='paused';frame=requestAnimationFrame(animate);return;}
+      if(document.hidden){lastMotionElapsed=clock.getElapsedTime();lastFrameAt=performance.now();host.dataset.haulMotion='paused';frame=requestAnimationFrame(animate);return;}
       const elapsed = clock.getElapsedTime();
-      const qualityNow=performance.now(),frameMs=qualityNow-lastQualityFrame;lastQualityFrame=qualityNow;
-      if(elapsed>2){
-        const inGesture=interacting||performance.now()-lastInteractionAt<350;
-        // Keep the draw-buffer scale fixed while the camera moves. Dropping
-        // to 0.6 during a drag and restoring the settled scale on release
-        // made colored blocks, pads, and thin terrain details visibly shimmer.
-        // Let the governor adapt only while the view is at rest; all scenes
-        // share this loop, so camera motion keeps a consistent raster scale.
-        const ratio=inGesture?renderer.getPixelRatio():resolutionGovernor.sample(frameMs);
-        if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);
-        const scale=ratio.toFixed(2);
-        if(host.dataset.renderScale!==scale)host.dataset.renderScale=scale;
-      }
+      // Measure frame time for diagnostics, but never change render quality
+      // based on camera movement or frame time.
+      const frameNow=performance.now(),frameMs=frameNow-lastFrameAt;lastFrameAt=frameNow;
       const detail=detailOptions.current;
       if(mode==='subsurface'){
         stage.updateMatrixWorld(true);
