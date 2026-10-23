@@ -140,6 +140,7 @@ Acceptance: marker endpoints stay attached at every camera preset and during zoo
 | 12. Evidence to decisions | Replace repeated closing text with a decision map | Three clear study questions, each linked back to its supporting evidence and next work |
 
 - [ ] Create an authored-shot specification for each row: camera target, visible layers, one takeaway, interaction, source and fallback image.
+  - [x] Document the current camera/story composition for all 12 chapters and 35 authored shots, with source and runtime-fallback status: `TANGA_AUTHORED_SHOT_SPEC_2026-10-24.md`. The parent remains open because seven map/peer/route/closing chapters have no runtime still fallback and the full desktop capture matrix is not complete.
 - [ ] Reduce the metallurgy canvas whitespace by fitting the selected instrument to the view. Use authentic report images as primary evidence when an illustrative model adds little explanatory value.
   - [x] Matched camera-fit calculations to the closer 24° exhibit camera, left margin around every fitted stage, and changed the exhibit bay to a contrasting dark finish. All five desktop stages and phone stages 1, 3 and 5 were visually reviewed.
 - [x] Reframe mine overview using the complete pit, plant and facility footprint; keep close plant detail in its authored view.
