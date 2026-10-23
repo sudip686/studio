@@ -673,6 +673,23 @@ function resourceBlockCenterY(block: ResourceBlock, _voxelScale: number, _resour
   return block.y;
 }
 
+/**
+ * The mine-plan target story is a spatial cue, not the full resource model.
+ * Keep one highest-grade source cell per 50 m location and grade class so the
+ * scene communicates both target bands without drawing tens of thousands of
+ * overlapping boxes. The resource chapter continues to render every cell.
+ */
+function sampleMinePlanTargets(blocks: ResourceBlock[], spacing = 50) {
+  const representatives = new Map<string, ResourceBlock>();
+  for (const block of blocks) {
+    const gradeClass = block.carbon >= 5 ? 'high' : 'mid';
+    const cell = `${gradeClass}:${Math.floor(block.x / spacing)}:${Math.floor(block.z / spacing)}`;
+    const current = representatives.get(cell);
+    if (!current || block.carbon > current.carbon) representatives.set(cell, block);
+  }
+  return Array.from(representatives.values());
+}
+
 function drillPointFromCoords(coords: [number, number, number]) {
   return localPoint(Number(coords[0]), Number(coords[1]), Number(coords[2] ?? 0));
 }
@@ -2097,6 +2114,7 @@ export default function TangaThreeGeologyScene({
   const [haulCount, setHaulCount] = useState(0);
   const [haulStatus,setHaulStatus]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
   const [targetCount, setTargetCount] = useState(0);
+  const [targetDisplayCount, setTargetDisplayCount] = useState(0);
   const [mineOrientation,setMineOrientation]=useState<'oblique'|'plan'>('oblique');
   useEffect(()=>{setMineOrientation('oblique');},[mode]);
   const [evidenceHoleIds,setEvidenceHoleIds]=useState<string[]>([]);
@@ -4035,10 +4053,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           tagDeckLayer(evidenceGroup,'context');stage.add(evidenceGroup);
           storyMotionStart=motionTime;
           const targets=blocks.filter(b=>b.carbon>=4.5&&sitePlan!.pits.some(p=>inside([b.x,b.z],p.ring)&&b.y>=p.floor&&b.y<=p.surface));
+          const displayedTargets=sampleMinePlanTargets(targets);
           setTargetCount(targets.length);
+          setTargetDisplayCount(displayedTargets.length);
           host.dataset.miningTargets=String(targets.length);
+          host.dataset.miningTargetsDisplayed=String(displayedTargets.length);
           for(const high of [false,true]){
-            const subset=targets.filter(b=>(b.carbon>=5)===high);
+            const subset=displayedTargets.filter(b=>(b.carbon>=5)===high);
             if(!subset.length)continue;
             const material=new THREE.MeshBasicMaterial({color:high?0xe58b32:0x388e96,transparent:true,opacity:.85,depthTest:false,depthWrite:false});
             const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,subset.length);
@@ -5337,7 +5358,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <details><summary>{evidenceHoleIds.length} selected drillholes · inspect source</summary><div className="tanga-mine-story__steps">{evidenceHoleIds.map(id=><button key={id} onClick={()=>{setEvidenceVisible(true);setStoryPlaying(false);setMiningBeat(0);evidenceFocusRef.current?.(id);}}>{id}</button>)}</div><small>Actual source interval coordinates. Spatially distributed collars within the crest footprints; not chosen by highest grade. These show nearby sampling, not verified hole-to-block provenance. No surface snapping; markers locate the first available interval. Use the camera reset to return to both pits.</small></details>
         <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Reveal high-grade model targets, without changing source cell sizes or positions.','Reveal the conceptual benches around the target footprint. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
         <div className="tanga-mine-story__key"><span>● 4.5–&lt;5% TGC</span><span>● ≥5% TGC</span></div>
-        <small>{targetCount.toLocaleString()} source cells · original size and position<br/>Display thresholds, not economic cutoffs or reserves.</small>
+        <small>{targetCount.toLocaleString()} source cells qualify; {targetDisplayCount.toLocaleString()} shown as a 50 m grid sample across both grade bands. Sampled cells keep their source sizes and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on':'Solid pit view'}</button>
         </>}
         <details open={miningBeat>=3}><summary>Explore processing equipment</summary>

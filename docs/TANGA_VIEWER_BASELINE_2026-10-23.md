@@ -56,6 +56,12 @@ This confirms that the percentile governor adapts during a sustained slow run, b
 - One chapter loop recorded `Evidence to decisions` at 7.6–7.8 seconds, but a fresh instrumented foreground load measured DOMContentLoaded at 29 ms and the chapter heading at 311 ms. The slow result was not reproduced and is treated as a harness outlier; full asset/transition readiness remains unmeasured.
 - Do next: repeat with cache/service-worker disabled and capture actual wire transfer; repeat the 30-second desktop orbit after the p90 governor change and collect a controlled before/after plus phone-sized distributions; inject texture/model/API failure and context loss; test rapid scene switching; repeat on a named physical laptop and phone rather than browser viewport emulation.
 
+## Mine-plan target-overlay production recheck — 24 October 2026
+
+The conceptual mine-plan target story now draws 1,380 source cells, selected as the highest-grade cell in each 50 m grid location and grade band, while retaining the exact 70,892 qualifying-cell count. Each displayed block retains its source position, size and grade class. The resource chapter still displays its full source population. This keeps the mine-plan target cue spatially representative without rendering the full overlapping block population.
+
+On the optimized local Next.js production server at `localhost:3013`, Chrome at 1707 × 842 ran a 33-second foreground orbit at renderer scale 0.90. The browser requestAnimationFrame sample contained 1,258 intervals: median 25.0 ms, p90 37.8 ms, p95 50.0 ms, p99 54.3 ms; 84.5% of intervals were at or below 33.4 ms. The scene stayed ready and logged zero JavaScript errors. This sample shows continued desktop frame-time headroom above the plan's 33 ms p95 target; it is not a controlled before/after comparison, a GPU timer, a cold-cache test, or a physical-device certification.
+
 ## Reproduction notes
 
 The optimized application was served with `npm start -- -p 3002`. Browser scripts navigated to each chapter through a fresh query and hash, waited for its authored chapter heading, and for Three.js chapters waited on `.tanga-three__canvas[data-ready="true"]`. The browser tab was explicitly foregrounded before timing. A background tab reports no first useful frame because its animation loop intentionally pauses.
