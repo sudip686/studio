@@ -12,7 +12,7 @@ import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan
 import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
-import {buildGeologySurface,type GeologySurfaceData} from '@/lib/deck/geology-surface';
+import {buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
 import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
@@ -42,7 +42,6 @@ type GeologyMode = 'topography' | 'drillholes' | 'subsurface' | 'resource' | 'mi
  * the orebody's saturated grade colours are the only vivid thing on screen.
  */
 const TERRAIN_GROUND_COLOR = 0x9a8267;   // untextured fallback surface
-const TERRAIN_TEXTURE_TINT = 0xcbb9a4;   // multiplier over the satellite map
 const TOPOGRAPHY_ELEVATION_RAMP = [
   {at: 0, color: new THREE.Color('#27352f')},
   {at: 0.36, color: new THREE.Color('#46564a')},
@@ -843,7 +842,10 @@ function terrainOpacityForView(mode: GeologyMode, view: SurfaceCameraView) {
 
   // The default three-quarter view, where most of the deck is presented.
   if (mode === 'subsurface') return 0.28;
-  if (mode === 'drillholes') return 0.42;
+  // The drilling chapter opens like a satellite map. Its recorded holes sit
+  // just beneath the near-opaque surface; the opacity control remains
+  // available when viewers want to inspect the traces more directly.
+  if (mode === 'drillholes') return 0.92;
   if (mode === 'resource') return 0.32;
 if (mode === 'mine_planning') return 1;
   return 1;
@@ -1972,7 +1974,7 @@ export default function TangaThreeGeologyScene({
   const gradeFocusMaterialsRef=useRef<THREE.Material[]>([]);
   // Terrain surface materials, shared with the legend cross-highlight so the
   // ground can fade back ("x-ray") and reveal the isolated subsurface grade.
-  const terrainMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const terrainMaterialsRef = useRef<THREE.Material[]>([]);
   const rotationKeyRef = useRef(rotationKey);
   const cameraCommandRef = useRef<ThreeCameraCommand | null>(cameraCommand ?? null);
   const cameraCommandHandlerRef = useRef<((command: ThreeCameraCommand) => void) | null>(null);
@@ -2297,7 +2299,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let siteOverviewCallouts: ThreeCallout[] = [];
     const calloutAnchors = new Map<string, THREE.Vector3>();
     const calloutObjects = new Map<string, THREE.Object3D>();
-    const terrainSurfaceMaterials: THREE.MeshStandardMaterial[] = [];
+    const terrainSurfaceMaterials: THREE.Material[] = [];
     // Depth-only twins of the terrain; hidden while the surface is glass.
     const terrainOccluders: THREE.Mesh[] = [];
     // The terrain surfaces themselves, so the mine plan can carve a pit into
@@ -2329,13 +2331,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       });
     };
     resetSurfaceRef.current=applyTerrainSurfaceView;
-    const registerTerrainSurfaceMaterial = (material: THREE.MeshStandardMaterial) => {
-      if (subsurfaceStudio) {
-        material.onBeforeCompile = shader => {
-          shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\nfloat groundLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));\ndiffuseColor.rgb = mix(vec3(groundLuma), diffuseColor.rgb, 0.18);');
-        };
-        material.customProgramCacheKey = () => 'tanga-muted-subsurface-ground-v1';
-      }
+    const registerTerrainSurfaceMaterial = (material: THREE.Material) => {
       terrainSurfaceMaterials.push(material);
       applyTerrainSurfaceView();
     };
@@ -2916,24 +2912,38 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           carvePit(terrainGeometry, sitePlan.pits);
           const pad=processPlant?.userData.conceptPad as ConceptPad|undefined;if(pad)gradeConceptPad(terrainGeometry,pad);
         }
+        const hasSatelliteTexture = mode !== 'topography' && Boolean(terrainTexture);
         const texturedTerrain = new THREE.Mesh(
           terrainGeometry,
-          new THREE.MeshStandardMaterial({
-            map: mode === 'topography' ? null : terrainTexture,
-            // Neutral-warm multiplier, not a near-white one. The old 0xfff4e2
-            // combined with a bright IBL and 1.15 env intensity was blowing the
-            // satellite imagery out to a pale glow — the ground lost its rock
-            // colour and stopped separating from the white drill collars.
-            color: mode === 'subsurface' ? 0x9caeb8 : mode === 'topography' ? 0xffffff : TERRAIN_TEXTURE_TINT,
-            // Matte ground. The specular sheen read as wet plastic at this
-            // scale and added to the wash.
-            roughness: 0.88,
-            metalness: 0.0,
-            envMapIntensity: mode === 'topography' ? 0.72 : 0.55,
+          hasSatelliteTexture
+            // Keep the source satellite basemap's real colours. PBR lighting,
+            // warm tinting and the old near-monochrome shader shifted it away
+            // from a recognisable map and made the drillhole scene feel flat.
+            ? new THREE.MeshBasicMaterial({
+            map: terrainTexture,
+            color: 0xffffff,
+            colorWrite: true,
+            toneMapped: false,
             transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
             opacity: terrainOpacityForView(mode, surfaceCameraView),
-            emissive: new THREE.Color('#120d09'),
-            emissiveIntensity: 0.03,
+            alphaTest: 0,
+            side: THREE.DoubleSide,
+            forceSinglePass: true,
+            depthWrite: terrainOpacityForView(mode, surfaceCameraView) >= 1,
+            depthTest: true,
+            polygonOffset: true,
+            polygonOffsetFactor: 2,
+          })
+            : new THREE.MeshStandardMaterial({
+            map: mode === 'topography' ? null : terrainTexture,
+            color: 0xffffff,
+            roughness: 0.88,
+            metalness: 0.0,
+            envMapIntensity: 0.35,
+            transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
+            opacity: terrainOpacityForView(mode, surfaceCameraView),
+            emissive: new THREE.Color('#000000'),
+            emissiveIntensity: 0,
             alphaTest: 0,
             side: THREE.DoubleSide,
             forceSinglePass: true,
@@ -2944,7 +2954,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             polygonOffsetFactor: 2,
           })
         );
-        const texturedMaterial = texturedTerrain.material as THREE.MeshStandardMaterial;
+        const texturedMaterial = texturedTerrain.material;
         registerTerrainSurfaceMaterial(texturedMaterial);
         texturedTerrain.receiveShadow = true;
         texturedTerrain.renderOrder = 20;
@@ -3371,14 +3381,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         calloutAnchors.set('volume', assayAnchor.clone());
       }
       const tubeGeometry = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
+      const traceMaterial = new THREE.MeshBasicMaterial({
+        color: 0x050505,
+        transparent: true,
+        opacity: mode === 'resource' ? 0.36 : 0.92,
+        depthWrite: false,
+        // Keep the measured paths in the terrain's depth order. The opaque
+        // surface remains a Google-Earth-like map, with a small translucency
+        // so the subsurface drilling pattern still reads beneath it.
+        depthTest: true,
+      });
       const traceMesh = new THREE.InstancedMesh(
         tubeGeometry,
-        new THREE.MeshBasicMaterial({
-          color: 0x050505,
-          transparent: true,
-          opacity: mode === 'resource' ? 0.36 : 0.92,
-          depthWrite: false,
-        }),
+        traceMaterial,
         shownDrillholes.length
       );
       const tubeMatrix = new THREE.Matrix4();
@@ -4411,7 +4426,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const geologyBlendAlpha=1-Math.exp(-Math.max(0,elapsed-geologyBlendTime)*3.6);
       geologyBlendTime=elapsed;
       if(geologySurface){
-        const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??.9):0;
+        const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??GEOLOGY_SURFACE_DEFAULT_OPACITY):0;
         geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,geologyBlendAlpha);
         geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.context.visible;
         geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.context.opacity;});
