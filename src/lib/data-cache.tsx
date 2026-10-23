@@ -14,6 +14,7 @@ type FetchJsonOptions = {
   candidates: string[];
   attempts?: number;
   timeoutMs?: number;
+  signal?: AbortSignal;
   validate?: (payload: any) => boolean;
 };
 
@@ -129,8 +130,26 @@ const resourceCandidates: Record<CacheResourceKey, string[]> = {
   ],
 };
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason instanceof Error ? signal.reason : new Error('Request cancelled.'));
+      return;
+    }
+
+    const finish = () => {
+      signal?.removeEventListener('abort', cancel);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    const cancel = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
+      reject(signal?.reason instanceof Error ? signal.reason : new Error('Request cancelled.'));
+    };
+
+    signal?.addEventListener('abort', cancel, { once: true });
+  });
 }
 
 function isGeoJsonFeatureCollection(payload: any) {
@@ -488,13 +507,20 @@ async function fetchJson({
   candidates,
   attempts = GEOJSON_FETCH_ATTEMPTS,
   timeoutMs = GEOJSON_FETCH_TIMEOUT_MS,
+  signal,
   validate,
 }: FetchJsonOptions) {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     for (const candidate of Array.from(new Set(candidates.filter(Boolean)))) {
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : new Error(`Fetching ${label} was cancelled.`);
+      }
+
       const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+      const abortRequest = () => controller?.abort(signal?.reason);
+      signal?.addEventListener('abort', abortRequest, { once: true });
       const timeoutId = controller
         ? setTimeout(() => controller.abort(`Timed out while fetching ${label}.`), timeoutMs)
         : null;
@@ -502,7 +528,7 @@ async function fetchJson({
       try {
         const response = await fetch(candidate, {
           cache: candidate.startsWith('/api/') ? 'no-store' : 'force-cache',
-          signal: controller?.signal,
+          signal: controller?.signal ?? signal,
         });
         if (!response.ok) {
           throw new Error(`Failed to fetch ${label} from ${candidate}: ${response.status} ${response.statusText}`);
@@ -516,15 +542,17 @@ async function fetchJson({
         return payload;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        if (signal?.aborted) throw lastError;
       } finally {
         if (timeoutId !== null) {
           clearTimeout(timeoutId);
         }
+        signal?.removeEventListener('abort', abortRequest);
       }
     }
 
     if (attempt < attempts - 1) {
-      await delay(500 * (attempt + 1));
+      await delay(500 * (attempt + 1), signal);
     }
   }
 
@@ -622,6 +650,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = typeof AbortController === 'undefined' ? null : new AbortController();
     let idleHandle: number | null = null;
     let timerHandle: number | null = null;
 
@@ -651,6 +680,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
       void fetchJson({
         label: 'lithology data',
         candidates: resourceCandidates.lithology,
+        signal: controller?.signal,
         validate: isGeoJsonFeatureCollection,
       })
         .then((payload) => {
@@ -698,6 +728,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
       void fetchJson({
         label: 'assay data',
         candidates: resourceCandidates.assay,
+        signal: controller?.signal,
         validate: isGeoJsonFeatureCollection,
       })
         .then((payload) => {
@@ -766,6 +797,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       cancelled = true;
+      controller?.abort(new Error('The data cache load was superseded.'));
       if (idleHandle !== null && browserWindow?.cancelIdleCallback) {
         browserWindow.cancelIdleCallback(idleHandle);
       }
