@@ -178,7 +178,7 @@ Acceptance: a shared link opens the intended view; missing assets produce a usab
 
 Implementation details, priorities, reference evidence and acceptance conditions are in the [reference review](TANGA_POLISH_REFERENCE_REVIEW_2026-10-23.md). The other nine packages in that document refine existing A–F items and are not duplicate checkboxes.
 
-- [ ] **G1 · Visual chapter index:** extend the existing All scenes overlay with lazy scene thumbnails, chapter questions and current-view indication; retain keyboard/touch access and avoid hidden WebGL pre-renders. Corresponds to BP10.
+- [x] **G1 · Visual chapter index:** extend the existing All scenes overlay with lazy scene thumbnails, chapter questions and current-view indication; retain keyboard/touch access and avoid hidden WebGL pre-renders. Desktop feature and keyboard path are complete; device-specific layout review remains deferred to the requested phone/tablet pass. Corresponds to BP10.
   - [x] Add lazy local evidence/saved-view thumbnails, chapter questions and current-view/shot labels to the existing index; no hidden WebGL scenes are created.
   - [x] Desktop smoke check: the dialog opens with focus on Close, shows all 12 chapter cards, and selecting chapter 9 closes the index and navigates to `#mine_planning`.
   - [x] Desktop: all 12 cards and all 10 local thumbnails load, keyboard traversal wraps within the dialog, and selecting a card returns focus to the chapter trigger.
