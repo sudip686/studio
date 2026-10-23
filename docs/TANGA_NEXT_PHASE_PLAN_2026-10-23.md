@@ -182,6 +182,7 @@ Implementation details, priorities, reference evidence and acceptance conditions
   - [x] Add lazy local evidence/saved-view thumbnails, chapter questions and current-view/shot labels to the existing index; no hidden WebGL scenes are created.
   - [x] Desktop smoke check: the dialog opens with focus on Close, shows all 12 chapter cards, and selecting chapter 9 closes the index and navigates to `#mine_planning`.
   - [x] Desktop: all 12 cards and all 10 local thumbnails load, keyboard traversal wraps within the dialog, and selecting a card returns focus to the chapter trigger.
+  - [x] Rechecked at 1707×842: all 12 chapter questions are present with one `aria-current` card, ten lazy-loaded local images have nonzero natural widths, and opening the index adds no canvas/renderers (3 canvases before and after). Keyboard focus wraps from Close to the last scene and back. Capture: `.playwright-mcp/scene-index-audit-1707x842.png`.
   - [ ] Review phone/tablet layout later as requested.
 - [x] **G2 · Same-camera comparison:** extend the current original-terrain comparison with a labelled draggable wipe for registered surface/concept or terrain/geology representations; preserve camera, scale, coverage and source limitations and provide a keyboard equivalent. Corresponds to BP11.
   - [x] Add one-renderer scissor comparison for original terrain versus the registered mine-site concept; both passes share the live camera, scale and coverage, with a visible split line and side labels.
