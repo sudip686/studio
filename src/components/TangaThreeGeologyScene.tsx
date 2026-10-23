@@ -261,6 +261,7 @@ type TangaThreeGeologySceneProps = {
   selectedGeologyUnit?: string | null;
   hiddenGeologyUnits?: string[];
   onSelectGeologyUnit?: (unit: DrillPickInfo) => void;
+  onGeologyLegendMount?: (element: HTMLDivElement | null) => void;
   onSiteFacilities?: (ids:string[])=>void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
@@ -2013,13 +2014,16 @@ export default function TangaThreeGeologyScene({
   selectedGeologyUnit = null,
   hiddenGeologyUnits = [],
   onSelectGeologyUnit,
+  onGeologyLegendMount,
   onSiteFacilities,
   onAssayFacts,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const geologyRailBodyRef = useRef<HTMLDivElement | null>(null);
   const [inspectionOpen, setInspectionOpen] = useState(false);
   const inspectionActiveRef=useRef(false);inspectionActiveRef.current=inspectionMode||inspectionOpen;
   useEffect(() => setInspectionOpen(false), [mode]);
+  useEffect(() => { if (geologyRailBodyRef.current) geologyRailBodyRef.current.scrollTop=0; }, [inspectionOpen, inspectionMode]);
   const controlsRef = useRef<OrbitControls | null>(null);
   const groupRef = useRef<THREE.Group | null>(null);
   const gradeFocusMaterialsRef=useRef<THREE.Material[]>([]);
@@ -4883,16 +4887,31 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           ? 'Mine plan'
           : 'Drillhole volume';
 
+  const surfaceControl = <div className="tanga-surface-control" onKeyDown={event=>event.stopPropagation()}>
+        <label htmlFor="tanga-surface-opacity">Surface opacity <output>{surfaceOpacity===null?`Auto · ${Math.round(authoredSurfaceOpacity*100)}%`:`${Math.round(surfaceOpacity*100)}%`}</output></label>
+        <input id="tanga-surface-opacity" aria-label="Surface opacity" type="range" min="0" max="100" step="1" value={Math.round((surfaceOpacity??authoredSurfaceOpacity)*100)} onChange={event=>{setSurfaceOpacity(Number(event.target.value)/100);window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
+        <div><span>Transparent</span><button type="button" onClick={()=>setSurfaceOpacity(null)} title="Restore the authored surface opacity for this view">Auto</button><span>Opaque</span></div>
+      </div>;
+  const geologyInspection = <section className="tanga-geology-section" aria-label="Geology section controls">
+        <small>READ THE DEPOSIT</small><h2>Surface → host rock → sampling</h2>
+        <button aria-pressed={sectionEnabled} onClick={()=>{setExploded(false);setSectionEnabled(v=>!v);}}>{sectionEnabled?'Restore whole geology':'Open geology cutaway'}</button>
+        <button aria-pressed={exploded} onClick={()=>{setMotionPaused(false);setSectionEnabled(false);setHostOnly(false);setExploded(v=>!v);}}>{exploded?'Reassemble registered geology':'Separate rock units'}</button>
+        {exploded&&<p role="status">Illustrative exploded view: units displaced vertically for inspection, not their true positions or stratigraphic order. Reassemble before interpreting contacts.</p>}
+        <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
+        <label>East–west section · north–south position<input aria-label="East–west section position along north–south axis" type="range" min="0" max="100" value={sectionPosition} disabled={!sectionEnabled} onChange={e=>setSectionPosition(Number(e.target.value))}/></label>
+        <p className="tanga-geology-section__basis">1× vertical scale. The cut passes through the interpreted model only; surface polygons are not projected to depth.</p>
+        <button aria-pressed={hostOnly} onClick={()=>setHostOnly(v=>!v)}>{hostOnly?'Show all rock units':'Isolate GRSC host unit'}</button>
+        <label>Evidence spotlight<select aria-label="Geology spotlight unit" value={spotlight} onChange={e=>{setSpotlight(e.target.value);setHostOnly(false);}}><option value="">All units · no spotlight</option>{crossSource?.units.map(unit=><option key={unit.name} value={unit.name}>{unit.name.replace(/_/g,' ')}</option>)}</select></label>
+        <p>Pale grey: graphitic schist. Rock colours follow the map where names correspond. Unspecified schist and soil use neutral colours. Interpreted contacts are not observed everywhere.</p>
+        <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
+      </section>;
+
   return (
     <>
     <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
       {mode === 'mine_planning' && terrainCompare.enabled && <div className="tanga-three__comparison-wipe" style={{left:`${THREE.MathUtils.clamp(terrainCompare.split,8,92)}%`}} title="Drag to compare original terrain and concept site" onPointerDown={event=>{event.currentTarget.setPointerCapture(event.pointerId);const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} onPointerMove={event=>{if(!event.currentTarget.hasPointerCapture(event.pointerId))return;const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} aria-hidden="true"><span>ORIGINAL TERRAIN</span><i/><span>CONCEPT SITE</span></div>}
-      {mode!=='metallurgy' && <div className="tanga-surface-control" onKeyDown={event=>event.stopPropagation()}>
-        <label htmlFor="tanga-surface-opacity">Surface opacity <output>{surfaceOpacity===null?`Auto · ${Math.round(authoredSurfaceOpacity*100)}%`:`${Math.round(surfaceOpacity*100)}%`}</output></label>
-        <input id="tanga-surface-opacity" aria-label="Surface opacity" type="range" min="0" max="100" step="1" value={Math.round((surfaceOpacity??authoredSurfaceOpacity)*100)} onChange={event=>{setSurfaceOpacity(Number(event.target.value)/100);window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
-        <div><span>Transparent</span><button type="button" onClick={()=>setSurfaceOpacity(null)} title="Restore the authored surface opacity for this view">Auto</button><span>Opaque</span></div>
-      </div>}
+      {mode!=='metallurgy' && mode!=='subsurface' && surfaceControl}
       {!sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
       {!minimalViewerChrome && (
         <>
@@ -5022,7 +5041,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             cameraCommandHandlerRef.current?.({id: Date.now(), action: 'resetView'});
           }}>Reset view</button>
           <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
-          {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{inspectionOpen ? 'Close inspection tools' : 'Inspection tools'}</button>}
+          {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-label={mode==='subsurface'?(inspectionOpen?'Close inspection tools':'Inspection tools'):undefined} title={mode==='subsurface'?'Geology inspection tools':'Inspection tools'} aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{mode==='subsurface'?(inspectionOpen?'Close tools':'Inspect'):(inspectionOpen ? 'Close inspection tools' : 'Inspection tools')}</button>}
         </div>
         {mode==='resource'&&<details className="tanga-three-animation-tools"><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
@@ -5066,6 +5085,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           </div>
           </>
         )}
+        {mode==='subsurface' && <div className="tanga-geology-rail-body" ref={geologyRailBodyRef}>
+          {surfaceControl}
+          <div className="tanga-geology-legend-slot" hidden={inspectionMode||inspectionOpen} ref={onGeologyLegendMount}/>
+          {(inspectionMode||inspectionOpen)&&geologyInspection}
+        </div>}
         {mode === 'topography' && (
           <div className="tanga-three__terrain-tools" aria-label="Survey terrain tools">
             <div className="tanga-three__terrain-tools-head">
@@ -5130,19 +5154,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Mine-to-feed road requires survey; map-traced conveyor is shown separately'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
-      </section>}
-      {mode==='subsurface'&&<section className="tanga-geology-section" aria-label="Geology section controls">
-        <small>READ THE DEPOSIT</small><h2>Surface → host rock → sampling</h2>
-        <button aria-pressed={sectionEnabled} onClick={()=>{setExploded(false);setSectionEnabled(v=>!v);}}>{sectionEnabled?'Restore whole geology':'Open geology cutaway'}</button>
-        <button aria-pressed={exploded} onClick={()=>{setMotionPaused(false);setSectionEnabled(false);setHostOnly(false);setExploded(v=>!v);}}>{exploded?'Reassemble registered geology':'Separate rock units'}</button>
-        {exploded&&<p role="status">Illustrative exploded view: units displaced vertically for inspection, not their true positions or stratigraphic order. Reassemble before interpreting contacts.</p>}
-        <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
-        <label>East–west section · north–south position<input aria-label="East–west section position along north–south axis" type="range" min="0" max="100" value={sectionPosition} disabled={!sectionEnabled} onChange={e=>setSectionPosition(Number(e.target.value))}/></label>
-        <p className="tanga-geology-section__basis">1× vertical scale. The cut passes through the interpreted model only; surface polygons are not projected to depth.</p>
-        <button aria-pressed={hostOnly} onClick={()=>setHostOnly(v=>!v)}>{hostOnly?'Show all rock units':'Isolate GRSC host unit'}</button>
-        <label>Evidence spotlight<select aria-label="Geology spotlight unit" value={spotlight} onChange={e=>{setSpotlight(e.target.value);setHostOnly(false);}}><option value="">All units · no spotlight</option>{crossSource?.units.map(unit=><option key={unit.name} value={unit.name}>{unit.name.replace(/_/g,' ')}</option>)}</select></label>
-        <p>Pale grey: graphitic schist. Rock colours follow the map where names correspond. Unspecified schist and soil use neutral colours. Interpreted contacts are not observed everywhere.</p>
-        <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
       {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}

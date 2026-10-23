@@ -2192,6 +2192,7 @@ export default function TangaDeckWorkbench() {
   const restoredLayerSettingsRef = useRef<WorkbenchMode|null>(null);
   const [geologySectionShown, setGeologySectionShown] = useState(false);
   const [selectedGeologyUnit, setSelectedGeologyUnit] = useState<GeologyUnitSelection|null>(null);
+  const [geologyLegendMount, setGeologyLegendMount] = useState<HTMLDivElement|null>(null);
   const [hiddenGeologyUnits,setHiddenGeologyUnits]=useState<string[]>([]);
   const [availableMineFacilities,setAvailableMineFacilities]=useState<string[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState('drilling');
@@ -5367,7 +5368,7 @@ export default function TangaDeckWorkbench() {
       data-act={MODE_ACT[activeMode]}
       data-mode={activeMode}
       onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
-      onPointerDownCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
+      onPointerDownCapture={event => { setIsAutoplay(false); setIsExecutiveTour(false); if(!(event.target as Element).closest('.tanga-presentation-tools')) { const tools=stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');if(tools)tools.open=false; } }}
       data-testid="tanga-deck-workbench"
     >
       <DeckHoverGuide mode={activeMode}/>
@@ -5431,6 +5432,7 @@ export default function TangaDeckWorkbench() {
           selectedGeologyUnit={selectedGeologyUnit?.title}
           hiddenGeologyUnits={hiddenGeologyUnits}
           onSelectGeologyUnit={setSelectedGeologyUnit}
+          onGeologyLegendMount={setGeologyLegendMount}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
           terrainCompare={{enabled: surfaceConceptView, split: surfaceCompareSplit}}
@@ -6062,7 +6064,7 @@ export default function TangaDeckWorkbench() {
             </div>
           )}
         </div>
-        <details key={activeMode} className="tanga-presentation-tools" onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
+        <details key={activeMode} className="tanga-presentation-tools" onClick={event=>{if((event.target as Element).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
           <summary aria-label="Presentation tools" title="Presentation tools"><Layers size={16}/><span>Tools</span></summary>
           <div className="tanga-presentation-tools__grid">
         <section className="tanga-tour-mobile" aria-label="Guided presentation">
@@ -6471,7 +6473,7 @@ export default function TangaDeckWorkbench() {
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
-      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 3 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
+      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 3 && <TangaGeologyMapStage legendMount={geologyLegendMount} step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
       {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory}/>}
 
       {activeMode === 'accessibility' && (
