@@ -2594,7 +2594,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         stageBaseRotation = 0; stageVerticalBaseRotation = 0;
         rotationTween = null; verticalRotationTween = null; stage.rotation.set(0, 0, 0);
         controls.target.copy(geologyPlanTarget);
-        const halfHeight = Math.max(geologyPlanExtent.z / 1.3, geologyPlanExtent.x / (camera.aspect * 1.04)) * 1.08;
+        // This view is rendered with an orthographic projection below, so fit
+        // the true mapped bounds with the standard half-span calculation. The
+        // earlier perspective-derived divisor left the mapped footprint tiny
+        // between the side HUDs. Keep the survey proportions intact with a
+        // modest margin around the true mapped bounds.
+        const halfHeight = Math.max(geologyPlanExtent.z / 2, geologyPlanExtent.x / (camera.aspect * 2)) * 1.34;
         const distance = Math.min(controls.maxDistance, Math.max(1800, halfHeight / Math.tan(THREE.MathUtils.degToRad(42 / 2))));
         camera.position.copy(geologyPlanTarget).add(new THREE.Vector3(0, distance, .01));
         camera.fov = 42;
@@ -2613,19 +2618,22 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         stageBaseRotation = 0; stageVerticalBaseRotation = 0; stage.rotation.set(0,0,0);
         setSectionEnabled(false);
         explodedRef.current=false;setExploded(false);separation=0;
-        const reliefPosition = cameraShot.to.clone();
-        if (camera.aspect < .85) {
-          // On a phone the wide authored oblique compresses the terrain into
-          // a thin ribbon between the HUD panels. Raise the camera to a more
-          // map-readable 25° pitch while preserving its horizontal bearing;
-          // the shared portrait fit still keeps the mapped footprint in frame.
-          const offset = reliefPosition.clone().sub(cameraShot.target);
-          const horizontal = Math.hypot(offset.x, offset.z);
-          offset.y = horizontal * Math.tan(THREE.MathUtils.degToRad(25));
-          reliefPosition.copy(cameraShot.target).add(offset);
-        }
-        host.dataset.geologyReliefCamera = JSON.stringify({aspect:Number(camera.aspect.toFixed(3)),pitchDeg:Number(THREE.MathUtils.radToDeg(Math.atan2(reliefPosition.y-cameraShot.target.y,Math.hypot(reliefPosition.x-cameraShot.target.x,reliefPosition.z-cameraShot.target.z))).toFixed(1)),target:cameraShot.target.toArray().map(value=>Number(value.toFixed(1))),position:reliefPosition.toArray().map(value=>Number(value.toFixed(1)))});
-        scheduleCameraTween(reliefPosition, cameraShot.target.clone(), 2.8, cameraShot.fov);
+        // Keep the complete map footprint in view as it tilts. The old relief
+        // shot used the underground model's tighter bounds, cropping the map
+        // and making the terrain read like a texture sheet.
+        const reliefPitch = THREE.MathUtils.degToRad(camera.aspect < .85 ? 25 : 50);
+        const reliefFov = THREE.MathUtils.degToRad(camera.fov);
+        const mappedSpan = Math.max(geologyPlanExtent.z, geologyPlanExtent.x / Math.max(.5, camera.aspect));
+        const reliefDistance = mappedSpan / (2 * Math.tan(reliefFov / 2)) * 2.15;
+        const reliefDirection = cameraShot.to.clone().sub(cameraShot.target);
+        reliefDirection.y = 0;
+        if (reliefDirection.lengthSq() < 1) reliefDirection.set(.7, 0, .85);
+        reliefDirection.normalize();
+        const reliefPosition = geologyPlanTarget.clone()
+          .addScaledVector(reliefDirection, reliefDistance * Math.cos(reliefPitch))
+          .add(new THREE.Vector3(0, reliefDistance * Math.sin(reliefPitch), 0));
+        host.dataset.geologyReliefCamera = JSON.stringify({aspect:Number(camera.aspect.toFixed(3)),pitchDeg:Number(THREE.MathUtils.radToDeg(reliefPitch).toFixed(1)),target:geologyPlanTarget.toArray().map(value=>Number(value.toFixed(1))),position:reliefPosition.toArray().map(value=>Number(value.toFixed(1)))});
+        scheduleCameraTween(reliefPosition, geologyPlanTarget.clone(), 2.8, cameraShot.fov);
         applyTerrainSurfaceView();
         host.dataset.geologyStage = 'mapped-relief';
         setStatus('Mapped rock polygons follow the unchanged terrain · drag to inspect relief');

@@ -2,7 +2,9 @@ import * as THREE from 'three';
 
 type MapUnit = {properties:{unit:string;color:string};geometry:{type:'MultiPolygon';coordinates:number[][][][]}};
 export type GeologySurfaceData = {features:MapUnit[]};
-export const GEOLOGY_SURFACE_DEFAULT_OPACITY=.68;
+// VRIFY-style map emphasis: strong enough to read on satellite imagery while
+// retaining the terrain texture beneath each mapped outcrop.
+export const GEOLOGY_SURFACE_DEFAULT_OPACITY=.82;
 
 /** Derived map polygons only. No source model vertices are changed or extruded. */
 export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:number;northing:number}, height:(x:number,z:number)=>number, extent:{width:number;depth:number;surveyed?:(x:number,z:number)=>boolean}) {
@@ -87,8 +89,17 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     if(outline.length){
       const outlineGeometry=new THREE.BufferGeometry();
       outlineGeometry.setAttribute('position',new THREE.Float32BufferAttribute(outline,3));
-      const outlineMaterial=new THREE.LineBasicMaterial({color:'#e7ece8',transparent:true,opacity:.34,depthWrite:false,toneMapped:false});
-      const boundaries=new THREE.LineSegments(outlineGeometry,outlineMaterial);
+      // A quiet dark keyline keeps pale units readable over both bright ground
+      // and forest imagery; the fine light line preserves the map-like edge.
+      const shadowGeometry=outlineGeometry.clone();
+      const shadowPositions=shadowGeometry.getAttribute('position');
+      for(let i=0;i<shadowPositions.count;i++)shadowPositions.setY(i,shadowPositions.getY(i)-1.5);
+      shadowPositions.needsUpdate=true;
+      const shadow=new THREE.LineSegments(shadowGeometry,new THREE.LineBasicMaterial({color:'#18241e',transparent:true,opacity:.46,depthWrite:false,toneMapped:false}));
+      shadow.name=`${feature.properties.unit} · boundary keyline`;
+      shadow.renderOrder=30;
+      group.add(shadow);
+      const boundaries=new THREE.LineSegments(outlineGeometry,new THREE.LineBasicMaterial({color:'#f5f2e9',transparent:true,opacity:.76,depthWrite:false,toneMapped:false}));
       boundaries.name=`${feature.properties.unit} · mapped boundary`;
       boundaries.renderOrder=31;
       group.add(boundaries);
