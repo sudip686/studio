@@ -5,7 +5,7 @@ import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
 export function buildConcentrator() {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshStandardMaterial({color:0x858278,roughness:.98}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshStandardMaterial({color:0x756b5d,roughness:1})};
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshLambertMaterial({color:0x858278}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d})};
   const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
@@ -13,8 +13,8 @@ export function buildConcentrator() {
   };
   cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
-  const box=(w:number,h:number,d:number,x:number,y:number,z:number,m=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
-  const cylinder=(r:number,h:number,x:number,y:number,z:number,m=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
+  const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
+  const cylinder=(r:number,h:number,x:number,y:number,z:number,m:THREE.Material=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
   // The pad and graded transition are placed against the existing terrain by
   // placeConcentrator. Avoid a second oversized slab beneath the whole campus:
   // it reads as a floating platform and hides the surrounding ground texture.

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 /** Mechanical detail for the illustrative 400 × 280 local-unit plant campus. */
-export function addPlantDetail(root: THREE.Group, materials: Record<string, THREE.MeshStandardMaterial>) {
+export function addPlantDetail(root: THREE.Group, materials: Record<string, THREE.Material>) {
   const steel = materials.steel, accent = materials.copper, dark = materials.roof;
   const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number, name: string) => {
     const object = new THREE.Mesh(geometry, material);

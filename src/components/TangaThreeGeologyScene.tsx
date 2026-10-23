@@ -1114,10 +1114,8 @@ function buildMiniPlant(options: {
     emissive: new THREE.Color(accent),
     emissiveIntensity: 0.22,
   });
-  const padMaterial = new THREE.MeshStandardMaterial({
+  const padMaterial = new THREE.MeshLambertMaterial({
     color: 0x4a4238,
-    roughness: 0.95,
-    metalness: 0,
   });
 
   // Pad the plant stands on, so it reads as sited rather than dropped.
@@ -3915,12 +3913,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (!gradeBlocks.length || mode === 'mine_planning') return;
 
           const blockColor = new THREE.Color(bin.color);
-          const blockMaterial = new THREE.MeshStandardMaterial({
+          // Grade is evidence, so keep the legend colour stable as the camera
+          // moves. StandardMaterial's view-dependent specular/environment
+          // response made category colours pulse across different angles.
+          const blockMaterial = new THREE.MeshLambertMaterial({
             color: blockColor,
             emissive: blockColor.clone().multiplyScalar(0.2),
             emissiveIntensity: bin.key === 'very-high' ? 0.36 : 0.18,
-            roughness: 0.28,
-            metalness: 0.18,
             transparent: true,
             opacity: bin.key === 'trace' ? 0.42 : focusOpacity,
             depthWrite: true,
@@ -4665,7 +4664,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const at=routePosition(item.points,(returning?2-phase:phase)*item.length);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
-      targetMeshes.forEach(mesh=>{mesh.visible=(!facilityFocused||beat<3)&&beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat>=2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
+      // Keep the grade-target patches in the two beats that explain them.
+      // Leaving them over the processing/site overview made the default mine
+      // scene read as bright speckled terrain and competed with the facilities.
+      targetMeshes.forEach(mesh=>{mesh.visible=beat>=1&&beat<=2&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat===2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;m.transparent=true;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5);m.opacity=(presentationOptions.current.targetXray ? .45 : 1)*reveal*layerSettingsRef.current.context.opacity;m.depthWrite=!presentationOptions.current.targetXray;});
       pitRamps.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=(presentationOptions.current.targetXray?.82:1)*reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
       if (processPlant && processMarker) {
