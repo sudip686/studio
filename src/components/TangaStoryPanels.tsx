@@ -120,8 +120,13 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
   if (chapter === 'mine_planning') return <aside className="tanga-story-panel tanga-story-panel--concept" aria-label="Concept and terrain comparison">
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
     <h2>{developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
-    <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Follow PaulSam’s uphill feed point and lowland plant candidate, then explore the illustrative waste and water systems.'}</p>
+    <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
     <span className="tanga-site-concept-tag">Proposed site · illustrative facilities</span>
+    <div className="tanga-site-status-key" role="group" aria-label="Site feature evidence status">
+      <span><i data-status="report"/>Report candidate</span>
+      <span><i data-status="approximate"/>Approx. map trace</span>
+      <span><i data-status="illustrative"/>Illustrative</span>
+    </div>
     <select className="tanga-development-select" aria-label="Mine site view" value={developmentViewId ?? 'overview'} onChange={event=>onInspectDevelopment?.(event.target.value as DevelopmentView)}>{(developmentViewId==='north-pit'||developmentViewId==='south-pit')&&<option value={developmentViewId} disabled>{developmentViewId==='north-pit'?'North pit':'South pit'}</option>}{DEVELOPMENT_FACILITIES.map(view=><option key={view.id} value={view.id} disabled={!developmentAvailable(view.id)}>{view.label}</option>)}</select>
     <div className="tanga-site-orientation" role="group" aria-label="Site camera view">
       <button type="button" disabled={!onSiteOrientation} onClick={()=>onSiteOrientation?.('plan')}>North-up plan</button>

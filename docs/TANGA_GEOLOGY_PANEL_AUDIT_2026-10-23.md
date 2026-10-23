@@ -40,6 +40,14 @@ After captures: `.playwright-mcp/geology-panels-final-{plan,relief,depth}-select
 
 This audit covers desktop geology and the related shared utility popups. Phone/tablet redesign, other chapter compositions, frame-time budgets and hosted deployment acceptance remain in the main checklist.
 
+## Current desktop spot check
+
+23 October 2026 · local development build · interpreted-depth stage with Graphitic schist selected.
+
+- Rechecked the latest layout at 1366×768 and 1707×842. The geology rail and right story panel occupy separate sides of the viewport; the story evidence body scrolls independently while the interpretation action remains in its fixed footer.
+- Confirmed the preceding drilling chapter's matched typography/panel treatment remains applied. This focused check found no panel collision and no browser JavaScript errors; it does not replace the full stage-and-popup matrix above.
+- Captures: `.playwright-mcp/geology-latest-1366x768-review.png` and `.playwright-mcp/geology-latest-1707x842-review.png`.
+
 ## Follow-up: match the preceding chapter's control treatment
 
 23 October 2026 · desktop local development browser · latest visual polish request.
