@@ -1310,3 +1310,10 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
  .tanga-surface-control{top:232px}
  .tanga-deck[data-mode="mine_planning"] .tanga-deck__planning-note{top:232px}
 }
+
+/* Keep the resource viewer's two primary controls in a single, non-overlapping row. */
+@media(max-width:700px){
+ .tanga-deck .tanga-three__camera-tools{left:24px;width:190px;}
+ .tanga-deck .tanga-three__camera-tools button{min-width:0;padding:5px 4px;font-size:9px;}
+ .tanga-deck .tanga-surface-control{left:auto;right:12px;width:156px;}
+}

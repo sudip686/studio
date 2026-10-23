@@ -13872,7 +13872,8 @@ button.tanga-deck__pager-count {
 .tanga-deck:has(.tanga-evidence-replay) [aria-label="Deck navigation"]{visibility:hidden;pointer-events:none;}
 .tanga-evidence-replay strong{color:#74d4ca;}.tanga-evidence-replay span{font-size:11px;}
 .tanga-evidence-replay button{padding:6px;border:1px solid #698b98;border-radius:5px;font-size:11px;}
-.tanga-evidence-replay-start{top:auto;bottom:108px;}
+.tanga-evidence-replay-start{top:148px;left:24px;bottom:auto;transform:none;min-height:42px;}
+@media(max-width:700px){.tanga-evidence-replay-start{top:148px;left:12px;right:12px;width:max-content;max-width:calc(100% - 24px);min-height:44px;}}
 
 /* Presentation polish: keep the evidence canvas dominant, without removing controls. */
 .tanga-deck { --hud-border: #78919d45; --hud-surface: #11202aed; }
