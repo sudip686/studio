@@ -17,7 +17,7 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
   const eyebrow=['01 / MAPPED SURFACE','02 / TERRAIN RELIEF','03 / INTERPRETED DEPTH'][step] ?? stages[0];
   const headings=['Map the rock units','Read the terrain relief','Reveal the interpreted depth'][step] ?? 'Map the rock units';
   const intros=[
-    'The source-map units are draped onto the real terrain. Select a colour to isolate a mapped class and inspect its evidence basis.',
+    'Source-map units draw onto the real terrain in place. Select a colour to isolate a class and inspect its evidence basis.',
     'Tilt the same mapped surface to read its relationship to the land. Surface polygons do not encode dip, thickness or depth.',
     'The surface fades as the separate interpreted geological model appears. Matching colours indicate named units only where the model labels resolve.',
   ];

@@ -18,7 +18,7 @@ import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-camp
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import MetallurgyVisualStory from './MetallurgyProcessExhibit';
-import {modelRockUnit} from '@/lib/deck/geology-palette';
+import {MAPPED_SURFACE_UNITS,modelRockUnit} from '@/lib/deck/geology-palette';
 import GeologyCrossSections from './GeologyCrossSections';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
 import {assetUrl} from '@/lib/asset-url';
@@ -2332,6 +2332,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let sitePlanView = false;
     let geologyDepthBlend = 1;
     let geologyBlendTime = 0;
+    let geologyMapRevealStartedAt = -Infinity;
     let geologySurface:THREE.Group|null=null;
     let geologySurfaceOpacity=0;
     let geologySectionLocator:THREE.Group|null=null;
@@ -2587,6 +2588,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'geologyPlan' && mode === 'subsurface') {
         geologyPlan = true; geologyOblique = false; geologyDepthBlend=0; scene.fog = null;
+        // Reveal each source-map class in place over the terrain. This is a
+        // short cartographic emphasis only: vertices and registration never
+        // move, and the usual layer/selection controls remain authoritative.
+        geologyMapRevealStartedAt=motionTime;
         cameraTween = null;
         userTookControl = true;
         controls.enableRotate = false; controls.minPolarAngle = 0; controls.maxPolarAngle = 0;
@@ -3411,6 +3416,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if(cancelled)return;
             const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,(x,z)=>terrainSurfaceY(terrainResources,x,-z),{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
             geologySurface=mapped.group;tagDeckLayer(geologySurface,'context');stage.add(geologySurface);
+            // The camera command can finish while the polygon asset is still
+            // loading. Start the reveal when the registered surface actually
+            // enters the scene so every class is visible in sequence.
+            if(mode==='subsurface')geologyMapRevealStartedAt=motionTime;
             geologySurface.children.forEach(mesh=>pickables.push(mesh));
             if(!mapped.bounds.isEmpty()) {mapped.bounds.getCenter(geologyPlanTarget);mapped.bounds.getSize(geologyPlanExtent);}
             host.dataset.geologySurfaceUnits=String(mapped.group.children.length);
@@ -4647,15 +4656,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,geologyBlendAlpha);
         geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.geology.visible;
         const hiddenUnits=new Set(hiddenGeologyUnitsRef.current);
+        const geologyMapRevealAge=Math.max(0,motionTime-geologyMapRevealStartedAt);
+        let geologyMapRevealProgress=1;
         geologySurface.children.forEach(object=>{
           const unitName=String(object.userData.geologicUnit??object.name.replace(/ · (?:mapped boundary|boundary keyline)$/,''));
           const visible=!hiddenUnits.has(unitName);
           object.visible=visible;
+          const unitIndex=Math.max(0,MAPPED_SURFACE_UNITS.findIndex(unit=>unit.label===unitName));
+          const revealProgress=geologyMapRevealStartedAt===-Infinity||reducedMotion.matches?1:THREE.MathUtils.smoothstep(geologyMapRevealAge-unitIndex*0.17,0,0.38);
+          geologyMapRevealProgress=Math.min(geologyMapRevealProgress,revealProgress);
           const selectionOpacity=selectedGeologyUnitRef.current&&unitName!==selectedGeologyUnitRef.current ? .28 : 1;
-          const classOpacity=Number(object.userData.surfaceOpacityScale??1);
+          const classOpacity=Number(object.userData.surfaceOpacityScale??1)*revealProgress;
           if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity*classOpacity;
           else if(object instanceof THREE.LineSegments&&object.material instanceof THREE.LineBasicMaterial)object.material.opacity=.34*geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity*classOpacity;
         });
+        host.dataset.geologyMapRevealProgress=geologyMapRevealProgress.toFixed(2);
       }
       const mappedSurface = geologyPlan || geologyOblique;
       geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);
