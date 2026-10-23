@@ -21,9 +21,13 @@ export function buildConcentrator() {
   // The pad and graded transition are placed against the existing terrain by
   // placeConcentrator. Avoid a second oversized slab beneath the whole campus:
   // it reads as a floating platform and hides the surrounding ground texture.
-  // Keep the pad top at local y=0 so shed walls and equipment bases meet the
-  // graded site datum. The former centre at y=0 buried every wall base by 1.5 m.
-  box(400,3,280,0,-1.5,0,materials.concrete,'Plant pad');
+  // Keep the equipment bases on the graded site datum. The former slab centre
+  // at y=0 buried every wall base by 1.5 m.
+  // Lift the pad top a few decimetres above its concept-graded terrain datum.
+  // The terrain is flattened to exactly `pad.level` inside the footprint; a
+  // coplanar slab top caused depth-buffer z-fighting (color shimmer) while the
+  // camera orbited. Footings still begin at y=0 and overlap the slab cleanly.
+  box(400,3,280,0,-1.15,0,materials.concrete,'Plant pad');
   // A perimeter service lane and drainage edge make the pad read as a site.
   box(392,.15,7,0,.1,135,materials.roof,'Conceptual service lane');
   box(392,.15,5,0,.1,-135,materials.roof,'Service lane');

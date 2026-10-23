@@ -4288,7 +4288,7 @@ export default function TangaDeckWorkbench() {
     return point;
   }, [mapInstance, mapCameraTick, stageSize.width, stageSize.height]);
   const projectedSceneCallouts = useMemo<ProjectedSceneCallout[]>(() => {
-    return sceneCallouts.map((callout) => {
+    const projected = sceneCallouts.map((callout) => {
       const boxPixelX = stageSize.width * callout.boxX / 100;
       const boxPixelY = stageSize.height * callout.boxY / 100;
       let anchorPixelX: number | null = null;
@@ -4319,7 +4319,59 @@ export default function TangaDeckWorkbench() {
         anchorPixelY,
       };
     }).filter(callout => !callout.anchor || callout.anchorPixelX !== null);
-  }, [projectMapAnchor, sceneCallouts, stageSize.height, stageSize.width, viewState.bearing, viewState.latitude, viewState.longitude, viewState.pitch, viewState.zoom]);
+
+    const anchored = projected.filter((callout) => callout.anchor && callout.anchorPixelX !== null && callout.anchorPixelY !== null);
+    if (!anchored.length) return projected;
+
+    // Map callout leaders follow WGS84 anchors as the viewer pans and zooms.
+    // Place each box beside its current anchor, avoiding live UI panels, so a
+    // fixed percentage slot cannot leave a long leader across the map.
+    const mapBounds = mapInstance?.getContainer().getBoundingClientRect();
+    const keepOutRects: Rect[] = [];
+    if (mapBounds && typeof document !== 'undefined') {
+      const panelSelector = [
+        '.tanga-deck__chapter-title', '.tanga-deck__explore-toggle', '.tanga-deck__data-panel',
+        '.tanga-deck__layers', '.tanga-story-panel', '.tanga-geology-surface-legend',
+        '.tanga-deck__pager', '.tanga-evidence-sequence', '.tanga-deck__planning-note',
+      ].join(',');
+      document.querySelectorAll<HTMLElement>(panelSelector).forEach((element) => {
+        if (element.closest('.tanga-deck') !== stageRef.current) return;
+        const rect = element.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return;
+        const x = rect.left - mapBounds.left, y = rect.top - mapBounds.top;
+        const left = Math.max(0, x), top = Math.max(0, y);
+        const right = Math.min(stageSize.width, x + rect.width), bottom = Math.min(stageSize.height, y + rect.height);
+        if (right > left && bottom > top) keepOutRects.push({x:left,y:top,width:right-left,height:bottom-top});
+      });
+    }
+    // Keep a predictable safe frame even during the short interval before the
+    // overlay panels have mounted or returned measurable bounds.
+    keepOutRects.push(
+      {x:0,y:0,width:stageSize.width,height:145},
+      {x:0,y:stageSize.height-132,width:stageSize.width,height:132},
+    );
+    const primaryIds = new Set(['project','aoi','relief','route','comparison']);
+    const candidates = anchored.map((callout, index) => ({
+      id: callout.id,
+      anchorPx: {x:callout.anchorPixelX!,y:callout.anchorPixelY!},
+      width:224,
+      height:94,
+      priority: primaryIds.has(callout.id) ? 1000 : callout.id.startsWith('power-') ? 600-index : 400-index,
+    }));
+    const placements = placeLabels(candidates, stageSize, {
+      padding:12,
+      maxVisible:4,
+      keepOutRects,
+      offsetDistances:[18,36,58,88,124,164],
+    }).placed;
+    const placementById = new globalThis.Map(placements.map((placement) => [placement.id, placement]));
+    return projected.flatMap((callout) => {
+      if (!callout.anchor) return [callout];
+      const placement = placementById.get(callout.id);
+      if (!placement) return [];
+      return [{...callout,boxPixelX:placement.boxPx.x,boxPixelY:placement.boxPx.y,side:placement.side}];
+    });
+  }, [mapInstance, projectMapAnchor, sceneCallouts, stageSize.height, stageSize.width, viewState.bearing, viewState.latitude, viewState.longitude, viewState.pitch, viewState.zoom]);
 
   // ── Pinned map labels ──────────────────────────────────────────────────────
   // The map's place labels (licence, marker, mine facilities, villages, power,
@@ -5492,6 +5544,7 @@ export default function TangaDeckWorkbench() {
             {projectedSceneCallouts.map((callout) => callout.anchorPixelX !== null && callout.anchorPixelY !== null && (
               <g key={`leader-${callout.id}`}>
                 <line
+                  data-callout-leader={callout.id}
                   x1={callout.anchorPixelX}
                   y1={callout.anchorPixelY}
                   x2={callout.boxPixelX}
@@ -5499,6 +5552,7 @@ export default function TangaDeckWorkbench() {
                   style={{color: callout.tone, stroke: callout.tone}}
                 />
                 <circle
+                  data-callout-anchor={callout.id}
                   cx={callout.anchorPixelX}
                   cy={callout.anchorPixelY}
                   r="4"
@@ -5510,6 +5564,8 @@ export default function TangaDeckWorkbench() {
           {projectedSceneCallouts.map((callout, index) => (
             <div
               key={callout.id}
+              data-callout-id={callout.id}
+              data-anchor-space={callout.anchor ? 'EPSG:4326' : 'screen'}
               className={classNames('tanga-deck__callout', `is-${callout.side ?? 'right'}`)}
               style={{
                 '--callout-x': `${callout.boxPixelX}px`,

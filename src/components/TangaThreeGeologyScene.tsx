@@ -4065,8 +4065,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             // slightly toward the camera to prevent depth-buffer shimmer as
             // OrbitControls changes the view angle and zoom.
             polygonOffset: true,
-            polygonOffsetFactor: -1,
-            polygonOffsetUnits: -1,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
             fog: false,
             depthWrite: false,
             depthTest: true,
