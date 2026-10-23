@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {batchPlantMeshes} from './mine-plant-detail';
+import {createConceptPad, conceptPadHeight, type ConceptPad} from './mine-scene';
 import {overlaps,rectangle,type Point2,type CandidatePit} from './site-planning';
 
 /** Screen a nearby proposed apron and connection against current concept pits.
@@ -36,10 +37,14 @@ export function buildDevelopmentInfrastructure(feed: [number,number], discharge:
     const object=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);object.position.set(x,y,z);object.name=name;object.castShadow=true;object.receiveShadow=true;root.add(object);return object;
   };
   const [fx,fz]=feed;
-  const sampled:number[]=[];
-  for(let x=-75;x<=75;x+=5)for(let z=-50;z<=50;z+=5)sampled.push(height(fx+x,fz+z));
-  const low=Math.min(...sampled),level=Math.max(...sampled)+1;
-  box(150,level-low+2,100,fx,(level+low)/2-1,fz,concrete,'Feed point platform · illustrative 15000 m²');
+  const feedPad:ConceptPad=createConceptPad(fx,fz,150,100,height);
+  const level=feedPad.level;
+  root.userData.conceptPad=feedPad;
+  const padGround=(x:number,z:number)=>conceptPadHeight(feedPad,x,z,height(x,z));
+  // The terrain is graded to this median datum by the scene builder. Keep a
+  // thin hardstand above it instead of a deep rectangular slab down to the
+  // lowest sampled cell, which read as a floating concrete plinth.
+  box(150,2,100,fx,level,fz,concrete,'Feed point hardstand · illustrative 15000 m²');
   box(30,10,50,fx-45,level+5,fz,roof,'Feed point operatives shed · report allowance 30 × 50 m');
   for(const sign of [-1,1]){
     const panel=box(Math.hypot(15,3),.5,52,fx-45+sign*7.5,level+11.5,fz,steel,'Feed shed pitched roof');
@@ -58,7 +63,7 @@ export function buildDevelopmentInfrastructure(feed: [number,number], discharge:
   const count=60,points:THREE.Vector3[]=[];
   for(let i=0;i<=count;i++){
     const p=start.clone().lerp(end,i/count);
-    p.y=i===0?start.y:i===count?end.y:height(p.x,p.z)+10;
+    p.y=i===0?start.y:i===count?end.y:padGround(p.x,p.z)+10;
     points.push(p);
     if(i%2===0){
       const ground=height(p.x,p.z),h=p.y-ground;

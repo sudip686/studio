@@ -173,15 +173,20 @@ export function conceptPadHeight(pad:ConceptPad,x:number,z:number,sourceHeight:n
   const blend=padBlend(pad,x,z);return sourceHeight*(1-blend)+pad.level*blend;
 }
 
+/** Build a display-only, terrain-conforming facility pad at a stable median datum. */
+export function createConceptPad(x:number,z:number,width:number,depth:number,height:(x:number,z:number)=>number,transition=30):ConceptPad {
+  const levels:number[]=[];
+  for(let dx=-width/2;dx<=width/2;dx+=5)for(let dz=-depth/2;dz<=depth/2;dz+=5)levels.push(height(x+dx,z+dz));
+  levels.sort((a,b)=>a-b);
+  return {x,z,width,depth,level:levels[Math.floor(levels.length/2)]+1.5,transition};
+}
+
 /** An illustrative cut/fill display, never an engineered earthworks design.
  * Median ground level avoids a tall plinth perched above the entire hillside. */
 export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:number,z:number)=>number,footprint?:{width:number;depth:number}) {
   const width=footprint?.width??CONCEPT.plantWidth,depth=footprint?.depth??CONCEPT.plantDepth;
-  const levels:number[]=[];
-  for(let dx=-width/2;dx<=width/2;dx+=5)for(let dz=-depth/2;dz<=depth/2;dz+=5)levels.push(height(x+dx,z+dz));
-  levels.sort((a,b)=>a-b);
-  const level=levels[Math.floor(levels.length/2)]+1.5;
-  const pad:ConceptPad={x,z,width,depth,level,transition:30};
+  const pad=createConceptPad(x,z,width,depth,height);
+  const {level}=pad;
   root.userData.conceptPad=pad;
   const vertices:number[]=[],earthworkColors:number[]=[];
   const ring=(distance:number)=>[[-width/2-distance,-depth/2-distance],[width/2+distance,-depth/2-distance],[width/2+distance,depth/2+distance],[-width/2-distance,depth/2+distance]];

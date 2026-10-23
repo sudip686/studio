@@ -4162,6 +4162,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const feed=apron.point;
             const siteHeight=(px:number,pz:number)=>conceptPadHeight(plant.userData.conceptPad as ConceptPad,px,pz,terrainSurfaceY(terrainResources,px,-pz));
             developmentInfrastructure=buildDevelopmentInfrastructure(feed,[x,z],siteHeight,level);
+            const feedPad=developmentInfrastructure.userData.conceptPad as ConceptPad|undefined;
+            if(feedPad)for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,feedPad);
             tagDeckLayer(developmentInfrastructure,'context');stage.add(developmentInfrastructure);
             feedAnchor=new THREE.Vector3(...(developmentInfrastructure.userData.feedAnchor as [number,number,number]));
             const transferPath=developmentInfrastructure.userData.flow as THREE.Vector3[];
