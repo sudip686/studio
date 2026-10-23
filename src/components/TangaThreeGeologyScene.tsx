@@ -10,7 +10,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import proj4 from 'proj4';
 import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
 import {buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
@@ -2347,6 +2347,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let plantDetailKey='';
     const targetMeshes: THREE.InstancedMesh<THREE.BoxGeometry,THREE.MeshBasicMaterial>[]=[];
     const pitSurfaces:THREE.Mesh[]=[];
+    const pitRamps:THREE.Mesh[]=[];
     const revealBlocks:THREE.InstancedMesh[]=[];
     const geologyMeshes:THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>[]=[];
     let separation=0;
@@ -4035,11 +4036,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             mesh.instanceMatrix.needsUpdate=true;tagDeckLayer(mesh,'blocks');stage.add(mesh);targetMeshes.push(mesh);
           }
           for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePit(mesh.geometry, sitePlan.pits);
+          sitePlan.audit.push('Internal pit access ribbons are display-only concepts; no engineered alignment or checked gradient was supplied');
           for (const pit of sitePlan.pits) {
             const mesh = buildPitSurface(pit, (x, z) => terrainSurfaceY(terrainResources, x, -z));
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
             pitSurfaces.push(mesh);
+            const ramp=buildConceptualPitRamp(pit);
+            tagDeckLayer(ramp,'context');
+            stage.add(ramp);
+            pitRamps.push(ramp);
           }
           if (sitePlan.plant) {
             const plant = buildConcentrator();
@@ -4132,9 +4138,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         let parent:THREE.Object3D|null=object,plantPart=false;
         while(parent){if(parent.name==='conceptual-concentrator')plantPart=true;parent=parent.parent;}
         const pit=object.name==='Terraced conceptual excavation';
+        const ramp=object.name.startsWith('Illustrative internal pit access ramp');
         const target=object.name.startsWith('Target blocks');
-        if(!plantPart&&!pit&&!target)return;
-        object.userData.tooltipItems=[{title:object.name||(plantPart?'Processing plant equipment':'Mining concept'),rows:[target?'Above-threshold model cells explain the target; not ore reserves.':pit?'Conceptual benched pit envelope; not an optimised or engineered excavation.':'Illustrative concentrator equipment; dimensions and capacity are conceptual.'],tone:'#dfa066'}];
+        if(!plantPart&&!pit&&!ramp&&!target)return;
+        object.userData.tooltipItems=[{title:object.name||(plantPart?'Processing plant equipment':'Mining concept'),rows:[target?'Above-threshold model cells explain the target; not ore reserves.':ramp?'Display-only circulation path inside the candidate shell; not a designed haul road or checked gradient.':pit?'Conceptual benched pit envelope; not an optimised or engineered excavation.':'Illustrative concentrator equipment; dimensions and capacity are conceptual.'],tone:'#dfa066'}];
         pickables.push(object);
       });
       if(mode==='mine_planning'){
@@ -4597,6 +4604,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       targetMeshes.forEach(mesh=>{mesh.visible=(!facilityFocused||beat<3)&&beat>=1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat>=2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;m.transparent=true;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5);m.opacity=(presentationOptions.current.targetXray ? .45 : 1)*reveal*layerSettingsRef.current.context.opacity;m.depthWrite=!presentationOptions.current.targetXray;});
+      pitRamps.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=(presentationOptions.current.targetXray?.82:1)*reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
       if (processPlant && processMarker) {
         const points = processPlant.userData.flow as THREE.Vector3[];
         const phase = (motionTime / 3) % (points.length - 1), index = Math.floor(phase);
@@ -4788,7 +4796,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const radius=Math.round(clamp(camera.position.distanceTo(controls.target)*.65,350,4200)/25)*25;
         if(radius!==mineShadowRadius){mineShadowRadius=radius;key.shadow.camera.left=-radius;key.shadow.camera.right=radius;key.shadow.camera.top=radius;key.shadow.camera.bottom=-radius;key.shadow.camera.updateProjectionMatrix();}
         key.shadow.normalBias=facilityFocused ? .15 : .6;
-        const shadowKey=[controls.target.x.toFixed(1),controls.target.y.toFixed(1),controls.target.z.toFixed(1),radius,stage.rotation.x.toFixed(3),stage.rotation.y.toFixed(3),stage.children.length,beat,facilityFocused,plantDetailKey,processPlant?.visible,siteCampus?.visible,pitSurfaces[0]?.visible].join(':');
+        const shadowKey=[controls.target.x.toFixed(1),controls.target.y.toFixed(1),controls.target.z.toFixed(1),radius,stage.rotation.x.toFixed(3),stage.rotation.y.toFixed(3),stage.children.length,beat,facilityFocused,plantDetailKey,processPlant?.visible,siteCampus?.visible,pitSurfaces[0]?.visible,pitRamps[0]?.visible].join(':');
         if(shadowKey!==lastMineShadowKey){lastMineShadowKey=shadowKey;renderer.shadowMap.needsUpdate=true;}
 
       }

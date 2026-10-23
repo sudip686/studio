@@ -299,3 +299,63 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();
   const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x70675d,vertexColors:true,envMapIntensity:0.15,roughness:1,side:THREE.DoubleSide}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
 }
+
+/**
+ * A display-only access ribbon inside a candidate pit envelope. This is not a
+ * sourced alignment, engineered haul road, or geotechnically checked grade.
+ */
+export function buildConceptualPitRamp(pit:CandidatePit) {
+  const centre=pit.centre;
+  const radiusAt=(angle:number)=>{
+    const direction:Point2=[Math.cos(angle),Math.sin(angle)];
+    let nearest=Infinity;
+    for(let i=0;i<pit.ring.length;i++){
+      const a=pit.ring[i],b=pit.ring[(i+1)%pit.ring.length];
+      const edge:Point2=[b[0]-a[0],b[1]-a[1]],relative:Point2=[a[0]-centre[0],a[1]-centre[1]];
+      const denominator=direction[0]*edge[1]-direction[1]*edge[0];
+      if(Math.abs(denominator)<1e-8)continue;
+      const distance=(relative[0]*edge[1]-relative[1]*edge[0])/denominator;
+      const along=(relative[0]*direction[1]-relative[1]*direction[0])/denominator;
+      if(distance>0&&along>=-1e-7&&along<=1+1e-7)nearest=Math.min(nearest,distance);
+    }
+    return nearest;
+  };
+  const meanRadius=pit.ring.reduce((sum,point)=>sum+Math.hypot(point[0]-centre[0],point[1]-centre[1]),0)/pit.ring.length;
+  const emptyRamp=()=>{
+    const mesh=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial());
+    mesh.name='Illustrative internal pit access ramp · not engineered';mesh.visible=false;return mesh;
+  };
+  if(!Number.isFinite(meanRadius)||meanRadius<24||pit.depth<=0)return emptyRamp();
+  const turns=Math.min(5,Math.max(1,pit.depth/(.095*Math.PI*2*meanRadius*.58)));
+  const steps=Math.max(160,Math.ceil(turns*128)),halfWidth=Math.max(5,Math.min(7,CONCEPT.berm*1.05));
+  const path:THREE.Vector3[]=[];
+  for(let i=0;i<=steps;i++){
+    const t=i/steps,angle=-Math.PI/2+t*turns*Math.PI*2,outerRadius=radiusAt(angle);
+    if(!Number.isFinite(outerRadius))continue;
+    const radial=outerRadius*(.92-.58*t),x=centre[0]+Math.cos(angle)*radial,z=centre[1]+Math.sin(angle)*radial;
+    const ground=pitHeight([x,z],pit)??pit.floor,designY=pit.surface-t*pit.depth*.96;
+    path.push(new THREE.Vector3(x,Math.max(ground+1.25,designY),z));
+  }
+  if(path.length<2)return emptyRamp();
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[];
+  const shoulder=new THREE.Color(0x48453e),runningSurface=new THREE.Color(0x625a4c);
+  for(let i=0;i<path.length;i++){
+    const before=path[Math.max(0,i-1)],after=path[Math.min(path.length-1,i+1)];
+    const tangent=new THREE.Vector2(after.x-before.x,after.z-before.z).normalize();
+    const normal=new THREE.Vector2(-tangent.y,tangent.x),point=path[i];
+    for(const side of [-1,1]){
+      const tone=side===-1?shoulder:runningSurface;
+      positions.push(point.x+normal.x*halfWidth*side,point.y+.22,point.z+normal.y*halfWidth*side);
+      colors.push(tone.r,tone.g,tone.b);
+    }
+    if(i<path.length-1){const a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,c,b,b,c,d);}
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
+  const ramp=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,metalness:0,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2}));
+  ramp.name='Illustrative internal pit access ramp · not engineered';
+  ramp.renderOrder=41;ramp.castShadow=true;ramp.receiveShadow=true;
+  return ramp;
+}
