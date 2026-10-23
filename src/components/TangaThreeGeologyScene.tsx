@@ -827,6 +827,20 @@ function materialsForObject(object: THREE.Object3D) {
   return Array.from(materials);
 }
 
+/** Keep flat, evidence-coded colors independent of camera-distance haze. */
+function lockUnlitSceneColors(scene: THREE.Scene) {
+  scene.traverse((object) => {
+    const materialOwner = object as THREE.Object3D & {material?: THREE.Material | THREE.Material[]};
+    for (const material of materialList(materialOwner.material)) {
+      if (material instanceof THREE.MeshBasicMaterial
+        || material instanceof THREE.LineBasicMaterial
+        || material instanceof THREE.SpriteMaterial) {
+        material.fog = false;
+      }
+    }
+  });
+}
+
 /**
  * How opaque the ground is for a given scene and camera position.
  *
@@ -2337,7 +2351,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let geologySectionLocator:THREE.Group|null=null;
     const geologyPlanTarget=new THREE.Vector3();
     let geologyModelReady = false;
-    let recoverPlanFog = false;
     const geologyPlanExtent = new THREE.Vector3(2500, 0, 5000);
     const planProjection = new THREE.OrthographicCamera();
     let processMarker: THREE.Mesh | null = null;
@@ -2542,10 +2555,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const leaveGeologyPlan = (quiet = false) => {
       if (!geologyPlan) return;
       geologyPlan = false; scene.fog = authoredFog; controls.enableRotate = true;
-      const departureDistance = camera.position.distanceTo(controls.target);
-      authoredFog.near = Math.max(4600, departureDistance * 1.1);
-      authoredFog.far = Math.max(12000, departureDistance * 2);
-      recoverPlanFog = true;
       controls.minPolarAngle = .04; controls.maxPolarAngle = Math.PI - .04;
       controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; controls.touches.ONE = THREE.TOUCH.ROTATE;
       camera.updateProjectionMatrix();
@@ -4610,6 +4619,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // once construction is done — a scene rebuilt mid-presentation must come
     // back with whatever the presenter had switched off.
     applyDeckLayers(stage, layerSettingsRef.current);
+    // Flat grade, geology, assay and facility colors encode evidence. Fogging
+    // these materials based on camera distance made their hues pulse as the
+    // viewer orbited or zoomed. Keep the atmospheric fade for shaded terrain
+    // and structures, while preserving flat color keys across every chapter.
+    lockUnlitSceneColors(scene);
     projectCalloutsRef.current = projectCallouts;
     projectCallouts();
     updateNavInstruments();
@@ -4852,11 +4866,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=Boolean(selected)&&selected===mesh.name;const hasSelection=Boolean(selected);mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(hasSelection&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
       }
 
-      if (recoverPlanFog && !geologyPlan) {
-        authoredFog.near = THREE.MathUtils.lerp(authoredFog.near, 4600, .04);
-        authoredFog.far = THREE.MathUtils.lerp(authoredFog.far, 12000, .04);
-        if (authoredFog.far - 12000 < 1) {authoredFog.near = 4600; authoredFog.far = 12000; recoverPlanFog = false;}
-      }
       if (geologyPlan) {
         // Use a real parallel projection while retaining OrbitControls' existing
         // dolly/pan distances. Its perspective pan span equals this ortho span.
@@ -4918,13 +4927,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         }
       }
       if(terrainSurfaceMaterials[0])host.dataset.surfaceOpacity=terrainSurfaceMaterials[0].opacity.toFixed(3);
-      // Portrait framing can place the entire deposit beyond a fixed fog range.
-      // Keep the camera focus clear, including direct jumps into model depth.
-      if(scene.fog===authoredFog){
-        const focusDistance=camera.position.distanceTo(controls.target);
-        authoredFog.near=Math.max(4600,focusDistance*1.15);
-        authoredFog.far=Math.max(12000,focusDistance*2.2);
-      }
       if (!wasContextLost && mode === 'mine_planning' && terrainCompareRef.current.enabled && terrainMeshes.some(mesh => mesh.geometry.userData.sourcePositions && mesh.geometry.userData.conceptPositions)) {
         const split = THREE.MathUtils.clamp(terrainCompareRef.current.split, 8, 92) / 100;
         const conceptSurfaceVisible = layerSettingsRef.current.context.visible;
