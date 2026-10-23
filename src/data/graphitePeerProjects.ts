@@ -23,19 +23,74 @@ export type GraphitePeerEvidence = {
   dateLabel: string;
   href: string;
   sourceLabel: string;
+  benchmarkHref?: string;
 };
 
 const PUBLISHED_BENCHMARK_HREF = 'https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/';
 const EPANKO_MRE_HREF = 'https://www.ecograf.com.au/wp-content/uploads/2024/03/06_EGR_ASX_127-Increase-in-MRE_11-March-2024.pdf';
 const TANGA_MRE_HREF = '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf';
 
+const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmarkHref'>> = {
+  'Balama North / Nicanda Hill': {
+    dateLabel: 'Primary MRE · September 2016 · 41.5 Mt Indicated',
+    href: 'https://announcements.asx.com.au/asxpdf/20161024/pdf/43c81t8hnq20t0.pdf',
+    sourceLabel: 'Nicanda Hill 2016 MRE',
+  },
+  Sarytogan: {
+    dateLabel: '2023 MRE · approximately 36 Mt Indicated contained',
+    href: 'https://announcements.asx.com.au/asxpdf/20230426/pdf/45p05z8s36gslx.pdf',
+    sourceLabel: 'Sarytogan 2023 MRE',
+  },
+  'Lac Gueret': {
+    dateLabel: 'December 2022 MRE · 11.30 Mt Measured + Indicated contained',
+    href: 'https://www.sec.gov/Archives/edgar/data/1649752/000110465923036286/nmg-20221231xex99d3.htm',
+    sourceLabel: 'Uatnan PEA and resource table',
+  },
+  Mahenge: {
+    dateLabel: 'May 2023 MRE · 9.3 Mt Measured + Indicated contained',
+    href: 'https://announcements.asx.com.au/asxpdf/20230529/pdf/05q3wrk44jy2d7.pdf',
+    sourceLabel: 'Mahenge 2023 MRE',
+  },
+  Siviour: {
+    dateLabel: 'September 2023 MRE · approximately 5.2 Mt Measured + Indicated contained',
+    href: 'https://announcements.asx.com.au/asxpdf/20230914/pdf/05tvyxgwh07zl0.pdf',
+    sourceLabel: 'Siviour September 2023 MRE',
+  },
+  Epanko: {
+    dateLabel: 'Updated MRE · 11 March 2024 · 6.71 Mt Measured + Indicated contained',
+    href: EPANKO_MRE_HREF,
+    sourceLabel: 'Epanko 2024 MRE',
+  },
+  'La Loutre': {
+    dateLabel: '2023 MRE · 2.969 Mt Indicated contained',
+    href: 'https://lomiko.com/wp-content/uploads/2023/05/43-101-MRE2023-Lomiko-La-Loutre.pdf',
+    sourceLabel: 'La Loutre 2023 MRE',
+  },
+  Malingunde: {
+    dateLabel: 'Resource statement · 30 June 2023 · 2.73 Mt Measured + Indicated contained',
+    href: 'https://announcements.asx.com.au/asxpdf/20230921/pdf/05v44zt4y2vxsz.pdf',
+    sourceLabel: 'Malingunde 2023 resource statement',
+  },
+  'Balama Central': {
+    dateLabel: 'Historical MRE · March 2018 · 2.733 Mt Indicated at 6% cut-off',
+    href: 'https://www.tirupatigraphite.co.uk/images/TG%20Company%20Presentation%20Q32023.pdf',
+    sourceLabel: 'Balama Central 2018 MRE summary',
+  },
+  Bunyu: {
+    dateLabel: 'Resource statement · 30 June 2022 · primary M&I check differs from 2.3 Mt benchmark',
+    href: 'https://announcements.asx.com.au/asxpdf/20230927/pdf/05vbgy3sdc39kk.pdf',
+    sourceLabel: 'Bunyu 2022 resource statement',
+  },
+};
+
 /** Trace the estimate used in the selected row without implying a current global census. */
 export function graphitePeerEvidence(project: Pick<GraphitePeerProject, 'project' | 'isTanga'>): GraphitePeerEvidence {
   if (project.isTanga) {
     return {dateLabel: 'Final MRE · 19 Dec 2025', href: TANGA_MRE_HREF, sourceLabel: 'AMC Tanga MRE'};
   }
-  if (project.project === 'Epanko') {
-    return {dateLabel: 'MRE announced · 11 Mar 2024', href: EPANKO_MRE_HREF, sourceLabel: 'EcoGraf ASX release'};
+  const primarySource = PEER_PRIMARY_EVIDENCE[project.project];
+  if (primarySource) {
+    return {...primarySource, benchmarkHref: PUBLISHED_BENCHMARK_HREF};
   }
   return {dateLabel: 'Published benchmark · 7 Nov 2023', href: PUBLISHED_BENCHMARK_HREF, sourceLabel: 'Mining Intelligence / Costmine'};
 }
@@ -254,7 +309,7 @@ export const TANGA_INSERT_PROJECT: GraphitePeerProject = {
   isTanga: true,
 };
 
-function rankByMeasuredIndicatedContainedGraphite(projects: GraphitePeerProject[]) {
+function rankByReportedContainedGraphite(projects: GraphitePeerProject[]) {
   return [...projects].sort((left, right) => {
     const difference = right.containedGraphiteMt - left.containedGraphiteMt;
     if (difference !== 0) return difference;
@@ -263,7 +318,7 @@ function rankByMeasuredIndicatedContainedGraphite(projects: GraphitePeerProject[
 }
 
 export function graphitePeerRows(includeTanga: boolean) {
-  const rankedPeers = rankByMeasuredIndicatedContainedGraphite(GRAPHITE_PEER_PROJECTS);
+  const rankedPeers = rankByReportedContainedGraphite(GRAPHITE_PEER_PROJECTS);
 
   if (!includeTanga) {
     return rankedPeers.map((project, index) => ({
@@ -273,7 +328,7 @@ export function graphitePeerRows(includeTanga: boolean) {
     }));
   }
 
-  const rows = rankByMeasuredIndicatedContainedGraphite([...GRAPHITE_PEER_PROJECTS, TANGA_INSERT_PROJECT]);
+  const rows = rankByReportedContainedGraphite([...GRAPHITE_PEER_PROJECTS, TANGA_INSERT_PROJECT]);
   const tangaIndex = rows.findIndex((project) => project.isTanga);
 
   return rows.map((project, index) => ({
