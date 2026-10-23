@@ -2033,7 +2033,9 @@ function decodeLayerSettings(value: string | null, drillingVisible: boolean): De
     if (!Number.isInteger(opacity) || opacity < 0 || opacity > 100) return null;
     parsed[rawId as DeckLayerId] = {visible: rawVisible === '1', opacity: opacity / 100};
   }
-  if (DECK_LAYERS.some(({id}) => !parsed[id])) return null;
+  // The `geology` layer was added after v1 links shipped. Keep valid earlier
+  // links usable by filling that one new setting from the safe default.
+  if (DECK_LAYERS.some(({id}) => id !== 'geology' && !parsed[id])) return null;
   return {...DEFAULT_LAYER_SETTINGS, ...parsed, drilling: parsed.drilling ?? {...DEFAULT_LAYER_SETTINGS.drilling, visible:drillingVisible}};
 }
 function layerSettingsAreModified(settings: DeckLayerSettings, drillingVisible: boolean) {

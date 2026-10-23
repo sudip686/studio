@@ -83,7 +83,7 @@ Acceptance: no duplicated primary Continue action; no model focal point or selec
 - [ ] Keep source sheet → north-up mapped units → oblique mapped terrain → separate interpreted depth. Show a deliberate transition rather than implying that polygons are physically extruded into the existing model.
 - [ ] Add click/tap selection to the existing hover identification: highlight a unit, dim other units gently, and show its name, swatch, source and interpretation status in the shared inspector.
 - [x] Couple map/model highlighting only for verified unit-name mappings. Keep unmatched units explicitly distinct.
-- [ ] Put map-fill opacity beside the mapped-geology layer; retain terrain opacity as a separate clearly named control. The current two opacities must not be confused.
+- [x] Put map-fill opacity beside the mapped-geology layer; retain terrain opacity as a separate clearly named control. The current two opacities must not be confused.
 - [ ] Include a fixed section view or section-plane interaction only where supported by the existing model. Label orientation and vertical scale; flag any exaggeration.
 - [ ] Add grab-sample markers only if report coordinates or a defensible map registration are available, with sample IDs and provenance.
 
@@ -169,12 +169,15 @@ Start with the measured viewer baseline, one consolidated story/navigation shell
 - [x] Add in-place retry for a failed Three.js scene. Retry remounts the current chapter scene and keeps the presenter in place.
 - [x] Save/restore authored shot, peer selection, mapped geology unit and validated layer visibility/opacity in version 1 links.
 - [x] Let a viewer select a mapped unit from the legend or by pointer selection on the map, see its evidence limits in the story panel, and dim the other polygons. Verified named links highlight only the matching interpreted model units; unmatched names remain separate.
+- [x] Split digitized map-polygon visibility/opacity from terrain, interpreted 3D model and other site context; keep concise layer labels and default earlier v1 links to the new layer's safe visible/full-opacity setting.
 - [x] Remove the redundant bottom Continue cue from the four-step map/model story where the map panel already owns stage navigation.
 - [x] Keep metallurgy report figures accessible from the results inspector instead of placing a large source thumbnail over the equipment canvas; tighten the instrument framing.
 - [x] Make Explore → Return to story reapply the current authored camera/view without discarding layer settings; the local copy-link action reports success.
 - [x] Expand mine overview bounds to include the actual conceptual plant and illustrative facility footprints; use a wider, higher-angle overview and keep close-up actions separate.
 - [x] Confirm the local app and local Cloudflare Worker preview load the versioned geology stage with `ready=true`; the Worker served terrain, geological-model and geology-polygon requests successfully.
 - [x] Confirm the copy-link button reports success and the explore toggle returns to the story presentation.
+- [x] Confirm the production build renders a dedicated mapped-polygon control; reducing it to 35% visibly fades the surface while terrain opacity remains unchanged, and the setting is written into the share URL.
+- [x] Confirm the Cloudflare local Worker preview restores a 35% mapped-geology setting from the expanded v1 URL and reaches scene `ready=true` without browser console errors. A hosted Cloudflare deployment was not changed or verified.
 - [x] Confirm clean production builds for Next.js and OpenNext/Cloudflare, with no browser console errors on checked geology/mine/metallurgy views. MapLibre emitted graphics-buffer performance warnings; a controlled frame-rate benchmark has not been recorded.
 - [ ] Complete 12-chapter and responsive screenshot review; measure cold/warm load, transfer and frame-time budgets.
 - [ ] Validate scene retry against injected asset failures, WebGL context loss, stale requests and repeated scene revisits.

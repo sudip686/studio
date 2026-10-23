@@ -4464,8 +4464,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(geologySurface){
         const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??GEOLOGY_SURFACE_DEFAULT_OPACITY):0;
         geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,geologyBlendAlpha);
-        geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.context.visible;
-        geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.context.opacity*(selectedGeologyUnitRef.current&&object.name!==selectedGeologyUnitRef.current ? .28 : 1);});
+        geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.geology.visible;
+        geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*(selectedGeologyUnitRef.current&&object.name!==selectedGeologyUnitRef.current ? .28 : 1);});
       }
       const mappedSurface = geologyPlan || geologyOblique;
       geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);
