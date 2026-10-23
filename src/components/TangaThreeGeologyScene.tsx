@@ -2152,6 +2152,7 @@ export default function TangaThreeGeologyScene({
   const journeyCommand=useRef<((id:string|null)=>void)|null>(null);
   const [plantCutaway,setPlantCutaway]=useState(false);
   const [plantProcess,setPlantProcess]=useState('all');
+  const [mappedSurfaceStage,setMappedSurfaceStage]=useState(false);
   const detailOptions=useRef({sectionEnabled,sectionPosition,hostOnly,plantCutaway,plantProcess});
   detailOptions.current={sectionEnabled,sectionPosition,hostOnly,plantCutaway,plantProcess};
   const [haulCount, setHaulCount] = useState(0);
@@ -2659,6 +2660,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const leaveGeologyPlan = (quiet = false) => {
       if (!geologyPlan) return;
       geologyPlan = false; scene.fog = authoredFog; controls.enableRotate = true;
+      setMappedSurfaceStage(false);
       controls.minPolarAngle = .04; controls.maxPolarAngle = Math.PI - .04;
       controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; controls.touches.ONE = THREE.TOUCH.ROTATE;
       camera.updateProjectionMatrix();
@@ -2732,6 +2734,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'geologyPlan' && mode === 'subsurface') {
         geologyPlan = true; geologyOblique = false; geologyDepthBlend=0; scene.fog = null;
+        setMappedSurfaceStage(true);
         // Reveal each source-map class in place over the terrain. This is a
         // short cartographic emphasis only: vertices and registration never
         // move, and the usual layer/selection controls remain authoritative.
@@ -2766,6 +2769,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // spans. Tilt the mapped surface before showing a separate model.
         leaveGeologyPlan(true);
         geologyOblique = true; scene.fog = null;
+        setMappedSurfaceStage(true);
         stageBaseRotation = 0; stageVerticalBaseRotation = 0; stage.rotation.set(0,0,0);
         setSectionEnabled(false);
         explodedRef.current=false;setExploded(false);separation=0;
@@ -2795,6 +2799,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (command.action === 'geologyDepth' && mode === 'subsurface') {
         const retainFrame = geologyOblique;
         leaveGeologyPlan(true); geologyOblique = false;
+        setMappedSurfaceStage(false);
         setAuthoredSurfaceOpacity(terrainOpacityForPresentation(mode,surfaceCameraView,geologyPlan||geologyOblique));
         if (retainFrame) cameraTween=null;
         setSectionEnabled(false);explodedRef.current=false;setExploded(false);separation=0;
@@ -2811,7 +2816,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         leaveGeologyPlan();
       }
       if (!['zoomIn','zoomOut','orbit360','rotateDegrees'].includes(command.action)) {
-        if (geologyOblique) window.dispatchEvent(new Event('tanga:geology-perspective'));
+        if (geologyOblique) {
+          setMappedSurfaceStage(false);
+          window.dispatchEvent(new Event('tanga:geology-perspective'));
+        }
         geologyOblique = false;
       }
       const target = controls.target.clone();
@@ -5408,7 +5416,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             setMotionPaused(false);
             journeyCommand.current?.(journeyHole);
           }}>Follow recorded hole</button>}
-          {mode === 'subsurface' && <button type="button" disabled={!sceneReady} aria-pressed={exploded} onClick={() => {
+          {mode === 'subsurface' && !mappedSurfaceStage && <button type="button" disabled={!sceneReady} aria-pressed={exploded} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
             setMotionPaused(false);
             setSectionEnabled(false);
