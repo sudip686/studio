@@ -19,7 +19,9 @@ export function preloadGeologyAssets(): Promise<void> {
   warmup = (async () => {
     const warm = async (path: string) => {
       try {
-        const remote = assetUrl(path);
+        // Resource blocks are served through the app API on deployments; there
+        // is no public /BlockModel.geojson file to probe first.
+        const remote = path === '/BlockModel.geojson' ? '/api/block-model' : assetUrl(path);
         let response: Response;
         try { response = await cachedDeckAsset(remote, {priority: 'low'}); }
         catch (error) {

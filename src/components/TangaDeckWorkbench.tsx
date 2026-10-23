@@ -1587,7 +1587,7 @@ function sceneCalloutsForMode(
     // One bold callout only — the licence. (Was 2; the village-context box added
     // noise and repeated what the map already shows.)
     return [
-      {id: 'aoi', label: 'Provisional project boundary', detail: 'Legal licence geometry unconfirmed; drill coverage shown', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
+      {id: 'aoi', label: 'Provisional boundary', detail: 'Legal licence geometry unconfirmed; drill coverage shown', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
     ];
   }
   if (mode === 'topography') {
@@ -3562,7 +3562,7 @@ export default function TangaDeckWorkbench() {
       // Replaced by the pinned map-label overlay (fixed screen slot + pointer).
       false && new TextLayer({
         id: 'project-boundary-label',
-        data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'PROVISIONAL PROJECT BOUNDARY'}],
+        data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'PROVISIONAL BOUNDARY'}],
         getPosition: (d: any) => d.position,
         getText: (d: any) => d.text,
         getSize: 12,
@@ -4316,7 +4316,7 @@ export default function TangaDeckWorkbench() {
       out.push({id, text, lon, lat, z: heightAt(lon, lat) + lift, tone});
     };
     if (activeMode === 'project' || activeMode === 'topography') {
-      if (boundaryAnchor) push('lbl-license', 'PROVISIONAL PROJECT BOUNDARY', boundaryAnchor.lon, boundaryAnchor.lat, 0, '#f0b64a');
+      if (boundaryAnchor) push('lbl-license', 'PROVISIONAL BOUNDARY', boundaryAnchor.lon, boundaryAnchor.lat, 0, '#f0b64a');
     }
     if (activeMode === 'project') {
       // Processing plant and product stockpile pins are gone from this scene:

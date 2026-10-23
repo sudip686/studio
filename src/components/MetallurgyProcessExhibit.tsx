@@ -41,18 +41,20 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
     renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     renderer.domElement.setAttribute('role','img');renderer.domElement.setAttribute('aria-label','Illustrative laboratory equipment in 3D. Drag to orbit or scroll to zoom. Select a stage to frame an instrument.');
     el.appendChild(renderer.domElement);
-    const scene=new THREE.Scene();scene.background=new THREE.Color('#d9e2e5');
+    // Match the deck's dark geospatial stages. Light equipment and teal
+    // flotation surfaces read clearly against this instrument-bay backdrop.
+    const scene=new THREE.Scene();scene.background=new THREE.Color('#142630');
     const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment(),environment=pmrem.fromScene(room,.04);room.dispose();scene.environment=environment.texture;
-    const camera=new THREE.PerspectiveCamera(30,1,.1,1000),controls=new OrbitControls(camera,renderer.domElement);
+    const camera=new THREE.PerspectiveCamera(24,1,.1,1000),controls=new OrbitControls(camera,renderer.domElement);
     controls.enableDamping=true;controls.minDistance=15;controls.maxDistance=200;controls.maxPolarAngle=Math.PI*.49;
     const plant=createMetallurgyPlant();scene.add(plant.root);
     const plinth=new THREE.Group();scene.add(plinth);
     const cabinetMaterial=new THREE.MeshStandardMaterial({color:0xf1f3f0,roughness:.5,metalness:.05});
     const topMaterial=new THREE.MeshStandardMaterial({color:0xb8c4c9,roughness:.4,metalness:.55});
-    const floorMaterial=new THREE.MeshStandardMaterial({color:0xc7d0d3,roughness:1});
+    const floorMaterial=new THREE.MeshStandardMaterial({color:0x263a42,roughness:.92});
     const floor=new THREE.Mesh(new THREE.PlaneGeometry(500,500),floorMaterial);floor.rotation.x=-Math.PI/2;floor.position.y=-8;floor.receiveShadow=true;scene.add(floor);
-    scene.add(new THREE.HemisphereLight(0xffffff,0x7a8791,1.25));
-    const key=new THREE.DirectionalLight(0xfffcf5,2);key.position.set(-30,70,45);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-100;key.shadow.camera.right=100;key.shadow.camera.top=70;key.shadow.camera.bottom=-70;key.shadow.camera.far=250;key.shadow.normalBias=.12;scene.add(key);
+    scene.add(new THREE.HemisphereLight(0xeaf2f4,0x43545d,.95));
+    const key=new THREE.DirectionalLight(0xfffcf5,1.65);key.position.set(-30,70,45);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-100;key.shadow.camera.right=100;key.shadow.camera.top=70;key.shadow.camera.bottom=-70;key.shadow.camera.far=250;key.shadow.normalBias=.12;scene.add(key);
     const fill=new THREE.DirectionalLight(0xe5f2ff,.7);fill.position.set(45,20,-35);scene.add(fill);
     const target=new THREE.Vector3(),destination=new THREE.Vector3(),fromPosition=new THREE.Vector3(),fromTarget=new THREE.Vector3();
     let selected=2,userOrbit=false,cameraStarted=performance.now(),tween=true,dirty=true,ready=false,last=performance.now(),time=0,frame=0;
@@ -74,11 +76,13 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
       });
       cabinet(bounds);target.copy(bounds.getCenter(new THREE.Vector3()));
       const direction=new THREE.Vector3(.55,.42,1).normalize();let distance=Math.max(25,bounds.getSize(new THREE.Vector3()).length());
-      const fit=new THREE.PerspectiveCamera(30,camera.aspect,.1,1000);
+      const fit=new THREE.PerspectiveCamera(camera.fov,camera.aspect,.1,1000);
       for(let i=0;i<5;i++){
         fit.position.copy(target).addScaledVector(direction,distance);fit.lookAt(target);fit.updateMatrixWorld();let extent=0;
         for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){const point=new THREE.Vector3(x,y,z).project(fit);extent=Math.max(extent,Math.abs(point.x),Math.abs(point.y));}
-        distance*=extent/0.84;
+        // Leave breathing room for every instrument against this deliberately
+        // closer exhibit camera; the same fit is shared by all five stages.
+        distance*=extent/0.68;
       }
       destination.copy(target).addScaledVector(direction,distance);fromPosition.copy(camera.position);fromTarget.copy(controls.target);cameraStarted=performance.now();tween=true;dirty=true;userOrbit=false;
       if(!ready){camera.position.copy(destination);controls.target.copy(target);ready=true;tween=false;}
