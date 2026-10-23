@@ -4,12 +4,17 @@ import {cachedDeckAsset} from './cached-deck-asset';
 // One background transfer at a time, in presentation priority order.
 // Only assets used by this deck; exclude unused 200 MB legacy regional rasters.
 export const GEOLOGY_PRELOAD_PATHS = [
+  // Warm the assets needed to establish the map/terrain story first. The
+  // intro preloader is serial, so placing drillhole and resource datasets ahead
+  // of these can leave a quickly-entered geology view waiting behind them.
   '/geologicalModel.glb',
-  '/assay_data.geojson', '/lithology_data.geojson',
-  '/BlockModel.geojson',
   '/height_hires.bin', '/terrain_hires_meta.json',
   '/terrain_texture_hires.jpg', '/height_preview_1024.bin',
   '/terrain_preview_meta.json',
+  // These remain warm for the later evidence chapters, after the primary
+  // terrain view has its geometry and imagery available.
+  '/assay_data.geojson', '/lithology_data.geojson',
+  '/BlockModel.geojson',
 ] as const;
 let warmup: Promise<void> | undefined;
 
