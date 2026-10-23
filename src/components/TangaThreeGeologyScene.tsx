@@ -19,7 +19,6 @@ import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-d
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import MetallurgyVisualStory from './MetallurgyProcessExhibit';
 import {modelRockUnit} from '@/lib/deck/geology-palette';
-import MetallurgySampleExplorer from './MetallurgySampleExplorer';
 import GeologyCrossSections from './GeologyCrossSections';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
 import {assetUrl} from '@/lib/asset-url';
@@ -2010,7 +2009,6 @@ export default function TangaThreeGeologyScene({
   terrainCompare = {enabled: false, split: 50},
   onTerrainCompareSplit,
   inspectionMode = false,
-  onInspectEvidence,
   onRetry,
   selectedGeologyUnit = null,
   hiddenGeologyUnits = [],
@@ -4647,12 +4645,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.geology.visible;
         const hiddenUnits=new Set(hiddenGeologyUnitsRef.current);
         geologySurface.children.forEach(object=>{
-          const unitName=object.name.replace(/ · mapped boundary$/,'');
+          const unitName=String(object.userData.geologicUnit??object.name.replace(/ · (?:mapped boundary|boundary keyline)$/,''));
           const visible=!hiddenUnits.has(unitName);
           object.visible=visible;
           const selectionOpacity=selectedGeologyUnitRef.current&&unitName!==selectedGeologyUnitRef.current ? .28 : 1;
-          if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity;
-          else if(object instanceof THREE.LineSegments&&object.material instanceof THREE.LineBasicMaterial)object.material.opacity=.34*geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity;
+          const classOpacity=Number(object.userData.surfaceOpacityScale??1);
+          if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity*classOpacity;
+          else if(object instanceof THREE.LineSegments&&object.material instanceof THREE.LineBasicMaterial)object.material.opacity=.34*geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity*classOpacity;
         });
       }
       const mappedSurface = geologyPlan || geologyOblique;
@@ -5147,22 +5146,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
-      {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)} onInspectEvidence={onInspectEvidence}/>}
-      {mode === 'metallurgy' && <section className="tanga-met-report" aria-label="Metallurgy testwork summary">
-        <header><small>IMO FLOTATION TESTWORK · FINAL REPORT REV. 0 · DEC 2025</small><h2>Strong concentrate grades. Variable response.</h2></header>
-        <MetallurgySampleExplorer/>
-        <p className="tanga-met-report__intro">Eight variability composites were tested. All final cleaner concentrates exceeded 97% total carbon (TC); recovery and coarse-flake share vary by sample.</p>
-        <div className="tanga-met-report__metrics"><div><strong>98.4% TC</strong><span>TDM006 · oxide optimisation</span><b>93.0% recovery · FT01</b></div><div><strong>98.6% TC</strong><span>TDM001 · fresh optimisation</span><b>94.4% recovery · FT02</b></div></div>
-        <h3>Mass fraction above 150 µm</h3>
-        <p>AMC Table II · reported by weathering group; not the full sieve distribution.</p>
-        {[
-          ['Fresh · TDM001–005', '34.6–65.2%', 34.6, 65.2],
-          ['Oxide · TDM006–007', '57.1–67.2%', 57.1, 67.2],
-          ['TDM008 · kaolinised', '72.7%', 72.7, 72.7],
-        ].map(([label,value,min,max])=><div className="tanga-met-report__flake" key={String(label)}><span>{label}</span><b>{value}</b><i aria-hidden="true"><span style={{left:`${min}%`,width:`${Math.max(1.5,Number(max)-Number(min))}%`}}/></i></div>)}
-        <p className="tanga-met-report__caution"><strong>TDM004 · 75.8% recovery.</strong> IMO reports 1.83% carbonate in this composite and identifies it as the low-recovery exception. Laboratory results do not establish operating performance or customer qualification.</p>
-        <footer>Basis: IMO Final Report Rev. 0, Table 2 and §3.1; AMC MRE, Table II. AMC groups TDM008 as oxide / kaolinised; IMO labels it “Fresh / Kaolin.” Report terminology differs. TC = total carbon in concentrate; TGC = total graphitic carbon in feed/model.</footer>
-      </section>}
+      {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}
       {mode === 'resource' && (
         <details className="tanga-three__grade-legend" aria-label="TGC grade legend">
           <summary>Read the grade colours · % TGC</summary>

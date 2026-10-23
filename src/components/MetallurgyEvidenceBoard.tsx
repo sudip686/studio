@@ -11,8 +11,8 @@ const MEASURES = [
 const IMO = '/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf';
 const AMC = '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf';
 
-export default function MetallurgyEvidenceBoard({selected, onSelect, onEquipment}: {
-  selected: number; onSelect: (index: number) => void; onEquipment: () => void;
+export default function MetallurgyEvidenceBoard({selected, onSelect, onEquipment, onBack}: {
+  selected: number; onSelect: (index: number) => void; onEquipment: () => void; onBack?:()=>void;
 }) {
   const sample = MET_SAMPLES[selected];
   const select = (index: number) => {
@@ -25,7 +25,7 @@ export default function MetallurgyEvidenceBoard({selected, onSelect, onEquipment
         <h2>One deposit. Eight test responses.</h2>
         <p>High concentrate carbon across the test set. Recovery and flake size vary.</p>
       </div>
-      <button className={styles.equipment} type="button" onClick={onEquipment}>Explore the 3D test sequence <span aria-hidden="true">↗</span></button>
+      <div className={styles.actions}>{onBack ? <button className={styles.equipment} type="button" onClick={onBack}>← Return to factory tour</button> : <button className={styles.equipment} type="button" onClick={onEquipment}>Explore the connected 3D plant <span aria-hidden="true">↗</span></button>}</div>
     </header>
     <div className={styles.body}>
       <div className={styles.comparison}>

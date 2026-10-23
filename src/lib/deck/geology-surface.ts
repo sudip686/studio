@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-type MapUnit = {properties:{unit:string;color:string};geometry:{type:'MultiPolygon';coordinates:number[][][][]}};
+type MapUnit = {properties:{unit:string;color:string;opacity?:number;basis?:string};geometry:{type:'MultiPolygon';coordinates:number[][][][]}};
 export type GeologySurfaceData = {features:MapUnit[]};
 // VRIFY-style map emphasis: strong enough to read on satellite imagery while
 // retaining the terrain texture beneath each mapped outcrop.
@@ -70,7 +70,7 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
       for(let i=0;i<outer.length;i++){const a=outer[i],b=outer[(i+1)%outer.length];area+=a.x*b.y-b.x*a.y;}
       // Keep the presentation outline on substantial map units. Tiny raster
       // islands remain visible by colour without turning the view into a mesh.
-      if(Math.abs(area/2)>=25_000)addBoundary(polygon[0]);
+      if(feature.properties.unit!=='Soil cover'&&Math.abs(area/2)>=25_000)addBoundary(polygon[0]);
       const holes=polygon.slice(1).map(r=>r.slice(0,-1).map(toLocal));
       if(outer.length<3)continue;
       const vertices=outer.concat(...holes);
@@ -83,8 +83,10 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     const material=new THREE.MeshBasicMaterial({color:feature.properties.color,transparent:true,opacity:GEOLOGY_SURFACE_DEFAULT_OPACITY,toneMapped:false,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=feature.properties.unit;
-    mesh.renderOrder=30;
-    mesh.userData.tooltipItems=[{title:feature.properties.unit,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:feature.properties.color}];
+    mesh.renderOrder=feature.properties.unit==='Soil cover'?29:30;
+    mesh.userData.surfaceOpacityScale=feature.properties.opacity??1;
+    mesh.userData.geologicUnit=feature.properties.unit;
+    mesh.userData.tooltipItems=[{title:feature.properties.unit,rows:[feature.properties.basis??'Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:feature.properties.color}];
     group.add(mesh);
     if(outline.length){
       const outlineGeometry=new THREE.BufferGeometry();
@@ -97,10 +99,12 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
       shadowPositions.needsUpdate=true;
       const shadow=new THREE.LineSegments(shadowGeometry,new THREE.LineBasicMaterial({color:'#18241e',transparent:true,opacity:.46,depthWrite:false,toneMapped:false}));
       shadow.name=`${feature.properties.unit} · boundary keyline`;
+      shadow.userData.geologicUnit=feature.properties.unit;
       shadow.renderOrder=30;
       group.add(shadow);
       const boundaries=new THREE.LineSegments(outlineGeometry,new THREE.LineBasicMaterial({color:'#f5f2e9',transparent:true,opacity:.76,depthWrite:false,toneMapped:false}));
       boundaries.name=`${feature.properties.unit} · mapped boundary`;
+      boundaries.userData.geologicUnit=feature.properties.unit;
       boundaries.renderOrder=31;
       group.add(boundaries);
     }

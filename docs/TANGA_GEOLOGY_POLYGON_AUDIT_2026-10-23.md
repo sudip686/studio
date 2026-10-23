@@ -2,13 +2,13 @@
 
 Date: 23 October 2026
 Branch: `codex/tanga-investor-experience`
-Scope: visual QA of the checked-in map and derived surface polygons. No polygon, coordinate, or source raster was changed.
+Scope: visual QA of the checked-in map and derived surface polygons. The source raster and coordinates are unchanged. A narrow, graphitic-schist-only raster cleanup was applied and its effect recorded below.
 
 ## Evidence reviewed
 
 - `public/geology_map.jpg`, 1,240 × 1,755 px, with the printed UTM grid and seven-unit legend.
 - `public/generated/geology-surface-polygons.json`, whose provenance points to that map.
-- `scripts/derive-geology-polygons.py`, which creates colour masks, closes 3 × 3 px gaps, simplifies contours, and retains holes.
+- `scripts/derive-geology-polygons.py`, which creates colour masks, closes 5 × 5 px gaps in graphitic schist and 3 × 3 px gaps in other units, simplifies contours, and retains holes.
 - A source-map overlay rendered from the GeoJSON using its documented grid transform. The overlay was inspected at full resolution.
 - The supplied `documents_raw` report tree was searched for GIS vector files (`.shp`, `.gpkg`) and source elevation rasters (`.tif`, `.tiff`). No such project GIS files were found in that tree. This does not establish that no authoritative files exist elsewhere.
 - The December 2025 MRE and April 2025 graphite report text were searched for sample-specific grab-sample coordinates and IDs.
@@ -37,7 +37,7 @@ All seven feature names and swatch colours match the map legend. The source-alig
 
 | Map unit | Polygon pieces | Rings including holes | Coordinate vertices |
 |---|---:|---:|---:|
-| Graphitic schist | 95 | 143 | 1,827 |
+| Graphitic schist | 73 | 95 | 1,738 |
 | Khondalite | 28 | 29 | 416 |
 | Kyanite sillimanite schist | 1 | 1 | 7 |
 | Mafic granulite | 20 | 21 | 275 |
@@ -45,7 +45,7 @@ All seven feature names and swatch colours match the map legend. The source-alig
 | Quartzite | 24 | 24 | 260 |
 | Crystalline limestone | 1 | 1 | 8 |
 
-The counts are a QA signal, not a geological count. A hole in a colour mask may be an overprinted symbol, line, soil gap, or actual uncoloured area. The raster alone does not support deciding which. Do not fill holes, merge fragments, or smooth boundaries for presentation until source GIS or a defensible interpretation resolves them. Keep the existing UI disclosure that these are digitized map polygons, approximately registered, and not surveyed contacts.
+The counts are a QA signal, not a geological count. A hole in a colour mask may be an overprinted symbol, line, soil gap, or actual uncoloured area. The raster alone does not support deciding which. For the visibly fragmented graphitic-schist class only, a 5 × 5 px morphological closing now bridges narrow raster interruptions (about 33 m at the printed-grid scale). This reduced its pieces from 95 to 73 and its holes from 48 to 22. The original colour threshold, larger gaps and outer contours are retained; this is scan cleanup, not a geological reinterpretation or authoritative contact repair. Keep the UI disclosure that these are digitized map polygons, approximately registered, and not surveyed contacts. Original GIS remains necessary for exact contacts.
 
 ## Grab-sample locations
 
@@ -59,6 +59,12 @@ The local production view `?view=plan#subsurface` was inspected at 1,440 × 900.
 
 - Printed-grid registration has been checked against all visible labelled grid lines. No registration edit is justified by the residuals.
 - The north-up mapped-surface view was checked at desktop size; existing extent-aware framing preserves the complete drape and surrounding terrain context without distorting the map.
-- The polygon source check is complete, with raster contamination and fragmentation recorded. Geometry repair remains blocked on authoritative shapefiles/georeferenced source data or a reviewed digitization.
+- The polygon source check is complete, with raster contamination and fragmentation recorded. Narrow graphitic-schist interruptions have limited scan cleanup; exact contact repair remains dependent on authoritative shapefiles/georeferenced source data or a reviewed digitization.
 - No grab-sample coordinates were added. The report-text check and sample-type distinction are recorded above; reconsider markers only when a source register pairs surface sample IDs with verified coordinates and provenance.
 - The map should remain a translucent surface overlay over the existing terrain, with regional context clearly separate. Do not use the map raster as elevation or project these surface colours into the interpreted depth model.
+
+## Follow-up: source-map soil-cover category
+
+The source sheet's legend contains Soil cover in addition to the seven coloured rock units. The earlier 3D legend omitted this class. The generator now traces the pale soil-cover raster pixels, clips them to the map's existing approximate mapped footprint, and draws the class beneath the seven rock layers. The generated soil-cover feature is one outer polygon with 64 interior rings; it retains map gaps rather than inventing a continuous surveyed soil boundary. This is a more faithful rendering of the source symbol, not an authoritative GIS polygon.
+
+The 3D legend and shared-view state now expose eight map classes. Soil cover uses a restrained base tint; the seven rock layers keep their source swatches and remain individually toggleable. A visibility check confirmed the soil layer can be hidden independently. Desktop production captures at 1366 × 768 and 1707 × 842 are recorded in `.playwright-mcp/geology-soil-1366-final.png` and `.playwright-mcp/geology-soil-final-desktop.png`; the 1366 × 768 relief capture is `.playwright-mcp/geology-soil-relief-1366-retry.png`. For the graphitic-schist scan artifacts, the generator now closes only 5 × 5 px gaps (about 33 m at the printed-grid scale); its output decreases from 95 to 73 pieces and 48 to 22 holes. The original raster swatch threshold is unchanged, and larger gaps remain. The stage-01 source map now works as a smaller reference card over a visible 3D scene, keeping the story/navigation controls in view while the traced geology remains the visual focus. These are display improvements, not authoritative contact corrections; the original shapefile/georeferenced layer remains necessary for exact boundaries.

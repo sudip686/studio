@@ -5,8 +5,8 @@ import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
 export function buildConcentrator() {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
-  const materials={steel:new THREE.MeshStandardMaterial({color:0xb8c6cc,metalness:0.55,roughness:0.38}),roof:new THREE.MeshStandardMaterial({color:0x526c78,roughness:0.65}),copper:new THREE.MeshStandardMaterial({color:0xd2a544,metalness:.25,roughness:0.45}),concrete:new THREE.MeshStandardMaterial({color:0xb7b0a0,roughness:.95}),water:new THREE.MeshStandardMaterial({color:0x4a8b95,metalness:0.15,roughness:0.25}),rock:new THREE.MeshStandardMaterial({color:0x81735e,roughness:1})};
-  const cladding=new THREE.MeshStandardMaterial({color:0x9bafb7,roughness:.65,metalness:.25});
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x849095,metalness:0.48,roughness:0.48}),roof:new THREE.MeshStandardMaterial({color:0x3e525a,roughness:0.72}),copper:new THREE.MeshStandardMaterial({color:0xa47a50,metalness:.22,roughness:0.52}),concrete:new THREE.MeshStandardMaterial({color:0x98958d,roughness:.96}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.08,roughness:0.34}),rock:new THREE.MeshStandardMaterial({color:0x756b5d,roughness:1})};
+  const cladding=new THREE.MeshStandardMaterial({color:0x829196,roughness:.72,metalness:.18});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.94+0.06*smoothstep(-0.5,0.5,sin(vRoofPoint.x*4.0));');
@@ -15,9 +15,9 @@ export function buildConcentrator() {
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
-  // 250 × 250 m land allowance in PaulSam Table 5.3. Internal arrangement is
-  // illustrative; it is not a surveyed parcel or an engineered general arrangement.
-  box(500,1,500,0,-1,0,materials.concrete,'PaulSam land allowance · illustrative 250 × 250 m');
+  // Broader campus context; this is not a surveyed parcel or an engineered
+  // general arrangement. Keep the public scene location-neutral.
+  box(500,1,500,0,-1,0,materials.concrete,'Conceptual facility setting');
   box(400,3,280,0,0,0,materials.concrete,'Plant pad');
   // A perimeter service lane and drainage edge make the pad read as a site.
   box(392,.15,7,0,1.6,135,materials.roof,'Conceptual service lane');
@@ -25,12 +25,13 @@ export function buildConcentrator() {
   for(const x of [-195,195])box(4,.15,268,x,1.6,0,materials.roof);
   for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,1.72,135,materials.concrete);
   // Roof panels, portal frames and side openings give each building a legible silhouette.
-  function shed(name:string,x:number,z:number,w:number,d:number,h:number){
+  function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
     for(const sign of [-1,1]){
       const roof=box(w,1.2,roofLength,x,h+rise/2,z+sign*d/4,cladding,name);
       roof.rotation.x=sign*Math.atan2(rise,d/2);
       roof.userData.plantRoof=true;
+      if(stage)roof.userData.plantStage=stage;
     }
     for(let i=-w/2;i<=w/2;i+=w/4)for(const k of [-d/2,d/2])box(1.2,h,1.2,x+i,h/2,z+k,materials.copper);
     box(w,h,d*0.04,x,h/2,z+d/2,materials.steel);
@@ -42,9 +43,9 @@ export function buildConcentrator() {
   mesh(new THREE.ConeGeometry(22,14,32),materials.rock,-106,8,44,'ROM stockpile');
   box(22,12,18,-104,10,-16,materials.steel,'Feed bin');
   mesh(new THREE.CylinderGeometry(12,5,12,4),materials.copper,-104,21,-16,'Receiving hopper').rotation.y=Math.PI/4;
-  box(18,14,17,-73,10,-16,materials.roof,'Crushing');
-  shed('Milling',-30,-18,48,45,27);
-  const mill=cylinder(8,23,-30,12,-18);mill.rotation.z=Math.PI/2;
+  shed('ROM & crushing',-88,-16,72,58,30,'feed');
+  shed('Milling',-30,-18,48,45,27,'milling');
+  const mill=cylinder(8,23,-30,12,-18);mill.rotation.z=Math.PI/2;mill.name='Milling process drum';mill.userData.preserveAnimation=true;root.userData.processMill=mill;
   // Flotation banks with agitator drives and a maintenance deck.
   for(let row=0;row<2;row++)for(let i=0;i<5;i++){
     const x=8+i*15,z=-36+row*24;
@@ -55,9 +56,10 @@ export function buildConcentrator() {
   box(78,1,5,38,15,0,materials.steel);
   for(let x=0;x<80;x+=6)box(0.5,4,0.5,x,17,2,materials.copper);
   box(80,0.4,0.4,38,19,2,materials.copper);
+  shed('Flotation',40,-36,88,60,24,'flotation');
   cylinder(17,9,103,6,-31);cylinder(16,0.4,103,10.7,-31,materials.water);
   box(34,1,2,103,12,-31,materials.copper); // thickener bridge
-  shed('Dewatering / product handling',83,44,75,45,25);
+  shed('Dewatering / product handling',83,44,75,45,25,'dewatering');
   for(let i=0;i<9;i++)box(1,7,12,58+i*2.4,6,44,materials.steel,'Filter plates');
   for(let i=0;i<5;i++)box(7,6,7,92+i*8,5,51,materials.concrete,'Packaged product');
   shed('Workshop',-37,57,48,28,16);
@@ -80,9 +82,9 @@ export function buildConcentrator() {
     for(let j=0;j<3;j++)cylinder(.45,2,-83+i*9+j,7.5,-58,materials.copper);
   }
   // Added operating areas expand the campus rather than stretching equipment.
-  shed('Covered blending and feed hall',-85,-109,116,40,32);
+  shed('Covered blending and feed hall',-85,-109,116,40,32,'feed');
   for(let i=0;i<3;i++)mesh(new THREE.ConeGeometry(13,12,16),materials.rock,-122+i*36,8,-108,'Covered feed stockpile');
-  shed('Product storage and loadout',100,110,166,40,29);
+  shed('Product storage and loadout',100,110,166,40,29,'product');
   shed('Maintenance and spares hall',-157,102,58,48,22);
   for(const z of [-32,30])mesh(new THREE.ConeGeometry(24,18,24),materials.rock,-163,10,z,'ROM receiving yard');
   // Second flotation train and reclaim-water thickener.

@@ -34,7 +34,7 @@ import type {DevelopmentView} from '@/data/tanga-development';
 import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
 import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
-import {MAPPED_ROCK_UNITS} from '@/lib/deck/geology-palette';
+import {MAPPED_SURFACE_UNITS} from '@/lib/deck/geology-palette';
 import {presentationBuild} from '@/lib/presentation-build';
 import {
   type CameraAction,
@@ -4770,8 +4770,8 @@ export default function TangaDeckWorkbench() {
       }
       if (supportsVersionOneState && targetMode === 'subsurface') {
         const featureId = params.get('feature');
-        const unit = MAPPED_ROCK_UNITS.find((candidate) => candidate.label === featureId);
-        const hiddenUnits=(params.get('units')??'').split('|').filter(label=>MAPPED_ROCK_UNITS.some(candidate=>candidate.label===label));
+        const unit = MAPPED_SURFACE_UNITS.find((candidate) => candidate.label === featureId);
+        const hiddenUnits=(params.get('units')??'').split('|').filter(label=>MAPPED_SURFACE_UNITS.some(candidate=>candidate.label===label));
         if (unit&&!hiddenUnits.includes(unit.label)) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
         else if(unit)setSelectedGeologyUnit(null);
         setHiddenGeologyUnits(hiddenUnits);
@@ -4810,7 +4810,7 @@ export default function TangaDeckWorkbench() {
       }
       if (supportsVersionOneState && targetMode === 'subsurface') {
         const featureId = params.get('feature');
-        const unit = MAPPED_ROCK_UNITS.find((candidate) => candidate.label === featureId);
+        const unit = MAPPED_SURFACE_UNITS.find((candidate) => candidate.label === featureId);
         if (unit) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
       }
       if (supportsVersionOneState) {

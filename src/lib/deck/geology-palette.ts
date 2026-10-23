@@ -10,6 +10,13 @@ export const MAPPED_ROCK_UNITS = [
   {label:'Crystalline limestone',color:'#41a9ec'},
 ] as const;
 
+/** All categories on the supplied project map; soil cover is a surface class,
+ * not an added lithology in the interpreted model. */
+export const MAPPED_SURFACE_UNITS = [
+  {label:'Soil cover',color:'#f4e5cc'},
+  ...MAPPED_ROCK_UNITS,
+] as const;
+
 export function modelRockUnit(name:string) {
   // GLTFLoader sanitizes spaces to underscores in Object3D names.
   const suffix=name.replace(/^GM[_\s]*Litho[_\s]*-[_\s]*/i,'').replace(/_/g,' ').trim();

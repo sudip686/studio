@@ -113,17 +113,18 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
 
 /** Batch static detail by material/process; keep roof cutaways separately addressable. */
 export function batchPlantMeshes(root: THREE.Group) {
-  const buckets = new Map<string, {material: THREE.Material; name: string; roof: boolean; geometries: THREE.BufferGeometry[]}>();
-  const children = [...root.children].filter((child): child is THREE.Mesh<THREE.BufferGeometry, THREE.Material> => child instanceof THREE.Mesh && !Array.isArray(child.material));
+  const buckets = new Map<string, {material: THREE.Material; name: string; roof: boolean; stage?:string; geometries: THREE.BufferGeometry[]}>();
+  const children = [...root.children].filter((child): child is THREE.Mesh<THREE.BufferGeometry, THREE.Material> => child instanceof THREE.Mesh && !Array.isArray(child.material) && !child.userData.preserveAnimation);
   for (const object of children) {
     object.updateMatrix();
     const roof = Boolean(object.userData.plantRoof);
+    const stage=typeof object.userData.plantStage==='string'?object.userData.plantStage:undefined;
     const name = roof ? `${object.name} roof` : /Flotation/i.test(object.name) ? 'Flotation banks and walkways'
       : /Milling|Crushing|ROM|Feed|hopper/i.test(object.name) ? 'Crushing and milling equipment'
       : /Dewatering|Product|Filter|Packaged/i.test(object.name) ? 'Dewatering and product handling'
       : /Thickener|water|Reagent/i.test(object.name) ? 'Thickener, water and reagent circuits' : 'Plant structures and services';
-    const key = `${object.material.uuid}:${name}:${roof}`;
-    const bucket = buckets.get(key) ?? {material: object.material, name, roof, geometries: []};
+    const key = `${object.material.uuid}:${name}:${roof}:${stage??''}`;
+    const bucket = buckets.get(key) ?? {material: object.material, name, roof, stage, geometries: []};
     bucket.geometries.push(object.geometry.clone().applyMatrix4(object.matrix)); buckets.set(key, bucket);
     root.remove(object); object.geometry.dispose();
   }
@@ -132,7 +133,7 @@ export function batchPlantMeshes(root: THREE.Group) {
     for (const source of bucket.geometries) source.dispose();
     if (!geometry) throw new Error(`Unable to batch plant detail: ${bucket.name}`);
     const object = new THREE.Mesh(geometry, bucket.material); object.name = bucket.name;
-    object.userData.plantRoof = bucket.roof; object.castShadow = true; object.receiveShadow = true;
+    object.userData.plantRoof = bucket.roof; if(bucket.stage)object.userData.plantStage=bucket.stage; object.castShadow = true; object.receiveShadow = true;
     root.add(object);
   }
   root.userData.detailMeshCount = children.length;
