@@ -47,7 +47,7 @@ export default function TangaPeerBenchmark({revealed, onReveal, onReset, selecte
       </ol>
 
       {selectedRow&&<div className="tanga-peer-benchmark__phone-selection"><strong>{selectedRow.project} · {selectedRow.country}</strong><span>{selectedRow.measuredIndicated??selectedRow.resource}</span></div>}
-      <footer>2023 published benchmark with an updated Epanko entry. Dates and reporting bases differ; this is not a current worldwide deposit census. Tanga uses its Indicated portion only. <a href="https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/" target="_blank" rel="noreferrer">Benchmark source ↗</a></footer>
+      <details className="tanga-peer-benchmark__basis"><summary>Benchmark basis &amp; source</summary><p>2023 published benchmark with an updated Epanko entry. Dates and reporting bases differ; this is not a current worldwide deposit census. Tanga uses its Indicated portion only.</p><a href="https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/" target="_blank" rel="noreferrer">Benchmark source ↗</a></details>
     </div>
   </section>;
 }

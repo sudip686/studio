@@ -2375,7 +2375,7 @@ export default function TangaDeckWorkbench() {
     flightUntilRef.current = performance.now() + 2400 + 120;
     setViewState({
       ...target,
-      ...(mode==='ranking'&&window.innerWidth<760?{zoom:.95}:{}),
+      ...(mode==='ranking'&&window.innerWidth<760?{zoom:.72}:{}),
       bearing: bearingOverride ?? target.bearing,
       transitionDuration: 2400,
       transitionInterpolator: CINEMATIC_FLY(),
@@ -3260,7 +3260,7 @@ export default function TangaDeckWorkbench() {
       // Close enough to place the project in its country, far enough that the
       // peer field around it stays in frame — this scene is a comparison, so
       // diving to project scale would lose the point of the slide.
-      zoom: activeMode === 'ranking' ? (window.innerWidth<760?.95:1.55) : Math.max(current.zoom, 3.4),
+      zoom: activeMode === 'ranking' ? (window.innerWidth<760?.72:1.55) : Math.max(current.zoom, 3.4),
       transitionDuration: DURATION,
       transitionInterpolator: CINEMATIC_FLY(),
       transitionEasing: cinematicEase,
@@ -4644,7 +4644,7 @@ export default function TangaDeckWorkbench() {
       flightUntilRef.current = performance.now() + 2220;
       setViewState({
         ...shot.view,
-        ...(mode==='ranking'&&window.innerWidth<760?{zoom:.95}:{}),
+        ...(mode==='ranking'&&window.innerWidth<760?{zoom:.72}:{}),
         transitionDuration: 2100,
         transitionInterpolator: CINEMATIC_FLY(),
         transitionEasing: cinematicEase,

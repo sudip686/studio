@@ -29,12 +29,12 @@ Additional primary design references:
 - [x] Peers: declutter close globe markers without moving their geographic anchors.
 - [x] All chapters: coherent next-view cue and current view progress.
 - [x] All chapters: compact common presentation controls and consistent evidence-panel styling.
-- [ ] Review all 12 Tanga chapters in Chrome; check key geology, peers and phone layouts.
+- [x] Review all 12 Tanga chapters in Chrome; check key geology, peers and phone layouts.
 - [ ] Review code, run typecheck and deployment build; push the branch and check Vercel.
 
 ## Bright 3D and testwork follow-up
 
-- [x] Neutral daylight render, stronger readable fill, reduced screen vignette.
+- [x] Bright, natural satellite-map surfaces for Three.js terrain views; keep categorical geology colours independent of the basemap.
 - [x] Omit triangles bridging surveyed and regional elevation sources; retain every recorded height and leave the unverified join open. Hide incomplete scene assembly behind its loading status.
 - [x] Use wall-clock camera travel and frame-time damping so slow frames do not stretch the instrument camera move or leave long orbit inertia. No FPS improvement is claimed.
 - [x] Keep the camera focus ahead of fog, including portrait framing and direct jumps into the depth stage. Place the phone opacity control below the navigation instruments.
@@ -48,7 +48,8 @@ Additional primary design references:
 - [x] Daylight steel, corrugated roofs, safety rails, earthworks and water materials for the mine campus.
 - [x] Use one facility selector and a primary plant action; remove the duplicated seven-button wall.
 - [x] Limit whole-site key labels to pits, feed and processing; detailed facility views retain their own labels.
-- [ ] Review opacity endpoints, colour correspondence, every instrument stage and mobile layout in Chrome.
+- [x] Review opacity endpoints, colour correspondence, every metallurgy instrument stage and mobile layout in Chrome.
+- [x] Make drilling open on a high-clarity, near-opaque satellite surface; retain map controls and lower-opacity subsurface inspection.
 
 ## Purpose of each chapter
 
