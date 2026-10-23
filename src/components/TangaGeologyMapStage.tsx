@@ -27,13 +27,13 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
   const legend = <div className={`tanga-geology-surface-legend ${legendOpen?'is-open':''}`} aria-label={mapUnits?'Mapped rock types':'Interpreted model rock types'}>
       <header><strong>{mapUnits?'MAPPED GEOLOGY':'INTERPRETED MODEL'}</strong><small>{mapUnits?'8 map classes':'7 model units'}</small></header>
       <button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>{mapUnits?'Map':'Model'} legend · {mapUnits?8:7} classes {legendOpen?'−':'+'}</button>
-      <div>{(mapUnits?MAPPED_SURFACE_UNITS:MODEL_ROCK_UNITS).map(({color,label})=>mapUnits
+      <div>{(mapUnits?MAPPED_SURFACE_UNITS:MODEL_ROCK_UNITS).map(({color,label,...unit})=>mapUnits
         ? <div className="tanga-geology-surface-legend__row" key={label}>
           <button className="tanga-geology-surface-legend__unit" type="button" aria-pressed={selectedUnit?.title===label} onClick={()=>{if(selectedUnit?.title===label){onSelectUnit(null);return;}if(hiddenUnits.includes(label))onToggleUnit(label);onSelectUnit({title:label,rows:[label==='Soil cover'?'Source-map soil-cover class; generalized mapped footprint.':'Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:color});}}><i style={{background:color}}/>{label}</button>
           <button className="tanga-geology-surface-legend__visibility" type="button" aria-label={`${hiddenUnits.includes(label)?'Show':'Hide'} ${label}`} aria-pressed={!hiddenUnits.includes(label)} onClick={()=>onToggleUnit(label)} title={`${hiddenUnits.includes(label)?'Show':'Hide'} this mapped unit`}>{hiddenUnits.includes(label)?<EyeOff size={14}/>:<Eye size={14}/>}</button>
         </div>
-        : <span key={label}><i style={{background:color}}/>{label}</span>)}</div>
-      {!mapUnits&&<p>Map colours match only where unit names resolve.</p>}
+        : <span className="tanga-geology-surface-legend__model-row" key={label}><i style={{background:color}}/><span>{label}</span><small>{'matched' in unit&&unit.matched?'Mapped':'Unlinked'}</small></span>)}</div>
+      {!mapUnits&&<p>Not linked for depth highlighting: map units Kyanite sillimanite schist, Quartzite; model units Schist (subtype unspecified), Soil cover.</p>}
     </div>;
 
   return <>
@@ -50,7 +50,7 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
       <div ref={storyPanel} className="tanga-geology-story__body">
         <p className="tanga-story-panel__intro">{intros[step] ?? intros[0]}</p>
         {selectedUnit&&<section className="tanga-geology-selected-unit" aria-live="polite"><header><i style={{background:selectedUnit.tone}}/><strong>{selectedUnit.title}</strong><button type="button" onClick={()=>onSelectUnit(null)} aria-label="Clear selected map unit">×</button></header>{selectedUnit.rows.map(row=><p key={row}>{row}</p>)}</section>}
-        <details className="tanga-geology-basis"><summary>Source &amp; interpretation limits</summary><p className="tanga-story-datum-note">{step<2?'Surface polygons are colour-traced from the scanned project map and registered from its printed grid. They are approximate map interpretations, not original shapefiles or surveyed contacts.':'Mapped surface areas and modelled volumes are distinct interpretations. No mapped contacts are extruded into the model. Unmatched model units remain distinct.'}</p><a href="/geology_map.jpg" target="_blank" rel="noreferrer">Open original project map <ExternalLink size={13}/></a></details>
+        <details className="tanga-geology-basis"><summary>Source &amp; interpretation limits</summary><p className="tanga-story-datum-note">{step<2?'Surface polygons are colour-traced from the scanned project map and registered from its printed grid. They are approximate map interpretations, not original shapefiles or surveyed contacts.':'Mapped surface areas and modelled volumes are distinct interpretations. Display name associations: model Granulite ↔ mapped Mafic granulite; Quartz-Feldspathic ↔ mapped Quartzofeldspathic rock; Marble ↔ mapped Crystalline limestone. These links guide colour and selection only; no mapped contact is extruded into the model.'}</p><a href="/geology_map.jpg" target="_blank" rel="noreferrer">Open original project map <ExternalLink size={13}/></a></details>
       </div>
       <footer className="tanga-geology-story__footer">
         <span className="tanga-geology-basis-tag">{step<2?'8 mapped classes · approximate registration':'Separate interpreted volumes · true vertical scale'}</span>
