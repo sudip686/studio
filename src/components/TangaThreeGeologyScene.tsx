@@ -2100,20 +2100,30 @@ export default function TangaThreeGeologyScene({
     let cancelled = false;
     consumedCameraCommandIdRef.current=0;
     const sceneStartedAt = performance.now();
+    let firstUsefulFrameReported = false;
+    let pendingUsefulFrame: {scene: SceneLoadState; terrain: SceneLoadState; quality: AssetQuality; message: string} | null = null;
+    const publishLoadState = (sceneState: SceneLoadState, terrainState: SceneLoadState, quality: AssetQuality, message: string) => {
+      setSceneReady(sceneState === 'ready');
+      onLoadState?.({scene: sceneState, terrain: terrainState, quality, message, elapsedMs: Math.round(performance.now() - sceneStartedAt)});
+    };
     const reportLoadState = (
       sceneState: SceneLoadState,
       terrainState: SceneLoadState,
       quality: AssetQuality,
       message: string
     ) => {
-      setSceneReady(sceneState === 'ready');
-      onLoadState?.({
-        scene: sceneState,
-        terrain: terrainState,
-        quality,
-        message,
-        elapsedMs: Math.round(performance.now() - sceneStartedAt),
-      });
+      // Data readiness can precede the first useful picture by the duration
+      // of the authored camera move. Keep controls in their loading state
+      // until populated geometry has rendered and that move has settled.
+      if (sceneState === 'ready' && mode !== 'metallurgy' && !firstUsefulFrameReported) {
+        pendingUsefulFrame = {scene: sceneState, terrain: terrainState, quality, message};
+        setSceneReady(false);
+        onLoadState?.({scene: 'loading', terrain: terrainState, quality, message: 'Rendering the authored view', elapsedMs: Math.round(performance.now() - sceneStartedAt)});
+        return;
+      }
+      if (sceneState !== 'ready') pendingUsefulFrame = null;
+      if (sceneState === 'ready') firstUsefulFrameReported = true;
+      publishLoadState(sceneState, terrainState, quality, message);
     };
 
     reportLoadState('loading', 'loading', assetQuality, 'Drawing preview surface');
@@ -2521,7 +2531,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         stageBaseRotation = 0; stageVerticalBaseRotation = 0; stage.rotation.set(0,0,0);
         setSectionEnabled(false);
         explodedRef.current=false;setExploded(false);separation=0;
-        scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.8, cameraShot.fov);
+        const reliefPosition = cameraShot.to.clone();
+        if (camera.aspect < .85) {
+          // On a phone the wide authored oblique compresses the terrain into
+          // a thin ribbon between the HUD panels. Raise the camera to a more
+          // map-readable 25° pitch while preserving its horizontal bearing;
+          // the shared portrait fit still keeps the mapped footprint in frame.
+          const offset = reliefPosition.clone().sub(cameraShot.target);
+          const horizontal = Math.hypot(offset.x, offset.z);
+          offset.y = horizontal * Math.tan(THREE.MathUtils.degToRad(25));
+          reliefPosition.copy(cameraShot.target).add(offset);
+        }
+        host.dataset.geologyReliefCamera = JSON.stringify({aspect:Number(camera.aspect.toFixed(3)),pitchDeg:Number(THREE.MathUtils.radToDeg(Math.atan2(reliefPosition.y-cameraShot.target.y,Math.hypot(reliefPosition.x-cameraShot.target.x,reliefPosition.z-cameraShot.target.z))).toFixed(1)),target:cameraShot.target.toArray().map(value=>Number(value.toFixed(1))),position:reliefPosition.toArray().map(value=>Number(value.toFixed(1)))});
+        scheduleCameraTween(reliefPosition, cameraShot.target.clone(), 2.8, cameraShot.fov);
         applyTerrainSurfaceView();
         host.dataset.geologyStage = 'mapped-relief';
         setStatus('Mapped rock polygons follow the unchanged terrain · drag to inspect relief');
@@ -3944,7 +3966,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         geologyModelReady = true;
         if (cameraCommandRef.current && ['geologyPlan','geologyTilt','geologyDepth'].includes(cameraCommandRef.current.action)) consumeCameraCommand(cameraCommandRef.current);
       }
-      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userGestured && !geologyPlan && !facilityFocused) {
+      // Do not replace an authored scene command with the generic first-load
+      // camera. `userGestured` covers manual input only; a presentation shot
+      // sets `userTookControl` and must retain its own target and framing.
+      if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userTookControl && !geologyPlan && !facilityFocused) {
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.2, cameraShot.fov);
       }
         const shouldUpgradeTerrain = !cancelled && (resources?.quality ?? assetQuality) === 'preview';
@@ -4545,6 +4570,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         authoredFog.far=Math.max(12000,focusDistance*2.2);
       }
       renderer.render(scene,camera);
+      if (pendingUsefulFrame && !cameraTween && (userTookControl || flyProgress >= 1) && renderer.info.render.calls > 0) {
+        const firstFrame = pendingUsefulFrame;
+        pendingUsefulFrame = null;
+        firstUsefulFrameReported = true;
+        host.dataset.firstUsefulFrameMs = String(Math.round(performance.now() - sceneStartedAt));
+        publishLoadState(firstFrame.scene, firstFrame.terrain, firstFrame.quality, firstFrame.message);
+      }
       frame = requestAnimationFrame(animate);
     };
     animate();
