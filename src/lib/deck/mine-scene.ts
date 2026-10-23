@@ -34,9 +34,21 @@ export function buildConcentrator() {
       if(stage)roof.userData.plantStage=stage;
     }
     for(let i=-w/2;i<=w/2;i+=w/4)for(const k of [-d/2,d/2])box(1.2,h,1.2,x+i,h/2,z+k,materials.copper);
-    box(w,h,d*0.04,x,h/2,z+d/2,materials.steel);
+    const frontPortal=stage==='feed'&&x===-88?{x:-104,width:12,height:23}:stage==='dewatering'?{x:104,width:12,height:20}:null;
+    if(frontPortal){
+      const left=frontPortal.x-frontPortal.width/2-(x-w/2),right=x+w/2-(frontPortal.x+frontPortal.width/2);
+      box(left,h,d*.04,x-w/2+left/2,h/2,z+d/2,materials.steel);
+      box(right,h,d*.04,x+w/2-right/2,h/2,z+d/2,materials.steel);
+      box(frontPortal.width,h-frontPortal.height,d*.04,frontPortal.x,(h+frontPortal.height)/2,z+d/2,materials.steel);
+    }else box(w,h,d*.04,x,h/2,z+d/2,materials.steel);
     // Clerestory glazing and end walls give industrial buildings volume.
-    for(const sign of [-1,1])box(1,h,d,x+sign*w/2,h/2,z,materials.steel);
+    for(const sign of [-1,1]){
+      if(stage){
+        const portal=Math.min(24,d*.55),height=Math.min(h-4,22),side=(d-portal)/2;
+        for(const edge of [-1,1])box(1,h,side,x+sign*w/2,h/2,z+edge*(portal+side)/2,materials.steel);
+        box(1,h-height,portal,x+sign*w/2,(h+height)/2,z,materials.steel);
+      }else box(1,h,d,x+sign*w/2,h/2,z,materials.steel);
+    }
     for(let i=0;i<6;i++)box(w/9,3,.3,x-w*.4+i*w*.16,h-5,z+d/2+.5,materials.water,'High-level glazing');
   }
   // ROM / receiving and primary crushing.
@@ -46,6 +58,12 @@ export function buildConcentrator() {
   shed('ROM & crushing',-88,-16,72,58,30,'feed');
   shed('Milling',-30,-18,48,45,27,'milling');
   const mill=cylinder(8,23,-30,12,-18);mill.rotation.z=Math.PI/2;mill.name='Milling process drum';mill.userData.preserveAnimation=true;root.userData.processMill=mill;
+  // Longitudinal shell ribs provide scale and make rotation legible. Instances
+  // stay attached to the drum and share its local cylinder axis.
+  const millRibs=new THREE.InstancedMesh(new THREE.BoxGeometry(.55,23,.55),materials.roof,12);
+  const ribTransform=new THREE.Matrix4();
+  for(let i=0;i<12;i++){const angle=i*Math.PI/6;ribTransform.makeTranslation(Math.cos(angle)*8.1,0,Math.sin(angle)*8.1);millRibs.setMatrixAt(i,ribTransform);}
+  millRibs.name='Mill shell stiffeners';millRibs.castShadow=true;mill.add(millRibs);
   // Flotation banks with agitator drives and a maintenance deck.
   for(let row=0;row<2;row++)for(let i=0;i<5;i++){
     const x=8+i*15,z=-36+row*24;
@@ -106,12 +124,13 @@ export function buildConcentrator() {
     for(let t=.2;t<1;t+=.3){const p=a.clone().lerp(b,t);box(1,p.y,1,p.x,p.y/2,p.z,materials.steel);}
   }
   // Connected conveyors and pipe racks. Flow points are exposed for animation.
-  const flow=[new THREE.Vector3(-106,10,44),new THREE.Vector3(-104,21,-16),new THREE.Vector3(-73,16,-16),new THREE.Vector3(-30,16,-18),new THREE.Vector3(8,16,-36),new THREE.Vector3(68,16,-36),new THREE.Vector3(103,14,-31),new THREE.Vector3(104,14,44)];
+  const flow=[new THREE.Vector3(-106,10,44),new THREE.Vector3(-104,21,-16),new THREE.Vector3(-73,16,-16),new THREE.Vector3(-30,16,-18),new THREE.Vector3(8,16,-36),new THREE.Vector3(68,16,-36),new THREE.Vector3(103,14,-31),new THREE.Vector3(104,14,44),new THREE.Vector3(104,14,78),new THREE.Vector3(100,14,78),new THREE.Vector3(100,14,110)];
   for(let i=0;i<flow.length-1;i++){
     const a=flow[i],b=flow[i+1],v=b.clone().sub(a);
-    const belt=box(i<3?5:1.4,v.length(),i<3?2:1.4,0,0,0,i<3?materials.roof:materials.copper);
+    const dryTransfer=i<3||i>=7;
+    const belt=box(dryTransfer?5:1.4,v.length(),dryTransfer?2:1.4,0,0,0,dryTransfer?materials.roof:materials.copper);
     belt.position.copy(a).add(b).multiplyScalar(.5);belt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());
-    if(i<3)for(let t=.2;t<1;t+=.3){const p=a.clone().lerp(b,t);box(1,p.y,1,p.x,p.y/2,p.z,materials.steel);}
+    if(dryTransfer)for(let t=.2;t<1;t+=.3){const p=a.clone().lerp(b,t);box(1,p.y,1,p.x,p.y/2,p.z,materials.steel);}
   }
   root.userData.flow=flow;
   root.userData.labels=[['ROM / feed',-106,32,20],['Crushing & milling',-50,37,-20],['Flotation',40,30,-24],['Dewatering & product',95,35,45]];

@@ -81,11 +81,27 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
   for (const z of [38, 50]) box(37, .8, 1, 69, 10, z, 'Dewatering filter-press rail', accent);
   box(7, 7, 14, 48, 6, 44, 'Dewatering hydraulic power pack', dark);
   const dryer = cylinder(4, 27, 106, 11, 28, 'Dewatering rotary dryer'); dryer.rotation.z = Math.PI / 2;
+  dryer.userData.preserveAnimation=true;root.userData.processDryer=dryer;
+  const dryerRibs=new THREE.InstancedMesh(new THREE.BoxGeometry(.3,27,.3),dark,8);
+  const ribMatrix=new THREE.Matrix4();
+  for(let i=0;i<8;i++){const angle=i*Math.PI/4;ribMatrix.makeTranslation(Math.cos(angle)*4.05,0,Math.sin(angle)*4.05);dryerRibs.setMatrixAt(i,ribMatrix);}
+  dryerRibs.name='Dryer shell stiffeners';dryerRibs.castShadow=true;dryer.add(dryerRibs);
   for (const x of [96, 116]) box(3, 6, 9, x, 5, 28, 'Dewatering dryer support', materials.concrete);
   for (const x of [139, 156, 173]) {
     cylinder(5, 20, x, 16, 92, 'Product surge silo');
     mesh(new THREE.ConeGeometry(5, 8, 16), accent, x, 4, 92, 'Product silo discharge cone').rotation.z = Math.PI;
     for (const z of [87, 97]) box(.6, 9, .6, x, 5, z, 'Product silo support');
+  }
+  // Palletised bag forms give the covered store a readable purpose and scale.
+  // These are illustrative stock, without product tonnage or capacity meaning.
+  const bagMaterial=new THREE.MeshStandardMaterial({color:0xbec3b2,roughness:.98});
+  for(const x of [34,58,82,116])for(const z of [105,120]){
+    box(17,1,11,x,2,z,'Product storage pallet',dark);
+    for(let layer=0;layer<2;layer++)for(const offset of [-4,4]){
+      const bag=mesh(new THREE.SphereGeometry(1,10,6),bagMaterial,x+offset,4+layer*4.5,z,'Bagged concentrate · illustrative');
+      bag.scale.set(3.8,2.4,4.2);
+      box(.25,4.4,8,x+offset,4+layer*4.5,z,'Bag lifting strap',dark);
+    }
   }
   // Reagent bund with distinguishable tanks and service lines.
   box(48, 1.5, 27, -40, 2.2, 104, 'Reagent containment slab', materials.concrete);

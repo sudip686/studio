@@ -1529,6 +1529,10 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-process-exhibit--factory .tanga-factory-flow{grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px}
 .tanga-process-exhibit--factory .tanga-factory-flow div{padding:6px 7px}
 .tanga-process-exhibit--factory .tanga-factory-flow dd{font-size:10px;line-height:1.3}
+.tanga-factory-motion-note{margin:0 0 7px;padding-left:8px;border-left:2px solid #a47a50;color:#415b52;font-size:10px;line-height:1.45}
+.tanga-factory-operation-basis{margin:0 0 8px;color:#596a64;font-size:10px;line-height:1.45}
+.tanga-factory-operation-basis summary{cursor:pointer;color:#375f54;text-decoration:underline;text-underline-offset:3px}
+.tanga-factory-operation-basis p{margin:6px 0}.tanga-factory-operation-basis a{color:#375f54;text-decoration:underline;text-underline-offset:3px}
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result{gap:3px;margin:0 0 7px;padding:8px 9px;background:#e8ede6;color:#344b44}
 .tanga-process-exhibit--factory .tanga-factory-result strong{font-size:19px}
 .tanga-process-exhibit--factory .tanga-factory-result i{font-size:9px}

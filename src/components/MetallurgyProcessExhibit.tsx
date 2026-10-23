@@ -8,14 +8,16 @@ import {cameraEase} from '@/lib/deck/presentation-motion';
 import {buildConcentrator} from '@/lib/deck/mine-scene';
 import MetallurgyEvidenceBoard from './MetallurgyEvidenceBoard';
 import {MET_GROUPS} from '@/lib/deck/metallurgy-plant';
+import {createPlantProcessMotion} from '@/lib/deck/plant-process-motion';
 
 const PROCESS = [
-  {id: 'feed', title: 'Feed & crushing', short: 'Feed', point: [-44, 8, -8] as const, hasRoof: true, input: 'Mine feed · conceptual', output: 'Prepared feed · illustrative', description: 'A proposed receiving and crushing area. The layout is illustrative; an approved plant flowsheet and equipment specification are not available in this view.'},
-  {id: 'milling', title: 'Milling & classification', short: 'Milling', point: [-15, 7.5, -9] as const, hasRoof: true, input: 'Prepared feed · illustrative', output: 'Liberated material · illustrative', description: 'A conceptual mill and classification area. The 3D arrangement explains a possible process relationship and does not represent a selected equipment design.'},
-  {id: 'flotation', title: 'Flotation', short: 'Flotation', point: [20, 7.5, -18] as const, hasRoof: true, input: 'Milled material · illustrative', output: 'Concentrate and process water · illustrative', description: 'Bench-scale flotation results are shown in the evidence board. They do not validate this proposed plant arrangement or predict operating recovery.'},
-  {id: 'dewatering', title: 'Concentrate dewatering', short: 'Dewatering', point: [41.5, 6.5, 22] as const, hasRoof: true, input: 'Test concentrate · illustrative', output: 'Dried material · illustrative', description: 'A conceptual filter and drying area. Equipment, capacity, operating conditions and residue handling remain to be established by engineering.'},
-  {id: 'product', title: 'Product handling', short: 'Product', point: [50, 8, 55] as const, hasRoof: true, input: 'Dried material · illustrative', output: 'Storage / loadout · illustrative', description: 'Covered storage and loadout complete the visual process chain. No product specification, production rate or commercial qualification is implied.'},
+  {id: 'feed', title: 'Feed & crushing', short: 'Feed', point: [-44, 8, -8] as const, hasRoof: true, input: 'Mine feed · concept', output: 'Prepared feed · concept', description: 'Receive feed, reduce its size and convey it to milling. The industrial hopper and crushers illustrate the preparation step.', motion: 'Feed advances along the receiving conveyor.', basis: 'IMO Appendix D · A.1: laboratory stage crushing and sample splitting. Conveyor, industrial equipment and layout are conceptual.'},
+  {id: 'milling', title: 'Milling & classification', short: 'Milling', point: [-15, 7.5, -9] as const, hasRoof: true, input: 'Prepared feed · concept', output: 'Ground material · concept', description: 'Grinding prepares material for separation. Read the rotating drum, fixed bearings and classification equipment as one connected area.', motion: 'The drum rotates around its mounted axis.', basis: 'IMO Appendix D · A.2 and B.3: laboratory rod milling, screening and regrinding. The industrial drum and cyclone cluster are illustrative.'},
+  {id: 'flotation', title: 'Flotation', short: 'Flotation', point: [20, 7.5, -18] as const, hasRoof: true, input: 'Ground material · concept', output: 'Concentrate · concept', description: 'Agitation and air support flotation; the concentrate leaves through the launders. Compare the separate laboratory results for the tested response.', motion: 'Agitators turn; surface froth and launder cues show movement.', basis: 'IMO Appendix D · B.1–B.2: laboratory agitation, air addition and froth collection. Table 2 contains the reported final cleaner results; the plant arrangement is illustrative.'},
+  {id: 'dewatering', title: 'Concentrate dewatering', short: 'Dewatering', point: [41.5, 6.5, 22] as const, hasRoof: true, input: 'Wet concentrate · concept', output: 'Dried material · concept', description: 'Filter and dry the concentrate before handling. The filter press remains stationary while the conceptual dryer shell rotates on its supports.', motion: 'The dryer shell turns; filter plates stay fixed.', basis: 'IMO Appendix D · B.9: laboratory concentrate filtration, drying and sizing. Industrial filtration and rotary drying equipment remain design concepts.'},
+  {id: 'product', title: 'Product handling', short: 'Product', point: [50, 8, 55] as const, hasRoof: true, input: 'Dried material · concept', output: 'Storage / loadout · concept', description: 'A connected transfer leads into covered storage and loadout. This area completes the facility concept; product qualification remains future work.', motion: 'The modelled transfer connects dewatering to storage.', basis: 'Concept only: the reviewed laboratory procedures do not specify an industrial storage or loadout arrangement. No product grade, capacity or commercial qualification is established.'},
 ] as const;
+const IMO_PROCESS_REPORT='/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf';
 
 type ProcessId = typeof PROCESS[number]['id'];
 type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofBaseY?: number; roofOpacity?: number}};
@@ -78,20 +80,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     roofs.forEach(roof => {
       roof.userData.roofBaseY = roof.position.y;
       roof.userData.roofOpacity = 1;
-      if (Array.isArray(roof.material)) roof.material = roof.material.map(material => material.clone());
-      else roof.material = roof.material.clone();
+      const cloneRoofMaterial=(material:THREE.Material)=>{const clone=material.clone();clone.onBeforeCompile=material.onBeforeCompile;clone.customProgramCacheKey=material.customProgramCacheKey;return clone;};
+      if (Array.isArray(roof.material)) roof.material = roof.material.map(cloneRoofMaterial);
+      else roof.material = cloneRoofMaterial(roof.material);
     });
     // Fit the authored overview to the closed campus, never to lifted roofs or
     // moving markers. Reset must recover one stable whole-plant composition.
     const overviewBounds = new THREE.Box3().setFromObject(plant);
 
-    const material = new THREE.MeshStandardMaterial({color: '#28373b', roughness: .75, metalness: .05});
-    const flow = plant.userData.flow as THREE.Vector3[];
-    const markers = Array.from({length: 4}, (_, index) => {
-      const marker = new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 8), material);
-      marker.castShadow = true; marker.userData.phase = index / 4; plant.add(marker); return marker;
-    });
-    const mill = plant.userData.processMill as THREE.Mesh | undefined;
+    const processMotion = createPlantProcessMotion(plant);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#b8b9b0', roughness: .96}));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.8; ground.receiveShadow = true; scene.add(ground);
     scene.add(new THREE.HemisphereLight(0xf7fbff, 0x64736d, 1.05));
@@ -189,22 +186,13 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
     updateRoofTargets();
     if (overviewRef.current) fitOverview(false); else frameStage(stageRef.current, false);
-    const pointOnFlow = (distance: number) => {
-      if (flow.length < 2) return new THREE.Vector3();
-      const segmentCount = flow.length - 1, scaled = (distance % 1) * segmentCount;
-      const index = Math.min(segmentCount - 1, Math.floor(scaled));
-      return flow[index].clone().lerp(flow[index + 1], scaled - index);
-    };
     const draw = (now: number) => {
       if (disposed) return;
       const dt = Math.min(.08, Math.max(0, (now - last) / 1000)); last = now;
       if (!document.hidden && element.getClientRects().length) {
         const animateProcess = !pausedRef.current && !reducedMotion.matches;
         if (animateProcess) elapsed += dt;
-        markers.forEach(marker => marker.position.copy(pointOnFlow(elapsed * .045 + Number(marker.userData.phase))));
-        // The drum's cylinder axis is local Y (its mounting rotates it onto X).
-        // Rotate around that axis, only while inspecting the open mill area.
-        if (mill && animateProcess && !overviewRef.current && selected === 'milling' && openRoofRef.current) mill.rotateY(dt * .42);
+        const activity=processMotion.update(dt, overviewRef.current?'overview':selected, animateProcess&&(overviewRef.current||openRoofRef.current));
         let roofMoving = false;
         roofs.forEach(roof => {
           const state = roofState.get(roof); if (!state) return;
@@ -244,6 +232,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           element.dataset.cameraPosition = JSON.stringify(camera.position.toArray());
           element.dataset.cameraTarget = JSON.stringify(controls.target.toArray());
           element.dataset.processTime = elapsed.toFixed(3);
+          element.dataset.processActivity = JSON.stringify(activity);
           element.dataset.renderCount = String(renderer.info.render.frame);
         }
       }
@@ -296,19 +285,21 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     <div className="tanga-factory-body">
       <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage} />
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
-        <div className="tanga-process-caption"><span>{overview ? 'Facility overview · connected campus and process route' : `${selected.title} · ${openRoof ? selected.hasRoof ? 'roof opening to reveal the section' : 'open-air equipment focus' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · Whole plant restores overview</small></div>
+        <div className="tanga-process-caption"><span>{overview ? 'Facility overview · connected campus and process route' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · Whole plant restores overview</small></div>
       </div>
       <aside className="tanga-factory-inspector" aria-live="polite">
         <small className="tanga-process-kicker">{overview ? 'FACILITY OVERVIEW' : `AREA ${String(PROCESS.findIndex(item => item.id === stage) + 1).padStart(2, '0')} / 05`}</small>
         <h3>{overview ? 'A single connected campus' : selected.title}</h3>
         <p className="tanga-process-explanation">{overview ? 'Follow the conceptual route from feed receiving through preparation, flotation, dewatering and product handling. The layout and equipment are illustrative.' : selected.description}</p>
         {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
-        {!overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>Supporting evidence · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small><i>Open all eight laboratory results ↗</i></button>}
+        {!overview&&<><p className="tanga-factory-motion-note">{selected.motion}</p><details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
+        {!overview && selected.id==='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>Laboratory composite · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small><i>Open all eight laboratory results ↗</i></button>}
+        {!overview && selected.id!=='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
         {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>Separate measures for TC, recovery and coarse mass fraction.</small><i>Open comparison board ↗</i></button>}
         <small className="tanga-factory-disclosure">Concept layout only. No approved plant location, flowsheet, equipment schedule, capacity, residue design or operating performance is represented.</small>
       </aside>
     </div>
-    <footer className="tanga-factory-footer"><span><i aria-hidden="true"/> Conceptual material route</span><span>Plant arrangement is illustrative · lab results do not establish plant-scale performance</span></footer>
+    <footer className="tanga-factory-footer"><span><i aria-hidden="true"/> Illustrative process motion</span><span>Speeds and particle counts are display cues · laboratory results remain separate from plant performance</span></footer>
   </section></>;
 
   function frameRoofToggle() {
