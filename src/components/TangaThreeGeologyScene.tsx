@@ -315,6 +315,8 @@ type ThreeCallout = {
   priority?: number;
   /** Small surface tags keep the mine overview readable while the site stays in view. */
   compact?: boolean;
+  /** Hide this label when opaque, visible scene geometry blocks its world anchor. */
+  occlusion?: 'scene' | 'none';
 };
 
 type ThreeLegendItem = {
@@ -2355,6 +2357,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let siteOverviewCallouts: ThreeCallout[] = [];
     const calloutAnchors = new Map<string, THREE.Vector3>();
     const calloutObjects = new Map<string, THREE.Object3D>();
+    const calloutOccluders: THREE.Object3D[] = [];
     const terrainSurfaceMaterials: THREE.Material[] = [];
     // Depth-only twins of the terrain; hidden while the surface is glass.
     const terrainOccluders: THREE.Mesh[] = [];
@@ -2922,6 +2925,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     };
 
     const raycaster = new THREE.Raycaster();
+    const calloutRaycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const pickables: THREE.Object3D[] = [];
 
@@ -4108,14 +4112,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             cameraShot.mid.copy(cameraShot.from).lerp(cameraShot.to, .5);
             cameraShot.targetMid.copy(cameraShot.target);
             cameraShot.drift.set(8, 3, 8);
-            calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const}));
+            calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const,occlusion:'scene' as const}));
             if(feedAnchor&&sitePlan.plant&&processPlant){
-              calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story'});
-              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story'});
+              calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
+              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:[sitePlan.plant[0],processPlant.position.y+20,sitePlan.plant[1]],kind:'story',occlusion:'scene'});
             }
-            for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell · concept',water:'Settling / reclaim · concept','raw-water':'Raw-water pond · concept',waste:'Waste-rock benches · concept'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story'});
+            for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell · concept',water:'Settling / reclaim · concept','raw-water':'Raw-water pond · concept',waste:'Waste-rock benches · concept'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story',occlusion:'scene'});
             siteOverviewCallouts = calloutsForProjection;
             for(const label of calloutsForProjection)calloutAnchors.set(label.id,new THREE.Vector3(...label.anchor));
+            // Site labels disappear when a nearer solid feature blocks the
+            // world anchor. Exclude instanced grade blocks: they are not
+            // architectural occluders and are costly to ray-test individually.
+            calloutOccluders.length=0;
+            stage.traverse(object=>{
+              if(!(object instanceof THREE.Mesh)||object instanceof THREE.InstancedMesh)return;
+              if(terrainMeshes.includes(object)||terrainOccluders.includes(object))return;
+              const materials=Array.isArray(object.material)?object.material:[object.material];
+              if(materials.some(material=>material.visible&&material.depthWrite&&material.opacity>.65))calloutOccluders.push(object);
+            });
+            host.dataset.calloutOccluders=String(calloutOccluders.length);
           }
         }
 
@@ -4368,6 +4383,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       const candidates: LabelCandidate[] = [];
       const byId = new Map<string, {callout: ThreeCallout; anchorPixelX: number; anchorPixelY: number}>();
+      const activeOccluders=calloutOccluders.filter(object=>{
+        let parent:THREE.Object3D|null=object;
+        while(parent){if(!parent.visible)return false;parent=parent.parent;}
+        const materials=Array.isArray((object as THREE.Mesh).material)?(object as THREE.Mesh).material as THREE.Material[]:[(object as THREE.Mesh).material as THREE.Material];
+        return materials.some(material=>material.visible&&material.depthWrite&&material.opacity>.65);
+      });
+      const cameraWorld=camera.getWorldPosition(new THREE.Vector3());
 
       visible.forEach((callout) => {
         const anchor = calloutAnchors.get(callout.id);
@@ -4390,6 +4412,36 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           rawAnchorY > height
         ) {
           return;
+        }
+        if(callout.occlusion==='scene'&&mode==='mine_planning'&&activeOccluders.length){
+          // Cast only to a point just short of the feature. The small tolerance
+          // keeps a label attached to its own surface while hiding it behind a
+          // nearer ridge, pit wall, or building during orbit and zoom.
+          const toAnchor=anchorWorld.clone().sub(cameraWorld);
+          const anchorDistance=toAnchor.length();
+          const tolerance=Math.max(8,anchorDistance*.002);
+          if(anchorDistance>tolerance){
+            calloutRaycaster.set(cameraWorld,toAnchor.normalize());
+            calloutRaycaster.near=.1;
+            calloutRaycaster.far=anchorDistance-tolerance;
+            if(calloutRaycaster.intersectObjects(activeOccluders,false).length)return;
+          }
+        }
+        if(callout.occlusion==='scene'&&mode==='mine_planning'&&terrainResources&&layerSettingsRef.current.terrain.visible&&terrainSurfaceMaterials.some(material=>material.visible&&material.opacity>.65)){
+          // Terrain is checked against the same registered elevation samples
+          // used to build the visible surface. This avoids triangle-scanning a
+          // 512² mesh on every camera update while keeping ridge occlusion live.
+          const cameraLocal=stage.worldToLocal(cameraWorld.clone());
+          const anchorLocal=stage.worldToLocal(anchorWorld.clone());
+          const distance=Math.hypot(anchorLocal.x-cameraLocal.x,anchorLocal.z-cameraLocal.z);
+          const steps=Math.min(96,Math.max(4,Math.ceil(distance/55)));
+          for(let i=2;i<steps-1;i++){
+            const t=i/steps;
+            const x=THREE.MathUtils.lerp(cameraLocal.x,anchorLocal.x,t);
+            const z=THREE.MathUtils.lerp(cameraLocal.z,anchorLocal.z,t);
+            const lineY=THREE.MathUtils.lerp(cameraLocal.y,anchorLocal.y,t);
+            if(lineY<terrainSurfaceY(terrainResources,x,-z)-2)return;
+          }
         }
 
         const anchorPixelX = rawAnchorX;
