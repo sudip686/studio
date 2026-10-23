@@ -11,6 +11,7 @@ Scope: visual QA of the checked-in map and derived surface polygons. No polygon,
 - `scripts/derive-geology-polygons.py`, which creates colour masks, closes 3 × 3 px gaps, simplifies contours, and retains holes.
 - A source-map overlay rendered from the GeoJSON using its documented grid transform. The overlay was inspected at full resolution.
 - The supplied `documents_raw` report tree was searched for GIS vector files (`.shp`, `.gpkg`) and source elevation rasters (`.tif`, `.tiff`). No such project GIS files were found in that tree. This does not establish that no authoritative files exist elsewhere.
+- The December 2025 MRE and April 2025 graphite report text were searched for sample-specific grab-sample coordinates and IDs.
 
 ## Registration check
 
@@ -46,9 +47,13 @@ All seven feature names and swatch colours match the map legend. The source-alig
 
 The counts are a QA signal, not a geological count. A hole in a colour mask may be an overprinted symbol, line, soil gap, or actual uncoloured area. The raster alone does not support deciding which. Do not fill holes, merge fragments, or smooth boundaries for presentation until source GIS or a defensible interpretation resolves them. Keep the existing UI disclosure that these are digitized map polygons, approximately registered, and not surveyed contacts.
 
+## Grab-sample locations
+
+The December 2025 MRE text reports 155 reconnaissance grab samples and 170 detailed-mapping grab samples, as well as pit and channel samples. The reviewed report text gives aggregate counts but yielded no per-sample grab IDs paired with coordinates. The separate local sample-evidence workbook contains drill-core interval entities with calculated midpoints and is explicitly marked confidential; those points are not surface grab-sample locations and must not be repurposed as such. No grab-sample markers were added. A source register with surface sample IDs and verified coordinates is still required to show them.
+
 ## Decision and follow-up
 
 - Printed-grid registration has been checked against all visible labelled grid lines. No registration edit is justified by the residuals.
 - The polygon source check is complete, with raster contamination and fragmentation recorded. Geometry repair remains blocked on authoritative shapefiles/georeferenced source data or a reviewed digitization.
-- No grab-sample coordinates were added. The report-derived source set still needs a separate coordinate/provenance audit before markers can be considered.
+- No grab-sample coordinates were added. The report-text check and sample-type distinction are recorded above; reconsider markers only when a source register pairs surface sample IDs with verified coordinates and provenance.
 - The map should remain a translucent surface overlay over the existing terrain, with regional context clearly separate. Do not use the map raster as elevation or project these surface colours into the interpreted depth model.

@@ -90,7 +90,7 @@ Acceptance: no duplicated primary Continue action; no model focal point or selec
 - [x] Couple map/model highlighting only for verified unit-name mappings. Keep unmatched units explicitly distinct.
 - [x] Put map-fill opacity beside the mapped-geology layer; retain terrain opacity as a separate clearly named control. The current two opacities must not be confused.
 - [x] Include a fixed section view or section-plane interaction only where supported by the existing model. Label orientation and vertical scale; flag any exaggeration. The north–south position slider drives an east–west vertical cut through the registered interpretation. Its controls now state the orientation and 1× vertical scale and explain that surface polygons are not projected into depth. Verified on the local production build: the cutaway toggles on, the range is disabled until enabled, and moving the slider updates the rendered section position; the local model transform uses `VERTICAL_EXAGGERATION = 1`.
-- [ ] Add grab-sample markers only if report coordinates or a defensible map registration are available, with sample IDs and provenance.
+- [x] Check for grab-sample coordinates and add markers only if sample IDs and provenance can be verified. The reviewed report text gives aggregate counts but no per-sample coordinate pairs; confidential core-interval midpoints are not surface grabs. No markers were added. See `TANGA_GEOLOGY_POLYGON_AUDIT_2026-10-23.md`.
 
 Acceptance: select a rock unit in plan, tilt, reveal the interpretation and return without losing orientation; its color and evidence basis remain understandable throughout. No invented sample locations or volume reconstruction.
 
