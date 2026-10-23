@@ -6,7 +6,11 @@ export const cameraEase=(value:number)=>{
 
 /** Resolution-only adaptation: never changes source geometry, counts or assays. */
 export function createResolutionGovernor(initial:number){
-  let ratio=Math.max(.75,Math.min(2,initial)),samples=0,slowWindows=0;
+  // Reduce the settled draw-buffer scale conservatively when an integrated GPU
+  // remains slow. Brief gesture scaling is handled separately so the held
+  // presentation view does not stay soft after the presenter releases.
+  const minimumRatio=.75;
+  let ratio=Math.max(minimumRatio,Math.min(2,initial)),samples=0,slowWindows=0;
   const window:number[]=[];
   return {sample(milliseconds:number):number{
     if(!Number.isFinite(milliseconds)||milliseconds<1||milliseconds>250)return ratio;
@@ -16,7 +20,7 @@ export function createResolutionGovernor(initial:number){
       // The target is expressed as a tail-latency budget. Average frame time
       // alone can hide the stutters visible during orbit and camera changes.
       slowWindows=window[80]>33.4?slowWindows+1:0;
-      if(slowWindows>=2){ratio=Math.max(.75,Math.round((ratio-.1)*100)/100);slowWindows=0;}
+      if(slowWindows>=2){ratio=Math.max(minimumRatio,Math.round((ratio-.1)*100)/100);slowWindows=0;}
       samples=0;window.length=0;
     }
     return ratio;
