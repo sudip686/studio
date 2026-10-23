@@ -181,10 +181,31 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
 
 function retainSourceTerrain(geometry:THREE.BufferGeometry){
   const position=geometry.getAttribute('position');
-  if(position&&!geometry.userData.sourcePositions)geometry.userData.sourcePositions=new Float32Array(position.array);
+  if(position&&!geometry.userData.sourcePositions){
+    const sourcePositions=new Float32Array(position.array);
+    const sourcePositionAttribute=new THREE.BufferAttribute(sourcePositions,position.itemSize,position.normalized);
+    geometry.userData.sourcePositions=sourcePositions;
+    geometry.userData.sourcePositionAttribute=sourcePositionAttribute;
+    geometry.userData.sourceBoundingSphere=geometry.boundingSphere?.clone()??null;
+    const normal=geometry.getAttribute('normal');
+    if(normal){
+      const sourceNormalAttribute=new THREE.BufferAttribute(new Float32Array(normal.array),normal.itemSize,normal.normalized);
+      geometry.userData.sourceNormalAttribute=sourceNormalAttribute;
+    }
+  }
 }
 function retainConceptTerrain(geometry:THREE.BufferGeometry){
-  geometry.userData.conceptPositions=new Float32Array(geometry.getAttribute('position').array);
+  const position=geometry.getAttribute('position');
+  const conceptPositions=new Float32Array(position.array);
+  const conceptPositionAttribute=new THREE.BufferAttribute(conceptPositions,position.itemSize,position.normalized);
+  geometry.userData.conceptPositions=conceptPositions;
+  geometry.userData.conceptPositionAttribute=conceptPositionAttribute;
+  geometry.userData.conceptBoundingSphere=geometry.boundingSphere?.clone()??null;
+  const normal=geometry.getAttribute('normal');
+  if(normal){
+    const conceptNormalAttribute=new THREE.BufferAttribute(new Float32Array(normal.array),normal.itemSize,normal.normalized);
+    geometry.userData.conceptNormalAttribute=conceptNormalAttribute;
+  }
   geometry.userData.conceptVisible=undefined;
 }
 export function gradeConceptPad(geometry:THREE.BufferGeometry,pad:ConceptPad){
@@ -198,9 +219,12 @@ export function gradeConceptPad(geometry:THREE.BufferGeometry,pad:ConceptPad){
 }
 export function showConceptTerrain(geometry:THREE.BufferGeometry,show:boolean){
   if(!geometry.userData.sourcePositions||!geometry.userData.conceptPositions||geometry.userData.conceptVisible===show)return;
-  const position=geometry.getAttribute('position');
-  (position.array as Float32Array).set(show?geometry.userData.conceptPositions:geometry.userData.sourcePositions);
-  position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();geometry.userData.conceptVisible=show;
+  const position=show?geometry.userData.conceptPositionAttribute:geometry.userData.sourcePositionAttribute;
+  const normal=show?geometry.userData.conceptNormalAttribute:geometry.userData.sourceNormalAttribute;
+  if(position)geometry.setAttribute('position',position);
+  if(normal)geometry.setAttribute('normal',normal);
+  geometry.boundingSphere=show?geometry.userData.conceptBoundingSphere:geometry.userData.sourceBoundingSphere;
+  geometry.userData.conceptVisible=show;
 }
 
 export function pitHeight(p:Point2,pit:CandidatePit) {

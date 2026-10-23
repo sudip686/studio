@@ -4935,22 +4935,13 @@ export default function TangaDeckWorkbench() {
   // ask is usually "drop the blocks and show me just the holes", and changing
   // scene is too blunt an answer.
   const [surfaceConceptView, setSurfaceConceptView] = useState(false);
-  const preCompareLayersRef = useRef<DeckLayerSettings | null>(null);
+  const [surfaceCompareSplit, setSurfaceCompareSplit] = useState(50);
   const toggleSurfaceConceptView = useCallback(() => {
-    setLayerSettings((current) => {
-      if (!surfaceConceptView) {
-        preCompareLayersRef.current = current;
-        return {...current, terrain: {...current.terrain, visible: true}, drilling: {...current.drilling, visible: false}, blocks: {...current.blocks, visible: false}, context: {...current.context, visible: false}};
-      }
-      return preCompareLayersRef.current ?? DEFAULT_LAYER_SETTINGS;
-    });
     setSurfaceConceptView((current) => !current);
-  }, [surfaceConceptView]);
+  }, []);
   const defaultDrillingVisible = activeMode !== 'mine_planning' && activeMode !== 'metallurgy';
   useEffect(() => {
     if (activeMode !== 'mine_planning' && surfaceConceptView) {
-      setLayerSettings(preCompareLayersRef.current ?? DEFAULT_LAYER_SETTINGS);
-      preCompareLayersRef.current = null;
       setSurfaceConceptView(false);
     }
   }, [activeMode, surfaceConceptView]);
@@ -5422,6 +5413,8 @@ export default function TangaDeckWorkbench() {
           onSelectGeologyUnit={setSelectedGeologyUnit}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
+          terrainCompare={{enabled: surfaceConceptView, split: surfaceCompareSplit}}
+          onTerrainCompareSplit={setSurfaceCompareSplit}
           inspectionMode={isExploreMode}
           onInspectEvidence={()=>{setIsAutoplay(false);setIsExecutiveTour(false);}}
           onSiteFacilities={setAvailableMineFacilities}
@@ -6440,10 +6433,25 @@ export default function TangaDeckWorkbench() {
 
       {!isExploreMode && !isCoverScene && ['topography','drillholes','subsurface','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 Surface'],['drillholes','02 Drilling'],['subsurface','03 Geology'],['resource','04 Estimate']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
+      {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaChapterStoryPanel
+        chapter={activeMode as TangaChapterId}
+        developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id}
+        availableDevelopment={availableMineFacilities}
+        onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }}
+        onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined}
+        surfaceConceptView={surfaceConceptView}
+        surfaceCompareSplit={surfaceCompareSplit}
+        onSurfaceCompareSplit={setSurfaceCompareSplit}
+        onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined}
+        geologySectionShown={geologySectionShown}
+        milestoneId={selectedMilestoneId}
+        onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}}
+        onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined}
+        onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
+      />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
       {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 4 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
-      {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id} availableDevelopment={availableMineFacilities} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}} onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined} onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}/ >}
       {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory}/>}
 
       {activeMode === 'accessibility' && (

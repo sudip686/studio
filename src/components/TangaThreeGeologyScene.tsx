@@ -254,6 +254,8 @@ type TangaThreeGeologySceneProps = {
    */
   labelDensity?: LabelDensity;
   layerSettings?: DeckLayerSettings;
+  terrainCompare?: {enabled: boolean; split: number};
+  onTerrainCompareSplit?: (split: number) => void;
   inspectionMode?: boolean;
   onInspectEvidence?: () => void;
   onRetry?: () => void;
@@ -2003,6 +2005,8 @@ export default function TangaThreeGeologyScene({
   onLoadState,
   labelDensity = 'key',
   layerSettings = DEFAULT_LAYER_SETTINGS,
+  terrainCompare = {enabled: false, split: 50},
+  onTerrainCompareSplit,
   inspectionMode = false,
   onInspectEvidence,
   onRetry,
@@ -2098,6 +2102,8 @@ export default function TangaThreeGeologyScene({
   // Presenter layer state. Kept in a ref so the scene effect never rebuilds
   // just because a slider moved, and applied through a stage ref instead.
   const layerSettingsRef = useRef<DeckLayerSettings>(layerSettings);
+  const terrainCompareRef = useRef(terrainCompare);
+  terrainCompareRef.current = terrainCompare;
   const stageRef = useRef<THREE.Object3D | null>(null);
   useEffect(() => {
     layerSettingsRef.current = layerSettings;
@@ -4662,7 +4668,32 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         authoredFog.near=Math.max(4600,focusDistance*1.15);
         authoredFog.far=Math.max(12000,focusDistance*2.2);
       }
-      if (!wasContextLost) renderer.render(scene,camera);
+      if (!wasContextLost && mode === 'mine_planning' && terrainCompareRef.current.enabled && terrainMeshes.some(mesh => mesh.geometry.userData.sourcePositions && mesh.geometry.userData.conceptPositions)) {
+        const split = THREE.MathUtils.clamp(terrainCompareRef.current.split, 8, 92) / 100;
+        const conceptSurfaceVisible = layerSettingsRef.current.context.visible;
+        const width = renderer.domElement.width;
+        const height = renderer.domElement.height;
+        const splitX = Math.round(width * split);
+        const conceptVisibility = new Map<THREE.Object3D, boolean>();
+        stage.traverse(object => {
+          if (object.userData.deckLayer === 'context') {
+            conceptVisibility.set(object, object.visible);
+            object.visible = false;
+          }
+        });
+        for (const mesh of terrainMeshes) showConceptTerrain(mesh.geometry, false);
+        renderer.setScissorTest(false);
+        renderer.clear(true, true, true);
+        renderer.setScissorTest(true);
+        renderer.setScissor(0, 0, splitX, height);
+        renderer.render(scene, camera);
+        conceptVisibility.forEach((visible, object) => { object.visible = visible; });
+        for (const mesh of terrainMeshes) showConceptTerrain(mesh.geometry, true);
+        renderer.setScissor(splitX, 0, width - splitX, height);
+        renderer.render(scene, camera);
+        renderer.setScissorTest(false);
+        for (const mesh of terrainMeshes) showConceptTerrain(mesh.geometry, conceptSurfaceVisible);
+      } else if (!wasContextLost) renderer.render(scene,camera);
       if (pendingUsefulFrame && !cameraTween && (userTookControl || flyProgress >= 1) && renderer.info.render.calls > 0) {
         const firstFrame = pendingUsefulFrame;
         pendingUsefulFrame = null;
@@ -4798,6 +4829,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     <>
     <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
+      {mode === 'mine_planning' && terrainCompare.enabled && <div className="tanga-three__comparison-wipe" style={{left:`${THREE.MathUtils.clamp(terrainCompare.split,8,92)}%`}} title="Drag to compare original terrain and concept site" onPointerDown={event=>{event.currentTarget.setPointerCapture(event.pointerId);const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} onPointerMove={event=>{if(!event.currentTarget.hasPointerCapture(event.pointerId))return;const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} aria-hidden="true"><span>ORIGINAL TERRAIN</span><i/><span>CONCEPT SITE</span></div>}
       {mode!=='metallurgy' && <div className="tanga-surface-control" onKeyDown={event=>event.stopPropagation()}>
         <label htmlFor="tanga-surface-opacity">Surface opacity <output>{surfaceOpacity===null?`Auto · ${Math.round(authoredSurfaceOpacity*100)}%`:`${Math.round(surfaceOpacity*100)}%`}</output></label>
         <input id="tanga-surface-opacity" aria-label="Surface opacity" type="range" min="0" max="100" step="1" value={Math.round((surfaceOpacity??authoredSurfaceOpacity)*100)} onChange={event=>{setSurfaceOpacity(Number(event.target.value)/100);window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
