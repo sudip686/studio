@@ -105,6 +105,7 @@ Acceptance: select a rock unit in plan, tilt, reveal the interpretation and retu
 - [ ] Reproject leaders during camera movement; hide labels behind the camera or outside coverage. Define occluded versus deliberate x-ray labels consistently.
 - [ ] Clicking a model object, legend row, peer row or map marker selects the same feature, with an equivalent keyboard/touch route.
 - [ ] Preserve complete facility names in the inspector even when compact map labels abbreviate them.
+- [x] Correct the drill scene headline denominator: it now says “holes with intercepts” and the detail names the intercept-bearing population, distinct from the source report's 100 drillholes.
 
 Acceptance: marker endpoints stay attached at every camera preset and during zoom/resize; selection is reversible and never depends on hover alone.
 
@@ -139,6 +140,7 @@ Acceptance: every chapter introduces a different question or dataset; advancing 
 
 - [x] Extend existing chapter URLs with a small versioned, validated view state: chapter, substage, selected peer/map unit and layer options. Preserve old hash links and provide safe defaults for invalid state.
 - [x] Add Copy this view and a deterministic Return to story. Avoid embedding private report content or unbounded camera data in links.
+- [x] Expose the build revision and runtime target in the existing presenter Tools panel; Cloudflare OpenNext builds identify themselves explicitly. Exact hosted release/share-link verification remains open.
 - [ ] Refine preloading around the current and next authored views. Audit existing high-resolution image warmups before adding further downloads.
   - [x] Send the block-model warmup directly to `/api/block-model` instead of probing the nonexistent `/BlockModel.geojson` path first; local production opening logged no console errors.
 - [ ] Apply device-appropriate resolution and asset detail while preserving source values. Load detailed plant meshes only for relevant close-ups.
@@ -154,6 +156,10 @@ Acceptance: a shared link opens the intended view; missing assets produce a usab
 Implementation details, priorities, reference evidence and acceptance conditions are in the [reference review](TANGA_POLISH_REFERENCE_REVIEW_2026-10-23.md). The other nine packages in that document refine existing A–F items and are not duplicate checkboxes.
 
 - [ ] **G1 · Visual chapter index:** extend the existing All scenes overlay with lazy scene thumbnails, chapter questions and current-view indication; retain keyboard/touch access and avoid hidden WebGL pre-renders. Corresponds to BP10.
+  - [x] Add lazy local evidence/saved-view thumbnails, chapter questions and current-view/shot labels to the existing index; no hidden WebGL scenes are created.
+  - [x] Desktop smoke check: the dialog opens with focus on Close, shows all 12 chapter cards, and selecting chapter 9 closes the index and navigates to `#mine_planning`.
+  - [x] Desktop: all 12 cards and all 10 local thumbnails load, keyboard traversal wraps within the dialog, and selecting a card returns focus to the chapter trigger.
+  - [ ] Review phone/tablet layout later as requested.
 - [ ] **G2 · Same-camera comparison:** extend the current original-terrain comparison with a labelled draggable wipe for registered surface/concept or terrain/geology representations; preserve camera, scale, coverage and source limitations and provide a keyboard equivalent. Corresponds to BP11.
 - [ ] **G3 · Executive highlights:** add a clearly labelled short route through six existing authored shots, targeting approximately 90 seconds after assets are ready, with manual interruption and a return to the full 12-chapter story. Keep it distinct from per-chapter autoplay timing. Corresponds to BP12.
 
@@ -187,6 +193,10 @@ These are targets to measure during implementation, not claims about current per
 Start with the measured viewer baseline, one consolidated story/navigation shell, and the geology sequence. This addresses the most visible repetition and protects the spatial behavior on which drilling, resource and mine planning depend. Follow with the mine overview and metallurgy compositions, then apply the shared patterns to the remaining chapters.
 
 ## Implemented package and verification notes
+
+- [x] Repair same-tab chapter links, including `#subsurface`, and dismiss the intro when a linked chapter is selected. Catch unavailable WebGL renderer creation inside the viewer so graphics failure or retry cannot replace the entire presentation with the page error screen. The local production build and TypeScript checks pass; fresh desktop verification reached ready and traversed all four geology stages without JavaScript errors. Graphics-unavailable injection retained the chapter and retry action. A real Chrome GPU reset was also observed, so native GPU stability remains an open performance concern.
+- [x] Restore the normal Next.js build serving port 3010 after the Cloudflare packaging run replaced the shared `.next` output. Keep Cloudflare packaging separate from active local Next servers; hosted release verification remains open.
+- [x] Save desktop captures for all twelve chapter entry views, the initial load and geology relief/depth stages in `.playwright-mcp/`; create `tanga-local-desktop-contact-sheet.png` and a full-resolution HTML index. Rechecked the normal Chrome session after reload: `#subsurface` reached ready with no alerts or JavaScript errors, and same-tab project-to-geology links selected the correct chapter. Software-rendered batch capture was slower and timed out on one geology reload; the successful isolated and normal-Chrome geology captures were retained. These screenshots document current appearance, not completion of all visual-polish or performance gates.
 
 - [x] Compare survey DTM, regional DEM, all 100 viewer collars, the original survey collar shapefile, AMC MRE collar CSV, interpreted geology GLB bounds, presentation grids and all 155,952 resource block features. Record the two unresolved collar mismatches and undeclared vertical references; preserve every recorded source coordinate. Reproduction steps and detailed results are in `TANGA_SPATIAL_REGISTRATION_AUDIT_2026-10-23.md`.
 - [x] Clear failed shared drillhole, terrain-boundary and road promises so transient request/parse errors can retry on revisit; keep assay intervals available if optional lithology enrichment fails, then retry that enrichment later. `npm run typecheck` and `npm run cf:build` pass. Full network-failure injection, rapid-switch and WebGL-context-recovery checks remain open in A.

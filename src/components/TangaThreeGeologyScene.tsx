@@ -1186,7 +1186,7 @@ function threeCallouts(
   const best = assayFacts?.best;
   const bestQuote = best ? `${best.holeId} · ${formatIntercept(best).sub}` : null;
   const coverage = assayFacts
-    ? `${assayFacts.interceptCount} intercepts above ${assayFacts.cutoffLabel} across ${assayFacts.holeCount} holes`
+    ? `${assayFacts.interceptCount} above-threshold intercepts across ${assayFacts.holeCount} intercept-bearing holes`
     : null;
 
   if (mode === 'topography') {
@@ -1210,7 +1210,7 @@ function threeCallouts(
     return [
       {
         id: 'collars',
-        label: assayFacts ? `${assayFacts.holeCount} holes drilled` : 'Drillhole collars',
+        label: assayFacts ? `${assayFacts.holeCount} holes with intercepts` : 'Drillhole collars',
         detail: coverage ?? 'Surface control points feeding the 3D assay trace',
         x: 47, y: 28, tone: '#facc15', anchor: [-820, 30, 540], side: 'right', kind: 'story',
       },
@@ -2420,7 +2420,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     camera.position.copy(recoveryView ? new THREE.Vector3(...recoveryView.position) : cameraShot.from);
     camera.updateProjectionMatrix();
 
-    const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+    } catch {
+      // Chrome can temporarily block new contexts after a GPU reset. Keep the
+      // chapter and its source evidence available while graphics recover.
+      const message = '3D graphics unavailable. Reload this tab if retry does not restore the scene.';
+      setStatus(message);
+      reportLoadState('error', 'degraded', assetQuality, message);
+      disposeObject(scene);
+      return;
+    }
     let wasContextLost = false;
     const onContextLost = (event: Event) => {
       event.preventDefault();

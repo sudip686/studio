@@ -35,6 +35,7 @@ import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
 import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {MAPPED_ROCK_UNITS} from '@/lib/deck/geology-palette';
+import {presentationBuild} from '@/lib/presentation-build';
 import {
   type CameraAction,
   type CommandIntent,
@@ -888,6 +889,26 @@ const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: s
     note: 'Conceptual mine layout · saved scene view',
   },
 };
+
+// The chapter index uses evidence images and saved scene stills already shipped
+// with the deck. Loading these as ordinary images avoids mounting hidden maps
+// or WebGL renderers just to populate navigation thumbnails.
+const SCENE_INDEX_META: Record<WorkbenchMode, {question: string; thumbnail?: string; alt?: string}> = {
+  project: {question: 'Where is the project footprint?', thumbnail: '/presentation-assets/survey-site-aerial.jpg', alt: 'Survey aerial of the Tanga project area'},
+  tanzania: {question: 'Where does Tanga sit in the region?', thumbnail: '/presentation-assets/mre-regional-geology.jpg', alt: 'Regional geology map from the resource report'},
+  work_completed: {question: 'What work supports the current interpretation?', thumbnail: '/presentation-assets/metallurgy-samples.jpg', alt: 'Photographs of project testwork samples'},
+  topography: {question: 'What does the measured landscape show?', thumbnail: STATIC_SCENE_FALLBACKS.topography!.src, alt: STATIC_SCENE_FALLBACKS.topography!.alt},
+  drillholes: {question: 'Where is the recorded drilling evidence?', thumbnail: STATIC_SCENE_FALLBACKS.drillholes!.src, alt: STATIC_SCENE_FALLBACKS.drillholes!.alt},
+  subsurface: {question: 'How do mapped rocks relate to the interpretation?', thumbnail: '/geology_map.jpg', alt: 'Original Tanga geological map sheet'},
+  resource: {question: 'What does the reported block model show?', thumbnail: STATIC_SCENE_FALLBACKS.resource!.src, alt: STATIC_SCENE_FALLBACKS.resource!.alt},
+  ranking: {question: 'How does the dated peer set compare?'},
+  mine_planning: {question: 'How could the proposed facilities connect?', thumbnail: STATIC_SCENE_FALLBACKS.mine_planning!.src, alt: STATIC_SCENE_FALLBACKS.mine_planning!.alt},
+  metallurgy: {question: 'What did the reported testwork measure?', thumbnail: '/presentation-assets/metallurgy-report-page.png', alt: 'Metallurgy report results page'},
+  accessibility: {question: 'What infrastructure links need study?', thumbnail: '/presentation-assets/paulsam-conveyor-sites.jpg', alt: 'Planning report view of conveyor and site candidates'},
+  comparison: {question: 'Which evidence and decisions come next?'},
+};
+
+
 function storyTravel(fromMode: WorkbenchMode, toMode: WorkbenchMode): SceneTransitionState['travel'] {
   const fromModel = MODEL_MODES.has(fromMode);
   const toModel = MODEL_MODES.has(toMode);
@@ -4741,6 +4762,43 @@ export default function TangaDeckWorkbench() {
   // Intentionally run once — restore is a one-shot on mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // `history.replaceState` keeps the current story hash in sync but does not
+  // emit hashchange. Links pasted/clicked while the deck is already open do
+  // emit it, so restore those URLs explicitly instead of leaving the old scene
+  // on screen beneath a new address-bar hash.
+  useEffect(() => {
+    const restoreHashScene = () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedMode = readHashScene();
+      const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
+      if (targetIndex < 0) return;
+      const targetMode = STORY_STEPS[targetIndex].mode;
+      if (targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+
+      const supportsVersionOneState = params.get('v') === '1';
+      const shotId = params.get('view');
+      const shotIndex = supportsVersionOneState && shotId
+        ? STORY_SHOTS[targetMode].findIndex((shot) => shot.id === shotId)
+        : -1;
+      if (shotIndex >= 0) applyStoryShot(targetMode, shotIndex);
+      if (supportsVersionOneState && targetMode === 'ranking') {
+        const peerKey = params.get('peer');
+        const peer = peerKey ? graphitePeerRows(true).find((row) => peerProjectKey(row) === peerKey) : null;
+        if (peer) selectPeerProject(peer);
+      }
+      if (supportsVersionOneState && targetMode === 'subsurface') {
+        const featureId = params.get('feature');
+        const unit = MAPPED_ROCK_UNITS.find((candidate) => candidate.label === featureId);
+        if (unit) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
+      }
+      if (supportsVersionOneState) {
+        const sharedLayers = decodeLayerSettings(params.get('layers'), targetMode !== 'mine_planning' && targetMode !== 'metallurgy');
+        if (sharedLayers) {restoredLayerSettingsRef.current=targetMode;setLayerSettings(sharedLayers);}
+      }
+    };
+    window.addEventListener('hashchange', restoreHashScene);
+    return () => window.removeEventListener('hashchange', restoreHashScene);
+  }, [activeStoryIndex, applyStoryShot, goToStoryIndex, selectPeerProject]);
   const activeShareViewId = activeShots[activeShotIndex]?.id;
   const activeSharedFeature = activeMode === 'subsurface' ? selectedGeologyUnit?.title : undefined;
   const sharedLayers = layerSettingsAreModified(layerSettings, activeMode !== 'mine_planning' && activeMode !== 'metallurgy') ? layerSettings : undefined;
@@ -4858,6 +4916,21 @@ export default function TangaDeckWorkbench() {
   // left; this stage is far more panel-heavy than theirs, so the same job is
   // done by an overlay that costs no width until it is asked for.
   const [isIndexOpen, setIndexOpen] = useState(false);
+  const sceneIndexDialogRef = useRef<HTMLElement | null>(null);
+  const sceneIndexTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const sceneIndexWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (!isIndexOpen) {
+      if (sceneIndexWasOpenRef.current) sceneIndexTriggerRef.current?.focus();
+      sceneIndexWasOpenRef.current = false;
+      return;
+    }
+    sceneIndexWasOpenRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      sceneIndexDialogRef.current?.querySelector<HTMLButtonElement>('.tanga-deck__index > header button')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isIndexOpen]);
   const toggleIndex = useCallback(() => setIndexOpen((open) => !open), []);
   const setLayerVisible = useCallback((id: DeckLayerId, visible: boolean) => {
     setLayerSettings((current) => ({...current, [id]: {...current[id], visible}}));
@@ -5832,6 +5905,7 @@ export default function TangaDeckWorkbench() {
           </span>
           <button
             type="button"
+            ref={sceneIndexTriggerRef}
             className="tanga-deck__pager-count"
             onClick={toggleIndex}
             aria-expanded={isIndexOpen}
@@ -6027,6 +6101,11 @@ export default function TangaDeckWorkbench() {
         >
           <HelpCircle size={16} strokeWidth={2.2} />
         </button>
+        <div className="tanga-presentation-tools__build" aria-label={`Build ${presentationBuild.revision}, ${presentationBuild.target}`}>
+          <span>BUILD</span>
+          <code>{presentationBuild.revision}</code>
+          <span>{presentationBuild.target}</span>
+        </div>
           </div>
           <span className="tanga-presentation-tools__status" role="status" aria-live="polite">{shareStatus}</span>
         </details>
@@ -6054,11 +6133,31 @@ export default function TangaDeckWorkbench() {
         >
           <section
             className="tanga-deck__index"
-            aria-label="All scenes"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tanga-scene-index-title"
+            ref={sceneIndexDialogRef}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab') return;
+              const buttons = sceneIndexDialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])');
+              if (!buttons?.length) return;
+              const first = buttons[0];
+              const last = buttons[buttons.length - 1];
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
           >
             <header>
-              <span>All scenes</span>
+              <div>
+                <span id="tanga-scene-index-title">Explore the story</span>
+                <small>12 chapters · Select a scene to jump</small>
+              </div>
               <button type="button" onClick={() => setIndexOpen(false)} aria-label="Close scene index">
                 <X size={14} strokeWidth={2.2} />
               </button>
@@ -6083,8 +6182,23 @@ export default function TangaDeckWorkbench() {
                           onClick={() => { goToStoryIndex(index); setIndexOpen(false); }}
                           aria-current={index === activeStoryIndex}
                         >
-                          <strong>{String(index + 1).padStart(2, "0")}</strong>
-                          <span>{step.label}</span>
+                          <span className="tanga-deck__index-thumb">
+                            {SCENE_INDEX_META[step.mode].thumbnail ? (
+                              <img src={SCENE_INDEX_META[step.mode].thumbnail} alt="" loading="lazy" decoding="async" />
+                            ) : step.mode === 'ranking' ? (
+                              <span className="tanga-deck__index-globe" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>
+                            ) : (
+                              <span className="tanga-deck__index-decisions" aria-hidden="true"><i>01</i><b /><i>02</i><b /><i>03</i></span>
+                            )}
+                            {index === activeStoryIndex && <em>Current view</em>}
+                          </span>
+                          <span className="tanga-deck__index-copy">
+                            <span className="tanga-deck__index-title"><strong>{String(index + 1).padStart(2, "0")}</strong>{step.label}</span>
+                            <span className="tanga-deck__index-question">{SCENE_INDEX_META[step.mode].question}</span>
+                            {index === activeStoryIndex && activeShots.length > 0 && (
+                              <span className="tanga-deck__index-shot">Viewing: {activeShots[activeShotIndex]?.label ?? activeShots[0].label}</span>
+                            )}
+                          </span>
                         </button>
                       </li>
                     ))}

@@ -65,6 +65,23 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   }, []);
 
   useEffect(() => {
+    const revealLinkedChapter = () => {
+      if (!window.location.hash.replace(/^#/, '')) return;
+      if (fallbackTimerRef.current) {
+        window.clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      if (finishTimerRef.current) {
+        window.clearTimeout(finishTimerRef.current);
+        finishTimerRef.current = null;
+      }
+      setIntroState('done');
+    };
+    window.addEventListener('hashchange', revealLinkedChapter);
+    return () => window.removeEventListener('hashchange', revealLinkedChapter);
+  }, []);
+
+  useEffect(() => {
     if (introState !== 'playing') return;
 
     const video = videoRef.current;

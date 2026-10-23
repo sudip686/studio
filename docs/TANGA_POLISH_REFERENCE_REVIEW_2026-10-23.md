@@ -61,6 +61,29 @@ The first nine packages refine existing A–F requirements. Packages 10–12 are
 | BP11 · P2 | **Same-camera comparison wipe.** Extend Compare original terrain with a draggable wipe for original surface versus concept; add terrain versus mapped geology only where both sides share registration. | G2. Both sides use the same camera, scale and coverage; keyboard slider is available. Use the current renderer/scissor or paired validated stills, rather than a second live scene. Labels identify each side and retain registration limits. |
 | BP12 · P2 | **Executive highlights route.** Add a clearly labelled short route through six existing shots, with an approximately 90-second target after assets are ready; keep the complete 12-chapter story. | G3. Short route has a different label from chapter timing, no fabricated content and explicit return to the full story. Preload readiness and failure stills are checked before timing; manual interruption and reduced motion remain usable. |
 
+## Implementation tracker across both plans
+
+The detailed workstream checkboxes remain authoritative in [the next-phase checklist](TANGA_NEXT_PHASE_PLAN_2026-10-23.md). This crosswalk prevents the reference-review packages from disappearing inside the larger A–G items.
+
+- [ ] **BP01 / F:** Exact release identity and independent Vercel/Cloudflare/share-link verification.
+  - [x] Show the build revision and runtime target in presenter Tools; hosted deployment/share verification remains open.
+- [ ] **BP02 / B:** One shared presentation shell, semantic style tokens and clear panel hierarchy.
+- [ ] **BP03 / A, B, E:** Subject-aware camera composition and recovery across viewport sizes.
+- [ ] **BP04 / A, C, E:** Natural terrain/material treatment with source geometry preserved.
+- [ ] **BP05 / C, D:** Geology sequence, selection continuity and map/model distinction.
+- [ ] **BP06 / E:** Evidence-led metallurgy with verified report locators and qualifications.
+- [ ] **BP07 / D, E:** Connected conceptual mine site with facility status and clear labels.
+- [ ] **BP08 / D:** Complete cross-view feature selection and label review.
+  - [x] Correct the drill callout denominator to holes with qualifying intercepts.
+- [ ] **BP09 / E:** Peer and closing-scene composition, benchmark basis and linked evidence.
+- [ ] **BP10 / G1:** Complete the visual chapter index release check.
+  - [x] Add the lazy image cards, chapter questions, current-view indicator and dialog keyboard focus handling.
+  - [x] Confirm desktop dialog visibility, chapter 9 jump and return to the requested URL hash.
+  - [x] Finish desktop keyboard traversal, focus return and all 10 thumbnail path checks.
+  - [ ] Defer phone/tablet review as requested.
+- [ ] **BP11 / G2:** Same-camera comparison wipe.
+- [ ] **BP12 / G3:** Six-shot executive highlights route.
+
 ## Chapter-by-chapter storyboard for the next pass
 
 This table is a proposed art-direction brief. Exact camera targets, source IDs, layer masks and fallback files still need to be captured in the authored-shot implementation specification required by E.
