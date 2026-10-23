@@ -37,7 +37,7 @@ Additional primary design references:
 - [x] All chapters: coherent next-view cue and current view progress.
 - [x] All chapters: compact common presentation controls and consistent evidence-panel styling.
 - [x] Review all 12 Tanga chapters in Chrome; check key geology, peers and phone layouts.
-- [ ] Review this pass, run typecheck and deployment build; push the branch and check the new Vercel deployment.
+- [x] Review this pass, run typecheck and deployment build; push the branch and check the new Vercel deployment (Vercel status: success for `9e026dd`).
 
 ## Bright 3D and testwork follow-up
 
