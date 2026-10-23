@@ -12,7 +12,7 @@ import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan
 import {buildConcentrator, placeConcentrator, buildPitSurface, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
-import {buildGeologySurface,type GeologySurfaceData} from '@/lib/deck/geology-surface';
+import {buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
 import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
@@ -4426,7 +4426,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const geologyBlendAlpha=1-Math.exp(-Math.max(0,elapsed-geologyBlendTime)*3.6);
       geologyBlendTime=elapsed;
       if(geologySurface){
-        const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??.9):0;
+        const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??GEOLOGY_SURFACE_DEFAULT_OPACITY):0;
         geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,geologyBlendAlpha);
         geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.context.visible;
         geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.context.opacity;});

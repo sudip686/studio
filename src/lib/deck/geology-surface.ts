@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 type MapUnit = {properties:{unit:string;color:string};geometry:{type:'MultiPolygon';coordinates:number[][][][]}};
 export type GeologySurfaceData = {features:MapUnit[]};
+export const GEOLOGY_SURFACE_DEFAULT_OPACITY=.68;
 
 /** Derived map polygons only. No source model vertices are changed or extruded. */
 export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:number;northing:number}, height:(x:number,z:number)=>number, extent:{width:number;depth:number;surveyed?:(x:number,z:number)=>boolean}) {
@@ -10,7 +11,24 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
   const bounds = new THREE.Box3();
   for(const feature of data.features) {
     const positions:number[]=[];
+    const outline:number[]=[];
     const toLocal=(p:number[])=>new THREE.Vector2(p[0]-origin.easting,origin.northing-p[1]);
+    const inExtent=(p:THREE.Vector2)=>(p.x>=-extent.width/2&&p.x<=extent.width/2&&p.y>=-extent.depth/2&&p.y<=extent.depth/2);
+    const addBoundary=(ring:number[][])=>{
+      const points=ring.slice(0,-1).map(toLocal);
+      for(let i=0;i<points.length;i++){
+        const start=points[i],end=points[(i+1)%points.length],length=start.distanceTo(end);
+        const segments=Math.max(1,Math.ceil(length/30));
+        for(let j=0;j<segments;j++){
+          const a=start.clone().lerp(end,j/segments),b=start.clone().lerp(end,(j+1)/segments);
+          if(!inExtent(a)||!inExtent(b))continue;
+          const mid=a.clone().lerp(b,.5);
+          const survey=extent.surveyed?.(a.x,a.y);
+          if(extent.surveyed&&(extent.surveyed(b.x,b.y)!==survey||extent.surveyed(mid.x,mid.y)!==survey))continue;
+          outline.push(a.x,height(a.x,a.y)+4,a.y,b.x,height(b.x,b.y)+4,b.y);
+        }
+      }
+    };
     function triangle(a:THREE.Vector2,b:THREE.Vector2,c:THREE.Vector2,depth=0) {
       const ab=a.distanceToSquared(b),bc=b.distanceToSquared(c),ca=c.distanceToSquared(a);
       const sourceA=extent.surveyed?.(a.x,a.y);
@@ -35,13 +53,22 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
         }
         clipped=output;if(clipped.length<3)return;
       }
-      for(let i=1;i<clipped.length-1;i++)for(const p of [clipped[0],clipped[i],clipped[i+1]]) {
-        const y=height(p.x,p.y)+2.5;
-        positions.push(p.x,y,p.y);bounds.expandByPoint(new THREE.Vector3(p.x,y,p.y));
+      for(let i=1;i<clipped.length-1;i++){
+        const vertices=[clipped[0],clipped[i],clipped[i+1]];
+        for(const p of vertices) {
+          const y=height(p.x,p.y)+2.5;
+          positions.push(p.x,y,p.y);bounds.expandByPoint(new THREE.Vector3(p.x,y,p.y));
+        }
       }
     }
     for(const polygon of feature.geometry.coordinates) {
-      const outer=polygon[0].slice(0,-1).map(toLocal);
+      const sourceOuter=polygon[0].slice(0,-1);
+      const outer=sourceOuter.map(toLocal);
+      let area=0;
+      for(let i=0;i<outer.length;i++){const a=outer[i],b=outer[(i+1)%outer.length];area+=a.x*b.y-b.x*a.y;}
+      // Keep the presentation outline on substantial map units. Tiny raster
+      // islands remain visible by colour without turning the view into a mesh.
+      if(Math.abs(area/2)>=25_000)addBoundary(polygon[0]);
       const holes=polygon.slice(1).map(r=>r.slice(0,-1).map(toLocal));
       if(outer.length<3)continue;
       const vertices=outer.concat(...holes);
@@ -51,12 +78,21 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     geometry.computeBoundingSphere();
-    const material=new THREE.MeshBasicMaterial({color:feature.properties.color,transparent:true,opacity:.9,toneMapped:false,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+    const material=new THREE.MeshBasicMaterial({color:feature.properties.color,transparent:true,opacity:GEOLOGY_SURFACE_DEFAULT_OPACITY,toneMapped:false,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
     const mesh=new THREE.Mesh(geometry,material);
     mesh.name=feature.properties.unit;
     mesh.renderOrder=30;
     mesh.userData.tooltipItems=[{title:feature.properties.unit,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:feature.properties.color}];
     group.add(mesh);
+    if(outline.length){
+      const outlineGeometry=new THREE.BufferGeometry();
+      outlineGeometry.setAttribute('position',new THREE.Float32BufferAttribute(outline,3));
+      const outlineMaterial=new THREE.LineBasicMaterial({color:'#e7ece8',transparent:true,opacity:.34,depthWrite:false,toneMapped:false});
+      const boundaries=new THREE.LineSegments(outlineGeometry,outlineMaterial);
+      boundaries.name=`${feature.properties.unit} · mapped boundary`;
+      boundaries.renderOrder=31;
+      group.add(boundaries);
+    }
   }
   return {group,bounds};
 }

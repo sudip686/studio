@@ -10,8 +10,13 @@ and disclose source detail on demand.
 ## References reviewed in Chrome
 
 - Mithril, VRIFY 24464: 32-slide sequence. Editorial opening; common metric and aligned bars in 18–20; regional → property → mapped observations → geology → drilling → resource in 21–29; field photographs in 30–32.
-- RUA, VRIFY 24303: 19-slide sequence. Keep geography stable while changing one evidence layer; muted context, labelled targets, related source images and sections.
+- RUA, [VRIFY 24303](https://vrify.com/decks/24303): 19-slide sequence. Keep geography stable while changing one evidence layer; muted context, labelled targets, related source images and sections. Reviewed the regional and geophysics views.
 - Discovery, VRIFY 24534: five-slide sequence. Facility footprints and fine leaders, followed by a muted surface roof over brighter subsurface evidence.
+- Silver North, [VRIFY 24527](https://vrify.com/decks/24527): reviewed the 52-slide outline and slide 12. Its property map uses semi-transparent, category-coloured polygons, an anchored legend, and geographic labels over satellite context.
+- Scorpio Gold, [VRIFY 24631](https://vrify.com/decks/24631): reviewed the 49-slide outline and its district geology / target views. The clearest pattern is one claim per view, labelled map features, a separate legend, and a map-to-target-to-resource sequence.
+- Silver Tiger, [VRIFY 24392](https://vrify.com/decks/24392): reviewed the 74-slide outline. Its construction, mine-phase, exploration, and appendix sections show why long sequences need named chapters and a purposeful change of evidence at each step.
+- [GeoLibre](https://web.geolibre.app/): reviewed its layer workspace. Separate layer naming, basemap context, opacity, and feature identification make map controls easier to understand.
+- GitHub and Vercel: checked the current branch, latest preview entry, and deployment panel. The project branch remains the implementation source; the preview is access protected.
 - Some first frames show loading or camera travel; detailed conclusions use the settled views and the supplied Tanga evidence. Reference assets and geological interpretations are not copied.
 
 Additional primary design references:
@@ -25,12 +30,14 @@ Additional primary design references:
 - [x] Geology: add an oblique mapped-surface stage before revealing separate interpreted volumes.
 - [x] Geology: preserve orientation and camera framing during surface-to-depth reveal.
 - [x] Geology: compact, reversible stage navigation; disclose approximate raster registration and model scope.
+- [x] Geology: show clear unit boundaries with a softened, semi-transparent map overlay; retain the source palette and disclose unmatched model names.
+- [x] Geology: distinguish the source map sheet from digitized project-map areas and the separate interpreted volume.
 - [x] Peers: common linear bar scale, numerical values, clear dated benchmark basis and Tanga reveal.
 - [x] Peers: declutter close globe markers without moving their geographic anchors.
 - [x] All chapters: coherent next-view cue and current view progress.
 - [x] All chapters: compact common presentation controls and consistent evidence-panel styling.
 - [x] Review all 12 Tanga chapters in Chrome; check key geology, peers and phone layouts.
-- [ ] Review code, run typecheck and deployment build; push the branch and check Vercel.
+- [ ] Review this pass, run typecheck and deployment build; push the branch and check the new Vercel deployment.
 
 ## Bright 3D and testwork follow-up
 

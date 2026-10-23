@@ -19,6 +19,7 @@ export default function TangaGeologyMapStage({step, ready, onAdvance, onStage}: 
           <button type="button" aria-pressed={!regional} onClick={() => {setRegional(false);setZoom(1);}}>Project map</button>
           <button type="button" aria-pressed={regional} onClick={() => {setRegional(true);setZoom(1);}}>MRE regional context</button>
         </div>
+        <span className="tanga-geology-map-sheet__source-tag">SOURCE MAP <i/> {regional ? 'REGIONAL' : 'PROJECT DETAIL'}</span>
         <div role="group" aria-label="Map document zoom">
           <button type="button" aria-label="Zoom out map document" disabled={zoom === 1} onClick={() => setZoom(v => Math.max(1, v - .5))}><Minus size={15}/></button>
           <button type="button" aria-label="Reset map document zoom" onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</button>
@@ -35,15 +36,20 @@ export default function TangaGeologyMapStage({step, ready, onAdvance, onStage}: 
       </div>
       <footer><span>{regional ? 'AMC · 19 Dec 2025 · Fig. 2.1 · PDF p.18' : 'Tanga project geological map · original legend and grid retained'}</span><a href={source} target="_blank" rel="noreferrer">Full resolution <ExternalLink size={12}/></a></footer>
     </section>}
-    {(step >= 1 && step <= 3) && <div className={`tanga-geology-surface-legend ${legendOpen?'is-open':''}`} aria-label={step===3?"Model rock types":"Mapped rock types"}><button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>{step===3?'Model':'Map'} legend · 7 units {legendOpen?'−':'+'}</button><div>{(step===3?MODEL_ROCK_UNITS:MAPPED_ROCK_UNITS).map(({color,label})=><span key={label}><i style={{background:color}}/>{label}</span>)}</div></div>}
+    {(step >= 1 && step <= 3) && <div className={`tanga-geology-surface-legend ${legendOpen?'is-open':''}`} aria-label={step===3?"Model rock types":"Mapped rock types"}>
+      <header><strong>{step===3?'INTERPRETED MODEL':'MAPPED GEOLOGY'}</strong><small>{step===3?'7 model units':'7 map units'}</small></header>
+      <button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>{step===3?'Model':'Map'} legend · 7 units {legendOpen?'−':'+'}</button>
+      <div>{(step===3?MODEL_ROCK_UNITS:MAPPED_ROCK_UNITS).map(({color,label})=><span key={label}><i style={{background:color}}/>{label}</span>)}</div>
+      {step===3&&<p>Map colours match only where unit names resolve.</p>}
+    </div>}
     <aside className="tanga-story-panel tanga-story-panel--map" aria-label="Geology map to model story">
       <div className="tanga-story-panel__eyebrow">GEOLOGICAL FRAMEWORK · {['01 / SOURCE','02 / OVERHEAD','03 / RELIEF','04 / DEPTH'][step]}</div>
       <h2>{['Begin with the map','Read the rock pattern','See the same rocks in relief','Look beneath the mapped surface'][step]}</h2>
-      <p className="tanga-story-panel__intro">{['Read the recorded rock units, drilling and coordinate grid. Next, place the mapped rock areas on the terrain.','Coloured polygons follow the source legend. Transparent areas leave the satellite terrain visible; hover a rock area to identify it.','Tilt the mapped surface to see its relief. Colours stay on the ground; they do not show rock thickness or dip.','Hold the viewpoint as the mapped surface fades. The separate 3D model appears below; rock colours correspond to the source legend where model names agree.'][step]}</p>
+      <p className="tanga-story-panel__intro">{['Read the source rock units, coordinate grid and drilling evidence. Next, place the digitized areas against the terrain.','The map palette separates seven digitized surface units. Its reduced opacity keeps terrain context visible; hover an area to identify it.','Tilt the same map to read the terrain beneath it. Surface colours do not represent depth, thickness or dip.','The mapped surface fades while the separate 3D interpretation appears. Matching colours indicate named units only where the model labels resolve.'][step]}</p>
       <ol className="tanga-geology-map-sequence" aria-label="Map to model sequence">
         {['Source sheet','Mapped surface','Terrain relief','Interpreted depth'].map((label, i) => <li key={label} aria-current={step === i ? 'step' : undefined}><button type="button" disabled={!ready && i>0} onClick={()=>onStage(i)}><span>0{i + 1}</span>{label}</button></li>)}
       </ol>
-      <div className="tanga-story-inline-note">{step<3 ? 'Source-map colours · soil cover transparent' : 'Map-matched rock colours · neutral unresolved units · scale 1:1'}</div>
+      <div className="tanga-story-inline-note">{step<3 ? 'Source palette · transparent terrain context' : 'Matched names · unresolved units stay neutral · scale 1:1'}</div>
       <details className="tanga-geology-basis"><summary>Source &amp; interpretation limits</summary><p className="tanga-story-datum-note">{sheet ? (regional ? 'The MRE figure is regional context at 1:10,000,000. It is separate from the detailed project map and 3D interpretation.' : 'Original sheet retained. Coloured areas are digitized from its printed UTM grid; original geological shapefiles were not supplied.') : (step < 3 ? 'Derived polygons, approximately registered from the printed grid and clipped to displayed terrain. Datum and contacts need verification. Grab sampling is reported, but usable sample coordinates were not found.' : 'Mapped surface areas and modelled volumes are distinct interpretations. No mapped contacts are extruded into the model. Five named model units correspond to mapped colours; unspecified schist and soil remain distinct. Quartzite and kyanite-sillimanite schist have no resolved named volume.')}</p></details>
       <span className="tanga-geology-basis-tag">{step<3?'Approximate map registration':'Geological interpretation · not observed everywhere'}</span>
       <button type="button" className="tanga-story-panel__compare" onClick={onAdvance} disabled={!ready}>{!ready ? 'Preparing project model…' : ['Place the map on terrain','Tilt the mapped surface','Reveal interpreted depth','Inspect the sample evidence'][step]} <ArrowRight size={14}/></button>
