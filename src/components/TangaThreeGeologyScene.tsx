@@ -2600,6 +2600,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         consumeCameraCommand({id:Date.now()+1,action:resetAction});
         return;
       }
+      if(command.action==='resetView'&&mode==='mine_planning'&&sitePlan?.pits.length){
+        consumeCameraCommand({id:Date.now()+1,action:'sitePlan'});
+        return;
+      }
 
       if (command.action === 'geologyPlan' && mode === 'subsurface') {
         geologyPlan = true; geologyOblique = false; geologyDepthBlend=0; scene.fog = null;

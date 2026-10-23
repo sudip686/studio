@@ -96,7 +96,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 const DEVELOPMENT_CAMERAS:Record<DevelopmentView,ThreeCameraAction>={overview:'developmentOverview',feed:'feedPoint',plant:'plantDetail',services:'siteServices',tailings:'tailingsView',waste:'wasteView',campus:'campusView'};
 
@@ -768,7 +768,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'samples', label: 'Metallurgy overview', detail: 'Carbon, recovery and flake-size evidence', threeAction: 'resetView'},
   ],
   mine_planning: [
-    {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'resetView'},
+    {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'sitePlan'},
     {id: 'north-pit', label: 'North pit', detail: 'Inspect the northern conceptual excavation', threeAction: 'northPit'},
     {id: 'south-pit', label: 'South pit', detail: 'Inspect the southern conceptual excavation', threeAction: 'southPit'},
     {id: 'waste',label: 'Waste-rock landform',detail:'Read illustrative benches and working areas',threeAction:'wasteView'},
@@ -2505,6 +2505,7 @@ export default function TangaDeckWorkbench() {
     setActiveShotIndex(0);
     setThreeCameraCommand(null);
     if (mode === 'subsurface') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'geologyPlan'});
+    else if (mode === 'mine_planning') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'sitePlan'});
     setActiveMode(mode);
     setStatusText(`Mode: ${MODE_LABELS[mode]}`);
     flyTo(mode, overrides.bearing);
@@ -6469,6 +6470,7 @@ export default function TangaDeckWorkbench() {
         milestoneId={selectedMilestoneId}
         onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}}
         onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined}
+        onSiteOrientation={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? orientation => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand(orientation==='plan'?'sitePlan':'siteOblique');} : undefined}
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
