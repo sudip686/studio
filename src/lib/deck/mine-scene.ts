@@ -288,20 +288,36 @@ export function carvePit(geometry:THREE.BufferGeometry,pits:CandidatePit[]) {
 /** Exact contour bands eliminate the staircase aliasing of a clipped XY grid. */
 export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>number) {
   const positions:number[]=[],colors:number[]=[],indices:number[]=[];
-  const sample = (ring:Point2[]) => ring.flatMap((a,i) => {
-    const b=ring[(i+1)%ring.length],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/12));
-    return Array.from({length:n},(_,j)=>[a[0]+(b[0]-a[0])*j/n,a[1]+(b[1]-a[1])*j/n] as Point2);
-  });
+  const perimeter=(ring:Point2[])=>ring.reduce((sum,a,i)=>sum+Math.hypot(ring[(i+1)%ring.length][0]-a[0],ring[(i+1)%ring.length][1]-a[1]),0);
+  const sample = (ring:Point2[],count:number) => {
+    const lengths=ring.map((a,i)=>Math.hypot(ring[(i+1)%ring.length][0]-a[0],ring[(i+1)%ring.length][1]-a[1]));
+    const total=lengths.reduce((sum,length)=>sum+length,0);
+    return Array.from({length:count},(_,index)=>{
+      let distance=total*index/count,edge=0;
+      while(edge<lengths.length-1&&distance>lengths[edge]){distance-=lengths[edge];edge++;}
+      const a=ring[edge],b=ring[(edge+1)%ring.length],t=distance/(lengths[edge]||1);
+      return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t] as Point2;
+    });
+  };
   function band(outer:Point2[],inner:Point2[],upper:number,lower:number,tone:number) {
-    const a=sample(outer),b=inner.length?sample(inner):[];
-    const vertices=[...a,...b],base=positions.length/3,color=new THREE.Color(tone);
-    for(let i=0;i<vertices.length;i++){
-      const [x,z]=vertices[i];
-      positions.push(x,Math.min(height(x,z),i<a.length?upper:lower)+.6,z);
-      colors.push(color.r,color.g,color.b);
+    const count=Math.max(24,Math.ceil(Math.max(perimeter(outer),inner.length?perimeter(inner):0)/12));
+    const a=sample(outer,count),b=inner.length?sample(inner,count):[],base=positions.length/3,color=new THREE.Color(tone),lift=1.2;
+    for(const [ring,level] of [[a,upper],[b,lower]] as const){
+      for(const [x,z] of ring){
+        positions.push(x,Math.min(height(x,z),level)+lift,z);
+        colors.push(color.r,color.g,color.b);
+      }
     }
-    const faces=THREE.ShapeUtils.triangulateShape(a.map(p=>new THREE.Vector2(...p)),b.length?[b.map(p=>new THREE.Vector2(...p))]:[]);
-    for(const face of faces) indices.push(...face.map(i=>base+i));
+    if(b.length){
+      for(let i=0;i<count;i++){
+        const next=(i+1)%count,outerHere=base+i,outerNext=base+next,innerHere=base+count+i,innerNext=base+count+next;
+        indices.push(outerHere,outerNext,innerNext,outerHere,innerNext,innerHere);
+      }
+    }else{
+      const x=a.reduce((sum,p)=>sum+p[0],0)/count,z=a.reduce((sum,p)=>sum+p[1],0)/count;
+      const centre=positions.length/3;positions.push(x,Math.min(height(x,z),upper)+lift,z);colors.push(color.r,color.g,color.b);
+      for(let i=0;i<count;i++)indices.push(centre,base+(i+1)%count,base+i);
+    }
   }
   let outer=pit.ring,distance=0,y=pit.surface;
   const slope=Math.tan(CONCEPT.batterDegrees*Math.PI/180);
@@ -319,7 +335,9 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
   }
   band(outer,[],y,y,0xa88b66);
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();
-  const mesh=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0xffffff,vertexColors:true,toneMapped:false,side:THREE.DoubleSide}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
+  // The mine-plan sun is fixed in site coordinates, so diffuse shading adds
+  // readable bench walls and contact shadows without changing with the camera.
+  const mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0xffffff,vertexColors:true,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
 }
 
 /**
@@ -376,7 +394,7 @@ export function buildConceptualPitRamp(pit:CandidatePit) {
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
   geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
-  const ramp=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xffffff,vertexColors:true,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2}));
+  const ramp=new THREE.Mesh(geometry,new THREE.MeshLambertMaterial({color:0xffffff,vertexColors:true,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2}));
   ramp.name='Illustrative internal pit access ramp · not engineered';
   ramp.renderOrder=41;ramp.castShadow=true;ramp.receiveShadow=true;
   // Keep the authored centreline with the display mesh so a single vehicle
