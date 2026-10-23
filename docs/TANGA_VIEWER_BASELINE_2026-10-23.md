@@ -35,6 +35,12 @@ Warm encoded resource-body totals across each chapter navigation ranged from rou
 
 On the 1707 × 842 Intel UHD run, the resource scene reported its first useful frame at 5.06 seconds. The adaptive resolution governor started at render scale 1.00 and reduced to 0.75 after sustained slow frames. Sparse frame samples moved from about 33–37 ms at scale 1.00 to about 16–36 ms at scale 0.75. This demonstrates adaptation, but the remaining slow samples and short observation window do not establish the 30-second-orbit target.
 
+## Cold-cache subsurface sample
+
+A fresh local production origin (`localhost:3011`) was opened directly at `#subsurface` after clearing that origin's CacheStorage and service-worker registrations. Playwright injected `Cache-Control: no-cache` and `Pragma: no-cache` request headers. The Three.js `data-ready="true"` marker appeared at 9.84 seconds after navigation. The run recorded zero failed requests and zero JavaScript console errors; 16 graphics-buffer warnings appeared.
+
+Eight large same-origin responses reported `Content-Length` headers totaling 37,523,709 bytes (37.5 MB): survey aerial 428,420; assay GeoJSON 4,874,074; terrain texture 6,242,357; terrain context 1,435,648; survey height 5,742,592; survey coverage 1,435,648; geological model GLB 12,517,520; lithology GeoJSON 4,847,450 bytes. The request was not bandwidth-throttled. These origin body sizes are not measured wire-transfer totals, and the resource timing API returned no encoded-size entries for these assets in this run. This single local sample exceeds the proposed 8-second 3D target and needs a repeat under the named network/device conditions before release decisions.
+
 ## Adaptive governor retest: 30-second desktop subsurface orbit
 
 After changing the resolution governor to inspect the 90-frame p90 rather than the mean, a foreground 1707 x 842 subsurface orbit collected 857 requestAnimationFrame intervals over 30 seconds. Median was 33.3 ms; p90 41.9 ms; p95 50.1 ms; p99 70.8 ms; one 962.3 ms outlier occurred; 59.3% of frames were at or below 33.4 ms. The governor stepped render scale from 1.00 down to 0.75. Console errors were zero; the browser continued to emit graphics-buffer warnings.
@@ -44,6 +50,7 @@ This confirms that the percentile governor adapts during a sustained slow run, b
 ## Findings and remaining measurements
 
 - Warm-cache foreground 3D first-useful frames were 3.42–4.81 seconds at 390 × 844 and 3.64–5.24 seconds at 1707 × 842. These are below the plan's 8-second warm target, but do not describe a cold network start.
+- One clean-origin local subsurface run reached `data-ready` at 9.84 seconds with 37.5 MB in large response bodies. It is a useful cold-cache diagnostic, not a controlled network benchmark; exact wire transfer and throttled repeat remain open.
 - Desktop 3D frame-pacing p95 values were 45.7–58.4 ms in this short sample, above the 33 ms target. Portrait p95 values were 12.6–24.9 ms in the same test environment. Prioritize desktop resource/subsurface/mine-plan rendering without reducing scientific data.
 - The renderer emits recurring GPU buffer `READ-usage` performance warnings in this browser. The runs recorded zero JavaScript console errors. The warnings remain a performance investigation item.
 - One chapter loop recorded `Evidence to decisions` at 7.6–7.8 seconds, but a fresh instrumented foreground load measured DOMContentLoaded at 29 ms and the chapter heading at 311 ms. The slow result was not reproduced and is treated as a harness outlier; full asset/transition readiness remains unmeasured.
