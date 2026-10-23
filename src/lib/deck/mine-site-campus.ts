@@ -20,17 +20,20 @@ export function buildMineSiteCampus(options:Options) {
   const facilities:CampusFacility[]=[],omissions:string[]=[];
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
   const materials={
-    // Earthworks and pad surfaces use diffuse lighting only: their mapped
+    // Earthworks and pad surfaces use an unlit fixed palette: their mapped
     // colors must not shift with camera angle as the viewer rotates the site.
-    earth:new THREE.MeshLambertMaterial({color:0x8b775e,side:THREE.DoubleSide}),
-    bench:new THREE.MeshLambertMaterial({color:0xa28b6c,side:THREE.DoubleSide}),
-    rock:new THREE.MeshLambertMaterial({color:0x857e71,side:THREE.DoubleSide}),
-    beach:new THREE.MeshLambertMaterial({color:0xa5a397,side:THREE.DoubleSide}),
-    liner:new THREE.MeshLambertMaterial({color:0x3e4e50,side:THREE.DoubleSide}),
-    water:new THREE.MeshStandardMaterial({color:0x4a8b8b,roughness:.23,metalness:.15,side:THREE.DoubleSide}),
-    fresh:new THREE.MeshStandardMaterial({color:0x579aa4,roughness:.24,metalness:.12,side:THREE.DoubleSide}),
+    // These hues identify conceptual pads and facilities in the mine-plan
+    // legend. Render them without view-dependent lighting/specular response;
+    // Their relief comes from geometry and deterministic procedural grain.
+    earth:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false}),
+    bench:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false}),
+    rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
+    beach:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false}),
+    liner:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false}),
+    water:new THREE.MeshBasicMaterial({color:0x4a8b8b,side:THREE.DoubleSide,toneMapped:false}),
+    fresh:new THREE.MeshBasicMaterial({color:0x579aa4,side:THREE.DoubleSide,toneMapped:false}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
-    concrete:new THREE.MeshLambertMaterial({color:0xb1aa96}),
+    concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
   };
   for(const material of [materials.earth,materials.bench,materials.rock,materials.beach]){
     material.onBeforeCompile=shader=>{

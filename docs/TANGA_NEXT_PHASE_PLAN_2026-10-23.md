@@ -316,6 +316,7 @@ Design intent: retain the earlier natural world/terrain character the user prefe
 - [ ] Capture each chapter at 1366×768 and 1707×842 in overview and selected detail, with labels/controls clear of the canvas focal area. Verify keyboard selection, pause, reset and reduced motion.
 - [ ] Run typecheck, production and Cloudflare builds; check chapter entry, recovery and shared model behavior. Push completed slices on the existing branch and retain screenshot evidence in the checklist.
   - [x] After the camera-stable material update, `npm run typecheck`, `npm run build`, and `npm run cf:build` all pass; Cloudflare reports its worker and static assets ready.
+  - [x] Remove camera-dependent shading from mapped geology/resource colors and mine-plan earthworks, ponds, pad surfaces, pit benches and ramps. Keep terrain diffuse-lit for relief. Desktop orbit checks on mine planning and resource stayed ready with no alerts or JavaScript errors; captures: `.playwright-mcp/mine-plan-color-stability.png`, `mine-plan-pad-focused-detail.png`, `mine-plan-pad-focused-orbit.png`, and `resource-color-stability-orbit.png`.
 
 Acceptance: metallurgy explains the process through one believable plant with opening sections; geology shows independently controlled, correctly registered vector units on real 3D terrain; mine planning reads as a realistic proposed site in its natural landscape. Every animation explains an operation or transition. Source data and interpretation limits remain available. These are planned changes, not implemented results.
 

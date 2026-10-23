@@ -3113,14 +3113,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const edgeAlphaMap = createTerrainEdgeAlphaTexture();
       const terrain = new THREE.Mesh(
         terrainGeometry,
-        new THREE.MeshStandardMaterial({
+        new THREE.MeshLambertMaterial({
           // Warm mineral brown rather than the old near-white cream. The
           // reference decks keep the ground low-chroma so the orebody's
           // saturated grades are the only vivid thing on screen; a pale
           // surface competes with the data and washes the whole frame out.
           color: mode==='subsurface' ? 0x52616a : TERRAIN_GROUND_COLOR,
-          roughness: mode === 'drillholes' || mode === 'subsurface' ? 0.88 : 0.8,
-          metalness: 0.0,
           transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
           opacity: terrainOpacityForView(mode, surfaceCameraView),
           alphaTest: 0,
@@ -3136,7 +3134,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           polygonOffsetFactor: 2,
         })
       );
-      const terrainMaterial = terrain.material as THREE.MeshStandardMaterial;
+      const terrainMaterial = terrain.material as THREE.MeshLambertMaterial;
       registerTerrainSurfaceMaterial(terrainMaterial);
       terrain.receiveShadow = true;
       terrain.renderOrder = 20;
@@ -3253,12 +3251,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             polygonOffset: true,
             polygonOffsetFactor: 2,
           })
-            : new THREE.MeshStandardMaterial({
+            : new THREE.MeshLambertMaterial({
             map: mode === 'topography' ? null : terrainTexture,
             color: 0xffffff,
-            roughness: 0.88,
-            metalness: 0.0,
-            envMapIntensity: 0.35,
             transparent: terrainOpacityForView(mode, surfaceCameraView) < 1,
             opacity: terrainOpacityForView(mode, surfaceCameraView),
             emissive: new THREE.Color('#000000'),
@@ -3546,7 +3541,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
             color:unit.color,
             transparent:true, opacity:1, depthWrite:true, side:THREE.DoubleSide,
-            forceSinglePass:true, toneMapped:true,
+            forceSinglePass:true, toneMapped:false,
           }));
           mesh.name = object.name;
           mesh.userData.tooltipItems=[{title:unit.label,rows:[unit.basis,'Interpreted contact geometry, not observed everywhere.'],tone:unit.color}];
@@ -4028,6 +4023,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             opacity: bin.key === 'trace' ? 0.42 : focusOpacity,
             depthWrite: true,
             depthTest: true,
+            toneMapped: false,
           });
           const mesh = new THREE.InstancedMesh(blockGeometry, blockMaterial, gradeBlocks.length);
           mesh.name = `resource-grade-${bin.key}`;
