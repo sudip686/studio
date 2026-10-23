@@ -81,8 +81,8 @@ Acceptance: no duplicated primary Continue action; no model focal point or selec
 
 ### C. Make geology the signature interaction — P0/P1
 
-- [ ] Check digitized polygons against the source sheet, including fragmentation, holes, unit assignment and possible raster-label/line contamination. Do not smooth or invent geological contacts for visual effect.
-- [ ] Audit map registration using identifiable coordinate-grid control points. Record the transform and residuals; improve registration only where the source supports it.
+- [x] Check digitized polygons against the source sheet, including fragmentation, holes, unit assignment and possible raster-label/line contamination. No geometry was changed; raster artifacts and the required authoritative-source follow-up are documented in `TANGA_GEOLOGY_POLYGON_AUDIT_2026-10-23.md`.
+- [x] Audit map registration against all labelled coordinate-grid lines. Record the current transform and measured residuals in `TANGA_GEOLOGY_POLYGON_AUDIT_2026-10-23.md`; no correction is justified by the image-space residuals, and the raster still does not establish surveyed accuracy or datum.
 - [ ] Reframe the map footprint within the available canvas. Use registered surrounding imagery/terrain where available, and clearly distinguish survey coverage from regional context; do not bridge unverified elevation joins.
 - [x] Re-tune the measured-DEM elevation tint and terrain fill light for clearer ridge/valley relief; retain the 1× source elevation and identify the tint as display treatment, not land cover. Reviewed the ready desktop scene.
 - [x] Keep source sheet → north-up mapped units → oblique mapped terrain → separate interpreted depth. Show a deliberate transition rather than implying that polygons are physically extruded into the existing model. Verified all four authored stages in the local production build: the source image loads; mapped and relief stages identify digitized surface polygons; depth stage explicitly says "separate interpreted volumes" and preserves the viewpoint while the surface opacity fades and model depth opacity rises.
