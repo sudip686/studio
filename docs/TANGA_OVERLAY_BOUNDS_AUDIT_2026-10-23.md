@@ -43,5 +43,5 @@ All probed pages reported no horizontal document overflow. Desktop, tablet and p
 
 ## Still open
 
-- Measure the 3D camera targets and projected callout/leader bounds against panel slots at each viewport; the DOM checks cannot establish these world-to-screen collisions.
+- At 1707 × 842, measured callout rectangles for the topography, drillholes, resource and mine-planning overview. None intersected the primary story panel or left the viewport. Still measure the authored subsurface depth stages, mine facility close-ups and phone/tablet layouts; the original DOM bounds sweep does not establish collisions in those views.
 - Inventory every chapter-specific tool, disclosure and fallback panel before claiming complete overlay consolidation.
