@@ -173,8 +173,10 @@ Start with the measured viewer baseline, one consolidated story/navigation shell
 - [x] Keep metallurgy report figures accessible from the results inspector instead of placing a large source thumbnail over the equipment canvas; tighten the instrument framing.
 - [x] Make Explore → Return to story reapply the current authored camera/view without discarding layer settings; the local copy-link action reports success.
 - [x] Expand mine overview bounds to include the actual conceptual plant and illustrative facility footprints; use a wider, higher-angle overview and keep close-up actions separate.
-- [x] Confirm the local app builds the shared selection and links without browser console errors on the checked geology and mine views. MapLibre emitted graphics-buffer performance warnings in this environment; a controlled frame-rate benchmark has not been recorded.
+- [x] Confirm the local app and local Cloudflare Worker preview load the versioned geology stage with `ready=true`; the Worker served terrain, geological-model and geology-polygon requests successfully.
+- [x] Confirm the copy-link button reports success and the explore toggle returns to the story presentation.
+- [x] Confirm clean production builds for Next.js and OpenNext/Cloudflare, with no browser console errors on checked geology/mine/metallurgy views. MapLibre emitted graphics-buffer performance warnings; a controlled frame-rate benchmark has not been recorded.
 - [ ] Complete 12-chapter and responsive screenshot review; measure cold/warm load, transfer and frame-time budgets.
 - [ ] Validate scene retry against injected asset failures, WebGL context loss, stale requests and repeated scene revisits.
 - [ ] Inspect the new metallurgy camera fit after a clean reload and verify on narrow viewports.
-- [ ] Verify the final Vercel preview and a Cloudflare Worker preview independently; inspect public access and production R2 asset configuration.
+- [ ] Verify the pushed Vercel preview and live Cloudflare deployment, inspect public access and production R2 asset configuration. The local Cloudflare preview passed; the hosted Vercel session currently redirects to login.
