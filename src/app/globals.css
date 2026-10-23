@@ -13947,9 +13947,9 @@ button.tanga-deck__pager-count {
 
 /* Mine-planning orientation presets: a compact map/oblique pair above the story steps. */
 .tanga-mine-story__orientation{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 10px;padding:0 0 10px;border-bottom:1px solid #ffffff24}
-.tanga-deck .tanga-mine-story .tanga-mine-story__orientation button{min-height:36px;margin:0;padding:7px 8px;border:1px solid #90a69b66;border-radius:4px;background:#e8e8dd;color:#263d37;font-size:10px;font-weight:700;text-align:center;letter-spacing:.025em}
-.tanga-deck .tanga-mine-story .tanga-mine-story__orientation button:first-child{background:#dce5d9;border-color:#829680;color:#29483d}
-.tanga-deck .tanga-mine-story .tanga-mine-story__orientation button:hover:not(:disabled){background:#cbd9ca;border-color:#526f5d}
+.tanga-deck .tanga-mine-story .tanga-mine-story__orientation button{min-height:36px;margin:0;padding:7px 8px;border:1px solid #78919d66;border-radius:5px;background:#20313a;color:#d9e4e7;font-size:10px;font-weight:650;text-align:center;letter-spacing:.025em;transition:background-color 160ms ease,border-color 160ms ease,color 160ms ease}
+.tanga-deck .tanga-mine-story .tanga-mine-story__orientation button[aria-pressed="true"]{background:#654126;border-color:#dda36c;color:#fff4e8;box-shadow:inset 0 0 0 1px #dda36c55}
+.tanga-deck .tanga-mine-story .tanga-mine-story__orientation button:hover:not(:disabled):not([aria-pressed="true"]){background:#2a424e;border-color:#82c6c4}
 .tanga-mine-story__orientation button:focus-visible{outline:2px solid #efc58e;outline-offset:2px}
 .tanga-mine-story__orientation button:disabled{opacity:.5;cursor:wait}
 .tanga-deck .tanga-three__callout { max-width:180px; padding:8px 10px; background:#0c1822ed; box-shadow:0 4px 14px #0003; }

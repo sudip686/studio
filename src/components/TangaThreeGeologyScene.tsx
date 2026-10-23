@@ -2083,6 +2083,8 @@ export default function TangaThreeGeologyScene({
   const [haulCount, setHaulCount] = useState(0);
   const [haulStatus,setHaulStatus]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
   const [targetCount, setTargetCount] = useState(0);
+  const [mineOrientation,setMineOrientation]=useState<'oblique'|'plan'>('oblique');
+  useEffect(()=>{setMineOrientation('oblique');},[mode]);
   const [evidenceHoleIds,setEvidenceHoleIds]=useState<string[]>([]);
   const [focusedSource,setFocusedSource]=useState<string|null>(null);
   const evidenceFocusRef=useRef<((holeId:string)=>void)|null>(null);
@@ -2578,6 +2580,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const leaveMinePlanView = () => {
       if (mode !== 'mine_planning' || !sitePlanView) return;
       sitePlanView = false;
+      setMineOrientation('oblique');
       camera.up.set(0, 1, 0);
       controls.enableRotate = true;
       controls.minPolarAngle = 0;
@@ -2707,6 +2710,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (command.action === 'sitePlan' && mode === 'mine_planning' && sitePlan?.pits.length) {
         facilityFocused=false;setStoryPlaying(false);calloutsForProjection=siteOverviewCallouts;
         sitePlanView=true;
+        setMineOrientation('plan');
         const bounds=new THREE.Box3();
         for(const pit of sitePlan.pits) for(const [x,z] of pit.ring) bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,pit.surface,z)));
         const includeLocal=(x:number,z:number,y=0)=>bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,y,z)));
@@ -2737,6 +2741,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'siteOblique' && mode === 'mine_planning') {
         sitePlanView=false;
+        setMineOrientation('oblique');
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI-0.04;
         facilityFocused=false;calloutsForProjection=siteOverviewCallouts;
         scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);
@@ -2746,6 +2751,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'resetView') {
         if(mode==='mine_planning')sitePlanView=false;
+        if(mode==='mine_planning')setMineOrientation('oblique');
         facilityFocused=false;
         if (mode === 'mine_planning') calloutsForProjection = siteOverviewCallouts;
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle = Math.PI - 0.04;
@@ -5291,8 +5297,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {mode === 'mine_planning' && <section className="tanga-mine-story" aria-label="Mining targets and animation">
         <h2>{miningBeat>=3?'Processing & site services':'Why these pits?'}</h2>
         <div className="tanga-mine-story__orientation" role="group" aria-label="Site orientation">
-          <button disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'sitePlan'})}>North-up plan</button>
-          <button disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'siteOblique'})}>Oblique view</button>
+          <button aria-pressed={mineOrientation==='plan'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'sitePlan'})}>North-up plan</button>
+          <button aria-pressed={mineOrientation==='oblique'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'siteOblique'})}>Oblique view</button>
         </div>
         <div className="tanga-mine-story__steps" aria-label="Mining camera presets">
           {(['northPit','southPit','resetView'] as const).map((action,index)=><button key={action} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(index===2?3:2);setFocusedSource(null);cameraCommandHandlerRef.current?.({id:Date.now(),action});}}>{['North pit','South pit','Whole site'][index]}</button>)}
