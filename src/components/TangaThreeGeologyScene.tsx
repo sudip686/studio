@@ -3515,8 +3515,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       host.dataset.drillEvidenceVisible = String(shownDrillholes.length > 0);
       if (mode === 'subsurface') {
         const response = await earlyGeology;
+        // The public asset request may be shared with a later chapter visit.
+        // Leave that download alone, but don't buffer or parse its GLB after
+        // this scene has been superseded.
+        if (cancelled) return;
         if (!response?.ok) throw new Error('Interpreted geology model unavailable');
-        const gltf = await new GLTFLoader().parseAsync(await response.arrayBuffer(), '');
+        const geologyBuffer = await response.arrayBuffer();
+        if (cancelled) return;
+        const gltf = await new GLTFLoader().parseAsync(geologyBuffer, '');
         if (cancelled) {disposeObject(gltf.scene); return;}
         let unitCount = 0;
         const modelBounds = new THREE.Box3();
