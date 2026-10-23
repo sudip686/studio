@@ -56,7 +56,7 @@ Use restrained dark panels, warm white typography, the existing copper brand acc
 ### A. Establish reliability and a measurable baseline — P0
 
 - [ ] Record first useful frame, scene-ready time, transfer size, frame times and failure modes for all 12 chapters on the current branch.
-- [ ] Audit survey, regional terrain, collars and mesh transforms against their coordinate/elevation metadata. Report unresolved vertical-reference differences; do not shift recorded drillholes to make them look attached.
+- [x] Audit survey, regional terrain, collars, resource blocks and interpreted mesh transforms against their coordinate/elevation metadata. Report unresolved vertical-reference and two-hole source discrepancies; do not shift recorded drillholes to make them look attached. Reproducible results: `docs/TANGA_SPATIAL_REGISTRATION_AUDIT_2026-10-23.md` and `scripts/audit_tanga_spatial_data.py`.
 - [ ] Exercise orbit, below-ground camera, zoom, reset, direct chapter entry and rapid chapter switching. The authored geology camera being overwritten by a generic startup tween was reproduced and fixed; initial 390 px and desktop chapter entry now retain their authored views. Remaining interaction and stale-update cases are unverified.
 - [ ] Introduce in-place scene retry, visible loading stages and a chapter-specific static fallback from the actual project scene. Keep explanation and navigation usable when WebGL or assets fail.
 - [ ] Make asset fetches deduplicate and cancel or ignore obsolete work safely; failed promises must be retryable. Check shared asset ownership before changing disposal.
@@ -166,6 +166,7 @@ Start with the measured viewer baseline, one consolidated story/navigation shell
 
 ## Implemented package and verification notes
 
+- [x] Compare survey DTM, regional DEM, all 100 viewer collars, the original survey collar shapefile, AMC MRE collar CSV, interpreted geology GLB bounds, presentation grids and all 155,952 resource block features. Record the two unresolved collar mismatches and undeclared vertical references; preserve every recorded source coordinate. Reproduction steps and detailed results are in `TANGA_SPATIAL_REGISTRATION_AUDIT_2026-10-23.md`.
 - [x] Add in-place retry for a failed Three.js scene. Retry remounts the current chapter scene and keeps the presenter in place.
 - [x] Save/restore authored shot, peer selection, mapped geology unit and validated layer visibility/opacity in version 1 links.
 - [x] Let a viewer select a mapped unit from the legend or by pointer selection on the map, see its evidence limits in the story panel, and dim the other polygons. Verified named links highlight only the matching interpreted model units; unmatched names remain separate.

@@ -35,6 +35,7 @@ export const CHAPTER_SOURCES: Record<TangaChapterId, EvidenceSource[]> = {
   ],
   drillholes: [
     {title: 'AMC Tanga Graphite Mineral Resource Estimate', locator: 'Final report · 19 December 2025 · drilling §3.2; Figure 3.9', qualification: 'The core photograph is report evidence and is not asserted to be the selected 3D hole.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
+    {title:'Collar coordinate cross-check',locator:'August 2025 survey shapefile vs AMC DH_Collar.csv · 100 records',qualification:'99 survey IDs match the displayed collars; one survey ID has a probable O/0 transcription issue. After Arc 1960 to WGS 84 transformation, TGDD1037 and TGDD1076 remain about 199 m and 190 m from their displayed survey positions. Source coordinates are retained pending reconciliation. Survey and regional terrain vertical datums are not stated.'},
   ],
   subsurface: [
       {title:'Tanga project geological map', locator:'Existing project asset · original coordinate grid and lithology legend', qualification:'Original sheet plus derived transparent rock polygons. Printed UTM grid provides approximate registration; map datum, source date and contacts require independent verification. Soil is omitted; no image contacts are extruded into the existing model.', href:'/geology_map.jpg'},
