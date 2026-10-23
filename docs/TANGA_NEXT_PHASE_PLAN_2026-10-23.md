@@ -2,6 +2,8 @@
 
 Date: 23 October 2026. Status: implementation in progress on `codex/tanga-investor-experience`.
 
+Planning refresh: the user paused implementation, then requested a fresh current-state/online design review. The [reference review](TANGA_POLISH_REFERENCE_REVIEW_2026-10-23.md) records the current branch and Vercel preview separately, six sampled VRIFY views across the four open decks, GeoLibre, and live Cesium/ArcGIS examples. Its twelve implementation packages refine A–F and add the three scoped enhancements in G below. The earlier review findings remain historical context; the refresh identifies which problems are still visible on the current branch. Research/planning does not mark implementation or verification complete.
+
 ## Outcome
 
 Make Tanga feel like one professionally directed presentation: viewers understand the project, follow the evidence, and can explore without losing their place. Keep the existing Next.js, Cesium/MapLibre/deck.gl, Three.js and overlay-slot architecture. Extend the existing presentation controls instead of creating parallel controls.
@@ -147,12 +149,23 @@ Acceptance: every chapter introduces a different question or dataset; advancing 
 
 Acceptance: a shared link opens the intended view; missing assets produce a usable fallback; both runtime targets are checked before release. Build compatibility alone does not establish a working Cloudflare deployment.
 
+### G. Add the next presentation enhancements — P1/P2
+
+Implementation details, priorities, reference evidence and acceptance conditions are in the [reference review](TANGA_POLISH_REFERENCE_REVIEW_2026-10-23.md). The other nine packages in that document refine existing A–F items and are not duplicate checkboxes.
+
+- [ ] **G1 · Visual chapter index:** extend the existing All scenes overlay with lazy scene thumbnails, chapter questions and current-view indication; retain keyboard/touch access and avoid hidden WebGL pre-renders. Corresponds to BP10.
+- [ ] **G2 · Same-camera comparison:** extend the current original-terrain comparison with a labelled draggable wipe for registered surface/concept or terrain/geology representations; preserve camera, scale, coverage and source limitations and provide a keyboard equivalent. Corresponds to BP11.
+- [ ] **G3 · Executive highlights:** add a clearly labelled short route through six existing authored shots, targeting approximately 90 seconds after assets are ready, with manual interruption and a return to the full 12-chapter story. Keep it distinct from per-chapter autoplay timing. Corresponds to BP12.
+
+Acceptance: the new index, comparison and route reuse existing scene state, controls and caches; source limitations remain visible; new interactions pass the existing responsive, accessibility, failure and performance gates.
+
 ## Implementation order and release gates
 
 1. **Foundation:** A plus the UI inventory in B. Establish a real baseline and fix reproduced geometry/navigation failures first.
 2. **First visible release:** B, C and the shared annotation pieces of D. Deliver the unified shell and a polished geology experience together.
-3. **Full story release:** finish D and E across all 12 chapters, concentrating on mine-site framing and metallurgy evidence.
-4. **Delivery release:** F, cross-device checks, source review, deployment verification and a complete rehearsal.
+3. **Full story release:** finish D and E across all 12 chapters, concentrating on mine-site framing and metallurgy evidence; add the G1 visual index using the validated scene stills.
+4. **Presentation enhancements:** G2 comparison and G3 executive highlights once the underlying shots, source captions and shared state are stable.
+5. **Delivery release:** F, cross-device checks, source review, deployment verification and a complete rehearsal including the G interactions.
 
 Keep checklist items open until evidence exists. Implement small commits on the existing project branch with before/after screenshots and a rollback point for each release. Extract shared scene loading, camera/state and label responsibilities only as needed for these changes; retain the current rendering architecture.
 
