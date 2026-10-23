@@ -21,15 +21,20 @@ export function buildConcentrator() {
   // The pad and graded transition are placed against the existing terrain by
   // placeConcentrator. Avoid a second oversized slab beneath the whole campus:
   // it reads as a floating platform and hides the surrounding ground texture.
-  box(400,3,280,0,0,0,materials.concrete,'Plant pad');
+  // Keep the pad top at local y=0 so shed walls and equipment bases meet the
+  // graded site datum. The former centre at y=0 buried every wall base by 1.5 m.
+  box(400,3,280,0,-1.5,0,materials.concrete,'Plant pad');
   // A perimeter service lane and drainage edge make the pad read as a site.
-  box(392,.15,7,0,1.6,135,materials.roof,'Conceptual service lane');
-  box(392,.15,5,0,1.6,-135,materials.roof,'Service lane');
-  for(const x of [-195,195])box(4,.15,268,x,1.6,0,materials.roof);
-  for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,1.72,135,materials.concrete);
+  box(392,.15,7,0,.1,135,materials.roof,'Conceptual service lane');
+  box(392,.15,5,0,.1,-135,materials.roof,'Service lane');
+  for(const x of [-195,195])box(4,.15,268,x,.1,0,materials.roof);
+  for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,.22,135,materials.concrete);
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
+    // A narrow, raised concrete footing gives the wall line a readable base
+    // while staying flush with the shared site pad.
+    box(w+1.5,.45,d+1.5,x,.225,z,materials.concrete,`${name} concrete footing`);
     for(const sign of [-1,1]){
       const roof=box(w,1.2,roofLength,x,h+rise/2,z+sign*d/4,cladding,name);
       roof.rotation.x=sign*Math.atan2(rise,d/2);

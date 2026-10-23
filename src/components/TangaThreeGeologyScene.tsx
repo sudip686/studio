@@ -898,6 +898,19 @@ if (mode === 'mine_planning') return 1;
   return 1;
 }
 
+/** Blend the ground toward its under-surface view as the camera passes below
+ * the horizon. A binary above/below test makes every terrain colour pop at
+ * once while orbiting, so use a continuous pitch-based transition instead. */
+function terrainOpacityForCamera(mode: GeologyMode, view: SurfaceCameraView, camera: THREE.Camera, target: THREE.Vector3) {
+  if (view === 'top') return terrainOpacityForView(mode, 'top');
+  const defaultOpacity = terrainOpacityForView(mode, 'default');
+  const belowOpacity = terrainOpacityForView(mode, 'bottom');
+  const distance = Math.max(1, camera.position.distanceTo(target));
+  const belowPitch = Math.max(0, (target.y - camera.position.y) / distance);
+  const blend = THREE.MathUtils.smoothstep(belowPitch, 0, Math.sin(THREE.MathUtils.degToRad(40)));
+  return THREE.MathUtils.lerp(defaultOpacity, belowOpacity, blend);
+}
+
 function makeCameraShot(
   from: THREE.Vector3,
   to: THREE.Vector3,
@@ -4016,6 +4029,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             transparent: true,
             opacity: bin.key === 'trace' ? 0.16 : 0.24,
             wireframe: true,
+            // The wire overlay shares the block faces exactly. Offset it
+            // slightly toward the camera to prevent depth-buffer shimmer as
+            // OrbitControls changes the view angle and zoom.
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
             fog: false,
             depthWrite: false,
             depthTest: true,
@@ -4818,10 +4837,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.update();
       if (userGestured) {
         const orbitView: SurfaceCameraView = camera.position.y < controls.target.y ? 'bottom' : 'default';
-        if (surfaceCameraView !== orbitView) {
-          surfaceCameraView = orbitView;
-          applyTerrainSurfaceView();
-        }
+        // Remember explicit top-down mode, but never snap the surface opacity
+        // at the horizon while the viewer is orbiting. The per-frame camera
+        // blend below handles that transition smoothly across every chapter.
+        if (surfaceCameraView !== orbitView) surfaceCameraView = orbitView;
       }
       const driftYaw = 0; // Hold the registered scene after its authored move.
       let rotationTweenActive = false;
@@ -4925,8 +4944,26 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const mappedSurface = geologyPlan || geologyOblique;
       geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);
       if(geologySectionLocator)geologySectionLocator.visible=!mappedSurface&&(inspectionActiveRef.current||detail.sectionEnabled);
+      {
+        const cameraOpacity = (geologyPlan || geologyOblique)
+          ? .92
+          : terrainOpacityForCamera(mode, surfaceCameraView, camera, controls.target);
+        const geologyOpacity = mode === 'subsurface'
+          ? THREE.MathUtils.lerp(.92, cameraOpacity, geologyDepthBlend)
+          : cameraOpacity;
+        const opacity = geologyOpacity * layerSettingsRef.current.terrain.opacity;
+        const transparent = opacity < .999;
+        for (const material of terrainSurfaceMaterials) {
+          const surfaceMaterial = material as THREE.Material & {opacity?: number; transparent?: boolean; depthWrite?: boolean};
+          surfaceMaterial.opacity = opacity;
+          surfaceMaterial.depthWrite = !transparent;
+          if (surfaceMaterial.transparent !== transparent) {
+            surfaceMaterial.transparent = transparent;
+            surfaceMaterial.needsUpdate = true;
+          }
+        }
+      }
       if(mode==='subsurface') {
-        for(const material of terrainSurfaceMaterials) material.opacity=THREE.MathUtils.lerp(.92,terrainOpacityForView(mode,surfaceCameraView),geologyDepthBlend)*layerSettingsRef.current.terrain.opacity;
         // A selected surface map unit must not imply a volumetric correlation.
         // Only the independent model spotlight can emphasize a depth body until
         // a source-verified surface-to-depth crosswalk is available.
