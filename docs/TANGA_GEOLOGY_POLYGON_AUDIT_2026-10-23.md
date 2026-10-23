@@ -51,9 +51,14 @@ The counts are a QA signal, not a geological count. A hole in a colour mask may 
 
 The December 2025 MRE text reports 155 reconnaissance grab samples and 170 detailed-mapping grab samples, as well as pit and channel samples. The reviewed report text gives aggregate counts but yielded no per-sample grab IDs paired with coordinates. The separate local sample-evidence workbook contains drill-core interval entities with calculated midpoints and is explicitly marked confidential; those points are not surface grab-sample locations and must not be repurposed as such. No grab-sample markers were added. A source register with surface sample IDs and verified coordinates is still required to show them.
 
+## 3D map footprint check
+
+The local production view `?view=plan#subsurface` was inspected at 1,440 × 900. The north-up drape fits the full mapped surface extent inside the displayed terrain patch, while surrounding terrain imagery remains visible as context. The existing camera fit uses the mapped extent and viewport aspect ratio; the geology surface is not stretched to fill the canvas. No camera or geometry change was warranted by this check. The map basis remains approximate printed-grid registration, and the context must not be read as extending survey coverage beyond its source mask.
+
 ## Decision and follow-up
 
 - Printed-grid registration has been checked against all visible labelled grid lines. No registration edit is justified by the residuals.
+- The north-up mapped-surface view was checked at desktop size; existing extent-aware framing preserves the complete drape and surrounding terrain context without distorting the map.
 - The polygon source check is complete, with raster contamination and fragmentation recorded. Geometry repair remains blocked on authoritative shapefiles/georeferenced source data or a reviewed digitization.
 - No grab-sample coordinates were added. The report-text check and sample-type distinction are recorded above; reconsider markers only when a source register pairs surface sample IDs with verified coordinates and provenance.
 - The map should remain a translucent surface overlay over the existing terrain, with regional context clearly separate. Do not use the map raster as elevation or project these surface colours into the interpreted depth model.
