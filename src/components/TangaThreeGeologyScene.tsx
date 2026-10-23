@@ -463,14 +463,6 @@ const DRILL_TRACE_SURFACE_CLEARANCE = 9;
 const DRILL_COLLAR_SURFACE_LIFT = 1;
 const SURFACE_Y = 0;
 const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, -60, 0);
-const MAPPED_UNIT_MODEL_NAMES:Record<string,string[]>={
-  'Graphitic schist':['GRSC'],
-  'Khondalite':['Khondalite'],
-  'Mafic granulite':['Granulite'],
-  'Quartzofeldspathic rock':['Quartz-Feldspathic'],
-  'Crystalline limestone':['Marble'],
-};
-
 // Large assets are served from Cloudflare R2 in production (set
 // NEXT_PUBLIC_ASSET_BASE_URL on Vercel) and from /public locally. This keeps
 // the 192 MB high-res texture and other heavy files out of the git repo and
@@ -4745,8 +4737,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(geologySectionLocator)geologySectionLocator.visible=!mappedSurface&&(inspectionActiveRef.current||detail.sectionEnabled);
       if(mode==='subsurface') {
         for(const material of terrainSurfaceMaterials) material.opacity=THREE.MathUtils.lerp(.92,terrainOpacityForView(mode,surfaceCameraView),geologyDepthBlend)*layerSettingsRef.current.terrain.opacity;
-        const mappedNames=MAPPED_UNIT_MODEL_NAMES[selectedGeologyUnitRef.current??'']??[];
-        for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=selected?selected===mesh.name:mappedNames.some(name=>mesh.name.includes(name));const hasSelection=Boolean(selected||mappedNames.length);mesh.material.emissive.copy(mesh.material.color);mesh.material.emissiveIntensity=active?.25:.08;mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(hasSelection&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
+        // A selected surface map unit must not imply a volumetric correlation.
+        // Only the independent model spotlight can emphasize a depth body until
+        // a source-verified surface-to-depth crosswalk is available.
+        for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=Boolean(selected)&&selected===mesh.name;const hasSelection=Boolean(selected);mesh.material.emissive.copy(mesh.material.color);mesh.material.emissiveIntensity=active?.25:.08;mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(hasSelection&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
       }
 
       if (recoverPlanFog && !geologyPlan) {
