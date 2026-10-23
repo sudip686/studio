@@ -3,6 +3,7 @@
 import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
 
 import {useEffect, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -4748,6 +4749,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           : 'Drillhole volume';
 
   return (
+    <>
     <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
       {mode!=='metallurgy' && <div className="tanga-surface-control" onKeyDown={event=>event.stopPropagation()}>
@@ -4756,9 +4758,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <div><span>Transparent</span><button type="button" onClick={()=>setSurfaceOpacity(null)} title="Restore the authored surface opacity for this view">Auto</button><span>Opaque</span></div>
       </div>}
       {!sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
-      {(/failed|unavailable|exceeded|could not|no contained/i.test(status)) && (
-        <div role="alert" className="tanga-three__load-error"><span>{status}</span><button type="button" onClick={onRetry}>Retry this scene</button></div>
-      )}
       {!minimalViewerChrome && (
         <>
           {/* Scene title removed. It rendered bottom-centre, directly under
@@ -5054,5 +5053,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         </details>
       )}
     </section>
+    {visible && /failed|unavailable|exceeded|could not|no contained/i.test(status) && typeof document !== 'undefined' && createPortal(
+      <div role="alert" className="tanga-three__load-error"><span>{status}</span><button type="button" onClick={onRetry}>Retry this scene</button></div>,
+      document.body
+    )}
+    </>
   );
 }

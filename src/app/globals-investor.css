@@ -1300,7 +1300,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-three.is-mine_planning .tanga-three__callout{max-width:264px!important}
 @media(max-width:700px){.tanga-deck[data-mode="mine_planning"] .tanga-deck__planning-note{top:166px;left:174px;right:12px;bottom:auto;max-width:none;font-size:8px;padding:7px 9px}}
 
-.tanga-three__load-error{z-index:32;display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100% - 32px));padding:12px 14px;border:1px solid #dfaa7a88;border-radius:8px;background:#17252df5;color:#f5e5d6;font-size:12px;line-height:1.4}
+.tanga-three__load-error{position:fixed!important;z-index:1000!important;top:216px!important;left:24px!important;display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100vw - 48px));padding:12px 14px;border:1px solid #dfaa7a88;border-radius:8px;background:#17252df5;color:#f5e5d6;font-size:12px;line-height:1.4}
+@media(max-width:760px){.tanga-three__load-error{top:170px!important;left:12px!important;max-width:calc(100vw - 24px)}}
 .tanga-three__load-error button{flex:0 0 auto;min-height:40px;padding:8px 12px;border:1px solid #e0ad7e88;border-radius:5px;background:#382b25;color:#fff4e8;cursor:pointer;font:inherit}
 .tanga-three__load-error button:hover{background:#5c3d2d}
 .tanga-three__load-error button:focus-visible{outline:2px solid #f0bf92;outline-offset:2px}
