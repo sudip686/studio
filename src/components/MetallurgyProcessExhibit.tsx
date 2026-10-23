@@ -100,7 +100,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const fill = new THREE.DirectionalLight(0xd3e8fa, .48); fill.position.set(400, 180, -350); scene.add(fill);
 
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
-    const direction = new THREE.Vector3(1.1, .86, 1.25).normalize();
+    // Lower the overview orbit to show more façade and spread the campus across
+    // the widescreen canvas; fitOverview still frames the complete boundary.
+    const direction = new THREE.Vector3(1.1, .58, 1.25).normalize();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); dirty = true; };
     onMotionPreference();
@@ -129,9 +131,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         }
         distance *= Math.max(.1, extent / .76);
       }
-      // Keep the whole campus comfortably inside the canvas. Tighter .58/.64
-      // factors cropped the near-side water allowance at 1366 × 768.
-      distance = Math.max(125, distance * .68);
+      // Slightly tighter than the former high-angle frame; the lower horizon
+      // recovers breathing room above the near-side water allowance.
+      distance = Math.max(125, distance * .62);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
     }
