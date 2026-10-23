@@ -1376,10 +1376,10 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 
 /* A same-camera, same-scale terrain wipe for the mine-planning concept. */
 .tanga-three__comparison-wipe{position:absolute;z-index:16;top:0;bottom:0;width:24px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;transform:translateX(-50%);pointer-events:auto;touch-action:none;cursor:col-resize}
-.tanga-three__comparison-wipe>i{position:absolute;top:0;bottom:0;width:2px;background:#f5c08c;box-shadow:0 0 16px #f5c08c99}
-.tanga-three__comparison-wipe>span{position:absolute;top:158px;z-index:1;margin:0;padding:5px 8px;border:1px solid #f5c08c55;border-radius:4px;background:#121d26e8;color:#fff4e9;font-size:9px;font-weight:750;letter-spacing:.12em;white-space:nowrap}
+.tanga-three__comparison-wipe>i{position:absolute;top:0;bottom:0;width:2px;background:var(--story-accent,#f5c08c);box-shadow:0 0 16px color-mix(in srgb,var(--story-accent,#f5c08c) 60%,transparent)}
+.tanga-three__comparison-wipe>span{position:absolute;top:158px;z-index:1;margin:0;padding:5px 8px;border:1px solid color-mix(in srgb,var(--story-accent,#f5c08c) 34%,transparent);border-radius:4px;background:var(--story-surface,#121d26e8);color:var(--story-ink,#fff4e9);font-size:9px;font-weight:750;letter-spacing:.12em;white-space:nowrap}
 .tanga-three__comparison-wipe>span:first-of-type{right:calc(100% + 8px)}
 .tanga-three__comparison-wipe>span:last-of-type{left:calc(100% + 8px)}
-.tanga-story-compare-range{display:grid;gap:5px;margin-top:8px;padding:9px 10px;border:1px solid #b8cbd12b;border-radius:6px;background:#111d25;color:#c5d1d5;font-size:9px;font-weight:650;letter-spacing:.06em;text-transform:uppercase}
-.tanga-story-compare-range input{width:100%;accent-color:#f1ae77;cursor:ew-resize}
-.tanga-story-compare-range :focus-visible{outline:2px solid #ffd0a7;outline-offset:3px}
+.tanga-story-compare-range{display:grid;gap:5px;margin-top:8px;padding:9px 10px;border:1px solid var(--story-line,#b8cbd12b);border-radius:6px;background:var(--story-surface,#111d25);color:var(--story-muted,#c5d1d5);font-size:9px;font-weight:650;letter-spacing:.06em;text-transform:uppercase}
+.tanga-story-compare-range input{width:100%;accent-color:var(--story-accent,#f1ae77);cursor:ew-resize}
+.tanga-story-compare-range :focus-visible{outline:2px solid var(--story-accent,#ffd0a7);outline-offset:3px}
