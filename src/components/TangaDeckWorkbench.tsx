@@ -5266,7 +5266,7 @@ export default function TangaDeckWorkbench() {
           cameraCommand={threeCameraCommand}
           assetQuality={assetQuality}
           onLoadState={handleThreeLoadState}
-          onRetry={() => { setThreeLoadReport(DEFAULT_THREE_LOAD_REPORT); setThreeSceneRevision((revision) => revision + 1); }}
+          onRetry={() => { setThreeCameraCommand(null); setThreeLoadReport(DEFAULT_THREE_LOAD_REPORT); setThreeSceneRevision((revision) => revision + 1); }}
           selectedGeologyUnit={selectedGeologyUnit?.title}
           onSelectGeologyUnit={setSelectedGeologyUnit}
           labelDensity={labelDensity}

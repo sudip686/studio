@@ -2394,9 +2394,27 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       terrainSurfaceMaterials.push(material);
       applyTerrainSurfaceView();
     };
+    const recoveryViewKey = `tanga-webgl-recovery:${mode}`;
+    let recoveryView: {position: [number, number, number]; target: [number, number, number]; fov: number} | null = null;
+    try {
+      const stored = sessionStorage.getItem(recoveryViewKey);
+      if (stored) {
+        const candidate = JSON.parse(stored) as {position?: number[]; target?: number[]; fov?: number};
+        const validVector = (value?: number[]): value is [number, number, number] =>
+          Array.isArray(value) && value.length === 3 && value.every((coordinate) => Number.isFinite(coordinate) && Math.abs(coordinate) <= 1e7);
+        const distance = validVector(candidate.position) && validVector(candidate.target)
+          ? Math.hypot(...candidate.position.map((coordinate, index) => coordinate - candidate.target![index]))
+          : 0;
+        const maxDistance = mode === 'subsurface' ? 34000 : 16000;
+        if (validVector(candidate.position) && validVector(candidate.target) && distance >= 25 && distance <= maxDistance && Number.isFinite(candidate.fov) && candidate.fov! >= 10 && candidate.fov! <= 90) {
+          recoveryView = {position: candidate.position, target: candidate.target, fov: candidate.fov!};
+        }
+        sessionStorage.removeItem(recoveryViewKey);
+      }
+    } catch { /* Session storage is optional; retain the authored camera. */ }
     const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 1, mode === 'subsurface' ? 65000 : 26000);
-    camera.fov = cameraShot.fov;
-    camera.position.copy(cameraShot.from);
+    camera.fov = recoveryView?.fov ?? cameraShot.fov;
+    camera.position.copy(recoveryView ? new THREE.Vector3(...recoveryView.position) : cameraShot.from);
     camera.updateProjectionMatrix();
 
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
@@ -2404,6 +2422,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const onContextLost = (event: Event) => {
       event.preventDefault();
       wasContextLost = true;
+      try {
+        sessionStorage.setItem(recoveryViewKey, JSON.stringify({
+          position: camera.position.toArray(),
+          target: controlsRef.current?.target.toArray() ?? DEFAULT_CAMERA_TARGET.toArray(),
+          fov: camera.fov,
+        }));
+      } catch { /* Camera recovery is best-effort if storage is disabled. */ }
       setStatus('WebGL context lost; the 3D scene is unavailable. Waiting for graphics recovery…');
       setSceneReady(false);
       onLoadState?.({scene: 'error', terrain: 'degraded', quality: assetQuality, message: 'WebGL context lost; retry the scene after graphics recover.'});
@@ -2447,13 +2472,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     controls.screenSpacePanning = true;
     controls.minPolarAngle = 0.04;
     controls.maxPolarAngle = Math.PI - 0.04;
-    controls.target.copy(DEFAULT_CAMERA_TARGET);
+    controls.target.copy(recoveryView ? new THREE.Vector3(...recoveryView.target) : DEFAULT_CAMERA_TARGET);
     controls.maxDistance = mode === 'subsurface' ? 34000 : 16000;
     controls.minDistance = 25;
     controls.update();
     controlsRef.current = controls;
-    let userTookControl = false;
-    let userGestured = false;
+    let userTookControl = Boolean(recoveryView);
+    let userGestured = Boolean(recoveryView);
     let interacting = false;
     let lastInteractionAt = -Infinity;
     const onControlStart = () => {
