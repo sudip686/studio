@@ -5823,22 +5823,24 @@ export default function TangaDeckWorkbench() {
       )}
 
       {/* Three-act story ribbon — top-center, shows narrative progression. */}
-      <div className="tanga-deck__act-ribbon" aria-hidden="true">
-        {STORY_ACTS.map((act, i) => (
-          <div
-            key={act.id}
-            className={classNames(
-              'tanga-deck__act-seg',
-              i === activeActIndex && 'is-active',
-              i < activeActIndex && 'is-done',
-            )}
-            style={{'--act-theme': act.theme} as any}
-          >
-            <span className="tanga-deck__act-num">{`Act ${['I', 'II', 'III'][i]}`}</span>
-            <span className="tanga-deck__act-label">{act.label}</span>
-          </div>
-        ))}
-      </div>
+      {activeMode !== 'subsurface' && (
+        <div className="tanga-deck__act-ribbon" aria-hidden="true">
+          {STORY_ACTS.map((act, i) => (
+            <div
+              key={act.id}
+              className={classNames(
+                'tanga-deck__act-seg',
+                i === activeActIndex && 'is-active',
+                i < activeActIndex && 'is-done',
+              )}
+              style={{'--act-theme': act.theme} as any}
+            >
+              <span className="tanga-deck__act-num">{`Act ${['I', 'II', 'III'][i]}`}</span>
+              <span className="tanga-deck__act-label">{act.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* First-run coach marks — one-time interactive hint. */}
       {showCoach && !showCover && !isAutoplayMenuOpen && !isNotesOpen && !isLayersOpen && !isAutoplay && (
@@ -6467,7 +6469,7 @@ export default function TangaDeckWorkbench() {
         )}
       </section>
 
-      {!isExploreMode && !isCoverScene && ['topography','drillholes','subsurface','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 Surface'],['drillholes','02 Drilling'],['subsurface','03 Geology'],['resource','04 Estimate']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
+      {!isExploreMode && !isCoverScene && ['topography','drillholes','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 Surface'],['drillholes','02 Drilling'],['subsurface','03 Geology'],['resource','04 Estimate']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
       {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaChapterStoryPanel
         chapter={activeMode as TangaChapterId}

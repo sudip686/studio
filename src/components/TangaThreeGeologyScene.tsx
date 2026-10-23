@@ -16,6 +16,7 @@ import {buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceD
 import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
+import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
 import MetallurgyVisualStory from './MetallurgyProcessExhibit';
 import {MAPPED_SURFACE_UNITS,modelRockUnit} from '@/lib/deck/geology-palette';
 import GeologyCrossSections from './GeologyCrossSections';
@@ -865,19 +866,6 @@ function materialsForObject(object: THREE.Object3D) {
     });
   });
   return Array.from(materials);
-}
-
-/** Keep every material free from camera-distance haze across all chapters. */
-function lockSceneMaterialFog(scene: THREE.Scene) {
-  scene.traverse((object) => {
-    const materialOwner = object as THREE.Object3D & {material?: THREE.Material | THREE.Material[]};
-    for (const material of materialList(materialOwner.material)) {
-      if ('fog' in material && material.fog) {
-        material.fog = false;
-        material.needsUpdate = true;
-      }
-    }
-  });
 }
 
 /**
@@ -3342,7 +3330,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         }
         terrainMeshes.push(texturedTerrain);
         applyTerrainSurfaceView();
-        lockSceneMaterialFog(scene);
+        stabilizeSceneMaterialAppearance(scene);
         reportLoadState('loading', 'ready', quality, `${quality} terrain ready`);
         return resources;
       } catch (error) {
@@ -3503,7 +3491,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             calloutAnchors.set(id, new THREE.Vector3(x, terrainSurfaceY(resources, x, north), -north));
           }
         }
-        lockSceneMaterialFog(scene);
+        stabilizeSceneMaterialAppearance(scene);
         setStatus('Measured survey terrain ready');
         reportLoadState('ready', 'ready', resources?.quality ?? assetQuality, 'Measured survey terrain ready');
         return;
@@ -4310,13 +4298,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           }
         }
 
-        lockSceneMaterialFog(scene);
+        stabilizeSceneMaterialAppearance(scene);
         setStatus(mode === 'mine_planning'
           ? `${sitePlan?.pits.length ?? 0} conceptual excavations · provisional boundary · not optimised`
           : `${shownHoleCount} drillholes support ${sampled.length} ${resourceFocusLabel(activeFocus).toLowerCase()} blocks`);
         reportLoadState('ready', resources ? 'ready' : 'degraded', resources?.quality ?? assetQuality, `${shownHoleCount} drillholes / ${sampled.length} blocks ready`);
       } else {
-        lockSceneMaterialFog(scene);
+        stabilizeSceneMaterialAppearance(scene);
         setStatus(mode === 'metallurgy'
           ? 'Illustrative concentrator ready · testwork is separate evidence'
           : `${shownHoleCount} drillholes / ${shownDrillholes.length} intervals in Three.js`);
@@ -4765,7 +4753,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     applyDeckLayers(stage, layerSettingsRef.current);
     // This first pass protects anything already present; build() reapplies the
     // rule after its asynchronously loaded scene objects have been added.
-    lockSceneMaterialFog(scene);
+    stabilizeSceneMaterialAppearance(scene);
     projectCalloutsRef.current = projectCallouts;
     projectCallouts();
     updateNavInstruments();

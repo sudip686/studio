@@ -8,6 +8,7 @@ import {buildConcentrator} from '@/lib/deck/mine-scene';
 import MetallurgyEvidenceBoard from './MetallurgyEvidenceBoard';
 import {MET_GROUPS} from '@/lib/deck/metallurgy-plant';
 import {createPlantProcessMotion} from '@/lib/deck/plant-process-motion';
+import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
 
 const PROCESS = [
   {id: 'feed', title: 'Feed & crushing', short: 'Feed', point: [-44, 8, -8] as const, hasRoof: true, input: 'Mine feed · concept', output: 'Prepared feed · concept', description: 'Receive feed, reduce its size and convey it to milling. The industrial hopper and crushers illustrate the preparation step.', motion: 'Feed advances along the receiving conveyor.', basis: 'IMO Appendix D · A.1: laboratory stage crushing and sample splitting. Conveyor, industrial equipment and layout are conceptual.'},
@@ -90,6 +91,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const processMotion = createPlantProcessMotion(plant);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#b8b9b0', roughness: .96}));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.8; ground.receiveShadow = true; scene.add(ground);
+    stabilizeSceneMaterialAppearance(scene);
     scene.add(new THREE.HemisphereLight(0xf7fbff, 0x64736d, 1.05));
     const sun = new THREE.DirectionalLight(0xfff7e7, 1.75);
     sun.position.set(-330, 520, 360); sun.castShadow = true;
