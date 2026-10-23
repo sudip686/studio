@@ -2139,6 +2139,7 @@ export default function TangaThreeGeologyScene({
     if (!visible || !hostRef.current) return;
 
     let cancelled = false;
+    let cancelTerrainUpgrade: (() => void) | null = null;
     consumedCameraCommandIdRef.current=0;
     const sceneStartedAt = performance.now();
     let firstUsefulFrameReported = false;
@@ -4067,16 +4068,29 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const shouldUpgradeTerrain = !cancelled && (resources?.quality ?? assetQuality) === 'preview';
       if (shouldUpgradeTerrain) {
         const upgrade = async () => {
-          const upgradedResources = await applyTexturedTerrain('standard');
-          if (cancelled || !upgradedResources) return;
-          reportLoadState('ready', 'ready', 'standard', 'Standard terrain upgraded');
+          if (cancelled) return;
+          try {
+            const upgradedResources = await applyTexturedTerrain('standard');
+            if (cancelled || !upgradedResources) return;
+            reportLoadState('ready', 'ready', 'standard', 'Standard terrain upgraded');
+          } catch {
+            if (cancelled) return;
+            const retainedSurface = terrainMeshes.length > 0;
+            const message = retainedSurface
+              ? 'Higher-detail terrain unavailable; the current scene remains available.'
+              : 'Higher-detail terrain upgrade failed; retry this scene to restore the surface.';
+            setStatus(message);
+            reportLoadState(retainedSurface ? 'ready' : 'error', retainedSurface ? 'degraded' : 'error', assetQuality, message);
+          }
         };
 
         const requestIdle = window.requestIdleCallback;
         if (typeof requestIdle === 'function') {
-          requestIdle.call(window, () => void upgrade(), {timeout: 5000});
+          const idleId = requestIdle.call(window, () => void upgrade(), {timeout: 5000});
+          cancelTerrainUpgrade = () => window.cancelIdleCallback?.(idleId);
         } else {
-          globalThis.setTimeout(() => void upgrade(), 1800);
+          const timer = globalThis.setTimeout(() => void upgrade(), 1800);
+          cancelTerrainUpgrade = () => globalThis.clearTimeout(timer);
         }
       }
     };
@@ -4707,6 +4721,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     return () => {
       cancelled = true;
+      cancelTerrainUpgrade?.();
+      cancelTerrainUpgrade = null;
       updateTerrainDisplayRef.current = null;
       gradeFocusMaterialsRef.current=[];
       displayReveal.reset();revealCommand.current=null;
