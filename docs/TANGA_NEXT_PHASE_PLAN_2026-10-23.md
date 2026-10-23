@@ -183,3 +183,5 @@ Start with the measured viewer baseline, one consolidated story/navigation shell
 - [ ] Validate scene retry against injected asset failures, WebGL context loss, stale requests and repeated scene revisits.
 - [ ] Inspect the new metallurgy camera fit after a clean reload and verify on narrow viewports.
 - [ ] Verify the pushed Vercel preview and live Cloudflare deployment, inspect public access and production R2 asset configuration. The local Cloudflare preview passed; the hosted Vercel session currently redirects to login.
+
+Responsive review note: a 390 px Playwright capture had no horizontal page overflow and the story panel remained within the viewport, but the Three.js canvas was fully transparent despite reporting `ready=true`. Do not treat that capture as a visual pass; confirm the mobile scene in a real browser and investigate renderer output if it reproduces.
