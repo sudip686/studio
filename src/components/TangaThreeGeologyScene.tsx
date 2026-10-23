@@ -397,6 +397,7 @@ type SceneRevealItem = {
   basePosition: THREE.Vector3;
   scaleFrom: number;
   yOffset: number;
+  startTime: number;
   delay: number;
   duration: number;
 };
@@ -542,6 +543,8 @@ const METALLURGY_LAB_POSITION = new THREE.Vector3(760, 330, -980);
 const HAUL_TRUCK_COUNT = 5;
 /** Seconds for one truck to run the ramp end to end. */
 const HAUL_LAP_SECONDS = 9;
+/** Presentation pacing for material moving along the report-traced concept conveyor. */
+const SITE_TRANSFER_LOOP_SECONDS = 72;
 
 const METALLURGY_TRAVEL_SECONDS = 2.6;
 /** Gap between consecutive departures, so the eight read as a sequence. */
@@ -2320,7 +2323,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let campusFacilities:CampusFacility[]=[];
     let mineCampusReady=false;
     if(mode==='mine_planning')onSiteFacilities?.([]);
-    let developmentMarker: THREE.Mesh | null = null;
+    const developmentMarkers:{group:THREE.Group;offset:number;length:number}[]=[];
     let feedAnchor: THREE.Vector3 | null = null;
     let facilityFocused = false;
     let geologyPlan = false;
@@ -2960,9 +2963,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     key.shadow.camera.updateProjectionMatrix();
     scene.add(key);
     if(mode==='mine_planning')scene.add(key.target);
-    let mineShadowRadius=4200;
     let lastMineShadowKey='';
-    const mineLightOffset=new THREE.Vector3(900,1800,1200);
     // Decorative colour accents. Both kept subtle so the overhead sun always
     // wins on the terrain *top*. Previously an amber PointLight sat BELOW the
     // surface (y=-220) at high intensity, lighting the underside brighter than
@@ -3269,6 +3270,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         basePosition,
         scaleFrom,
         yOffset,
+        startTime: motionTime,
         delay,
         duration,
       });
@@ -4064,7 +4066,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             developmentInfrastructure=buildDevelopmentInfrastructure(feed,[x,z],siteHeight,level);
             tagDeckLayer(developmentInfrastructure,'context');stage.add(developmentInfrastructure);
             feedAnchor=new THREE.Vector3(...(developmentInfrastructure.userData.feedAnchor as [number,number,number]));
-            developmentMarker=new THREE.Mesh(new THREE.SphereGeometry(3,8,6),new THREE.MeshBasicMaterial({color:0xf3c389}));developmentInfrastructure.add(developmentMarker);
+            const transferPath=developmentInfrastructure.userData.flow as THREE.Vector3[];
+            const transferLength=transferPath.slice(1).reduce((sum,point,index)=>sum+point.distanceTo(transferPath[index]),0);
+            const oreGeometry=new THREE.IcosahedronGeometry(1.35,0);
+            const oreMaterial=new THREE.MeshStandardMaterial({color:0x49443a,roughness:.96,metalness:0});
+            for(let index=0;index<3;index++){
+              const group=new THREE.Group();group.name=`Concept conveyor material cue ${index+1}`;
+              for(const [xOffset,zOffset,scale] of [[-.7,-1.4,.8],[.55,0,1],[0,1.25,.72]] as const){
+                const parcel=new THREE.Mesh(oreGeometry,oreMaterial);parcel.scale.set(scale,scale*.65,scale*.85);parcel.position.set(xOffset,1.4,zOffset);parcel.castShadow=true;group.add(parcel);
+              }
+              group.visible=false;developmentInfrastructure.add(group);
+              developmentMarkers.push({group,offset:index/3,length:transferLength});
+            }
+            host.dataset.conveyorTransfer='report-traced concept path · display pacing only';
             host.dataset.developmentReference=JSON.stringify({site:2,mappedFeedUtm:DEVELOPMENT_SITE.feedUtm,proposedFeedUtm:[Math.round(feed[0]+PROJECT_UTM_CENTER.easting),Math.round(PROJECT_UTM_CENTER.northing-feed[1])],feedOffsetM:Math.round(apron.offsetM),plantUtm:DEVELOPMENT_SITE.dischargeUtm,registration:'Approximate map tracing; feed apron offset clear of concept pits · EPSG:32737',reportedLengthM:2150,source:DEVELOPMENT_SOURCE});
             sitePlan.audit.push(`Proposed feed apron shifted ${Math.round(apron.offsetM)} m from the old map marker to clear current conceptual pits; corridor screened against pit envelopes only`);
             host.dataset.siteAudit=JSON.stringify(sitePlan.audit);
@@ -4659,10 +4673,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const phase = (motionTime / 3) % (points.length - 1), index = Math.floor(phase);
         processMarker.position.lerpVectors(points[index], points[index+1], phase-index);
       }
-      if(developmentInfrastructure&&developmentMarker){
+      if(developmentInfrastructure&&developmentMarkers.length){
         const points=developmentInfrastructure.userData.flow as THREE.Vector3[];
-        const phase=(motionTime/600)%(1),at=phase*(points.length-1),index=Math.floor(at);
-        developmentMarker.position.lerpVectors(points[index],points[index+1],at-index);
+        for(const item of developmentMarkers){
+          const phase=(motionTime/SITE_TRANSFER_LOOP_SECONDS+item.offset)%1;
+          const at=routePosition(points,phase*item.length);
+          item.group.position.copy(at.position).add(new THREE.Vector3(0,1.2,0));
+          item.group.rotation.y=Math.atan2(at.direction.x,at.direction.z);
+          item.group.visible=beat>=3&&layerSettingsRef.current.context.visible;
+        }
       }
       const flyProgress = reducedMotion.matches?1:ease(Math.min(1, elapsed / cameraShot.flySeconds));
       if (cameraTween) {
@@ -4741,7 +4760,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         );
       }
       revealItems.forEach((item) => {
-        const progress = clamp((elapsed - item.delay) / item.duration, 0, 1);
+        // Keep authored model reveals on the same presentation clock as
+        // geology, resource and mine-site motion. This lets Pause and
+        // prefers-reduced-motion govern every chapter consistently, while
+        // starting the sequence when its geometry is actually registered.
+        const progress = reducedMotion.matches ? 1 : clamp((motionTime - item.startTime - item.delay) / item.duration, 0, 1);
         const eased = ease(progress);
         const layerId = item.object.userData?.deckLayer as DeckLayerId | undefined;
         const layerState = layerId ? layerSettingsRef.current[layerId] : undefined;
@@ -4822,6 +4845,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (projectionTick !== lastProjectionTick) {
         lastProjectionTick = projectionTick;
         if(haulTrucks[0])host.dataset.truckPosition=haulTrucks[0].mesh.position.toArray().map(v=>v.toFixed(2)).join(',');
+        if(developmentMarkers[0])host.dataset.conveyorMaterialPosition=developmentMarkers[0].group.position.toArray().map(v=>v.toFixed(2)).join(',');
         host.dataset.cameraMoving = String(Boolean(cameraTween) || (!userTookControl && flyProgress < 1));
         host.dataset.cameraDistance = String(Math.round(camera.position.distanceTo(controls.target)));
         if (mode === 'subsurface') {
@@ -4843,12 +4867,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         );
       }
       if(mode==='mine_planning'){
-        key.target.position.copy(controls.target);key.position.copy(controls.target).add(mineLightOffset);
-        const radius=Math.round(clamp(camera.position.distanceTo(controls.target)*.65,350,4200)/25)*25;
-        if(radius!==mineShadowRadius){mineShadowRadius=radius;key.shadow.camera.left=-radius;key.shadow.camera.right=radius;key.shadow.camera.top=radius;key.shadow.camera.bottom=-radius;key.shadow.camera.updateProjectionMatrix();}
-        key.shadow.normalBias=facilityFocused ? .15 : .6;
-        const shadowKey=[controls.target.x.toFixed(1),controls.target.y.toFixed(1),controls.target.z.toFixed(1),radius,stage.rotation.x.toFixed(3),stage.rotation.y.toFixed(3),stage.children.length,beat,facilityFocused,plantDetailKey,processPlant?.visible,siteCampus?.visible,pitSurfaces[0]?.visible,pitRamps[0]?.visible].join(':');
+        // Keep illumination and the shadow frustum fixed in site coordinates.
+        // Following the orbit target or rescaling the shadow camera with zoom
+        // made terrain, pads and facilities change brightness during camera
+        // movement, which read as material flicker.
+        key.target.position.set(0,0,0);
+        key.position.set(900,1800,1200);
+        key.shadow.normalBias=.45;
+        const shadowKey=[stage.rotation.x.toFixed(3),stage.rotation.y.toFixed(3),stage.children.length,beat,facilityFocused,plantDetailKey,processPlant?.visible,siteCampus?.visible,pitSurfaces[0]?.visible,pitRamps[0]?.visible].join(':');
         if(shadowKey!==lastMineShadowKey){lastMineShadowKey=shadowKey;renderer.shadowMap.needsUpdate=true;}
+        host.dataset.mineLighting='fixed site sun · camera independent';
 
       }
       // Apply the absolute surface control after authored views and layer fades.
@@ -5265,19 +5293,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <div className="tanga-mine-story__steps" aria-label="Mining camera presets">
           {(['northPit','southPit','resetView'] as const).map((action,index)=><button key={action} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(index===2?3:2);setFocusedSource(null);cameraCommandHandlerRef.current?.({id:Date.now(),action});}}>{['North pit','South pit','Whole site'][index]}</button>)}
         </div>
+        <div className="tanga-mine-story__steps" aria-label="Mine-site animation controls">
+          <button onClick={()=>{setFocusedSource(null);setMotionPaused(false);setStoryPlaying(true);setStoryReplay(v=>v+1);cameraCommandHandlerRef.current?.({id:Date.now(),action:'resetView'});}}>Play evidence → concept sequence</button>
+          <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
+        </div>
         {miningBeat<3&&<>
         {focusedSource&&<p aria-live="polite">{focusedSource}<br/><small>Trace colour: white context, teal ≥4.5%, copper ≥5% TGC.</small></p>}
         <div className="tanga-mine-story__steps" aria-label="Evidence to concept sequence">
           {['01 · Drill evidence','02 · Grade targets','03 · Pit concept','04 · Processing'].map((label,index)=><button key={label} aria-pressed={miningBeat===index} onClick={()=>{setStoryPlaying(false);setMiningBeat(index);}}>{label}</button>)}
         </div>
-        <button onClick={()=>{setFocusedSource(null);setMotionPaused(false);setStoryPlaying(true);setStoryReplay(v=>v+1);cameraCommandHandlerRef.current?.({id:Date.now(),action:'resetView'});}}>Replay evidence story</button>
         <button aria-pressed={evidenceVisible} onClick={()=>setEvidenceVisible(v=>!v)}>{evidenceVisible?'Hide evidence holes':'Show evidence holes'}</button>
         <details><summary>{evidenceHoleIds.length} selected drillholes · inspect source</summary><div className="tanga-mine-story__steps">{evidenceHoleIds.map(id=><button key={id} onClick={()=>{setEvidenceVisible(true);setStoryPlaying(false);setMiningBeat(0);evidenceFocusRef.current?.(id);}}>{id}</button>)}</div><small>Actual source interval coordinates. Spatially distributed collars within the crest footprints; not chosen by highest grade. These show nearby sampling, not verified hole-to-block provenance. No surface snapping; markers locate the first available interval. Use the camera reset to return to both pits.</small></details>
         <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Reveal high-grade model targets, without changing source cell sizes or positions.','Reveal the conceptual benches around the target footprint. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
         <div className="tanga-mine-story__key"><span>● 4.5–&lt;5% TGC</span><span>● ≥5% TGC</span></div>
         <small>{targetCount.toLocaleString()} source cells · original size and position<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on':'Solid pit view'}</button>
-        <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
         </>}
         <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
           <button onClick={()=>{setPlantCutaway(true);setPlantProcess('all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>Inspect whole processing plant</button>
@@ -5286,7 +5316,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
-        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'Mine-to-feed road requires survey; map-traced conveyor is shown separately'}<br/>18 m corridor · ≤20% sampled grade screening. Internal pit ramps and plant-pad access not designed. Motion pauses in evidence mode.</small>
+        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'No surveyed pit-to-feed haul road supplied; only the report-traced conveyor transfer is shown.'}<br/>Conveyor motion is a visual cue, not a throughput or operating schedule. Internal pit ramps and plant-pad access remain undesigned.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}

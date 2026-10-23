@@ -4960,7 +4960,10 @@ export default function TangaDeckWorkbench() {
   const toggleSurfaceConceptView = useCallback(() => {
     setSurfaceConceptView((current) => !current);
   }, []);
-  const defaultDrillingVisible = activeMode !== 'mine_planning' && activeMode !== 'metallurgy';
+  // Preserve the story reveal: establish place and relief before introducing
+  // drill evidence. Keep traces available through geology/resource chapters,
+  // then hide them again when the story moves into conceptual operations.
+  const defaultDrillingVisible = activeMode === 'drillholes' || activeMode === 'subsurface' || activeMode === 'resource';
   useEffect(() => {
     if (activeMode !== 'mine_planning' && surfaceConceptView) {
       setSurfaceConceptView(false);
