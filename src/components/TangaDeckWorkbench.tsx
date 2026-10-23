@@ -368,9 +368,9 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
     {label: 'Licence', value: 'Provisional boundary'},
   ],
   metallurgy: [
-    {label: 'Purity', value: '>97% TC concentrate'},
-    {label: 'Oxide', value: '93.0% recovery'},
-    {label: 'Fresh', value: '94.4% recovery'},
+    {label: 'Concentrate', value: '>97% TC · all 8 composites'},
+    {label: 'Optimisation tests', value: '93.0% oxide · 94.4% fresh'},
+    {label: 'Variation', value: 'TDM004: 75.8% recovery'},
   ],
   comparison: [
     {label: 'Peer slot', value: '#5 in selected set'},
@@ -455,13 +455,17 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
   },
   metallurgy: {
     title: 'Flotation Concentrate',
-    source: 'AMC Table II · 8 variability composites · flotation testwork',
+    source: 'IMO Final Report Rev. 0, Table 2 · AMC MRE, Table II',
     columns: ['Metric', 'Result', ''],
     rows: [
-      {cells: ['Concentrate purity', '>97% TC', '']},
-      {cells: ['Best flake grade (TDM008)', '73% +150 µm', ''], emphasis: true},
-      {cells: ['Typical fresh composites', '60-72% +150 µm', '']},
-      {cells: ['Weakest sample', '35% +150 µm', '']},
+      {cells: ['Final cleaner concentrate', '>97% TC · all 8', '']},
+      {cells: ['TDM006 · oxide optimisation', '98.4% TC · 93.0% recovery', '']},
+      {cells: ['TDM001 · fresh optimisation', '98.6% TC · 94.4% recovery', '']},
+      {cells: ['TDM004 · recovery outlier', '75.8% · 1.83% carbonate', ''], emphasis: true},
+      {cells: ['Fresh · TDM001–005', '34.6–65.2% +150 µm', '']},
+      {cells: ['Oxide · TDM006–007', '57.1–67.2% +150 µm', '']},
+      {cells: ['TDM008 · kaolinised*', '72.7% +150 µm', '']},
+      {cells: ['*IMO: Fresh / Kaolin; AMC: oxide / kaolinised.', '', '']},
     ],
   },
 };
@@ -1515,8 +1519,8 @@ function legendForMode(mode: WorkbenchMode, routeTarget: RouteTarget, focus: Res
   if (mode === 'metallurgy') {
     return [
       {label: 'Purity', detail: '>97% TC concentrate', tone: '#2dd4bf'},
-      {label: 'Best flake', detail: '73% coarser than 150 µm', tone: '#facc15'},
-      {label: 'Recovery', detail: '90% fresh · 85% oxide', tone: '#ef4444'},
+      {label: 'TDM008', detail: '72.7% mass above 150 µm · AMC Table II', tone: '#facc15'},
+      {label: 'Recovery', detail: '75.8–95.2% across composites · IMO Table 2', tone: '#ef4444'},
     ];
   }
   return [

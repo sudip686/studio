@@ -552,22 +552,23 @@ const METALLURGY_SAMPLE_STAGGER = 0.42;
 const METALLURGY_REVEAL_COLORS = ['#d96b2b', '#b9954b', '#facc15'] as const;
 
 /**
- * The eight flotation variability composites, with the results stated in the
- * AMC testwork summary (see `product_quality` in src/data/deck.ts).
+ * The eight flotation variability composites, with +150 µm mass fractions
+ * reported in AMC MRE Table II. TC grade and recovery remain in the IMO report
+ * evidence panel; these are separate measures and sources.
  *
  * Sending these — named, each carrying its own outcome — rather than ninety
  * anonymous particles is the point: a viewer sees that real, identified
  * material was tested, and the scene reads as a process instead of weather.
  */
 const METALLURGY_COMPOSITES: ReadonlyArray<{id: string; result: string}> = [
-  {id: 'TDM001', result: '34.8% +150 µm'},
-  {id: 'TDM002', result: '42.5% +150 µm'},
-  {id: 'TDM003', result: '>61% +150 µm'},
-  {id: 'TDM004', result: '75.8% recovery'},
-  {id: 'TDM005', result: '>61% +150 µm'},
-  {id: 'TDM006', result: '>97% TC concentrate'},
-  {id: 'TDM007', result: '>97% TC concentrate'},
-  {id: 'TDM008', result: '73% +150 µm · best flake'},
+  {id: 'TDM001', result: '34.6% +150 µm'},
+  {id: 'TDM002', result: '42.2% +150 µm'},
+  {id: 'TDM003', result: '60.5% +150 µm'},
+  {id: 'TDM004', result: '60.5% +150 µm · 75.8% recovery'},
+  {id: 'TDM005', result: '65.2% +150 µm'},
+  {id: 'TDM006', result: '67.2% +150 µm'},
+  {id: 'TDM007', result: '57.1% +150 µm'},
+  {id: 'TDM008', result: '72.7% +150 µm · kaolinised'},
 ];
 const DEFAULT_NAV_INSTRUMENT: ThreeNavInstrument = {
   northAngleDeg: 0,
@@ -1271,7 +1272,7 @@ function threeCallouts(
     // Anchored at the two ends of the story the scene now tells: material
     // leaving identified holes, and the lab it arrives at.
     {id: 'samples', label: '8 variability composites', detail: 'Oxide, transition and fresh material leaving the drilled holes', x: 30, y: 40, tone: '#d96b2b', anchor: [-360, 120, 220], side: 'right', kind: 'story'},
-    {id: 'recoveries', label: 'Flotation testwork', detail: '93.0% oxide and 94.4% fresh recovery, both above 97% TC concentrate', x: 62, y: 52, tone: '#b9954b', anchor: [METALLURGY_LAB_POSITION.x, METALLURGY_LAB_POSITION.y, METALLURGY_LAB_POSITION.z], side: 'left', kind: 'story'},
+    {id: 'recoveries', label: 'Flotation testwork', detail: 'TDM006 oxide: 93.0%; TDM001 fresh: 94.4%. TDM004 recovery: 75.8%.', x: 62, y: 52, tone: '#b9954b', anchor: [METALLURGY_LAB_POSITION.x, METALLURGY_LAB_POSITION.y, METALLURGY_LAB_POSITION.z], side: 'left', kind: 'story'},
   ];
 }
 
@@ -5110,14 +5111,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
       {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)} onInspectEvidence={onInspectEvidence}/>}
       {mode === 'metallurgy' && <section className="tanga-met-report" aria-label="Metallurgy testwork summary">
-        <header><small>DECK SUMMARY · LAB REPORT VERIFICATION PENDING</small><h2>Carbon. Recovery. Flake.</h2></header>
+        <header><small>IMO FLOTATION TESTWORK · FINAL REPORT REV. 0 · DEC 2025</small><h2>Strong concentrate grades. Variable response.</h2></header>
         <MetallurgySampleExplorer/>
-        <div className="tanga-met-report__metrics"><div><strong>98.4% TC</strong><span>Oxide concentrate</span><b>93.0% recovery</b></div><div><strong>98.6% TC</strong><span>Fresh concentrate</span><b>94.4% recovery</b></div></div>
-        <h3>Coarse fraction · +150 µm</h3>
-        <p>Reported fraction retained above 150 µm; not a complete sieve distribution.</p>
-        {[['Oxide composites','>57%',57],['Fresh TDM003–005','>61%',61],['Fresh TDM008','>73%',73],['TDM001','34.8%',34.8],['TDM002','42.5%',42.5]].map(([label,value,width])=><div className="tanga-met-report__flake" key={String(label)}><span>{label}</span><b>{value}</b><i style={{width:`${width}%`}}/></div>)}
-        <p className="tanga-met-report__caution">TDM004: 75.8% recovery reported; carbonate-rich outlier. Test results are not operating guarantees or product qualification.</p>
-        <footer>TC = total carbon in concentrate; TGC = total graphitic carbon in feed/model. Feed assay and complete impurity/sieve tables are not connected here.<br/>Source: existing project-deck summaries (metallurgy and product_quality); original laboratory report verification pending.</footer>
+        <p className="tanga-met-report__intro">Eight variability composites were tested. All final cleaner concentrates exceeded 97% total carbon (TC); recovery and coarse-flake share vary by sample.</p>
+        <div className="tanga-met-report__metrics"><div><strong>98.4% TC</strong><span>TDM006 · oxide optimisation</span><b>93.0% recovery · FT01</b></div><div><strong>98.6% TC</strong><span>TDM001 · fresh optimisation</span><b>94.4% recovery · FT02</b></div></div>
+        <h3>Mass fraction above 150 µm</h3>
+        <p>AMC Table II · reported by weathering group; not the full sieve distribution.</p>
+        {[
+          ['Fresh · TDM001–005', '34.6–65.2%', 34.6, 65.2],
+          ['Oxide · TDM006–007', '57.1–67.2%', 57.1, 67.2],
+          ['TDM008 · kaolinised', '72.7%', 72.7, 72.7],
+        ].map(([label,value,min,max])=><div className="tanga-met-report__flake" key={String(label)}><span>{label}</span><b>{value}</b><i aria-hidden="true"><span style={{left:`${min}%`,width:`${Math.max(1.5,Number(max)-Number(min))}%`}}/></i></div>)}
+        <p className="tanga-met-report__caution"><strong>TDM004 · 75.8% recovery.</strong> IMO reports 1.83% carbonate in this composite and identifies it as the low-recovery exception. Laboratory results do not establish operating performance or customer qualification.</p>
+        <footer>Basis: IMO Final Report Rev. 0, Table 2 and §3.1; AMC MRE, Table II. AMC groups TDM008 as oxide / kaolinised; IMO labels it “Fresh / Kaolin.” Report terminology differs. TC = total carbon in concentrate; TGC = total graphitic carbon in feed/model.</footer>
       </section>}
       {mode === 'resource' && (
         <details className="tanga-three__grade-legend" aria-label="TGC grade legend">

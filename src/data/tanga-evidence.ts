@@ -66,8 +66,8 @@ export const CHAPTER_SOURCES: Record<TangaChapterId, EvidenceSource[]> = {
   ],
   metallurgy: [
     {title:'Global Sustainable Eco-Solutions · Graphite report for SMMPL',locator:'12 April 2025 · PDF pp.2, 15–16, 25, 46, 169–172',qualification:'120 samples received, 40 selected for characterisation, 23 for thin sections. Microscopy and spectroscopy do not establish commercial product or battery qualification.'},
-    {title: 'IMO flotation testwork report', locator: 'Final report Rev. 0 · December 2025', qualification: 'Reported laboratory results; do not infer product qualification or commercial performance.', href: '/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf'},
-    {title: 'AMC Mineral Resource Estimate', locator: 'Final report · Table II · flake and concentrate summaries', qualification: 'Composite results vary; carbon grade, recovery and flake fraction are distinct measures.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
+    {title: 'IMO flotation testwork report', locator: 'Final report Rev. 0 · December 2025 · §3.1, Table 2 and Figures 18–19', qualification: 'Supports final cleaner TC grade and recovery values, including the TDM004 low-recovery result. Laboratory results do not establish operating performance or customer qualification.', href: '/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf'},
+    {title: 'AMC Mineral Resource Estimate', locator: 'Final report · Table II · eight-sample coarse/fine fraction mass and TC grade', qualification: 'The displayed +150 µm values use this table’s mass fractions. IMO narrative summaries use grouped/rounded values and call TDM008 Fresh / Kaolin; AMC groups it as oxide / kaolinised. Do not mix these bases within one chart.', href: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
   ],
   comparison: [
     {title: 'Next-stage decisions', locator: 'Survey / sample provenance / geology / model / development studies', qualification: 'Decision sequence is a work plan, not a forecast of engineering outcomes.'},

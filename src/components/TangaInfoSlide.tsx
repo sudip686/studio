@@ -17,8 +17,8 @@ const RESOURCE_ROWS = [
   {domain: 'Fresh', ind: '69', inf: '16', tgc: '4.66', w: 48.1, color: '#8fb4d6'},
 ];
 const FLAKE = [
-  {id: 'T1', v: 35}, {id: 'T2', v: 42}, {id: 'T3', v: 61}, {id: 'T4', v: 61},
-  {id: 'T5', v: 65}, {id: 'T6', v: 67}, {id: 'T7', v: 57}, {id: 'T8', v: 73},
+  {id: 'TDM001', v: 34.6}, {id: 'TDM002', v: 42.2}, {id: 'TDM003', v: 60.5}, {id: 'TDM004', v: 60.5},
+  {id: 'TDM005', v: 65.2}, {id: 'TDM006', v: 67.2}, {id: 'TDM007', v: 57.1}, {id: 'TDM008*', v: 72.7},
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -121,40 +121,40 @@ export default function TangaInfoSlide({id, onContinue}: {id: InfoSlideId; onCon
         {id === 'flake-purity' && (
           <>
             <motion.div className="tanga-info__eyebrow" {...rise(0.05)}>The Value · Metallurgy testwork</motion.div>
-            <motion.h2 className="tanga-info__title" {...rise(0.1)}>Coarse flake, &gt;97% carbon</motion.h2>
-            <motion.p className="tanga-info__sub" {...rise(0.15)}>Conventional flotation lifts pit ore to a high-purity concentrate — and most of that flake stays coarse.</motion.p>
+            <motion.h2 className="tanga-info__title" {...rise(0.1)}>Eight composites. Different size profiles.</motion.h2>
+            <motion.p className="tanga-info__sub" {...rise(0.15)}>Laboratory flotation produced high-TC concentrates; the reported coarse fraction varies by sample. Grade, recovery and flake mass share are separate measures.</motion.p>
 
             {/* Recovery flowsheet — feed → flotation → concentrate */}
             <motion.div className="tanga-met__flow" {...rise(0.2)}>
               <div className="tanga-met__node">
-                <span>Feed</span><strong>5.70% TGC</strong><small>Optimum pit ore</small>
+                <span>Variability samples</span><strong>8 composites</strong><small>Oxide, fresh and altered material</small>
               </div>
               <i className="tanga-met__arrow" aria-hidden="true" />
               <div className="tanga-met__node">
-                <span>Flotation recovery</span><strong>93.0% / 94.4%</strong><small>Oxide / fresh</small>
+                <span>Optimisation tests</span><strong>93.0% / 94.4%</strong><small>TDM006 oxide / TDM001 fresh</small>
               </div>
               <i className="tanga-met__arrow" aria-hidden="true" />
               <div className="tanga-met__node is-out">
-                <span>Concentrate</span><strong>&gt;97% TC</strong><small>97–99% across composites</small>
+                <span>Final cleaner concentrate</span><strong>&gt;97% TC</strong><small>Reported across all eight composites</small>
               </div>
             </motion.div>
 
             {/* Flake-size distribution — coarse share per composite */}
             <motion.div className="tanga-met__dist-head" {...rise(0.26)}>
-              <span>Flake size · share coarser than 150 µm</span>
+              <span>AMC Table II · mass fraction above 150 µm</span>
               <em>8 variability composites</em>
             </motion.div>
             <div className="tanga-met__bars">
               {FLAKE.map((b, i) => (
                 <motion.div
-                  className={`tanga-met__bar${b.id === 'T8' ? ' is-best' : ''}${b.id === 'T1' ? ' is-low' : ''}`}
+                  className={`tanga-met__bar${b.id === 'TDM008*' ? ' is-best' : ''}${b.id === 'TDM001' ? ' is-low' : ''}`}
                   key={b.id}
                   initial={reduce ? {opacity: 0} : {opacity: 0, y: 8}}
                   animate={{opacity: 1, y: 0}}
                   transition={{duration: reduce ? 0.2 : 0.4, ease: EASE, delay: reduce ? 0 : 0.32 + i * 0.05}}
                 >
                   <span className="pct">{b.v}%</span>
-                  <div className="track" title={`${b.v}% coarse (+150 µm) · ${100 - b.v}% fines`}>
+                  <div className="track" title={`${b.v}% mass above 150 µm · AMC MRE Table II`}>
                     <i className="coarse" style={{height: `${b.v}%`}} />
                   </div>
                   <span className="id">{b.id}</span>
@@ -163,31 +163,31 @@ export default function TangaInfoSlide({id, onContinue}: {id: InfoSlideId; onCon
             </div>
 
             <motion.div className="tanga-met__key" {...rise(0.5)}>
-              <span><i className="sw sw--coarse" />+150&nbsp;µm coarse flake</span>
-              <span><i className="sw sw--fine" />−150&nbsp;µm fines — still &gt;95% TC, sold as anode feedstock</span>
+              <span><i className="sw sw--coarse" />+150&nbsp;µm mass fraction · AMC MRE Table II</span>
+              <span>*IMO calls TDM008 “Fresh / Kaolin”; AMC groups it as oxide / kaolinised.</span>
             </motion.div>
 
             <motion.div className="tanga-met__stats" {...rise(0.56)}>
-              <div><span>Weakest</span><strong>35%</strong></div>
-              <div><span>Median</span><strong>61%</strong></div>
-              <div className="is-best"><span>Best · TDM008</span><strong>73%</strong></div>
+              <div><span>Fresh range</span><strong>34.6–65.2%</strong></div>
+              <div><span>Oxide range</span><strong>57.1–67.2%</strong></div>
+              <div className="is-best"><span>TDM008 · kaolinised</span><strong>72.7%</strong></div>
               <div className="is-warn"><span>TDM004 recovery</span><strong>75.8%</strong></div>
             </motion.div>
 
-            <div className="tanga-info__src">AMC MRE Table II · 8 variability composites · recoveries from optimisation testwork · TDM004 is a carbonate-rich recovery outlier</div>
+            <div className="tanga-info__src">AMC MRE Table II · individual composite values. IMO Table 2 reports recovery; TDM004 is the carbonate-rich low-recovery exception. Laboratory results are not operating or product qualification.</div>
           </>
         )}
 
         {id === 'battery-value' && (
           <>
             <motion.div className="tanga-info__eyebrow" {...rise(0.05)}>The Value · Product pathway</motion.div>
-            <motion.h2 className="tanga-info__title" {...rise(0.1)}>Fines that pay: spherical graphite</motion.h2>
-            <motion.p className="tanga-info__sub" {...rise(0.15)}>The &lt;150&nbsp;µm fraction assays &gt;95% TC — the feedstock spec for coated spherical graphite in lithium-ion anodes. The whole product is saleable.</motion.p>
+            <motion.h2 className="tanga-info__title" {...rise(0.1)}>A potential fine-fraction pathway</motion.h2>
+            <motion.p className="tanga-info__sub" {...rise(0.15)}>AMC reports &gt;95% TC in the &lt;150&nbsp;µm fractions and describes them as potentially suitable for spherical-graphite manufacture. Further product and performance work is required.</motion.p>
             <div className="tanga-info__flow">
               {[
                 {k: 'Concentrate', v: '>97% TC'},
                 {k: '<150 µm fraction', v: '>95% TC'},
-                {k: 'Anode feedstock', v: 'Spherical graphite', hero: true},
+                {k: 'Next evaluation', v: 'Spherical-graphite testwork', hero: true},
               ].map((c, i) => (
                 <motion.div
                   className={`tanga-info__chip${c.hero ? ' is-hero' : ''}`}
@@ -198,7 +198,7 @@ export default function TangaInfoSlide({id, onContinue}: {id: InfoSlideId; onCon
                 </motion.div>
               ))}
             </div>
-            <div className="tanga-info__src">AMC MRE executive summary · JORC Industrial Mineral (Clause 49)</div>
+            <div className="tanga-info__src">AMC MRE executive summary and recommendations · potential suitability is not customer qualification, product performance or an offtake claim.</div>
           </>
         )}
 

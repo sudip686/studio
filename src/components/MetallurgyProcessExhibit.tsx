@@ -126,15 +126,15 @@ export default function MetallurgyProcessExhibit({paused,onToggle,onInspectEvide
       <div className="tanga-process-scene"><div ref={host} className="tanga-process-canvas"/>
         {error&&<figure className="tanga-process-static-fallback"><img src="/presentation-assets/metallurgy-report-page.png" alt="Original metallurgy report analytical table page."/><figcaption>Original report excerpt · analytical table</figcaption></figure>}
         {error&&<p role="alert">{error} <button type="button" onClick={()=>{setError('');setRendererAttempt(value=>value+1);}}>Retry 3D exhibit</button></p>}<div className="tanga-process-caption"><span>{copy.question}</span><small>Drag to orbit · scroll to zoom</small></div></div>
-      <aside className="tanga-process-results">
+    <aside className="tanga-process-results">
         <small className="tanga-process-kicker">0{stage+1} / 05 · {copy.label.toUpperCase()}</small><h3>Reported test response</h3>
-        <label>Reported test group<select aria-label="Processing test group" value={group} onChange={event=>setGroup(Number(event.target.value))}>{MET_GROUPS.map((item,i)=><option key={item.id} value={i}>{item.id}</option>)}</select></label>
-        <dl className="tanga-process-metrics" aria-live="polite"><div><dt>Concentrate carbon</dt><dd>{result.carbon}</dd></div><div><dt>Graphite recovery</dt><dd>{result.recovery}</dd></div><div><dt>Coarse fraction · +150 µm</dt><dd>{result.coarse}</dd></div></dl>
+        <label>Variability composite<select aria-label="Select a variability composite" value={group} onChange={event=>setGroup(Number(event.target.value))}>{MET_GROUPS.map((item,i)=><option key={item.id} value={i}>{item.id}</option>)}</select></label>
+        <dl className="tanga-process-metrics" aria-live="polite"><div><dt>Concentrate total carbon (TC)</dt><dd>{result.carbon}</dd></div><div><dt>Graphite recovery</dt><dd>{result.recovery}</dd></div><div><dt>Mass fraction above 150 µm</dt><dd>{result.coarse}</dd></div></dl>
         <button type="button" className="tanga-material-entry" onClick={()=>{onInspectEvidence?.();setFigureIndex(sourceFigure.index);setMaterialEvidence(true);}}>Open report evidence: {sourceFigure.label} <span>{sourceFigure.locator} · April 2025 · separate characterisation evidence ↗</span></button>
         <details open={evidence} onToggle={event=>setEvidence(event.currentTarget.open)}><summary>Result basis &amp; definitions</summary><p>{copy.detail}</p><p>{result.basis}. Groups may overlap individual samples; values are not additive.</p><MetallurgySampleExplorer key={group} initialIndex={group}/></details>
       </aside>
     </div>
-    <footer>Equipment illustrates a testwork sequence. Results are existing deck summaries pending original laboratory-report verification; TC, recovery and flake size are separate measurements.</footer>
+    <footer>Equipment is illustrative. TC and recovery: IMO Final Report Rev. 0, Table 2. +150 µm mass fraction: AMC MRE, Table II. The reports classify TDM008 differently (IMO: “Fresh / Kaolin”; AMC: oxide / kaolinised). These are laboratory results, not operating performance or product qualification.</footer>
     {materialEvidence&&<TangaMaterialEvidence initialIndex={figureIndex} onClose={()=>setMaterialEvidence(false)}/>}
   </section>;
 }

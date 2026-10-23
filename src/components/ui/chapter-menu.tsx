@@ -229,7 +229,7 @@ export function ChapterMenu({
     'product_quality': {
       title: 'Product Quality',
       description: 'Flake size and purity evidence supporting a premium graphite product case.',
-      facts: ['>60% large and jumbo flake', '>73% best fresh flake outcome', '183 Mt resource base'],
+      facts: ['34.6–72.7% coarse mass fraction', 'TDM008 weathering label differs by report', 'Fine fraction potentially suitable for further spherical-graphite testing'],
       act: 'resolution'
     },
     'investment_thesis': {

@@ -42,9 +42,9 @@ These are design references. Tanga keeps its own brand, source assets, data and 
 9. **Core capabilities already exist.** The app has chapter URLs, versioned view state, layer settings, camera recovery, opacity, projected leaders, failure stills and a scene index. Improve these components in place. The current scene index is text-only; it has no thumbnails.
 10. **Rendering cost still constrains polish.** The recorded local cold sample was 9.84 s with 37.5 MB in large response bodies. That is prior measured evidence, not a new result from this visual review. Preserve the existing performance gates before adding more detail or concurrent canvases.
 
-## Twelve implementation packages
+## Thirteen implementation packages
 
-The first nine packages refine existing A–F requirements. Packages 10–12 are the three new scoped additions in section G of the main checklist. Priorities are proposed implementation order, not completion claims.
+The first nine packages refine existing A–F requirements. Packages 10–12 correspond to section G; package 13 is the distinct chapter art-direction reset in section H of the main checklist. Priorities are proposed implementation order, not completion claims.
 
 | ID / priority | Change and intended result | Existing owner / acceptance evidence |
 |---|---|---|
@@ -60,6 +60,7 @@ The first nine packages refine existing A–F requirements. Packages 10–12 are
 | BP10 · P1 | **Visual chapter index.** Extend the existing All scenes overlay with lazy thumbnail stills, chapter title, question and current state. Optional desktop rail appears only on request. | G1. All 12 chapters remain keyboard/touch reachable; thumbnail loading creates no hidden WebGL scenes; selection closes the index and preserves story/explore behavior. |
 | BP11 · P2 | **Same-camera comparison wipe.** Extend Compare original terrain with a draggable wipe for original surface versus concept; add terrain versus mapped geology only where both sides share registration. | G2. Both sides use the same camera, scale and coverage; keyboard slider is available. Use the current renderer/scissor or paired validated stills, rather than a second live scene. Labels identify each side and retain registration limits. |
 | BP12 · P2 | **Executive highlights route.** Add a clearly labelled short route through six existing shots, with an approximately 90-second target after assets are ready; keep the complete 12-chapter story. | G3. Short route has a different label from chapter timing, no fabricated content and explicit return to the full story. Preload readiness and failure stills are checked before timing; manual interruption and reduced motion remain usable. |
+| BP13 · P1 | **Redesign two chapters; reorient one.** Geology becomes a bright field atlas; metallurgy becomes a high-key sample/results board; mine planning keeps its site concept but starts from a north-up overview and offers a clear plan ↔ oblique preset. Keep the shared rendering architecture. | H. Desktop captures at 1707×842 and 1366×768; geology keeps map/relief/interpretation distinct, metallurgy separates TC/recovery/flake and preserves TDM008’s source-label discrepancy, and mine planning marks candidate/approximate/illustrative facilities with a visible compass, scale and reset view. Phone/tablet remains deferred. |
 
 ## Implementation tracker across both plans
 
@@ -87,6 +88,10 @@ The detailed workstream checkboxes remain authoritative in [the next-phase check
 - [ ] **BP12 / G3:** Six-shot executive highlights route.
   - [x] Add the 90-second six-view route with authored shots, per-stop indicator, load-aware holds, manual interruption and a separate full-story restart.
   - [x] Walk all six views in the desktop production build; the route ended on management decisions with no JavaScript errors.
+- [ ] **BP13 / H:** Distinct geology, metallurgy and mine-planning visual identities; desktop first.
+  - [ ] Approve/author the field-atlas, laboratory-evidence and engineering-board compositions and their exact source/qualification language.
+  - [ ] Implement and visually review each at the two desktop target sizes; preserve camera, layer and evidence interactions.
+  - [ ] Defer phone/tablet styling until the later device pass.
 
 ## Chapter-by-chapter storyboard for the next pass
 
