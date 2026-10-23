@@ -6,7 +6,7 @@ import {DeckGL} from '@deck.gl/react';
 import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
-import {ArrowDown, ArrowUp, Box, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
+import {ArrowDown, ArrowUp, Box, Copy, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import proj4 from 'proj4';
@@ -29,11 +29,13 @@ import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {TangaChapterStoryPanel, TangaEvidenceDrawer, TangaMilestoneStage} from './TangaStoryPanels';
 import TangaPeerBenchmark from './TangaPeerBenchmark';
 import TangaStoryCue from './TangaStoryCue';
-import TangaGeologyMapStage from './TangaGeologyMapStage';
+import TangaGeologyMapStage, {type GeologyUnitSelection} from './TangaGeologyMapStage';
 import type {DevelopmentView} from '@/data/tanga-development';
 import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
 import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
+import {MAPPED_SURFACE_UNITS} from '@/lib/deck/geology-palette';
+import {presentationBuild} from '@/lib/presentation-build';
 import {
   type CameraAction,
   type CommandIntent,
@@ -94,7 +96,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 const DEVELOPMENT_CAMERAS:Record<DevelopmentView,ThreeCameraAction>={overview:'developmentOverview',feed:'feedPoint',plant:'plantDetail',services:'siteServices',tailings:'tailingsView',waste:'wasteView',campus:'campusView'};
 
@@ -317,9 +319,9 @@ const MODE_LABELS: Record<WorkbenchMode, string> = {
 const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
   work_completed: [{label: 'Evidence', value: 'Survey · drilling · MRE · testwork'}],
   ranking: [
-    {label: 'Basis', value: 'M&I contained graphite'},
-    {label: 'Peer set', value: 'Top 10 public projects'},
-    {label: 'Tanga slot', value: '#5 after model'},
+    {label: 'Basis', value: 'Reported contained graphite'},
+    {label: 'Peer set', value: 'Selected 2023 benchmark'},
+    {label: 'Tanga slot', value: '#5 after Indicated MRE'},
   ],
   tanzania: [
     {label: 'Region', value: 'Tanga, NE Tanzania'},
@@ -366,12 +368,12 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
     {label: 'Licence', value: 'Provisional boundary'},
   ],
   metallurgy: [
-    {label: 'Purity', value: '>97% TC concentrate'},
-    {label: 'Oxide', value: '93.0% recovery'},
-    {label: 'Fresh', value: '94.4% recovery'},
+    {label: 'Concentrate', value: '>97% TC · all 8 composites'},
+    {label: 'Optimisation tests', value: '93.0% oxide · 94.4% fresh'},
+    {label: 'Variation', value: 'TDM004: 75.8% recovery'},
   ],
   comparison: [
-    {label: 'Peer slot', value: '#5 by M&I contained graphite'},
+    {label: 'Peer slot', value: '#5 in selected set'},
     {label: 'Metallurgy', value: '>97% TC concentrate'},
     {label: 'Logistics', value: 'Port / power / rail context'},
   ],
@@ -453,13 +455,17 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
   },
   metallurgy: {
     title: 'Flotation Concentrate',
-    source: 'AMC Table II · 8 variability composites · flotation testwork',
+    source: 'IMO Final Report Rev. 0, Table 2 · AMC MRE, Table II',
     columns: ['Metric', 'Result', ''],
     rows: [
-      {cells: ['Concentrate purity', '>97% TC', '']},
-      {cells: ['Best flake grade (TDM008)', '73% +150 µm', ''], emphasis: true},
-      {cells: ['Typical fresh composites', '60-72% +150 µm', '']},
-      {cells: ['Weakest sample', '35% +150 µm', '']},
+      {cells: ['Final cleaner concentrate', '>97% TC · all 8', '']},
+      {cells: ['TDM006 · oxide optimisation', '98.4% TC · 93.0% recovery', '']},
+      {cells: ['TDM001 · fresh optimisation', '98.6% TC · 94.4% recovery', '']},
+      {cells: ['TDM004 · recovery outlier', '75.8% · 1.83% carbonate', ''], emphasis: true},
+      {cells: ['Fresh · TDM001–005', '34.6–65.2% +150 µm', '']},
+      {cells: ['Oxide · TDM006–007', '57.1–67.2% +150 µm', '']},
+      {cells: ['TDM008 · kaolinised*', '72.7% +150 µm', '']},
+      {cells: ['*IMO: Fresh / Kaolin; AMC: oxide / kaolinised.', '', '']},
     ],
   },
 };
@@ -700,6 +706,17 @@ const STORY_STEPS: StoryStep[] = [
 
 // The guided route covers the complete evidence-to-decisions narrative.
 const EXECUTIVE_ROUTE: WorkbenchMode[] = STORY_STEPS.map(step => step.mode);
+// A short investor route through six already authored, evidence-backed views.
+// The route is six 15-second holds; scene loading can extend wall-clock time.
+const EXECUTIVE_HIGHLIGHTS = [
+  {mode:'project', shot:'licence'},
+  {mode:'drillholes', shot:'intercepts'},
+  {mode:'subsurface', shot:'framework'},
+  {mode:'resource', shot:'resource'},
+  {mode:'ranking', shot:'tanga-enters'},
+  {mode:'comparison', shot:'decisions'},
+] as const satisfies ReadonlyArray<{mode:WorkbenchMode; shot:string}>;
+const EXECUTIVE_HIGHLIGHTS_SECONDS = 90;
 
 // Authored camera beats. A scene is the narrative chapter; a shot is a
 // deliberate camera/evidence composition inside that chapter. Advancing a
@@ -712,7 +729,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'testwork', label: 'Flotation testwork', detail: 'Laboratory response across composites', view: VIEW_STATES.work_completed},
   ],
   ranking: [
-    {id: 'baseline', label: 'Ten reported projects', detail: 'Start with the published global M&I contained-graphite benchmark', view: VIEW_STATES.ranking},
+    {id: 'baseline', label: 'Ten reported projects', detail: 'Start with the published contained-graphite benchmark', view: VIEW_STATES.ranking},
     {id: 'tanga-enters', label: 'Tanga enters at fifth', detail: 'Insert 7.31 Mt from the Tanga Indicated MRE into the same measure', view: VIEW_STATES.ranking},
   ],
   tanzania: [
@@ -737,8 +754,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'intercepts', label: 'Best intercepts', detail: 'Push into the strongest reported intervals', threeAction: 'zoomIn'},
   ],
   subsurface: [
-    {id: 'map', label: 'Geological map', detail: 'Read the original project map and MRE regional context'},
-    {id: 'plan', label: 'Mapped rock polygons', detail: 'Drape digitized rock areas over terrain in a north-up view', threeAction: 'geologyPlan'},
+    {id: 'plan', label: 'Mapped surface', detail: 'Read the mapped rock units draped over the 3D terrain in a north-up view', threeAction: 'geologyPlan'},
     {id: 'relief', label: 'Mapped terrain in relief', detail: 'Tilt the mapped surface while keeping rock polygons attached to the ground', threeAction: 'geologyTilt'},
     {id: 'framework', label: 'Interpreted depth', detail: 'Hold the viewpoint and reveal the separate geological model', threeAction: 'geologyDepth'},
     {id: 'section', label: 'Interpreted host', detail: 'Open a reversible section to read interpreted contacts', threeAction: 'revealSection'},
@@ -752,7 +768,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id: 'samples', label: 'Metallurgy overview', detail: 'Carbon, recovery and flake-size evidence', threeAction: 'resetView'},
   ],
   mine_planning: [
-    {id: 'shell', label: 'Mine-plan overview', detail: 'Frame the complete conceptual shell', threeAction: 'resetView'},
+    {id: 'shell', label: 'Mine-plan overview', detail: 'Read the proposed site in its natural terrain setting', threeAction: 'siteOblique'},
     {id: 'north-pit', label: 'North pit', detail: 'Inspect the northern conceptual excavation', threeAction: 'northPit'},
     {id: 'south-pit', label: 'South pit', detail: 'Inspect the southern conceptual excavation', threeAction: 'southPit'},
     {id: 'waste',label: 'Waste-rock landform',detail:'Read illustrative benches and working areas',threeAction:'wasteView'},
@@ -799,7 +815,7 @@ const MODE_INVESTOR_ANGLE: Record<WorkbenchMode, {headline: string; points: stri
   work_completed: {headline: 'Work behind the estimate', points: ['Survey, drilling, estimation and testwork are separately dated source milestones']},
   ranking: {
     headline: 'Where Tanga sits in the selected peer field',
-    points: ['Bars compare reported M&I contained graphite on a common scale', 'Tanga enters at #5 within this selected dated benchmark', 'Different reporting dates and assumptions limit comparability'],
+    points: ['Bars compare reported contained graphite values in Mt', 'Tanga enters at #5 in this selected dated set using its Indicated contained graphite', 'Estimate dates and reported categories vary, so the set is not a like-for-like current census'],
   },
   tanzania: {
     headline: 'Locate the project in Tanzania',
@@ -860,6 +876,53 @@ function storyStepForMode(mode: WorkbenchMode) {
 
 // Scenes rendered by the Three.js model rather than the deck/map.
 const MODEL_MODES = new Set<WorkbenchMode>(['drillholes', 'subsurface', 'resource', 'mine_planning', 'metallurgy']);
+const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: string; note: string}>> = {
+  topography: {
+    src: '/presentation-assets/tanga-fallback-topography.jpg',
+    alt: 'Static view of the measured Tanga survey terrain and project boundary.',
+    note: 'Measured survey terrain · saved scene view',
+  },
+  drillholes: {
+    src: '/presentation-assets/tanga-fallback-drillholes.jpg',
+    alt: 'Static view of the Tanga project terrain with recorded drillhole collar markers.',
+    note: 'Recorded drillhole scene · saved view',
+  },
+  subsurface: {
+    src: '/presentation-assets/tanga-fallback-subsurface.jpg',
+    alt: 'Static view of the interpreted Tanga geological model beneath the mapped surface.',
+    note: 'Interpreted geology · saved scene view',
+  },
+  resource: {
+    src: '/presentation-assets/tanga-fallback-resource.jpg',
+    alt: 'Static view of displayed Tanga resource model blocks on the project terrain.',
+    note: 'Displayed resource model · saved scene view',
+  },
+  mine_planning: {
+    src: '/presentation-assets/tanga-fallback-mine-planning.jpg',
+    alt: 'Static view of the Tanga conceptual mine layout and illustrative site facilities.',
+    note: 'Conceptual mine layout · saved scene view',
+  },
+};
+
+// The chapter index uses evidence images and saved scene stills already shipped
+// with the deck. Loading these as ordinary images avoids mounting hidden maps
+// or WebGL renderers just to populate navigation thumbnails.
+const SCENE_INDEX_META: Record<WorkbenchMode, {question: string; thumbnail?: string; alt?: string}> = {
+  project: {question: 'Where is the project footprint?', thumbnail: '/presentation-assets/survey-site-aerial.jpg', alt: 'Survey aerial of the Tanga project area'},
+  tanzania: {question: 'Where does Tanga sit in the region?', thumbnail: '/presentation-assets/mre-regional-geology.jpg', alt: 'Regional geology map from the resource report'},
+  work_completed: {question: 'What work supports the current interpretation?', thumbnail: '/presentation-assets/metallurgy-samples.jpg', alt: 'Photographs of project testwork samples'},
+  topography: {question: 'What does the measured landscape show?', thumbnail: STATIC_SCENE_FALLBACKS.topography!.src, alt: STATIC_SCENE_FALLBACKS.topography!.alt},
+  drillholes: {question: 'Where is the recorded drilling evidence?', thumbnail: STATIC_SCENE_FALLBACKS.drillholes!.src, alt: STATIC_SCENE_FALLBACKS.drillholes!.alt},
+  subsurface: {question: 'How do mapped rocks relate to the interpretation?', thumbnail: '/geology_map.jpg', alt: 'Original Tanga geological map sheet'},
+  resource: {question: 'What does the reported block model show?', thumbnail: STATIC_SCENE_FALLBACKS.resource!.src, alt: STATIC_SCENE_FALLBACKS.resource!.alt},
+  ranking: {question: 'How does the dated peer set compare?'},
+  mine_planning: {question: 'How could the proposed facilities connect?', thumbnail: STATIC_SCENE_FALLBACKS.mine_planning!.src, alt: STATIC_SCENE_FALLBACKS.mine_planning!.alt},
+  metallurgy: {question: 'What did the reported testwork measure?', thumbnail: '/presentation-assets/metallurgy-report-page.png', alt: 'Metallurgy report results page'},
+  accessibility: {question: 'What infrastructure links need study?', thumbnail: '/presentation-assets/paulsam-conveyor-sites.jpg', alt: 'Planning report view of conveyor and site candidates'},
+  comparison: {question: 'Which evidence and decisions come next?'},
+};
+
+
 function storyTravel(fromMode: WorkbenchMode, toMode: WorkbenchMode): SceneTransitionState['travel'] {
   const fromModel = MODEL_MODES.has(fromMode);
   const toModel = MODEL_MODES.has(toMode);
@@ -883,7 +946,7 @@ const PEER_COMPARISON_METRICS = [
   {
     label: 'Peer position',
     value: '#5',
-    detail: `In this selected peer set · ${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(1)} Mt M&I contained graphite`,
+    detail: `In this selected set · ${TANGA_INSERT_PROJECT.containedGraphiteMt.toFixed(2)} Mt Indicated contained graphite`,
   },
   {
     label: 'Resource scale',
@@ -1103,7 +1166,7 @@ function peerPopupRows(project: GraphitePeerProjectRow) {
     ['TGC', project.tgcGrade ?? 'Not in peer summary'],
     ['Flake distribution', project.flakeDistribution ?? 'Not cleanly disclosed in peer summary'],
     ['Total resource', project.totalResource ?? project.resource],
-    ['M&I resource', project.measuredIndicated ?? project.resource],
+    ['Reported contained graphite', project.reportedContainedBasis ?? project.resource],
     ['Metallurgy', project.metallurgy ?? 'Not in peer summary'],
     ['Source basis', project.sourceLabel],
   ];
@@ -1293,8 +1356,8 @@ function intentRunLabel(intent: CommandIntent) {
 function modeSummary(mode: WorkbenchMode, routeTarget: RouteTarget, focus: ResourceFocus, tangaInserted: boolean) {
   if (mode === 'ranking') {
     return tangaInserted
-      ? 'Tanga is inserted into the peer field after the resource reveal, using M&I contained graphite.'
-      : 'A globe-based peer ranking sets the graphite context before the Tanga resource is revealed.';
+      ? 'Tanga is inserted into the peer field after the resource reveal, using its Indicated contained-graphite figure.'
+      : 'A published 2023 selected-project benchmark sets the graphite context before the Tanga resource is revealed.';
   }
   if (mode === 'tanzania') return 'Tanga is highlighted inside Tanzania with a project marker.';
   if (mode === 'project') return 'Raised terrain, roads, villages, vegetation, and licence limits are active around the project.';
@@ -1360,14 +1423,14 @@ function factsForMode(mode: WorkbenchMode, focus: ResourceFocus) {
 function legendForMode(mode: WorkbenchMode, routeTarget: RouteTarget, focus: ResourceFocus): LegendItem[] {
   if (mode === 'ranking') {
     return [
-      {label: 'Peer projects', detail: 'M&I graphite ranking', tone: '#a89c94'},
+      {label: 'Peer projects', detail: 'Reported contained-graphite values', tone: '#a89c94'},
       {label: 'Tanzania peers', detail: 'Mahenge, Epanko, Bunyu', tone: '#c7551b'},
       {label: 'Tanga insert', detail: 'After resource reveal', tone: '#41200e'},
     ];
   }
   if (mode === 'comparison') {
     return [
-      {label: 'Tanga', detail: '#5 inserted peer slot', tone: '#c7551b'},
+      {label: 'Tanga', detail: '#5 in selected peer set', tone: '#c7551b'},
       {label: 'Tanzania peers', detail: 'Mahenge, Epanko, Bunyu', tone: '#b9954b'},
       {label: 'Metallurgy', detail: '>97% TC and 93-94% recovery', tone: '#f5f1eb'},
     ];
@@ -1455,8 +1518,8 @@ function legendForMode(mode: WorkbenchMode, routeTarget: RouteTarget, focus: Res
   if (mode === 'metallurgy') {
     return [
       {label: 'Purity', detail: '>97% TC concentrate', tone: '#2dd4bf'},
-      {label: 'Best flake', detail: '73% coarser than 150 µm', tone: '#facc15'},
-      {label: 'Recovery', detail: '90% fresh · 85% oxide', tone: '#ef4444'},
+      {label: 'TDM008', detail: '72.7% mass above 150 µm · AMC Table II', tone: '#facc15'},
+      {label: 'Recovery', detail: '75.8–95.2% across composites · IMO Table 2', tone: '#ef4444'},
     ];
   }
   return [
@@ -1586,7 +1649,7 @@ function sceneCalloutsForMode(
     // One bold callout only — the licence. (Was 2; the village-context box added
     // noise and repeated what the map already shows.)
     return [
-      {id: 'aoi', label: 'Provisional project boundary', detail: 'Legal licence geometry unconfirmed; drill coverage shown', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
+      {id: 'aoi', label: 'Provisional boundary', detail: 'Legal licence geometry unconfirmed; drill coverage shown', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
     ];
   }
   if (mode === 'topography') {
@@ -1613,7 +1676,7 @@ function sceneCalloutsForMode(
   }
   if (mode === 'ranking') {
     return [
-      {id: 'peer', label: 'Global peer field', detail: 'Top 10 public graphite projects before Tanga reveal', boxX: 45, boxY: 35, tone: '#a89c94'},
+      {id: 'peer', label: 'Global peer field', detail: 'Selected 10-project benchmark before Tanga reveal', boxX: 45, boxY: 35, tone: '#a89c94'},
     ];
   }
   if (mode === 'comparison') {
@@ -2019,6 +2082,28 @@ function fmtElapsed(ms: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function encodeLayerSettings(settings: DeckLayerSettings) {
+  return DECK_LAYERS.map(({id}) => `${id}:${settings[id].visible ? 1 : 0}:${Math.round(clamp(settings[id].opacity,0,1)*100)}`).join(',');
+}
+function decodeLayerSettings(value: string | null, drillingVisible: boolean): DeckLayerSettings | null {
+  if (!value) return null;
+  const parsed: Partial<DeckLayerSettings> = {};
+  for (const entry of value.split(',')) {
+    const [rawId, rawVisible, rawOpacity, extra] = entry.split(':');
+    if (extra !== undefined || !DECK_LAYERS.some(({id}) => id === rawId) || !['0','1'].includes(rawVisible)) return null;
+    const opacity = Number(rawOpacity);
+    if (!Number.isInteger(opacity) || opacity < 0 || opacity > 100) return null;
+    parsed[rawId as DeckLayerId] = {visible: rawVisible === '1', opacity: opacity / 100};
+  }
+  // The `geology` layer was added after v1 links shipped. Keep valid earlier
+  // links usable by filling that one new setting from the safe default.
+  if (DECK_LAYERS.some(({id}) => id !== 'geology' && !parsed[id])) return null;
+  return {...DEFAULT_LAYER_SETTINGS, ...parsed, drilling: parsed.drilling ?? {...DEFAULT_LAYER_SETTINGS.drilling, visible:drillingVisible}};
+}
+function layerSettingsAreModified(settings: DeckLayerSettings, drillingVisible: boolean) {
+  return DECK_LAYERS.some(({id}) => settings[id].visible !== (id === 'drilling' ? drillingVisible : true) || settings[id].opacity < 1);
+}
+
 // URL hash <-> scene id (deep-linkable slides, refresh-safe)
 const SCENE_HASH_KEY = 'tanga:lastScene';
 function readHashScene(): string | null {
@@ -2026,10 +2111,26 @@ function readHashScene(): string | null {
   const h = window.location.hash.replace(/^#/, '');
   return h || null;
 }
-function writeHashScene(mode: string) {
+function writeHashScene(mode: string, viewId?: string, peerKey?: string, featureId?: string, layers?: DeckLayerSettings, hiddenUnits?: string[]) {
   if (typeof window === 'undefined') return;
-  if (window.location.hash === `#${mode}`) return;
-  history.replaceState(null, '', `#${mode}`);
+  const url = new URL(window.location.href);
+  url.hash = mode;
+  if (viewId) url.searchParams.set('view', viewId);
+  else url.searchParams.delete('view');
+  if (peerKey) url.searchParams.set('peer', peerKey);
+  else url.searchParams.delete('peer');
+  if (featureId) url.searchParams.set('feature', featureId);
+  else url.searchParams.delete('feature');
+  if (layers) url.searchParams.set('layers', encodeLayerSettings(layers));
+  else url.searchParams.delete('layers');
+  const units=hiddenUnits?.length?hiddenUnits.join('|'):undefined;
+  if (units) url.searchParams.set('units',units);
+  else url.searchParams.delete('units');
+  if (viewId || peerKey || featureId || layers || units) url.searchParams.set('v','1');
+  else url.searchParams.delete('v');
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  if (`${window.location.pathname}${window.location.search}${window.location.hash}` === next) return;
+  history.replaceState(null, '', next);
   try { window.localStorage?.setItem(SCENE_HASH_KEY, mode); } catch {}
 }
 function readStoredScene(): string | null {
@@ -2087,7 +2188,12 @@ export default function TangaDeckWorkbench() {
   const [activeMode, setActiveMode] = useState<WorkbenchMode>(DEFAULT_MODE);
   const [isExploreMode, setExploreMode] = useState(false);
   const [activeShotIndex, setActiveShotIndex] = useState(0);
+  const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
+  const restoredLayerSettingsRef = useRef<WorkbenchMode|null>(null);
   const [geologySectionShown, setGeologySectionShown] = useState(false);
+  const [selectedGeologyUnit, setSelectedGeologyUnit] = useState<GeologyUnitSelection|null>(null);
+  const [geologyLegendMount, setGeologyLegendMount] = useState<HTMLDivElement|null>(null);
+  const [hiddenGeologyUnits,setHiddenGeologyUnits]=useState<string[]>([]);
   const [availableMineFacilities,setAvailableMineFacilities]=useState<string[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState('drilling');
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
@@ -2158,6 +2264,8 @@ export default function TangaDeckWorkbench() {
   const [peerMreRevealed, setPeerMreRevealed] = useState(false);
   useEffect(() => { if (activeMode === 'ranking') setPeerMreRevealed(false); }, [activeMode]);
   const [threeSceneRequested, setThreeSceneRequested] = useState(false);
+  const [threeSceneRevision, setThreeSceneRevision] = useState(0);
+  const [shareStatus, setShareStatus] = useState('');
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
   const threeCameraSequenceRef=useRef(0);
   const [selectedPeerProject, setSelectedPeerProject] = useState<GraphitePeerProjectRow | null>(null);
@@ -2396,6 +2504,8 @@ export default function TangaDeckWorkbench() {
     if (overrides.resourceFocus) setResourceFocus(overrides.resourceFocus);
     setActiveShotIndex(0);
     setThreeCameraCommand(null);
+    if (mode === 'subsurface') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'geologyPlan'});
+    else if (mode === 'mine_planning') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'siteOblique'});
     setActiveMode(mode);
     setStatusText(`Mode: ${MODE_LABELS[mode]}`);
     flyTo(mode, overrides.bearing);
@@ -3521,7 +3631,7 @@ export default function TangaDeckWorkbench() {
       // Replaced by the pinned map-label overlay (fixed screen slot + pointer).
       false && new TextLayer({
         id: 'project-boundary-label',
-        data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'PROVISIONAL PROJECT BOUNDARY'}],
+        data: [{position: [PROJECT_CENTER.lon, PROJECT_CENTER.lat + 0.006, heightAt(PROJECT_CENTER.lon, PROJECT_CENTER.lat) + 260], text: 'PROVISIONAL BOUNDARY'}],
         getPosition: (d: any) => d.position,
         getText: (d: any) => d.text,
         getSize: 12,
@@ -4275,7 +4385,7 @@ export default function TangaDeckWorkbench() {
       out.push({id, text, lon, lat, z: heightAt(lon, lat) + lift, tone});
     };
     if (activeMode === 'project' || activeMode === 'topography') {
-      if (boundaryAnchor) push('lbl-license', 'PROVISIONAL PROJECT BOUNDARY', boundaryAnchor.lon, boundaryAnchor.lat, 0, '#f0b64a');
+      if (boundaryAnchor) push('lbl-license', 'PROVISIONAL BOUNDARY', boundaryAnchor.lon, boundaryAnchor.lat, 0, '#f0b64a');
     }
     if (activeMode === 'project') {
       // Processing plant and product stockpile pins are gone from this scene:
@@ -4518,7 +4628,7 @@ export default function TangaDeckWorkbench() {
 
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
   useEffect(() => {
-    const restoreDepth = () => {if(activeMode === 'subsurface') setActiveShotIndex(index => index === 1 || index === 2 ? 3 : index);};
+    const restoreDepth = () => {if(activeMode === 'subsurface') setActiveShotIndex(index => index === 0 || index === 1 ? 2 : index);};
     window.addEventListener('tanga:geology-perspective', restoreDepth);
     return () => window.removeEventListener('tanga:geology-perspective', restoreDepth);
   }, [activeMode]);
@@ -4598,20 +4708,6 @@ export default function TangaDeckWorkbench() {
   // hash) always starts from the beginning — we intentionally do NOT silently
   // resume the last-seen scene from localStorage, which surprised the user.
   const restoredRef = useRef(false);
-  useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
-    const stored = readHashScene();
-    if (!stored) return;
-    const targetIndex = STORY_STEPS.findIndex((s) => s.mode === stored);
-    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) {
-      goToStoryIndex(targetIndex);
-    }
-  // Intentionally run once — restore is a one-shot on mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // On scene change: keep the URL and localStorage in sync.
-  useEffect(() => { writeHashScene(activeMode); }, [activeMode]);
 
   const goToStoryIndex = useCallback((index: number) => {
     setExploreMode(false);
@@ -4654,13 +4750,138 @@ export default function TangaDeckWorkbench() {
     }
   }, [issueThreeCameraCommand]);
 
+  // Chapter and authored-shot links remain compatible with the existing #chapter URLs.
+  // Unknown chapter, view and peer identifiers safely fall back to the chapter default.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const requestedMode = readHashScene();
+    const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
+    const targetMode = targetIndex >= 0 ? STORY_STEPS[targetIndex].mode : null;
+    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+    if (targetMode) {
+      const supportsVersionOneState = params.get('v') === '1';
+      const shotId = params.get('view');
+      const shotIndex = supportsVersionOneState && shotId ? STORY_SHOTS[targetMode].findIndex((shot) => shot.id === shotId) : -1;
+      if (shotIndex >= 0) applyStoryShot(targetMode, shotIndex);
+      if (supportsVersionOneState && targetMode === 'ranking') {
+        const peerKey = params.get('peer');
+        const peer = peerKey ? graphitePeerRows(true).find((row) => peerProjectKey(row) === peerKey) : null;
+        if (peer) selectPeerProject(peer);
+      }
+      if (supportsVersionOneState && targetMode === 'subsurface') {
+        const featureId = params.get('feature');
+        const unit = MAPPED_SURFACE_UNITS.find((candidate) => candidate.label === featureId);
+        const hiddenUnits=(params.get('units')??'').split('|').filter(label=>MAPPED_SURFACE_UNITS.some(candidate=>candidate.label===label));
+        if (unit&&!hiddenUnits.includes(unit.label)) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
+        else if(unit)setSelectedGeologyUnit(null);
+        setHiddenGeologyUnits(hiddenUnits);
+      }
+      if (supportsVersionOneState) {
+        const sharedLayers = decodeLayerSettings(params.get('layers'), targetMode !== 'mine_planning' && targetMode !== 'metallurgy');
+        if (sharedLayers) {restoredLayerSettingsRef.current=targetMode;setLayerSettings(sharedLayers);}
+      }
+    }
+  // Intentionally run once — restore is a one-shot on mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // `history.replaceState` keeps the current story hash in sync but does not
+  // emit hashchange. Links pasted/clicked while the deck is already open do
+  // emit it, so restore those URLs explicitly instead of leaving the old scene
+  // on screen beneath a new address-bar hash.
+  useEffect(() => {
+    const restoreHashScene = () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedMode = readHashScene();
+      const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
+      if (targetIndex < 0) return;
+      const targetMode = STORY_STEPS[targetIndex].mode;
+      if (targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+
+      const supportsVersionOneState = params.get('v') === '1';
+      const shotId = params.get('view');
+      const shotIndex = supportsVersionOneState && shotId
+        ? STORY_SHOTS[targetMode].findIndex((shot) => shot.id === shotId)
+        : -1;
+      if (shotIndex >= 0) applyStoryShot(targetMode, shotIndex);
+      if (supportsVersionOneState && targetMode === 'ranking') {
+        const peerKey = params.get('peer');
+        const peer = peerKey ? graphitePeerRows(true).find((row) => peerProjectKey(row) === peerKey) : null;
+        if (peer) selectPeerProject(peer);
+      }
+      if (supportsVersionOneState && targetMode === 'subsurface') {
+        const featureId = params.get('feature');
+        const unit = MAPPED_SURFACE_UNITS.find((candidate) => candidate.label === featureId);
+        if (unit) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
+      }
+      if (supportsVersionOneState) {
+        const sharedLayers = decodeLayerSettings(params.get('layers'), targetMode !== 'mine_planning' && targetMode !== 'metallurgy');
+        if (sharedLayers) {restoredLayerSettingsRef.current=targetMode;setLayerSettings(sharedLayers);}
+      }
+    };
+    window.addEventListener('hashchange', restoreHashScene);
+    return () => window.removeEventListener('hashchange', restoreHashScene);
+  }, [activeStoryIndex, applyStoryShot, goToStoryIndex, selectPeerProject]);
+  const activeShareViewId = activeShots[activeShotIndex]?.id;
+  const activeSharedFeature = activeMode === 'subsurface' ? selectedGeologyUnit?.title : undefined;
+  const sharedLayers = layerSettingsAreModified(layerSettings, activeMode !== 'mine_planning' && activeMode !== 'metallurgy') ? layerSettings : undefined;
+  useEffect(() => { writeHashScene(activeMode, activeShotIndex > 0 ? activeShareViewId : undefined, activeMode === 'ranking' ? selectedPeerKey : undefined, activeSharedFeature, sharedLayers, activeMode==='subsurface'?hiddenGeologyUnits:undefined); }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, activeSharedFeature, sharedLayers, hiddenGeologyUnits]);
+  const copyCurrentView = useCallback(async () => {
+    const url = new URL(window.location.href);
+    url.hash = activeMode;
+    if (activeShotIndex > 0 && activeShareViewId) url.searchParams.set('view', activeShareViewId);
+    else url.searchParams.delete('view');
+    if (activeMode === 'ranking' && selectedPeerKey) url.searchParams.set('peer', selectedPeerKey);
+    else url.searchParams.delete('peer');
+    if (activeMode === 'subsurface' && selectedGeologyUnit) url.searchParams.set('feature', selectedGeologyUnit.title);
+    else url.searchParams.delete('feature');
+    if (sharedLayers) url.searchParams.set('layers', encodeLayerSettings(sharedLayers));
+    else url.searchParams.delete('layers');
+    if (activeMode==='subsurface'&&hiddenGeologyUnits.length) url.searchParams.set('units',hiddenGeologyUnits.join('|'));
+    else url.searchParams.delete('units');
+    if (url.searchParams.has('view') || url.searchParams.has('peer') || url.searchParams.has('feature') || url.searchParams.has('layers') || url.searchParams.has('units')) url.searchParams.set('v','1');
+    else url.searchParams.delete('v');
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      setShareStatus('View link copied');
+    } catch {
+      setShareStatus('Copy unavailable. Copy the address bar link.');
+    }
+    window.setTimeout(() => setShareStatus(''), 3200);
+  }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, selectedGeologyUnit, sharedLayers, hiddenGeologyUnits]);
+
+  const toggleMappedGeologyUnit=useCallback((label:string)=>{
+    const hiding=!hiddenGeologyUnits.includes(label);
+    setHiddenGeologyUnits(current=>current.includes(label)?current.filter(unit=>unit!==label):[...current,label]);
+    if(hiding&&selectedGeologyUnit?.title===label)setSelectedGeologyUnit(null);
+  },[hiddenGeologyUnits,selectedGeologyUnit]);
+
   const toggleGeologySection = useCallback(() => {
     const action: ThreeCameraAction = geologySectionShown ? 'restoreSection' : 'revealSection';
     issueThreeCameraCommand(action);
     setGeologySectionShown((shown) => !shown);
   }, [geologySectionShown, issueThreeCameraCommand]);
 
+  const [isExecutiveTour, setIsExecutiveTour] = useState(false);
+  const [isHighlightsTour, setIsHighlightsTour] = useState(false);
+  const [highlightStopIndex, setHighlightStopIndex] = useState(0);
+
   const handleExecutiveAdvance = useCallback(() => {
+    if (isHighlightsTour) {
+      const nextIndex = highlightStopIndex + 1;
+      const nextStop = EXECUTIVE_HIGHLIGHTS[nextIndex];
+      if (!nextStop) {
+        setIsAutoplay(false);
+        setIsExecutiveTour(false);
+        setIsHighlightsTour(false);
+        return;
+      }
+      setHighlightStopIndex(nextIndex);
+      const nextStoryIndex = STORY_STEPS.findIndex((step) => step.mode === nextStop.mode);
+      goToStoryIndex(nextStoryIndex);
+      return;
+    }
     if (activeShotIndex < activeShots.length - 1) {
       applyStoryShot(activeMode, activeShotIndex + 1);
       return;
@@ -4674,16 +4895,37 @@ export default function TangaDeckWorkbench() {
     }
     const nextIndex = STORY_STEPS.findIndex((step) => step.mode === nextMode);
     goToStoryIndex(nextIndex);
-  }, [activeMode, activeShotIndex, activeShots.length, applyStoryShot, goToStoryIndex]);
+  }, [activeMode, activeShotIndex, activeShots.length, applyStoryShot, goToStoryIndex, highlightStopIndex, isHighlightsTour]);
 
   const startExecutiveTour = useCallback(() => {
     const firstIndex = STORY_STEPS.findIndex((step) => step.mode === EXECUTIVE_ROUTE[0]);
     setIsAutoplay(false);
+    setIsHighlightsTour(false);
     setIsExecutiveTour(true);
     setPendingInfo(null);
     goToStoryIndex(firstIndex);
     window.setTimeout(() => setIsAutoplay(true), 0);
   }, [goToStoryIndex]);
+
+  const startExecutiveHighlights = useCallback(() => {
+    const firstStop = EXECUTIVE_HIGHLIGHTS[0];
+    const firstIndex = STORY_STEPS.findIndex((step) => step.mode === firstStop.mode);
+    setIsAutoplay(false);
+    setIsExecutiveTour(true);
+    setIsHighlightsTour(true);
+    setHighlightStopIndex(0);
+    setPendingInfo(null);
+    goToStoryIndex(firstIndex);
+    window.setTimeout(() => setIsAutoplay(true), 0);
+  }, [goToStoryIndex]);
+
+  useEffect(() => {
+    if (!isExecutiveTour || !isHighlightsTour) return;
+    const stop = EXECUTIVE_HIGHLIGHTS[highlightStopIndex];
+    if (!stop || activeMode !== stop.mode) return;
+    const shotIndex = STORY_SHOTS[stop.mode].findIndex((shot) => shot.id === stop.shot);
+    if (shotIndex >= 0 && activeShotIndex !== shotIndex) applyStoryShot(stop.mode, shotIndex);
+  }, [activeMode, activeShotIndex, applyStoryShot, highlightStopIndex, isExecutiveTour, isHighlightsTour]);
 
   // ── Presenter control layer ────────────────────────────────────────────
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -4693,13 +4935,14 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
-  const [isExecutiveTour, setIsExecutiveTour] = useState(false);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
   const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
   const transitionCardCount = nextChapterMode && INFO_BEFORE[nextChapterMode] ? 1 : 0;
-  const shotDwellSec = (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
+  const shotDwellSec = isHighlightsTour
+    ? EXECUTIVE_HIGHLIGHTS_SECONDS / EXECUTIVE_HIGHLIGHTS.length
+    : (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
   // Annotation density, cycled with Ctrl+A:
   //   key → authored scene callouts plus the three strongest drill intercepts
@@ -4712,28 +4955,22 @@ export default function TangaDeckWorkbench() {
   // Presenter layer controls, in the spirit of a GIS layers panel: in Q&A the
   // ask is usually "drop the blocks and show me just the holes", and changing
   // scene is too blunt an answer.
-  const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
   const [surfaceConceptView, setSurfaceConceptView] = useState(false);
-  const preCompareLayersRef = useRef<DeckLayerSettings | null>(null);
+  const [surfaceCompareSplit, setSurfaceCompareSplit] = useState(50);
   const toggleSurfaceConceptView = useCallback(() => {
-    setLayerSettings((current) => {
-      if (!surfaceConceptView) {
-        preCompareLayersRef.current = current;
-        return {...current, terrain: {...current.terrain, visible: true}, drilling: {...current.drilling, visible: false}, blocks: {...current.blocks, visible: false}, context: {...current.context, visible: false}};
-      }
-      return preCompareLayersRef.current ?? DEFAULT_LAYER_SETTINGS;
-    });
     setSurfaceConceptView((current) => !current);
-  }, [surfaceConceptView]);
+  }, []);
   const defaultDrillingVisible = activeMode !== 'mine_planning' && activeMode !== 'metallurgy';
   useEffect(() => {
     if (activeMode !== 'mine_planning' && surfaceConceptView) {
-      setLayerSettings(preCompareLayersRef.current ?? DEFAULT_LAYER_SETTINGS);
-      preCompareLayersRef.current = null;
       setSurfaceConceptView(false);
     }
   }, [activeMode, surfaceConceptView]);
   useEffect(() => {
+    if (restoredLayerSettingsRef.current) {
+      if (restoredLayerSettingsRef.current === activeMode) restoredLayerSettingsRef.current = null;
+      return;
+    }
     setLayerSettings(current => ({...current, drilling: {...current.drilling, visible: defaultDrillingVisible}}));
   }, [activeMode, defaultDrillingVisible]);
   const [isLayersOpen, setLayersOpen] = useState(false);
@@ -4742,6 +4979,21 @@ export default function TangaDeckWorkbench() {
   // left; this stage is far more panel-heavy than theirs, so the same job is
   // done by an overlay that costs no width until it is asked for.
   const [isIndexOpen, setIndexOpen] = useState(false);
+  const sceneIndexDialogRef = useRef<HTMLElement | null>(null);
+  const sceneIndexTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const sceneIndexWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (!isIndexOpen) {
+      if (sceneIndexWasOpenRef.current) sceneIndexTriggerRef.current?.focus();
+      sceneIndexWasOpenRef.current = false;
+      return;
+    }
+    sceneIndexWasOpenRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      sceneIndexDialogRef.current?.querySelector<HTMLButtonElement>('.tanga-deck__index > header button')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isIndexOpen]);
   const toggleIndex = useCallback(() => setIndexOpen((open) => !open), []);
   const setLayerVisible = useCallback((id: DeckLayerId, visible: boolean) => {
     setLayerSettings((current) => ({...current, [id]: {...current[id], visible}}));
@@ -5051,7 +5303,7 @@ export default function TangaDeckWorkbench() {
       title = `#${props.displayRank ?? props.baselineRank} ${props.project ?? 'Graphite project'}`;
       rows.push(`${props.country ?? 'Unknown'} - ${props.owner ?? props.company ?? 'Operator'}`);
       rows.push(`Listed: ${props.listing ?? 'Not in peer summary'}`);
-      rows.push(`M&I: ${props.measuredIndicated ?? props.resource ?? 'M&I graphite basis'}`);
+      rows.push(`Reported contained graphite: ${props.reportedContainedBasis ?? props.resource ?? 'Basis not in selected benchmark summary'}`);
       if (props.tgcGrade) rows.push(`TGC: ${props.tgcGrade}`);
       if (props.flakeDistribution) rows.push(`Flake: ${props.flakeDistribution}`);
       rows.push(String(props.sourceLabel ?? 'Peer project source'));
@@ -5117,7 +5369,7 @@ export default function TangaDeckWorkbench() {
       data-act={MODE_ACT[activeMode]}
       data-mode={activeMode}
       onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
-      onPointerDownCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
+      onPointerDownCapture={event => { setIsAutoplay(false); setIsExecutiveTour(false); if(!(event.target as Element).closest('.tanga-presentation-tools')) { const tools=stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');if(tools)tools.open=false; } }}
       data-testid="tanga-deck-workbench"
     >
       <DeckHoverGuide mode={activeMode}/>
@@ -5168,6 +5420,7 @@ export default function TangaDeckWorkbench() {
 
       {threeSceneRequested && (
         <TangaThreeGeologyScene
+          key={`${threeMode}:${threeSceneRevision}`}
           visible={threeVisible}
           mode={threeMode}
           resourceFocus={resourceFocus}
@@ -5176,13 +5429,27 @@ export default function TangaDeckWorkbench() {
           cameraCommand={threeCameraCommand}
           assetQuality={assetQuality}
           onLoadState={handleThreeLoadState}
+          onRetry={() => { setThreeCameraCommand(null); setThreeLoadReport(DEFAULT_THREE_LOAD_REPORT); setThreeSceneRevision((revision) => revision + 1); }}
+          selectedGeologyUnit={selectedGeologyUnit?.title}
+          hiddenGeologyUnits={hiddenGeologyUnits}
+          onSelectGeologyUnit={setSelectedGeologyUnit}
+          onGeologyLegendMount={setGeologyLegendMount}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
+          terrainCompare={{enabled: surfaceConceptView, split: surfaceCompareSplit}}
+          onTerrainCompareSplit={setSurfaceCompareSplit}
           inspectionMode={isExploreMode}
           onInspectEvidence={()=>{setIsAutoplay(false);setIsExecutiveTour(false);}}
           onSiteFacilities={setAvailableMineFacilities}
           onAssayFacts={setAssayFacts}
         />
+      )}
+
+      {threeVisible && threeLoadReport.scene === 'error' && STATIC_SCENE_FALLBACKS[activeMode] && (
+        <figure className="tanga-deck__static-scene-fallback" aria-label={`${MODE_LABELS[activeMode]} static scene fallback`}>
+          <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
+          <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> 3D unavailable</figcaption>
+        </figure>
       )}
 
       <div className="tanga-deck__shade" />
@@ -5233,7 +5500,7 @@ export default function TangaDeckWorkbench() {
       <TangaStoryVideoHero
         visible={storyHeroVisible}
         videoSrc="/api/assets/media/tanga-google-earth-intro-corrected-preview.mp4?v=story-hero-opt-1080-20260819"
-        posterSrc="/media/tanga-first-slide-story-poster.jpg?v=story-hero-20260625"
+        posterSrc={`${assetUrl('/media/tanga-first-slide-story-poster.jpg')}?v=story-hero-20260625`}
         onComplete={completeStoryHero}
         onShowRanking={dismissStoryHero}
         onSkip={dismissStoryHero}
@@ -5578,7 +5845,7 @@ export default function TangaDeckWorkbench() {
           like a self-running pitch (great for a lobby / booth screen). */}
       {isAutoplay && !isCoverScene && (!isClosingScene || isExecutiveTour) && (
         <div className="tanga-deck__narration" role="status" aria-live="polite">
-          <span className="tanga-deck__narration-eyebrow">{isExecutiveTour ? `Executive route · ${STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}` : STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}</span>
+          <span className="tanga-deck__narration-eyebrow">{isExecutiveTour ? `${isHighlightsTour ? `Executive highlights ${highlightStopIndex + 1}/${EXECUTIVE_HIGHLIGHTS.length}` : 'Full story'} · ${STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}` : STORY_STEPS[activeStoryIndex]?.label ?? MODE_LABELS[activeMode]}</span>
           <p key={activeMode}>{CHAPTER_GUIDANCE[activeMode].bridge}</p>
         </div>
       )}
@@ -5667,8 +5934,17 @@ export default function TangaDeckWorkbench() {
       )}
 
       <button type="button" className="tanga-deck__explore-toggle" aria-pressed={isExploreMode}
-        onClick={() => {setExploreMode(!isExploreMode); setLayersOpen(false);}}>
-        {isExploreMode ? 'Return to presentation' : 'Explore evidence'}
+        onClick={() => {
+          const returningToStory = isExploreMode;
+          setExploreMode(!isExploreMode); setLayersOpen(false);
+          // Exploring is a presenter pause: the narrative must not advance
+          // while someone is inspecting the evidence. Returning reapplies the
+          // authored shot but deliberately preserves the chosen layer state.
+          setIsAutoplay(false);
+          setIsExecutiveTour(false);
+          if (returningToStory) applyStoryShot(activeMode,activeShotIndex);
+        }}>
+        {isExploreMode ? 'Return to story' : 'Explore evidence'}
       </button>
       {!isCoverScene && !isClosingScene && (
         <header className="tanga-deck__chapter-title">
@@ -5696,6 +5972,7 @@ export default function TangaDeckWorkbench() {
           </span>
           <button
             type="button"
+            ref={sceneIndexTriggerRef}
             className="tanga-deck__pager-count"
             onClick={toggleIndex}
             aria-expanded={isIndexOpen}
@@ -5734,23 +6011,24 @@ export default function TangaDeckWorkbench() {
           className="tanga-deck__pager-btn tanga-deck__pager-btn--next"
           onClick={handleManualNext}
           disabled={isLastStory}
-          aria-label="Next scene"
-          title="Next  (→)"
+          aria-label={activeShots[activeShotIndex + 1] ? `Next view: ${activeShots[activeShotIndex + 1].label}` : isLastStory ? 'Story complete' : `Next chapter: ${STORY_STEPS[activeStoryIndex + 1]?.label ?? 'project story'}`}
+          title={`${activeShots[activeShotIndex + 1] ? `Next view · ${activeShots[activeShotIndex + 1].label}` : isLastStory ? 'Story complete' : `Next chapter · ${STORY_STEPS[activeStoryIndex + 1]?.label ?? 'project story'}`}  (→)`}
         >
           <ChevronRight size={20} strokeWidth={2.4} />
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
-          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Complete project story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Guided story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
+          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
+          <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
             style={{'--autoplay-dwell': `${shotDwellSec}s`} as any}
             key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}-${isAutoplay}`}
             onClick={toggleAutoplay}
-            aria-label={isAutoplay ? 'Pause autoplay' : 'Start autoplay'}
+            aria-label={isExecutiveTour ? (isAutoplay ? `Pause ${isHighlightsTour ? 'executive highlights' : 'full guided story'}` : `Resume ${isHighlightsTour ? 'executive highlights' : 'full guided story'}`) : (isAutoplay ? 'Pause current chapter playback' : 'Play current chapter views')}
             aria-pressed={isAutoplay}
-            title={isAutoplay ? 'Pause autoplay  (P)' : 'Autoplay  (P)'}
+            title={isAutoplay ? `Pause ${isHighlightsTour ? 'executive highlights' : isExecutiveTour ? 'full story' : 'chapter playback'}  (P)` : `${isHighlightsTour ? 'Resume executive highlights' : isExecutiveTour ? 'Resume full story' : 'Play chapter views'}  (P)`}
           >
             {isAutoplay ? <Pause size={16} strokeWidth={2.4} /> : <Play size={16} strokeWidth={2.4} />}
           </button>
@@ -5759,15 +6037,19 @@ export default function TangaDeckWorkbench() {
             className="tanga-deck__pager-btn tanga-deck__pager-speed"
             disabled={isExecutiveTour}
             onClick={() => setIsAutoplayMenuOpen((prev) => !prev)}
-            aria-label={`Chapter duration: ${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec} seconds`}
+            aria-label={isHighlightsTour ? `Executive highlights: ${EXECUTIVE_HIGHLIGHTS_SECONDS} seconds total` : `Advanced chapter playback timing: ${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec} seconds`}
             aria-haspopup="menu"
             aria-expanded={isAutoplayMenuOpen}
-            title={isExecutiveTour ? 'Guided story uses chapter-specific timing' : `${autoplaySec}s per chapter · ${STORY_STEPS.length * autoplaySec / 60} minute tour — click to change`}
+            title={isHighlightsTour ? 'Executive highlights use six 15-second authored holds; scene loading can extend total time' : isExecutiveTour ? 'Full story uses authored chapter timings' : `Advanced chapter autoplay timing · ${autoplaySec}s per chapter — click to change`}
           >
-            {isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec}s
+            {isHighlightsTour ? `${EXECUTIVE_HIGHLIGHTS_SECONDS}s` : `${isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec}s`}
           </button>
           {isAutoplayMenuOpen && (
             <div className="tanga-deck__speed-menu" role="menu">
+              <div className="tanga-deck__speed-menu-heading" role="presentation">
+                <strong>Advanced timing</strong>
+                <span>Chapter playback only. The full story uses authored timings.</span>
+              </div>
               {([60, 90, 120] as const).map((sec) => (
                 <button
                   key={sec}
@@ -5783,9 +6065,29 @@ export default function TangaDeckWorkbench() {
             </div>
           )}
         </div>
-        <details key={activeMode} className="tanga-presentation-tools" onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
+        <details key={activeMode} className="tanga-presentation-tools" onClick={event=>{if((event.target as Element).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
           <summary aria-label="Presentation tools" title="Presentation tools"><Layers size={16}/><span>Tools</span></summary>
           <div className="tanga-presentation-tools__grid">
+        <section className="tanga-tour-mobile" aria-label="Guided presentation">
+          <button type="button" onClick={startExecutiveTour}>
+            <strong>Start full guided story</strong>
+            <span>{Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s · 12 chapters</span>
+          </button>
+          <button type="button" onClick={startExecutiveHighlights}>
+            <strong>Start executive highlights</strong>
+            <span>Six authored views · about 90 seconds after scenes load</span>
+          </button>
+          <label>
+            <span>Advanced chapter timing</span>
+            <select value={autoplaySec} onChange={(event) => setAutoplaySec(Number(event.target.value) as 60 | 90 | 120)} aria-label="Chapter autoplay duration">
+              <option value={60}>60 seconds per chapter</option>
+              <option value={90}>90 seconds per chapter</option>
+              <option value={120}>120 seconds per chapter</option>
+            </select>
+          </label>
+          <p>Timing applies to chapter playback. The full story follows authored timings.</p>
+        </section>
+        <button type="button" className="tanga-deck__pager-btn tanga-deck__pager-btn--tool" onClick={copyCurrentView} aria-label="Copy link to this view" title="Copy a link to this chapter and authored view"><Copy size={16} strokeWidth={2.2}/></button>
         {threeVisible && activeMode !== 'metallurgy' && (
           <button
             type="button"
@@ -5871,7 +6173,13 @@ export default function TangaDeckWorkbench() {
         >
           <HelpCircle size={16} strokeWidth={2.2} />
         </button>
+        <div className="tanga-presentation-tools__build" aria-label={`Build ${presentationBuild.revision}, ${presentationBuild.target}`}>
+          <span>BUILD</span>
+          <code>{presentationBuild.revision}</code>
+          <span>{presentationBuild.target}</span>
+        </div>
           </div>
+          <span className="tanga-presentation-tools__status" role="status" aria-live="polite">{shareStatus}</span>
         </details>
       </nav>
 
@@ -5897,11 +6205,31 @@ export default function TangaDeckWorkbench() {
         >
           <section
             className="tanga-deck__index"
-            aria-label="All scenes"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tanga-scene-index-title"
+            ref={sceneIndexDialogRef}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab') return;
+              const buttons = sceneIndexDialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])');
+              if (!buttons?.length) return;
+              const first = buttons[0];
+              const last = buttons[buttons.length - 1];
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
           >
             <header>
-              <span>All scenes</span>
+              <div>
+                <span id="tanga-scene-index-title">Explore the story</span>
+                <small>12 chapters · Select a scene to jump</small>
+              </div>
               <button type="button" onClick={() => setIndexOpen(false)} aria-label="Close scene index">
                 <X size={14} strokeWidth={2.2} />
               </button>
@@ -5926,8 +6254,23 @@ export default function TangaDeckWorkbench() {
                           onClick={() => { goToStoryIndex(index); setIndexOpen(false); }}
                           aria-current={index === activeStoryIndex}
                         >
-                          <strong>{String(index + 1).padStart(2, "0")}</strong>
-                          <span>{step.label}</span>
+                          <span className="tanga-deck__index-thumb">
+                            {SCENE_INDEX_META[step.mode].thumbnail ? (
+                              <img src={SCENE_INDEX_META[step.mode].thumbnail} alt="" loading="lazy" decoding="async" />
+                            ) : step.mode === 'ranking' ? (
+                              <span className="tanga-deck__index-globe" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>
+                            ) : (
+                              <span className="tanga-deck__index-decisions" aria-hidden="true"><i>01</i><b /><i>02</i><b /><i>03</i></span>
+                            )}
+                            {index === activeStoryIndex && <em>Current view</em>}
+                          </span>
+                          <span className="tanga-deck__index-copy">
+                            <span className="tanga-deck__index-title"><strong>{String(index + 1).padStart(2, "0")}</strong>{step.label}</span>
+                            <span className="tanga-deck__index-question">{SCENE_INDEX_META[step.mode].question}</span>
+                            {index === activeStoryIndex && activeShots.length > 0 && (
+                              <span className="tanga-deck__index-shot">Viewing: {activeShots[activeShotIndex]?.label ?? activeShots[0].label}</span>
+                            )}
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -6113,11 +6456,27 @@ export default function TangaDeckWorkbench() {
 
       {!isExploreMode && !isCoverScene && ['topography','drillholes','subsurface','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 Surface'],['drillholes','02 Drilling'],['subsurface','03 Geology'],['resource','04 Estimate']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
+      {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaChapterStoryPanel
+        chapter={activeMode as TangaChapterId}
+        developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id}
+        availableDevelopment={availableMineFacilities}
+        onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }}
+        onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined}
+        surfaceConceptView={surfaceConceptView}
+        surfaceCompareSplit={surfaceCompareSplit}
+        onSurfaceCompareSplit={setSurfaceCompareSplit}
+        onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined}
+        geologySectionShown={geologySectionShown}
+        milestoneId={selectedMilestoneId}
+        onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}}
+        onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined}
+        onSiteOrientation={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? orientation => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand(orientation==='plan'?'sitePlan':'siteOblique');} : undefined}
+        onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
+      />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
-      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 4 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
-      {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaChapterStoryPanel chapter={activeMode as TangaChapterId} developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id} availableDevelopment={availableMineFacilities} onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }} onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined} surfaceConceptView={surfaceConceptView} onRevealGeology={activeMode === 'subsurface' ? toggleGeologySection : undefined} geologySectionShown={geologySectionShown} milestoneId={selectedMilestoneId} onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}} onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined} onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}/ >}
-      {!isExploreMode && !isCoverScene && !storyHeroVisible && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} onContinue={handleManualNext} complete={isLastStory}/>}
+      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 3 && <TangaGeologyMapStage legendMount={geologyLegendMount} step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
+      {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory}/>}
 
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">
@@ -6162,7 +6521,7 @@ export default function TangaDeckWorkbench() {
             <small>{selectedPeerProject.company} / {selectedPeerProject.country}</small>
           </div>
           <div className="tanga-deck__peer-popup-metric">
-            <span>M&I contained graphite</span>
+            <span>Reported contained graphite</span>
             <strong>{selectedPeerProject.containedGraphiteMt.toLocaleString(undefined, {maximumFractionDigits: 3})} Mt</strong>
             <small>{selectedPeerProject.status}</small>
           </div>
@@ -6189,10 +6548,10 @@ export default function TangaDeckWorkbench() {
         >
           <div className="tanga-deck__ranking-head">
             <span>{tangaRankingInserted ? 'Global Ranking' : 'Peer Context'}</span>
-            <strong>{tangaRankingInserted ? 'Tanga ranks #5 in this peer set' : 'Top 10 public graphite projects'}</strong>
+            <strong>{tangaRankingInserted ? 'Tanga ranks #5 in this peer set' : 'Selected 10-project 2023 benchmark'}</strong>
             <small>{tangaRankingInserted
-              ? 'By reported M&I contained graphite. Peer estimates may differ in effective date and reporting basis.'
-              : 'Ranked by reported M&I contained graphite. Select a project for ownership, grade, flake and metallurgy context.'}</small>
+              ? 'By reported contained graphite. Dates and reported categories vary; this is a selected comparison set.'
+              : 'Reported contained graphite in the published benchmark. Select a project to inspect its disclosed basis and source.'}</small>
           </div>
 
           <ol className="tanga-deck__ranking-list">
@@ -6256,7 +6615,7 @@ export default function TangaDeckWorkbench() {
                 <li className="is-win"><i>Metallurgy</i><b>&gt;97% TC</b><s>premium conc.</s><b>large-flake</b></li>
                 <li><i>Listing</i><b>Private</b><s>pre-market entry</s><b>ASX: BKT</b></li>
               </ul>
-              <p>In this selected peer set, Tanga ranks fifth by reported M&amp;I contained graphite. Port distance and metallurgical testwork are context, not demonstrated cost or product advantages.</p>
+              <p>In this selected peer set, Tanga ranks fifth by reported contained graphite, using its Indicated MRE figure. Port distance and metallurgical testwork are context, not demonstrated cost or product advantages.</p>
             </div>
           ) : (
             <div className="tanga-deck__ranking-foot">
@@ -6289,7 +6648,7 @@ export default function TangaDeckWorkbench() {
             <div className="tanga-deck__comparison-row is-head" role="row">
               <span>Rank</span>
               <span>Project</span>
-              <span>M&I graphite</span>
+              <span>Reported contained graphite</span>
               <span>Comparison note</span>
             </div>
             {comparisonRows.map((project) => (

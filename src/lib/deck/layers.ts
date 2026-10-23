@@ -11,7 +11,7 @@
  * defeat its dynamic import.
  */
 
-export type DeckLayerId = 'terrain' | 'drilling' | 'blocks' | 'context';
+export type DeckLayerId = 'terrain' | 'drilling' | 'blocks' | 'geology' | 'context';
 
 export interface DeckLayerState {
   visible: boolean;
@@ -24,12 +24,14 @@ export const DEFAULT_LAYER_SETTINGS: DeckLayerSettings = {
   terrain: {visible: true, opacity: 1},
   drilling: {visible: true, opacity: 1},
   blocks: {visible: true, opacity: 1},
+  geology: {visible: true, opacity: 1},
   context: {visible: true, opacity: 1},
 };
 
 /** Row order and copy for the layers panel. */
 export const DECK_LAYERS: ReadonlyArray<{id: DeckLayerId; label: string; detail: string}> = [
-  {id: 'blocks', label: 'Geological / grade model', detail: 'Interpreted units or grade blocks'},
+  {id: 'blocks', label: '3D model', detail: 'Interpreted units and grade blocks'},
+  {id: 'geology', label: 'Map polygons', detail: 'Digitized surface geology'},
   {id: 'drilling', label: 'Drilling', detail: 'Traces, assays and collars'},
   {id: 'terrain', label: 'Terrain', detail: 'Ground surface'},
   {id: 'context', label: 'Site context', detail: 'Boundary, roads, conceptual pits and plant'},

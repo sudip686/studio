@@ -51,6 +51,7 @@ async function* walk(directory) {
 }
 
 await loadEnvFiles();
+process.env.TANGA_BUILD_TARGET = 'Cloudflare Workers · OpenNext';
 if (process.env.NEXT_PUBLIC_ASSET_BASE_URL) {
   const devVarsPath = path.join(root, '.dev.vars');
   let devVars = '';

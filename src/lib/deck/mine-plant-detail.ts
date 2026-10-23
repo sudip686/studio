@@ -81,11 +81,27 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
   for (const z of [38, 50]) box(37, .8, 1, 69, 10, z, 'Dewatering filter-press rail', accent);
   box(7, 7, 14, 48, 6, 44, 'Dewatering hydraulic power pack', dark);
   const dryer = cylinder(4, 27, 106, 11, 28, 'Dewatering rotary dryer'); dryer.rotation.z = Math.PI / 2;
+  dryer.userData.preserveAnimation=true;root.userData.processDryer=dryer;
+  const dryerRibs=new THREE.InstancedMesh(new THREE.BoxGeometry(.3,27,.3),dark,8);
+  const ribMatrix=new THREE.Matrix4();
+  for(let i=0;i<8;i++){const angle=i*Math.PI/4;ribMatrix.makeTranslation(Math.cos(angle)*4.05,0,Math.sin(angle)*4.05);dryerRibs.setMatrixAt(i,ribMatrix);}
+  dryerRibs.name='Dryer shell stiffeners';dryerRibs.castShadow=true;dryer.add(dryerRibs);
   for (const x of [96, 116]) box(3, 6, 9, x, 5, 28, 'Dewatering dryer support', materials.concrete);
   for (const x of [139, 156, 173]) {
     cylinder(5, 20, x, 16, 92, 'Product surge silo');
     mesh(new THREE.ConeGeometry(5, 8, 16), accent, x, 4, 92, 'Product silo discharge cone').rotation.z = Math.PI;
     for (const z of [87, 97]) box(.6, 9, .6, x, 5, z, 'Product silo support');
+  }
+  // Palletised bag forms give the covered store a readable purpose and scale.
+  // These are illustrative stock, without product tonnage or capacity meaning.
+  const bagMaterial=new THREE.MeshStandardMaterial({color:0xbec3b2,roughness:.98});
+  for(const x of [34,58,82,116])for(const z of [105,120]){
+    box(17,1,11,x,2,z,'Product storage pallet',dark);
+    for(let layer=0;layer<2;layer++)for(const offset of [-4,4]){
+      const bag=mesh(new THREE.SphereGeometry(1,10,6),bagMaterial,x+offset,4+layer*4.5,z,'Bagged concentrate · illustrative');
+      bag.scale.set(3.8,2.4,4.2);
+      box(.25,4.4,8,x+offset,4+layer*4.5,z,'Bag lifting strap',dark);
+    }
   }
   // Reagent bund with distinguishable tanks and service lines.
   box(48, 1.5, 27, -40, 2.2, 104, 'Reagent containment slab', materials.concrete);
@@ -113,17 +129,18 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
 
 /** Batch static detail by material/process; keep roof cutaways separately addressable. */
 export function batchPlantMeshes(root: THREE.Group) {
-  const buckets = new Map<string, {material: THREE.Material; name: string; roof: boolean; geometries: THREE.BufferGeometry[]}>();
-  const children = [...root.children].filter((child): child is THREE.Mesh<THREE.BufferGeometry, THREE.Material> => child instanceof THREE.Mesh && !Array.isArray(child.material));
+  const buckets = new Map<string, {material: THREE.Material; name: string; roof: boolean; stage?:string; geometries: THREE.BufferGeometry[]}>();
+  const children = [...root.children].filter((child): child is THREE.Mesh<THREE.BufferGeometry, THREE.Material> => child instanceof THREE.Mesh && !Array.isArray(child.material) && !child.userData.preserveAnimation);
   for (const object of children) {
     object.updateMatrix();
     const roof = Boolean(object.userData.plantRoof);
+    const stage=typeof object.userData.plantStage==='string'?object.userData.plantStage:undefined;
     const name = roof ? `${object.name} roof` : /Flotation/i.test(object.name) ? 'Flotation banks and walkways'
       : /Milling|Crushing|ROM|Feed|hopper/i.test(object.name) ? 'Crushing and milling equipment'
       : /Dewatering|Product|Filter|Packaged/i.test(object.name) ? 'Dewatering and product handling'
       : /Thickener|water|Reagent/i.test(object.name) ? 'Thickener, water and reagent circuits' : 'Plant structures and services';
-    const key = `${object.material.uuid}:${name}:${roof}`;
-    const bucket = buckets.get(key) ?? {material: object.material, name, roof, geometries: []};
+    const key = `${object.material.uuid}:${name}:${roof}:${stage??''}`;
+    const bucket = buckets.get(key) ?? {material: object.material, name, roof, stage, geometries: []};
     bucket.geometries.push(object.geometry.clone().applyMatrix4(object.matrix)); buckets.set(key, bucket);
     root.remove(object); object.geometry.dispose();
   }
@@ -132,7 +149,7 @@ export function batchPlantMeshes(root: THREE.Group) {
     for (const source of bucket.geometries) source.dispose();
     if (!geometry) throw new Error(`Unable to batch plant detail: ${bucket.name}`);
     const object = new THREE.Mesh(geometry, bucket.material); object.name = bucket.name;
-    object.userData.plantRoof = bucket.roof; object.castShadow = true; object.receiveShadow = true;
+    object.userData.plantRoof = bucket.roof; if(bucket.stage)object.userData.plantStage=bucket.stage; object.castShadow = true; object.receiveShadow = true;
     root.add(object);
   }
   root.userData.detailMeshCount = children.length;

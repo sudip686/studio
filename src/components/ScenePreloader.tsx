@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useDataCache } from '@/lib/data-cache';
 import { buildBlockModelCenter, prewarmTerrainSurface } from '@/lib/terrain/shared-terrain-cache';
+import { assetUrl } from '@/lib/asset-url';
 
 // Preload heavy scene assets (terrain, texture, boreholes) early to reduce wait times
 export default function ScenePreloader() {
@@ -56,7 +57,7 @@ export default function ScenePreloader() {
           warmFirstAvailable(candidates, opts);
         });
 
-        const textureCandidates = ['/terrain_texture_hires.jpg', '/terrain_texture_8k.jpg'];
+        const textureCandidates = ['/terrain_texture_hires.jpg', '/terrain_texture_8k.jpg'].map(assetUrl);
 
         textureCandidates.forEach((src) => {
           const img = new Image();

@@ -307,10 +307,10 @@ function buildSpecs(args: {
       ],
       rows: [
         { metric: 'Oxide composites', value: '97.6% to 98.4% TC', note: 'Cleaner 6 concentrate grades across oxide composites TDM006 and TDM007.' },
-        { metric: 'Fresh composites', value: '97.18% to 98.64% TC', note: 'Cleaner 6 concentrate grades across fresh composites TDM001 to TDM008.' },
+        { metric: 'Fresh composites', value: '97.2% to 98.6% TC', note: 'Final cleaner grades for TDM001–005; TDM008 weathering label differs between reports.' },
         { metric: 'Low outlier', value: '75.8% recovery', note: 'TDM004 was weaker due to elevated carbonate content around 1.8%.' },
-        { metric: 'Product threshold', value: '>97% TC concentrate', note: 'IMO notes this is premium product quality versus a typical saleable minimum flake grade above 94% TC.' },
-        { metric: 'Next testwork', value: 'Bulk concentrate and battery testwork', note: 'Recommended follow-on program includes larger-scale concentrate generation, comminution work, and scoping study economics.' },
+        { metric: 'IMO product context', value: '>97% TC concentrate', note: 'IMO calls the laboratory concentrates premium against its stated typical saleable minimum; this does not establish customer qualification.' },
+        { metric: 'Next testwork', value: 'Larger-scale concentrate trials', note: 'Follow-on work is recommended; product performance and spherical-graphite suitability remain to be tested.' },
       ],
     },
     product_quality: {
@@ -322,14 +322,14 @@ function buildSpecs(args: {
       metrics: [
         { label: 'Resource base', value: STATIC_MRE.totalResource, tone: 'cool' },
         { label: 'Purity', value: '>97% TC', tone: 'mint' },
-        { label: 'Flake value', value: '>60% large & jumbo', tone: 'warm' },
+        { label: 'Flake fraction', value: '34.6–72.7% above 150 µm', tone: 'warm' },
       ],
       rows: [
-        { metric: 'Oxide flake content', value: '>57% at +150 um', note: 'Oxide composites delivered premium-price flake distribution in the flotation report.' },
-        { metric: 'Fresh flake content', value: '>61% at +150 um', note: 'TDM003 to TDM005 delivered strong large-flake distribution.' },
-        { metric: 'Best flake result', value: '>73% at +150 um', note: 'Fresh kaolin composite TDM008 delivered the standout premium flake outcome.' },
-        { metric: 'Lower flake cases', value: '34.8% and 42.5%', note: 'TDM001 and TDM002 had lower premium-price flake distribution than the other fresh composites.' },
-        { metric: 'Commercial framing', value: 'Battery and premium flake markets', note: 'Investor-deck framing positions the product above the purity threshold for higher-value markets including battery anodes.' },
+        { metric: 'Fresh composites', value: '34.6–65.2% at +150 µm', note: 'AMC MRE Table II, TDM001–005; these are mass fractions, not graphite recovery.' },
+        { metric: 'Oxide composites', value: '57.1–67.2% at +150 µm', note: 'AMC MRE Table II, TDM006–007.' },
+        { metric: 'TDM008', value: '72.7% at +150 µm', note: 'AMC groups it as oxide / kaolinised; IMO labels it Fresh / Kaolin.' },
+        { metric: 'Fine-fraction potential', value: '>95% TC at <150 µm', note: 'AMC describes potential suitability for spherical-graphite manufacture; further product trials are needed.' },
+        { metric: 'Qualification status', value: 'Not established', note: 'Testwork does not demonstrate customer qualification, anode performance, commercial terms or saleability of all fractions.' },
       ],
     },
   } satisfies Record<SlideKey, HighlightSpec>;

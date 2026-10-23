@@ -11,7 +11,7 @@ type BlockFeature = {
 
 export default function CesiumThreeBlockModel({
   kmzUrl = '/tanga_boundary.kmz',
-  blockGeoJsonUrl = '/BlockModel.geojson',
+  blockGeoJsonUrl = '/api/block-model',
   defaultBox = { x: 5, y: 5, z: 5 },   // meters
 }: {
   kmzUrl?: string;

@@ -5,8 +5,8 @@ import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
 export function buildConcentrator() {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
-  const materials={steel:new THREE.MeshStandardMaterial({color:0xb8c6cc,metalness:0.55,roughness:0.38}),roof:new THREE.MeshStandardMaterial({color:0x526c78,roughness:0.65}),copper:new THREE.MeshStandardMaterial({color:0xd2a544,metalness:.25,roughness:0.45}),concrete:new THREE.MeshStandardMaterial({color:0xb7b0a0,roughness:.95}),water:new THREE.MeshStandardMaterial({color:0x4a8b95,metalness:0.15,roughness:0.25}),rock:new THREE.MeshStandardMaterial({color:0x81735e,roughness:1})};
-  const cladding=new THREE.MeshStandardMaterial({color:0x9bafb7,roughness:.65,metalness:.25});
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshStandardMaterial({color:0x858278,roughness:.98}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshStandardMaterial({color:0x756b5d,roughness:1})};
+  const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.94+0.06*smoothstep(-0.5,0.5,sin(vRoofPoint.x*4.0));');
@@ -15,9 +15,9 @@ export function buildConcentrator() {
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
-  // 250 × 250 m land allowance in PaulSam Table 5.3. Internal arrangement is
-  // illustrative; it is not a surveyed parcel or an engineered general arrangement.
-  box(500,1,500,0,-1,0,materials.concrete,'PaulSam land allowance · illustrative 250 × 250 m');
+  // The pad and graded transition are placed against the existing terrain by
+  // placeConcentrator. Avoid a second oversized slab beneath the whole campus:
+  // it reads as a floating platform and hides the surrounding ground texture.
   box(400,3,280,0,0,0,materials.concrete,'Plant pad');
   // A perimeter service lane and drainage edge make the pad read as a site.
   box(392,.15,7,0,1.6,135,materials.roof,'Conceptual service lane');
@@ -25,26 +25,45 @@ export function buildConcentrator() {
   for(const x of [-195,195])box(4,.15,268,x,1.6,0,materials.roof);
   for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,1.72,135,materials.concrete);
   // Roof panels, portal frames and side openings give each building a legible silhouette.
-  function shed(name:string,x:number,z:number,w:number,d:number,h:number){
+  function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
     for(const sign of [-1,1]){
       const roof=box(w,1.2,roofLength,x,h+rise/2,z+sign*d/4,cladding,name);
       roof.rotation.x=sign*Math.atan2(rise,d/2);
       roof.userData.plantRoof=true;
+      if(stage)roof.userData.plantStage=stage;
     }
     for(let i=-w/2;i<=w/2;i+=w/4)for(const k of [-d/2,d/2])box(1.2,h,1.2,x+i,h/2,z+k,materials.copper);
-    box(w,h,d*0.04,x,h/2,z+d/2,materials.steel);
+    const frontPortal=stage==='feed'&&x===-88?{x:-104,width:12,height:23}:stage==='dewatering'?{x:104,width:12,height:20}:null;
+    if(frontPortal){
+      const left=frontPortal.x-frontPortal.width/2-(x-w/2),right=x+w/2-(frontPortal.x+frontPortal.width/2);
+      box(left,h,d*.04,x-w/2+left/2,h/2,z+d/2,materials.steel);
+      box(right,h,d*.04,x+w/2-right/2,h/2,z+d/2,materials.steel);
+      box(frontPortal.width,h-frontPortal.height,d*.04,frontPortal.x,(h+frontPortal.height)/2,z+d/2,materials.steel);
+    }else box(w,h,d*.04,x,h/2,z+d/2,materials.steel);
     // Clerestory glazing and end walls give industrial buildings volume.
-    for(const sign of [-1,1])box(1,h,d,x+sign*w/2,h/2,z,materials.steel);
+    for(const sign of [-1,1]){
+      if(stage){
+        const portal=Math.min(24,d*.55),height=Math.min(h-4,22),side=(d-portal)/2;
+        for(const edge of [-1,1])box(1,h,side,x+sign*w/2,h/2,z+edge*(portal+side)/2,materials.steel);
+        box(1,h-height,portal,x+sign*w/2,(h+height)/2,z,materials.steel);
+      }else box(1,h,d,x+sign*w/2,h/2,z,materials.steel);
+    }
     for(let i=0;i<6;i++)box(w/9,3,.3,x-w*.4+i*w*.16,h-5,z+d/2+.5,materials.water,'High-level glazing');
   }
   // ROM / receiving and primary crushing.
   mesh(new THREE.ConeGeometry(22,14,32),materials.rock,-106,8,44,'ROM stockpile');
   box(22,12,18,-104,10,-16,materials.steel,'Feed bin');
   mesh(new THREE.CylinderGeometry(12,5,12,4),materials.copper,-104,21,-16,'Receiving hopper').rotation.y=Math.PI/4;
-  box(18,14,17,-73,10,-16,materials.roof,'Crushing');
-  shed('Milling',-30,-18,48,45,27);
-  const mill=cylinder(8,23,-30,12,-18);mill.rotation.z=Math.PI/2;
+  shed('ROM & crushing',-88,-16,72,58,30,'feed');
+  shed('Milling',-30,-18,48,45,27,'milling');
+  const mill=cylinder(8,23,-30,12,-18);mill.rotation.z=Math.PI/2;mill.name='Milling process drum';mill.userData.preserveAnimation=true;root.userData.processMill=mill;
+  // Longitudinal shell ribs provide scale and make rotation legible. Instances
+  // stay attached to the drum and share its local cylinder axis.
+  const millRibs=new THREE.InstancedMesh(new THREE.BoxGeometry(.55,23,.55),materials.roof,12);
+  const ribTransform=new THREE.Matrix4();
+  for(let i=0;i<12;i++){const angle=i*Math.PI/6;ribTransform.makeTranslation(Math.cos(angle)*8.1,0,Math.sin(angle)*8.1);millRibs.setMatrixAt(i,ribTransform);}
+  millRibs.name='Mill shell stiffeners';millRibs.castShadow=true;mill.add(millRibs);
   // Flotation banks with agitator drives and a maintenance deck.
   for(let row=0;row<2;row++)for(let i=0;i<5;i++){
     const x=8+i*15,z=-36+row*24;
@@ -55,9 +74,10 @@ export function buildConcentrator() {
   box(78,1,5,38,15,0,materials.steel);
   for(let x=0;x<80;x+=6)box(0.5,4,0.5,x,17,2,materials.copper);
   box(80,0.4,0.4,38,19,2,materials.copper);
+  shed('Flotation',40,-36,88,60,24,'flotation');
   cylinder(17,9,103,6,-31);cylinder(16,0.4,103,10.7,-31,materials.water);
   box(34,1,2,103,12,-31,materials.copper); // thickener bridge
-  shed('Dewatering / product handling',83,44,75,45,25);
+  shed('Dewatering / product handling',83,44,75,45,25,'dewatering');
   for(let i=0;i<9;i++)box(1,7,12,58+i*2.4,6,44,materials.steel,'Filter plates');
   for(let i=0;i<5;i++)box(7,6,7,92+i*8,5,51,materials.concrete,'Packaged product');
   shed('Workshop',-37,57,48,28,16);
@@ -80,9 +100,9 @@ export function buildConcentrator() {
     for(let j=0;j<3;j++)cylinder(.45,2,-83+i*9+j,7.5,-58,materials.copper);
   }
   // Added operating areas expand the campus rather than stretching equipment.
-  shed('Covered blending and feed hall',-85,-109,116,40,32);
+  shed('Covered blending and feed hall',-85,-109,116,40,32,'feed');
   for(let i=0;i<3;i++)mesh(new THREE.ConeGeometry(13,12,16),materials.rock,-122+i*36,8,-108,'Covered feed stockpile');
-  shed('Product storage and loadout',100,110,166,40,29);
+  shed('Product storage and loadout',100,110,166,40,29,'product');
   shed('Maintenance and spares hall',-157,102,58,48,22);
   for(const z of [-32,30])mesh(new THREE.ConeGeometry(24,18,24),materials.rock,-163,10,z,'ROM receiving yard');
   // Second flotation train and reclaim-water thickener.
@@ -104,12 +124,13 @@ export function buildConcentrator() {
     for(let t=.2;t<1;t+=.3){const p=a.clone().lerp(b,t);box(1,p.y,1,p.x,p.y/2,p.z,materials.steel);}
   }
   // Connected conveyors and pipe racks. Flow points are exposed for animation.
-  const flow=[new THREE.Vector3(-106,10,44),new THREE.Vector3(-104,21,-16),new THREE.Vector3(-73,16,-16),new THREE.Vector3(-30,16,-18),new THREE.Vector3(8,16,-36),new THREE.Vector3(68,16,-36),new THREE.Vector3(103,14,-31),new THREE.Vector3(104,14,44)];
+  const flow=[new THREE.Vector3(-106,10,44),new THREE.Vector3(-104,21,-16),new THREE.Vector3(-73,16,-16),new THREE.Vector3(-30,16,-18),new THREE.Vector3(8,16,-36),new THREE.Vector3(68,16,-36),new THREE.Vector3(103,14,-31),new THREE.Vector3(104,14,44),new THREE.Vector3(104,14,78),new THREE.Vector3(100,14,78),new THREE.Vector3(100,14,110)];
   for(let i=0;i<flow.length-1;i++){
     const a=flow[i],b=flow[i+1],v=b.clone().sub(a);
-    const belt=box(i<3?5:1.4,v.length(),i<3?2:1.4,0,0,0,i<3?materials.roof:materials.copper);
+    const dryTransfer=i<3||i>=7;
+    const belt=box(dryTransfer?5:1.4,v.length(),dryTransfer?2:1.4,0,0,0,dryTransfer?materials.roof:materials.copper);
     belt.position.copy(a).add(b).multiplyScalar(.5);belt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());
-    if(i<3)for(let t=.2;t<1;t+=.3){const p=a.clone().lerp(b,t);box(1,p.y,1,p.x,p.y/2,p.z,materials.steel);}
+    if(dryTransfer)for(let t=.2;t<1;t+=.3){const p=a.clone().lerp(b,t);box(1,p.y,1,p.x,p.y/2,p.z,materials.steel);}
   }
   root.userData.flow=flow;
   root.userData.labels=[['ROM / feed',-106,32,20],['Crushing & milling',-50,37,-20],['Flotation',40,30,-24],['Dewatering & product',95,35,45]];
@@ -159,7 +180,7 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
   const level=levels[Math.floor(levels.length/2)]+1.5;
   const pad:ConceptPad={x,z,width,depth,level,transition:30};
   root.userData.conceptPad=pad;
-  const vertices:number[]=[];
+  const vertices:number[]=[],earthworkColors:number[]=[];
   const ring=(distance:number)=>[[-width/2-distance,-depth/2-distance],[width/2+distance,-depth/2-distance],[width/2+distance,depth/2+distance],[-width/2-distance,depth/2+distance]];
   const vertex=(p:number[])=>[p[0]/root.scale.x,((height(x+p[0],z+p[1])*(1-padBlend(pad,x+p[0],z+p[1]))+level*padBlend(pad,x+p[0],z+p[1]))-level+.3)/root.scale.y,p[1]/root.scale.z];
   for(let strip=0;strip<6;strip++){
@@ -168,23 +189,53 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
       const next=(edge+1)%4,n=Math.ceil(Math.hypot(outer[next][0]-outer[edge][0],outer[next][1]-outer[edge][1])/5);
       const point=(r:number[][],t:number)=>[r[edge][0]+(r[next][0]-r[edge][0])*t,r[edge][1]+(r[next][1]-r[edge][1])*t];
       for(let i=0;i<n;i++){
-        const a=vertex(point(inner,i/n)),b=vertex(point(inner,(i+1)/n)),c=vertex(point(outer,i/n)),d=vertex(point(outer,(i+1)/n));
+        const innerA=point(inner,i/n),innerB=point(inner,(i+1)/n),outerA=point(outer,i/n),outerB=point(outer,(i+1)/n);
+        const a=vertex(innerA),b=vertex(innerB),c=vertex(outerA),d=vertex(outerB);
         vertices.push(...a,...c,...b,...b,...c,...d);
+        // Quiet, broad colour variation keeps this display-only cut/fill apron
+        // from reading as a single plastic slab. It is a material treatment,
+        // not mapped soil or a claim about local ground composition.
+        for(const p of [innerA,outerA,innerB,innerB,outerA,outerB]){
+          const mottling=.965+Math.sin(p[0]*.041+Math.sin(p[1]*.019))*Math.cos(p[1]*.037)*.026+Math.sin((p[0]+p[1])*.19)*.008;
+          const color=new THREE.Color(0x766d5e).multiplyScalar(mottling);
+          earthworkColors.push(color.r,color.g,color.b);
+        }
       }
     }
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();
-  const earthworks=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0x9b876e,roughness:1,side:THREE.DoubleSide}));
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(earthworkColors,3));geometry.computeVertexNormals();
+  const earthworks=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,side:THREE.DoubleSide}));
   earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
   root.position.set(x,level,z);return level;
 }
 
 function retainSourceTerrain(geometry:THREE.BufferGeometry){
   const position=geometry.getAttribute('position');
-  if(position&&!geometry.userData.sourcePositions)geometry.userData.sourcePositions=new Float32Array(position.array);
+  if(position&&!geometry.userData.sourcePositions){
+    const sourcePositions=new Float32Array(position.array);
+    const sourcePositionAttribute=new THREE.BufferAttribute(sourcePositions,position.itemSize,position.normalized);
+    geometry.userData.sourcePositions=sourcePositions;
+    geometry.userData.sourcePositionAttribute=sourcePositionAttribute;
+    geometry.userData.sourceBoundingSphere=geometry.boundingSphere?.clone()??null;
+    const normal=geometry.getAttribute('normal');
+    if(normal){
+      const sourceNormalAttribute=new THREE.BufferAttribute(new Float32Array(normal.array),normal.itemSize,normal.normalized);
+      geometry.userData.sourceNormalAttribute=sourceNormalAttribute;
+    }
+  }
 }
 function retainConceptTerrain(geometry:THREE.BufferGeometry){
-  geometry.userData.conceptPositions=new Float32Array(geometry.getAttribute('position').array);
+  const position=geometry.getAttribute('position');
+  const conceptPositions=new Float32Array(position.array);
+  const conceptPositionAttribute=new THREE.BufferAttribute(conceptPositions,position.itemSize,position.normalized);
+  geometry.userData.conceptPositions=conceptPositions;
+  geometry.userData.conceptPositionAttribute=conceptPositionAttribute;
+  geometry.userData.conceptBoundingSphere=geometry.boundingSphere?.clone()??null;
+  const normal=geometry.getAttribute('normal');
+  if(normal){
+    const conceptNormalAttribute=new THREE.BufferAttribute(new Float32Array(normal.array),normal.itemSize,normal.normalized);
+    geometry.userData.conceptNormalAttribute=conceptNormalAttribute;
+  }
   geometry.userData.conceptVisible=undefined;
 }
 export function gradeConceptPad(geometry:THREE.BufferGeometry,pad:ConceptPad){
@@ -198,9 +249,12 @@ export function gradeConceptPad(geometry:THREE.BufferGeometry,pad:ConceptPad){
 }
 export function showConceptTerrain(geometry:THREE.BufferGeometry,show:boolean){
   if(!geometry.userData.sourcePositions||!geometry.userData.conceptPositions||geometry.userData.conceptVisible===show)return;
-  const position=geometry.getAttribute('position');
-  (position.array as Float32Array).set(show?geometry.userData.conceptPositions:geometry.userData.sourcePositions);
-  position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();geometry.userData.conceptVisible=show;
+  const position=show?geometry.userData.conceptPositionAttribute:geometry.userData.sourcePositionAttribute;
+  const normal=show?geometry.userData.conceptNormalAttribute:geometry.userData.sourceNormalAttribute;
+  if(position)geometry.setAttribute('position',position);
+  if(normal)geometry.setAttribute('normal',normal);
+  geometry.boundingSphere=show?geometry.userData.conceptBoundingSphere:geometry.userData.sourceBoundingSphere;
+  geometry.userData.conceptVisible=show;
 }
 
 export function pitHeight(p:Point2,pit:CandidatePit) {
@@ -253,4 +307,64 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
   band(outer,[],y,y,0xa88b66);
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();
   const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x70675d,vertexColors:true,envMapIntensity:0.15,roughness:1,side:THREE.DoubleSide}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
+}
+
+/**
+ * A display-only access ribbon inside a candidate pit envelope. This is not a
+ * sourced alignment, engineered haul road, or geotechnically checked grade.
+ */
+export function buildConceptualPitRamp(pit:CandidatePit) {
+  const centre=pit.centre;
+  const radiusAt=(angle:number)=>{
+    const direction:Point2=[Math.cos(angle),Math.sin(angle)];
+    let nearest=Infinity;
+    for(let i=0;i<pit.ring.length;i++){
+      const a=pit.ring[i],b=pit.ring[(i+1)%pit.ring.length];
+      const edge:Point2=[b[0]-a[0],b[1]-a[1]],relative:Point2=[a[0]-centre[0],a[1]-centre[1]];
+      const denominator=direction[0]*edge[1]-direction[1]*edge[0];
+      if(Math.abs(denominator)<1e-8)continue;
+      const distance=(relative[0]*edge[1]-relative[1]*edge[0])/denominator;
+      const along=(relative[0]*direction[1]-relative[1]*direction[0])/denominator;
+      if(distance>0&&along>=-1e-7&&along<=1+1e-7)nearest=Math.min(nearest,distance);
+    }
+    return nearest;
+  };
+  const meanRadius=pit.ring.reduce((sum,point)=>sum+Math.hypot(point[0]-centre[0],point[1]-centre[1]),0)/pit.ring.length;
+  const emptyRamp=()=>{
+    const mesh=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial());
+    mesh.name='Illustrative internal pit access ramp · not engineered';mesh.visible=false;return mesh;
+  };
+  if(!Number.isFinite(meanRadius)||meanRadius<24||pit.depth<=0)return emptyRamp();
+  const turns=Math.min(5,Math.max(1,pit.depth/(.095*Math.PI*2*meanRadius*.58)));
+  const steps=Math.max(160,Math.ceil(turns*128)),halfWidth=Math.max(5,Math.min(7,CONCEPT.berm*1.05));
+  const path:THREE.Vector3[]=[];
+  for(let i=0;i<=steps;i++){
+    const t=i/steps,angle=-Math.PI/2+t*turns*Math.PI*2,outerRadius=radiusAt(angle);
+    if(!Number.isFinite(outerRadius))continue;
+    const radial=outerRadius*(.92-.58*t),x=centre[0]+Math.cos(angle)*radial,z=centre[1]+Math.sin(angle)*radial;
+    const ground=pitHeight([x,z],pit)??pit.floor,designY=pit.surface-t*pit.depth*.96;
+    path.push(new THREE.Vector3(x,Math.max(ground+1.25,designY),z));
+  }
+  if(path.length<2)return emptyRamp();
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[];
+  const shoulder=new THREE.Color(0x48453e),runningSurface=new THREE.Color(0x625a4c);
+  for(let i=0;i<path.length;i++){
+    const before=path[Math.max(0,i-1)],after=path[Math.min(path.length-1,i+1)];
+    const tangent=new THREE.Vector2(after.x-before.x,after.z-before.z).normalize();
+    const normal=new THREE.Vector2(-tangent.y,tangent.x),point=path[i];
+    for(const side of [-1,1]){
+      const tone=side===-1?shoulder:runningSurface;
+      positions.push(point.x+normal.x*halfWidth*side,point.y+.22,point.z+normal.y*halfWidth*side);
+      colors.push(tone.r,tone.g,tone.b);
+    }
+    if(i<path.length-1){const a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,c,b,b,c,d);}
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
+  const ramp=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,metalness:0,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2}));
+  ramp.name='Illustrative internal pit access ramp · not engineered';
+  ramp.renderOrder=41;ramp.castShadow=true;ramp.receiveShadow=true;
+  return ramp;
 }

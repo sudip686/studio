@@ -166,5 +166,6 @@ node scripts/build-terrain-glb.mjs
 - `TERRAIN_CLIP_RADIUS_M` controls the visible clipping box radius at runtime. The build writes `public/terrain_runtime.json` (e.g., `{ "clipRadiusM": 7000 }`), which is consumed by the Three.js `TerrainSurfaceLayer`.
 
 Viewer alignment notes (Three.js):
-- The terrain mesh Y is stored as `(elev_m - zMin)` so that the base is at 0. The viewers clamp drillhole collars to the DEM and subtract `zMin` as well, ensuring collars sit exactly on the mesh, independent of the absolute vertical datum.
-- Cesium views are untouched by this pipeline.
+- The legacy `terrain_surface.glb` pipeline stores terrain Y as `(elev_m - zMin)` so that the base is at 0. This describes that legacy asset's local vertical origin; it is not a vertical-datum transformation.
+- The current Tanga investor scenes use the registered survey/regional grids documented in `TANGA_SPATIAL_REGISTRATION_AUDIT_2026-10-23.md`. Recorded drillhole collar elevations and traces are preserved; only the decorative collar marker may be projected to the visible surface. No source drillhole is clamped or snapped to the DTM.
+- Cesium views are untouched by this legacy pipeline.

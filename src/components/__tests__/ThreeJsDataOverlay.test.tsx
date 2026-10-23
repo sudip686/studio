@@ -71,7 +71,8 @@ describe('ThreeJsDataOverlay', () => {
 
     rerender(<ThreeJsDataOverlay slideId="product_quality" />);
     expect(screen.getByText('Premium graphite product case')).toBeInTheDocument();
-    expect(screen.getByText('>73% at +150 um')).toBeInTheDocument();
+    expect(screen.getByText('72.7% at +150 µm')).toBeInTheDocument();
+    expect(screen.getByText('Not established')).toBeInTheDocument();
   });
 
   it('returns null for unsupported slides', () => {
