@@ -2106,6 +2106,8 @@ export default function TangaThreeGeologyScene({
   const [terrainProfilePosition, setTerrainProfilePosition] = useState(50);
   const terrainProfilePositionRef = useRef(50);
   terrainProfilePositionRef.current = terrainProfilePosition;
+  const [terrainProfileSweeping, setTerrainProfileSweeping] = useState(false);
+  const terrainSweepProgressRef = useRef(0);
   const journeyCommand=useRef<((id:string|null)=>void)|null>(null);
   const [plantCutaway,setPlantCutaway]=useState(false);
   const [plantProcess,setPlantProcess]=useState('all');
@@ -2128,6 +2130,47 @@ export default function TangaThreeGeologyScene({
   miningStoryOptions.current={beat:miningBeat,playing:storyPlaying,replay:storyReplay,holes:evidenceVisible};
   const presentationOptions = useRef({targetXray:true,motionPaused:false});
   presentationOptions.current={targetXray,motionPaused};
+  useEffect(() => {
+    if (mode !== 'topography' || !terrainProfileSweeping) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (reducedMotion.matches) {
+      setTerrainProfilePosition(100);
+      setTerrainProfileSweeping(false);
+      return;
+    }
+
+    let frame = 0;
+    let previous = 0;
+    let lastPaint = 0;
+    const advance = (now: number) => {
+      if (!previous) previous = now;
+      const delta = Math.min(100, now - previous);
+      previous = now;
+      if (!document.hidden && !presentationOptions.current.motionPaused) {
+        terrainSweepProgressRef.current = Math.min(1, terrainSweepProgressRef.current + delta / 7000);
+        if (now - lastPaint >= 45 || terrainSweepProgressRef.current >= 1) {
+          lastPaint = now;
+          setTerrainProfilePosition(Math.round(terrainSweepProgressRef.current * 100));
+        }
+        if (terrainSweepProgressRef.current >= 1) {
+          setTerrainProfileSweeping(false);
+          return;
+        }
+      }
+      frame = window.requestAnimationFrame(advance);
+    };
+    const finishForReducedMotion = () => {
+      if (!reducedMotion.matches) return;
+      setTerrainProfilePosition(100);
+      setTerrainProfileSweeping(false);
+    };
+    reducedMotion.addEventListener('change', finishForReducedMotion);
+    frame = window.requestAnimationFrame(advance);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      reducedMotion.removeEventListener('change', finishForReducedMotion);
+    };
+  }, [mode, motionPaused, terrainProfileSweeping]);
   const [sceneReady, setSceneReady] = useState(false);
   const [projectedFrame, setProjectedFrame] = useState<ProjectedCalloutFrame>({width: 0, height: 0, items: []});
   const [navInstrument, setNavInstrument] = useState<ThreeNavInstrument>(DEFAULT_NAV_INSTRUMENT);
@@ -3311,6 +3354,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // Download independent geology inputs while terrain initialises. Capture
       // failures immediately so an early rejection cannot become unhandled.
       const earlyGeology=mode==='subsurface'?fetchAsset('/geologicalModel.glb',{cache:'force-cache'}).catch(()=>null):null;
+      // Keep the opening measured-terrain chapter free of drillhole geometry
+      // and avoid loading assay data before the drilling chapter introduces it.
       const earlyDrills=mode==='topography'?Promise.resolve({data:[] as DrillSegment[],error:null}):loadDrillholes().then(data=>({data,error:null}),error=>({data:null,error}));
       setStatus('Drawing preview terrain surface');
       const resources = await applyTexturedTerrain(assetQuality);
@@ -3443,6 +3488,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         host.dataset.sitePlan = JSON.stringify(sitePlan);
       }
       const shownDrillholes = drillSegmentsForMode(drillholes, mode);
+      host.dataset.drillSegmentsRendered = String(shownDrillholes.length);
+      host.dataset.drillEvidenceVisible = String(shownDrillholes.length > 0);
       if (mode === 'subsurface') {
         const response = await earlyGeology;
         if (!response?.ok) throw new Error('Interpreted geology model unavailable');
@@ -3570,6 +3617,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const sample=intervals.find(d=>depth>=d.depthFrom&&depth<=d.depthTo);marker.visible=Boolean(sample);
             if(sample){const fraction=(depth-sample.depthFrom)/Math.max(.001,sample.depthTo-sample.depthFrom);marker.position.copy(registeredDrillPoint(sample,'from',terrainResources,drillSurfaceOffsets)).lerp(registeredDrillPoint(sample,'to',terrainResources,drillSurfaceOffsets),fraction);}
             const next=Math.floor((time-started)*5);if(next!==tick){tick=next;setJourneyReadout(`${id} · ${depth.toFixed(1)} m${progress===1?' · complete':''} · ${sample?`${sample.lithology||'Lithology not supplied'} · ${Number.isFinite(sample.carbon)?sample.carbon.toFixed(2)+'% TGC':'Assay unavailable'}`:'No recorded interval here'}`);}
+            if(progress>=1)journeyUpdate=null;
           };
         };
       }
@@ -4387,8 +4435,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const onVisibilityChange=()=>{
       lastMotionElapsed=clock.getElapsedTime();
       lastQualityFrame=performance.now();
-      const evidenceOpen=host.closest('.tanga-deck')?.classList.contains('tanga-deck--present')===false;
-      const paused=presentationOptions.current.motionPaused||reducedMotion.matches||evidenceOpen||document.hidden;
+      // Scene animations are also presenter-triggered in Explore mode; only an
+      // explicit pause, reduced-motion preference or hidden tab stops them.
+      const paused=presentationOptions.current.motionPaused||reducedMotion.matches||document.hidden;
       host.dataset.haulMotion=paused?'paused':'playing';
     };
     document.addEventListener('visibilitychange',onVisibilityChange);
@@ -4697,8 +4746,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         host.dataset.plantCutaway=String(detail.plantCutaway);
         host.dataset.plantProcess=detail.plantProcess;
       }
-      const evidenceOpen=host.closest('.tanga-deck')?.classList.contains('tanga-deck--present')===false;
-      const paused=presentationOptions.current.motionPaused||reducedMotion.matches||evidenceOpen||document.hidden;
+      // Keep the shared animation clock running for explicit scene reveals in
+      // both Story and Explore modes; this clock also drives the mine sequence
+      // and the recorded drillhole journey.
+      const paused=presentationOptions.current.motionPaused||reducedMotion.matches||document.hidden;
       displayReveal.update(paused?0:elapsed-lastMotionElapsed,reducedMotion.matches);
       renderer.localClippingEnabled=true;
       if(!paused)motionTime+=Math.min(.5,elapsed-lastMotionElapsed);
@@ -5255,6 +5306,34 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             window.dispatchEvent(new Event('tanga:manual-exploration'));
             cameraCommandHandlerRef.current?.({id: Date.now(), action: 'resetView'});
           }}>Reset view</button>
+          {mode === 'topography' && <button type="button" disabled={!sceneReady || !terrainProfile.length} aria-pressed={terrainProfileSweeping} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            if (terrainProfileSweeping) {
+              setTerrainProfileSweeping(false);
+              return;
+            }
+            terrainSweepProgressRef.current = 0;
+            setTerrainProfilePosition(0);
+            setMotionPaused(false);
+            setTerrainProfileSweeping(true);
+          }}>{terrainProfileSweeping ? 'Stop profile sweep' : 'Trace measured profile'}</button>}
+          {mode === 'drillholes' && <button type="button" disabled={!sceneReady || !journeyHole} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            setMotionPaused(false);
+            journeyCommand.current?.(journeyHole);
+          }}>Follow recorded hole</button>}
+          {mode === 'subsurface' && <button type="button" disabled={!sceneReady} aria-pressed={exploded} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            setMotionPaused(false);
+            setSectionEnabled(false);
+            setHostOnly(false);
+            setExploded(value => !value);
+          }}>{exploded ? 'Reassemble rock units' : 'Animate rock separation'}</button>}
+          {mode === 'resource' && <button type="button" disabled={!sceneReady} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            setMotionPaused(false);
+            revealCommand.current?.('resource');
+          }}>Replay block assembly</button>}
           <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
           {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-label={mode==='subsurface'?(inspectionOpen?'Close inspection tools':'Inspection tools'):undefined} title={mode==='subsurface'?'Geology inspection tools':'Inspection tools'} aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{mode==='subsurface'?(inspectionOpen?'Close tools':'Inspect'):(inspectionOpen ? 'Close inspection tools' : 'Inspection tools')}</button>}
         </div>
@@ -5326,7 +5405,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 <label className="tanga-three__terrain-profile-control">
                   <span>Profile cursor</span>
                   <strong>{selectedProfileElevation?.toFixed(0)} m</strong>
-                  <input aria-label="Terrain profile cursor" type="range" min="0" max="100" value={terrainProfilePosition} onChange={(event) => setTerrainProfilePosition(Number(event.target.value))} />
+                  <input aria-label="Terrain profile cursor" type="range" min="0" max="100" value={terrainProfilePosition} onChange={(event) => {setTerrainProfileSweeping(false);setTerrainProfilePosition(Number(event.target.value));}} />
                 </label>
                 <small className="tanga-three__terrain-provenance">Survey DTM covers 17% of this tile; the rest uses regional DEM. Cursor follows the surveyed profile. Vertical datum is unstated; the survey/context join is left unbridged.</small>
               </>
@@ -5346,7 +5425,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           {(['northPit','southPit','resetView'] as const).map((action,index)=><button key={action} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(index===2?3:2);setFocusedSource(null);cameraCommandHandlerRef.current?.({id:Date.now(),action});}}>{['North pit','South pit','Whole site'][index]}</button>)}
         </div>
         <div className="tanga-mine-story__steps" aria-label="Mine-site animation controls">
-          <button onClick={()=>{setFocusedSource(null);setMotionPaused(false);setStoryPlaying(true);setStoryReplay(v=>v+1);cameraCommandHandlerRef.current?.({id:Date.now(),action:'resetView'});}}>Play evidence → concept sequence</button>
+          <button onClick={()=>{window.dispatchEvent(new Event('tanga:manual-exploration'));setFocusedSource(null);setMotionPaused(false);setStoryPlaying(true);setStoryReplay(v=>v+1);cameraCommandHandlerRef.current?.({id:Date.now(),action:'resetView'});}}>Play evidence → concept sequence</button>
           <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
         </div>
         {miningBeat<3&&<>
