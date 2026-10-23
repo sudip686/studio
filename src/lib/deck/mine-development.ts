@@ -66,7 +66,7 @@ export function buildDevelopmentInfrastructure(feed: [number,number], discharge:
     p.y=i===0?start.y:i===count?end.y:padGround(p.x,p.z)+10;
     points.push(p);
     if(i%2===0){
-      const ground=height(p.x,p.z),h=p.y-ground;
+      const ground=padGround(p.x,p.z),h=Math.max(0,p.y-ground);
       for(const side of [-1,1])box(.8,h,.8,p.x+side*3,ground+h/2,p.z,steel,'Conveyor support · conceptual');
       box(7,.6,1,p.x,p.y-1,p.z,copper,'Conveyor cross beam');
     }
