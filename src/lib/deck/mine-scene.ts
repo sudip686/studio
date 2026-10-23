@@ -5,7 +5,10 @@ import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
 export function buildConcentrator() {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshLambertMaterial({color:0x858278}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d})};
+  // The pad is a neutral reference surface, not a mapped material. Keep its
+  // color steady as the camera moves; the buildings, equipment and terrain
+  // retain physically shaded materials for depth.
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d})};
   const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
@@ -204,7 +207,7 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
     }
   }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(earthworkColors,3));geometry.computeVertexNormals();
-  const earthworks=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,side:THREE.DoubleSide}));
+  const earthworks=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xffffff,vertexColors:true,side:THREE.DoubleSide}));
   earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
   root.position.set(x,level,z);return level;
 }
@@ -366,5 +369,9 @@ export function buildConceptualPitRamp(pit:CandidatePit) {
   const ramp=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,metalness:0,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2}));
   ramp.name='Illustrative internal pit access ramp · not engineered';
   ramp.renderOrder=41;ramp.castShadow=true;ramp.receiveShadow=true;
+  // Keep the authored centreline with the display mesh so a single vehicle
+  // cue can follow this same conceptual alignment without implying a road to
+  // the receiving apron.
+  ramp.userData.displayPath=path.map(point=>point.clone());
   return ramp;
 }

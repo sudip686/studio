@@ -1114,7 +1114,7 @@ function buildMiniPlant(options: {
     emissive: new THREE.Color(accent),
     emissiveIntensity: 0.22,
   });
-  const padMaterial = new THREE.MeshLambertMaterial({
+  const padMaterial = new THREE.MeshBasicMaterial({
     color: 0x4a4238,
   });
 
@@ -2346,11 +2346,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const pitSurfaces:THREE.Mesh[]=[];
     const pitRamps:THREE.Mesh[]=[];
     const revealBlocks:THREE.InstancedMesh[]=[];
-    const geologyMeshes:THREE.Mesh<THREE.BufferGeometry,THREE.MeshLambertMaterial>[]=[];
+    const geologyMeshes:THREE.Mesh<THREE.BufferGeometry,THREE.MeshBasicMaterial>[]=[];
     let separation=0;
     const sectionPlane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
     const sectionPlanes=[sectionPlane];
-    const haulTrucks:{mesh:THREE.Group;points:THREE.Vector3[];length:number;offset:number}[]=[];
+    const haulTrucks:{mesh:THREE.Group;points:THREE.Vector3[];length:number;offset:number;legDuration:number}[]=[];
     const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
     let motionTime=0,lastMotionElapsed=0;
     const evidenceGroup=new THREE.Group();evidenceGroup.name='Selected source drill traces';
@@ -3438,10 +3438,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           geometry.computeVertexNormals(); geometry.computeBoundingSphere(); geometry.computeBoundingBox();
           const isHost = object.name.includes('GRSC');
           const unit=modelRockUnit(object.name);
-          // Interpreted unit colors are shared with the geological legend;
-          // use diffuse shading so their appearance does not pulse with view.
-          const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({
-            color:unit.color, emissive:unit.color, emissiveIntensity:.08,
+          // These colors carry the legend meaning. Keep them independent of
+          // orbit angle; the surrounding terrain and geometry still provide
+          // depth cues without shifting the mapped category hue.
+          const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+            color:unit.color,
             transparent:true, opacity:1, depthWrite:true, side:THREE.DoubleSide,
             forceSinglePass:true, toneMapped:true,
           }));
@@ -3650,12 +3651,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       });
       Array.from(lithologyGroups.entries()).forEach(([lithology, segments]) => {
         const baseColor = new THREE.Color(lithology==='UNKNOWN'?'#9da9ae':modelRockUnit(lithology).color);
-        // Lithology colors are categorical evidence. Keep the legend color
-        // stable while orbiting; specular highlights made units pulse.
-        const material = new THREE.MeshLambertMaterial({
+        // Lithology colors are categorical evidence. Lighting-dependent
+        // shading made the same legend hue vary as users orbited the scene.
+        const material = new THREE.MeshBasicMaterial({
           color: baseColor,
-          emissive: baseColor.clone().multiplyScalar(0.22),
-          emissiveIntensity: lithology === 'GRSC' ? 0.34 : 0.16,
           transparent: true,
           opacity: lithology === 'GRSC' ? 0.3 : 0.2,
           depthWrite: false,
@@ -3690,10 +3689,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           tubeGeometry,
           // Grade is encoded by color, so keep assay colors stable as the
           // viewer orbits around the drill traces.
-          new THREE.MeshLambertMaterial({
+          new THREE.MeshBasicMaterial({
             color,
-            emissive: color,
-            emissiveIntensity: bin.key === 'very-high' ? 0.64 : 0.42,
             transparent: true,
             opacity: mode === 'resource' ? 0.62 : 0.9,
             depthWrite: false,
@@ -3921,13 +3918,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (!gradeBlocks.length || mode === 'mine_planning') return;
 
           const blockColor = new THREE.Color(bin.color);
-          // Grade is evidence, so keep the legend colour stable as the camera
-          // moves. StandardMaterial's view-dependent specular/environment
-          // response made category colours pulse across different angles.
-          const blockMaterial = new THREE.MeshLambertMaterial({
+          // Grade is evidence, so keep its legend color fixed while orbiting.
+          const blockMaterial = new THREE.MeshBasicMaterial({
             color: blockColor,
-            emissive: blockColor.clone().multiplyScalar(0.2),
-            emissiveIntensity: bin.key === 'very-high' ? 0.36 : 0.18,
             transparent: true,
             opacity: bin.key === 'trace' ? 0.42 : focusOpacity,
             depthWrite: true,
@@ -4056,7 +4049,23 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             tagDeckLayer(ramp,'context');
             stage.add(ramp);
             pitRamps.push(ramp);
+            const rampPath=ramp.userData.displayPath as THREE.Vector3[]|undefined;
+            if(!haulTrucks.length&&rampPath&&rampPath.length>1){
+              const points=rampPath.slice().reverse();
+              const truck=buildHaulTruck();
+              truck.name='Illustrative truck · conceptual internal pit ramp only';
+              truck.scale.setScalar(1.25);
+              truck.position.copy(points[0]);
+              truck.traverse(object=>{if(object instanceof THREE.Mesh)object.castShadow=true;});
+              let length=0;for(let i=1;i<points.length;i++)length+=points[i].distanceTo(points[i-1]);
+              stage.add(truck);
+              haulTrucks.push({mesh:truck,points,length,offset:0,legDuration:Math.max(18,length/7)});
+            }
           }
+          setHaulCount(haulTrucks.length);
+          setHaulStatus('ready');
+          host.dataset.haulTrucks=String(haulTrucks.length);
+          host.dataset.haulRoutes=JSON.stringify([{kind:'display-only internal pit-ramp cue',connectsToFeed:false,engineeringStatus:'conceptual, not an engineered route or speed'}]);
           if (sitePlan.plant) {
             const plant = buildConcentrator();
             const [x, z] = sitePlan.plant;
@@ -4109,10 +4118,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
             processMarker=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshBasicMaterial({color:0xffb760}));plant.add(processMarker);
             // PaulSam separates mine-to-feed haulage from the downhill conveyor.
-            // Do not invent a pit-to-lowland haul road through the licence edge.
-            setHaulCount(0);setHaulStatus('ready');
-            host.dataset.haulTrucks='0';
-            host.dataset.haulRoutes=JSON.stringify([{admitted:false,reason:'No surveyed mine-to-feed haul road supplied; indicative conveyor shown separately'}]);
+            // Keep the animated vehicle on the conceptual internal pit ramp;
+            // no unreported pit-to-feed road is drawn or implied.
             // Ground-level receiving apron: internal pit ramps and pad access remain unengineered.
           }
           const pit = sitePlan.pits[0];
@@ -4667,15 +4674,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if(siteCampus)siteCampus.visible=beat>=3&&layerSettingsRef.current.context.visible;
       }
       for(const item of haulTrucks){
-        item.mesh.visible=beat>=3&&layerSettingsRef.current.context.visible;
-        const phase=(motionTime*9/item.length+item.offset)%2,returning=phase>1;
+        item.mesh.visible=beat===2&&layerSettingsRef.current.context.visible;
+        const phase=(motionTime/item.legDuration+item.offset)%2,returning=phase>1;
         const at=routePosition(item.points,(returning?2-phase:phase)*item.length);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
-      // Keep the grade-target patches in the two beats that explain them.
-      // Leaving them over the processing/site overview made the default mine
-      // scene read as bright speckled terrain and competed with the facilities.
-      targetMeshes.forEach(mesh=>{mesh.visible=beat>=1&&beat<=2&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=(beat===2?.68:.9)*layerSettingsRef.current.blocks.opacity;});
+      host.dataset.truckVisible=String(Boolean(haulTrucks[0]?.mesh.visible));
+      // Grade targets get their own beat. Clear them as the pit is revealed so
+      // conceptual benches and the internal haul-truck cue have a clean view.
+      targetMeshes.forEach(mesh=>{mesh.visible=beat===1&&layerSettingsRef.current.blocks.visible;mesh.material.depthTest=!presentationOptions.current.targetXray;mesh.material.opacity=.9*layerSettingsRef.current.blocks.opacity;});
+      host.dataset.mineTargetBlocksVisible=String(targetMeshes.some(mesh=>mesh.visible));
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;m.transparent=true;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5);m.opacity=(presentationOptions.current.targetXray ? .45 : 1)*reveal*layerSettingsRef.current.context.opacity;m.depthWrite=!presentationOptions.current.targetXray;});
       pitRamps.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.MeshStandardMaterial;const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=(presentationOptions.current.targetXray?.82:1)*reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
       if (processPlant && processMarker) {
@@ -4830,7 +4838,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // A selected surface map unit must not imply a volumetric correlation.
         // Only the independent model spotlight can emphasize a depth body until
         // a source-verified surface-to-depth crosswalk is available.
-        for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=Boolean(selected)&&selected===mesh.name;const hasSelection=Boolean(selected);mesh.material.emissive.copy(mesh.material.color);mesh.material.emissiveIntensity=active?.25:.08;mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(hasSelection&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
+        for(const mesh of geologyMeshes){mesh.visible=geologyDepthBlend>.005&&layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));const selected=spotlightRef.current;const active=Boolean(selected)&&selected===mesh.name;const hasSelection=Boolean(selected);mesh.material.opacity=geologyDepthBlend*(mesh.name.includes('SOIL')?.1:1)*layerSettingsRef.current.blocks.opacity*(hasSelection&&!active?.12:1);mesh.material.depthWrite=mesh.material.opacity>.98;}
       }
 
       if (recoverPlanFog && !geologyPlan) {
@@ -5326,7 +5334,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
-        <small>{haulStatus==='loading'?'Screening truck routes in background — pits and plant are ready':haulCount ? `${haulCount} illustrative trucks · pit rim → receiving apron` : 'No surveyed pit-to-feed haul road supplied; only the report-traced conveyor transfer is shown.'}<br/>Conveyor motion is a visual cue, not a throughput or operating schedule. Internal pit ramps and plant-pad access remain undesigned.</small>
+        <small>{haulStatus==='loading'?'Preparing a display-only pit-ramp vehicle cue':haulCount ? `${haulCount} illustrative truck on a conceptual internal pit ramp; no pit-to-feed road or operating speed is shown.` : 'No conceptual pit-ramp vehicle route is available; no pit-to-feed haul road was supplied.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is not throughput or an operating schedule.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
