@@ -2576,6 +2576,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       };
     };
 
+    const leaveMinePlanView = () => {
+      if (mode !== 'mine_planning' || !sitePlanView) return;
+      sitePlanView = false;
+      camera.up.set(0, 1, 0);
+      controls.enableRotate = true;
+      controls.minPolarAngle = 0;
+      controls.maxPolarAngle = Math.PI - 0.04;
+      controls.update();
+    };
+
     const consumeCameraCommand = (command: ThreeCameraCommand) => {
       if (['geologyPlan','geologyTilt','geologyDepth'].includes(command.action) && mode === 'subsurface' && !geologyModelReady) return;
       if(mode==='mine_planning'&&!mineCampusReady&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit'].includes(command.action))return;
@@ -2765,20 +2775,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
 
       if(command.action==='developmentOverview'){
+        leaveMinePlanView();
         facilityFocused=false;
         setStoryPlaying(false);setMiningBeat(3);calloutsForProjection=siteOverviewCallouts;
-        scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);return;
+        scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);
+        setStatus('Development overview · pits, feed route and lowland campus');return;
       }
       if(command.action==='feedPoint'&&feedAnchor){
+        leaveMinePlanView();
         facilityFocused=true;
         setStoryPlaying(false);setMiningBeat(3);
         const centre=stage.localToWorld(feedAnchor.clone());
         scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,1.5,42);
-        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed');return;
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed');
+        setStatus('Uphill feed station · conceptual route into processing');return;
       }
       if(command.action==='tailingsView'||command.action==='wasteView'||command.action==='campusView'){
         const selected=campusFacilities.filter(f=>command.action==='wasteView'?f.id==='waste':command.action==='tailingsView'?f.id==='tailings':f.id!=='waste');
         if(!selected.length){setStatus('Facility withheld: no illustrative footprint passed the display checks');return;}
+        leaveMinePlanView();
         facilityFocused=true;setStoryPlaying(false);setMiningBeat(3);
         const bounds=new THREE.Box3();for(const f of selected)for(const [x,z] of f.footprint)bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,f.level+8,z)));
         if(command.action==='campusView'&&processPlant)bounds.expandByObject(processPlant);
@@ -2789,16 +2804,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         offset.multiplyScalar(Math.max(1,.65/camera.aspect));
         scheduleCameraTween(centre.clone().add(offset),centre,1.8,42);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id.startsWith('facility-')&&(command.action==='wasteView'?item.id==='facility-waste':command.action==='tailingsView'?item.id==='facility-tailings':item.id!=='facility-waste')||(command.action==='campusView'&&item.id==='development-plant'));
+        setStatus(command.action==='tailingsView'?'Tailings and water concept detail':command.action==='wasteView'?'Waste-rock landform concept detail':'Lowland campus concept detail');
         return;
       }
       if(command.action==='siteServices'&&processPlant){
+        leaveMinePlanView();
         facilityFocused=true;
         setStoryPlaying(false);setMiningBeat(3);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(processPlant.userData.siteServices as [number,number,number])));
         scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,1.5,42);
-        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant');return;
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant');
+        setStatus('Site services · workshop, laboratory and water provision');return;
       }
       if(command.action==='plantDetail'&&processPlant){
+        leaveMinePlanView();
         facilityFocused=true;
         setStoryPlaying(false); setMiningBeat(3);
         const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
@@ -2807,9 +2826,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         for(const callout of calloutsForProjection){calloutAnchors.set(callout.id,new THREE.Vector3(...callout.anchor));calloutObjects.set(callout.id,processPlant);}
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
         const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
-        scheduleCameraTween(position,centre,1.3,42);return;
+        scheduleCameraTween(position,centre,1.3,42);
+        setStatus(selected?`${selected.label} · conceptual process area`:'Processing plant · conceptual facility detail');return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
+        leaveMinePlanView();
         facilityFocused=false;
         setStoryPlaying(false); setMiningBeat(2);
         calloutsForProjection = siteOverviewCallouts;
