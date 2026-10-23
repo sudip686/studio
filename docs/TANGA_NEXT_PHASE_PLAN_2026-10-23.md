@@ -209,6 +209,60 @@ This package comes from a UI/UX review for desktop investors and senior manageme
 
 Acceptance: a presenter can identify geology, testwork and site-planning purpose within five seconds; geology and metallurgy read as completely redesigned desktop experiences; mine planning starts from a correctly oriented, legible overview and can be reset after exploration; figures and claims remain traceable; proposed site components remain visibly conceptual; no art-direction change alters coordinates or source values.
 
+## Revised desktop direction — connected 3D plant, geology layers and realistic mine site
+
+User revision, 23 October 2026. This section supersedes the visual-lead and entry-camera requirements in H1–H3 above. Earlier checked items record delivered work, not acceptance of this new direction. Desktop is the priority; phone/tablet stays deferred. The existing goal references this document, so this checklist is part of its scope.
+
+### R1 · Metallurgy — one connected processing plant
+
+Design intent: open on an architectural oblique view of a coherent industrial plant. The presenter can understand the complete process, select a building or section, open its roof and see the machinery explaining that operation. The results board becomes supporting evidence accessible from the selected section.
+
+- [ ] Reconcile the PaulSam process description, layouts and equipment with metallurgical testwork before choosing stages. Record a source-to-section mapping; distinguish proposed industrial equipment from laboratory results. Do not imply a commissioned plant or validated operating performance.
+- [ ] Design a single connected campus with correctly scaled buildings, structural bays, platforms, service access, conveyors and pipe routes. Use a shared plant model in metallurgy and mine planning, with different camera/detail levels.
+- [ ] Use report-supported sections for the flow (candidate sequence: feed/crushing → milling/classification → flotation → concentrate dewatering/drying → product handling). Confirm every included operation from the reports; show water/tailings connections where supported.
+- [ ] Build independent selectable roof sections. Selection eases the camera toward one section, lifts/fades its roof and reveals its equipment; closing restores the roof. Whole-plant reset restores all roofs and the overview. Preserve manual orbit and cancel camera travel on input.
+- [ ] Add restrained explanatory motion only where appropriate: conveyor feed, a rotating mill shell, flotation air/material flow and transfer through pipes. Keep direction and stage connection legible; do not animate machinery in ways inconsistent with its function.
+- [ ] Provide Overview, process-stage navigation, Open/Close roof, Play/Pause and Reset controls. Only the selected section needs detailed continuous animation. Support reduced motion and static cutaway equivalents.
+- [ ] Give the selected operation one compact explanation, input/output labels and evidence access. Keep all eight sample results, TDM004/TDM008 notes and source locators accessible without covering the factory.
+- [ ] Verify the whole plant reads as one facility, roofs reveal the correct equipment, transitions are interruptible and the scene is understandable with animation paused at both desktop sizes.
+
+### R2 · Geology — separate vector layers on a 3D map
+
+Design intent: satellite terrain is the main canvas. Separate geological units appear in their correct locations as colored vector shapes; the camera then tilts to reveal relief and, separately, the interpreted model at depth.
+
+- [x] Inventory actual shapefiles/GeoJSON, lithology attributes, CRS and source provenance. Prefer original vectors; clearly identify digitized report polygons where those are the available source. Verify registration against the report and terrain before visual styling.
+- [x] Render each geological unit as independently selectable terrain-draped geometry, without the rectangular report-image background. Preserve report unit colors consistently across polygons, legend and matched model units.
+- [x] Provide per-unit visibility, surface-layer opacity, terrain opacity and a compact unit key. Prevent z-fighting with a small documented rendering offset; never move source coordinates for composition.
+- [ ] Animate the sequence whole terrain → progressively revealed mapped units → oblique relief → interpreted depth. Use fades/reveals at actual positions; never fly polygons from arbitrary locations or extrude surface shapes into invented geology.
+- [ ] Keep interpreted depth bodies distinct from mapped surface evidence. Highlight a corresponding depth unit only with a verified crosswalk; show unmatched units explicitly.
+- [ ] Keep compass, scale, reset and one selected-unit/source inspector consistent. Include grab-sample markers only where verified coordinates and identifiers exist.
+- [ ] Verify layer alignment and picking at several zooms and camera angles, stable colors, terrain occlusion, direct entry and readability with the depth interpretation hidden.
+
+R2 source and implementation record: the report folders and project files contain no original geological polygon shapefile. The current seven-unit vector file, `public/generated/geology-surface-polygons.json`, is derived from the project map image by colour segmentation and three printed UTM grid ties. Its metadata declares EPSG:32737 while explicitly recording approximate registration, unverified map date/datum and that the polygons are not surveyed contacts. The vector meshes are individually named and terrain-draped with a 2.5 m display lift and polygon offset. This pass adds independent visibility controls for all seven units, preserves selection/highlight and layer opacity, clears selection when its unit is hidden, and persists hidden-unit choices in version 1 geology links. Local 1366×768 browser verification confirmed the control state survives reload; `.playwright-mcp/geology-layer-controls-desktop.png` shows the result. Original shapefile acquisition and independent registration verification remain open evidence gates.
+
+### R3 · Mine planning — realistic terrain and industrial scale
+
+Design intent: retain the earlier natural world/terrain character the user preferred, then improve the pit and plant within it. Start from an attractive oblique whole-site view; keep North-up plan available as a secondary orientation preset.
+
+- [ ] Compare earlier committed screenshots/scene settings to identify the preferred natural world view and recover its framing/material character without restoring known coordinate or camera defects. Record the selected visual baseline before implementation.
+- [ ] Ground all site objects in the terrain using the established spatial transform. Keep report candidate locations, approximate registration and illustrative additions distinguishable.
+- [ ] Improve pit benches, ramps, wall shading, ground disturbance and stockpile forms at credible relative scale. Keep geometry visibly conceptual wherever an engineered design is absent.
+- [ ] Reuse the plant from R1 with realistic building proportions, foundations, roof thickness, steelwork and equipment. Add contact shadows, restrained material roughness and natural daylight; avoid saturated toy-like blocks or oversized props.
+- [ ] Improve access roads, yard surfaces, drains and report-supported water/waste facilities. Show credible embankments and water surfaces for conceptual ponds; do not imply approved tailings engineering.
+- [ ] Add sparse, purposeful animation: one haulage movement along a credible ramp/road to feed handling and a connected conveyor transfer. No random traffic, flying vehicles or decorative motion. Pause and reduced-motion modes remain useful.
+- [ ] Frame pit, feed route and plant together before offering details. Use compact anchored labels, full names in the inspector and collision/occlusion handling that works while orbiting.
+- [ ] Verify realistic relative scale, terrain contact, whole-site fit, north-up/oblique/reset behavior and visible concept/source qualifications at both desktop sizes.
+
+### R4 · Delivery sequence and desktop acceptance
+
+- [ ] First document report evidence, preferred earlier world view and shared plant component specification; prepare one representative camera composition for each chapter.
+- [ ] Implement the geology vector layers and shared plant exterior; then add metallurgy cutaways and machinery; then integrate mine-site detail and purposeful motion.
+- [ ] Lazy-load detailed interiors, reuse geometry/materials and dispose scene resources. Measure interaction and load performance with the existing plan targets; never block navigation on an animation.
+- [ ] Capture each chapter at 1366×768 and 1707×842 in overview and selected detail, with labels/controls clear of the canvas focal area. Verify keyboard selection, pause, reset and reduced motion.
+- [ ] Run typecheck, production and Cloudflare builds; check chapter entry, recovery and shared model behavior. Push completed slices on the existing branch and retain screenshot evidence in the checklist.
+
+Acceptance: metallurgy explains the process through one believable plant with opening sections; geology shows independently controlled, correctly registered vector units on real 3D terrain; mine planning reads as a realistic proposed site in its natural landscape. Every animation explains an operation or transition. Source data and interpretation limits remain available. These are planned changes, not implemented results.
+
 ## Implementation order and release gates
 
 1. **Foundation:** A plus the UI inventory in B. Establish a real baseline and fix reproduced geometry/navigation failures first.

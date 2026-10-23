@@ -2112,7 +2112,7 @@ function readHashScene(): string | null {
   const h = window.location.hash.replace(/^#/, '');
   return h || null;
 }
-function writeHashScene(mode: string, viewId?: string, peerKey?: string, featureId?: string, layers?: DeckLayerSettings) {
+function writeHashScene(mode: string, viewId?: string, peerKey?: string, featureId?: string, layers?: DeckLayerSettings, hiddenUnits?: string[]) {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   url.hash = mode;
@@ -2124,7 +2124,10 @@ function writeHashScene(mode: string, viewId?: string, peerKey?: string, feature
   else url.searchParams.delete('feature');
   if (layers) url.searchParams.set('layers', encodeLayerSettings(layers));
   else url.searchParams.delete('layers');
-  if (viewId || peerKey || featureId || layers) url.searchParams.set('v','1');
+  const units=hiddenUnits?.length?hiddenUnits.join('|'):undefined;
+  if (units) url.searchParams.set('units',units);
+  else url.searchParams.delete('units');
+  if (viewId || peerKey || featureId || layers || units) url.searchParams.set('v','1');
   else url.searchParams.delete('v');
   const next = `${url.pathname}${url.search}${url.hash}`;
   if (`${window.location.pathname}${window.location.search}${window.location.hash}` === next) return;
@@ -2190,6 +2193,7 @@ export default function TangaDeckWorkbench() {
   const restoredLayerSettingsRef = useRef<WorkbenchMode|null>(null);
   const [geologySectionShown, setGeologySectionShown] = useState(false);
   const [selectedGeologyUnit, setSelectedGeologyUnit] = useState<GeologyUnitSelection|null>(null);
+  const [hiddenGeologyUnits,setHiddenGeologyUnits]=useState<string[]>([]);
   const [availableMineFacilities,setAvailableMineFacilities]=useState<string[]>([]);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState('drilling');
   const [routeTarget, setRouteTarget] = useState<RouteTarget>('port');
@@ -4767,7 +4771,10 @@ export default function TangaDeckWorkbench() {
       if (supportsVersionOneState && targetMode === 'subsurface') {
         const featureId = params.get('feature');
         const unit = MAPPED_ROCK_UNITS.find((candidate) => candidate.label === featureId);
-        if (unit) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
+        const hiddenUnits=(params.get('units')??'').split('|').filter(label=>MAPPED_ROCK_UNITS.some(candidate=>candidate.label===label));
+        if (unit&&!hiddenUnits.includes(unit.label)) setSelectedGeologyUnit({title:unit.label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:unit.color});
+        else if(unit)setSelectedGeologyUnit(null);
+        setHiddenGeologyUnits(hiddenUnits);
       }
       if (supportsVersionOneState) {
         const sharedLayers = decodeLayerSettings(params.get('layers'), targetMode !== 'mine_planning' && targetMode !== 'metallurgy');
@@ -4817,7 +4824,7 @@ export default function TangaDeckWorkbench() {
   const activeShareViewId = activeShots[activeShotIndex]?.id;
   const activeSharedFeature = activeMode === 'subsurface' ? selectedGeologyUnit?.title : undefined;
   const sharedLayers = layerSettingsAreModified(layerSettings, activeMode !== 'mine_planning' && activeMode !== 'metallurgy') ? layerSettings : undefined;
-  useEffect(() => { writeHashScene(activeMode, activeShotIndex > 0 ? activeShareViewId : undefined, activeMode === 'ranking' ? selectedPeerKey : undefined, activeSharedFeature, sharedLayers); }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, activeSharedFeature, sharedLayers]);
+  useEffect(() => { writeHashScene(activeMode, activeShotIndex > 0 ? activeShareViewId : undefined, activeMode === 'ranking' ? selectedPeerKey : undefined, activeSharedFeature, sharedLayers, activeMode==='subsurface'?hiddenGeologyUnits:undefined); }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, activeSharedFeature, sharedLayers, hiddenGeologyUnits]);
   const copyCurrentView = useCallback(async () => {
     const url = new URL(window.location.href);
     url.hash = activeMode;
@@ -4829,7 +4836,9 @@ export default function TangaDeckWorkbench() {
     else url.searchParams.delete('feature');
     if (sharedLayers) url.searchParams.set('layers', encodeLayerSettings(sharedLayers));
     else url.searchParams.delete('layers');
-    if (url.searchParams.has('view') || url.searchParams.has('peer') || url.searchParams.has('feature') || url.searchParams.has('layers')) url.searchParams.set('v','1');
+    if (activeMode==='subsurface'&&hiddenGeologyUnits.length) url.searchParams.set('units',hiddenGeologyUnits.join('|'));
+    else url.searchParams.delete('units');
+    if (url.searchParams.has('view') || url.searchParams.has('peer') || url.searchParams.has('feature') || url.searchParams.has('layers') || url.searchParams.has('units')) url.searchParams.set('v','1');
     else url.searchParams.delete('v');
     try {
       await navigator.clipboard.writeText(url.toString());
@@ -4838,7 +4847,13 @@ export default function TangaDeckWorkbench() {
       setShareStatus('Copy unavailable. Copy the address bar link.');
     }
     window.setTimeout(() => setShareStatus(''), 3200);
-  }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, selectedGeologyUnit, sharedLayers]);
+  }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, selectedGeologyUnit, sharedLayers, hiddenGeologyUnits]);
+
+  const toggleMappedGeologyUnit=useCallback((label:string)=>{
+    const hiding=!hiddenGeologyUnits.includes(label);
+    setHiddenGeologyUnits(current=>current.includes(label)?current.filter(unit=>unit!==label):[...current,label]);
+    if(hiding&&selectedGeologyUnit?.title===label)setSelectedGeologyUnit(null);
+  },[hiddenGeologyUnits,selectedGeologyUnit]);
 
   const toggleGeologySection = useCallback(() => {
     const action: ThreeCameraAction = geologySectionShown ? 'restoreSection' : 'revealSection';
@@ -5414,6 +5429,7 @@ export default function TangaDeckWorkbench() {
           onLoadState={handleThreeLoadState}
           onRetry={() => { setThreeCameraCommand(null); setThreeLoadReport(DEFAULT_THREE_LOAD_REPORT); setThreeSceneRevision((revision) => revision + 1); }}
           selectedGeologyUnit={selectedGeologyUnit?.title}
+          hiddenGeologyUnits={hiddenGeologyUnits}
           onSelectGeologyUnit={setSelectedGeologyUnit}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
@@ -6455,7 +6471,7 @@ export default function TangaDeckWorkbench() {
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
-      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 4 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
+      {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 4 && <TangaGeologyMapStage step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
       {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 4) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory}/>}
 
       {activeMode === 'accessibility' && (

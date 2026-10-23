@@ -260,6 +260,7 @@ type TangaThreeGeologySceneProps = {
   onInspectEvidence?: () => void;
   onRetry?: () => void;
   selectedGeologyUnit?: string | null;
+  hiddenGeologyUnits?: string[];
   onSelectGeologyUnit?: (unit: DrillPickInfo) => void;
   onSiteFacilities?: (ids:string[])=>void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
@@ -2012,6 +2013,7 @@ export default function TangaThreeGeologyScene({
   onInspectEvidence,
   onRetry,
   selectedGeologyUnit = null,
+  hiddenGeologyUnits = [],
   onSelectGeologyUnit,
   onSiteFacilities,
   onAssayFacts,
@@ -2031,6 +2033,8 @@ export default function TangaThreeGeologyScene({
   const cameraCommandHandlerRef = useRef<((command: ThreeCameraCommand) => void) | null>(null);
   const selectedGeologyUnitRef = useRef(selectedGeologyUnit);
   selectedGeologyUnitRef.current = selectedGeologyUnit;
+  const hiddenGeologyUnitsRef=useRef(hiddenGeologyUnits);
+  hiddenGeologyUnitsRef.current=hiddenGeologyUnits;
   const onSelectGeologyUnitRef = useRef(onSelectGeologyUnit);
   onSelectGeologyUnitRef.current = onSelectGeologyUnit;
   const consumedCameraCommandIdRef = useRef(0);
@@ -4633,7 +4637,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const goal=(geologyPlan||geologyOblique)?(surfaceOpacityRef.current??GEOLOGY_SURFACE_DEFAULT_OPACITY):0;
         geologySurfaceOpacity=reducedMotion.matches?goal:THREE.MathUtils.lerp(geologySurfaceOpacity,goal,geologyBlendAlpha);
         geologySurface.visible=geologySurfaceOpacity>.005&&layerSettingsRef.current.geology.visible;
-        geologySurface.traverse(object=>{if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*(selectedGeologyUnitRef.current&&object.name!==selectedGeologyUnitRef.current ? .28 : 1);});
+        const hiddenUnits=new Set(hiddenGeologyUnitsRef.current);
+        geologySurface.children.forEach(object=>{
+          const unitName=object.name.replace(/ · mapped boundary$/,'');
+          const visible=!hiddenUnits.has(unitName);
+          object.visible=visible;
+          const selectionOpacity=selectedGeologyUnitRef.current&&unitName!==selectedGeologyUnitRef.current ? .28 : 1;
+          if(object instanceof THREE.Mesh)object.material.opacity=geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity;
+          else if(object instanceof THREE.LineSegments&&object.material instanceof THREE.LineBasicMaterial)object.material.opacity=.34*geologySurfaceOpacity*layerSettingsRef.current.geology.opacity*selectionOpacity;
+        });
       }
       const mappedSurface = geologyPlan || geologyOblique;
       geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);

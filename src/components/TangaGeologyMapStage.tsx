@@ -1,13 +1,13 @@
 'use client';
 
 import {useEffect, useRef, useState} from 'react';
-import {ArrowRight, ExternalLink, Minus, Plus} from 'lucide-react';
+import {ArrowRight, ExternalLink, Eye, EyeOff, Minus, Plus} from 'lucide-react';
 import {MAPPED_ROCK_UNITS,MODEL_ROCK_UNITS} from '@/lib/deck/geology-palette';
 
 export type GeologyUnitSelection = {title:string;rows:string[];tone:string};
 
 /** Original map documents remain separate from the registered, interpreted model. */
-export default function TangaGeologyMapStage({step, ready, onAdvance, onStage, selectedUnit, onSelectUnit}: {step: number; ready: boolean; onAdvance: () => void; onStage: (step:number)=>void; selectedUnit:GeologyUnitSelection|null; onSelectUnit:(unit:GeologyUnitSelection|null)=>void}) {
+export default function TangaGeologyMapStage({step, ready, onAdvance, onStage, selectedUnit, onSelectUnit, hiddenUnits, onToggleUnit}: {step: number; ready: boolean; onAdvance: () => void; onStage: (step:number)=>void; selectedUnit:GeologyUnitSelection|null; onSelectUnit:(unit:GeologyUnitSelection|null)=>void; hiddenUnits:string[]; onToggleUnit:(unit:string)=>void}) {
   const [regional, setRegional] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [legendOpen,setLegendOpen]=useState(false);
@@ -45,7 +45,10 @@ export default function TangaGeologyMapStage({step, ready, onAdvance, onStage, s
       <button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>{step===3?'Model':'Map'} legend · 7 units {legendOpen?'−':'+'}</button>
       <div>{(step===3?MODEL_ROCK_UNITS:MAPPED_ROCK_UNITS).map(({color,label})=>step===3
         ? <span key={label}><i style={{background:color}}/>{label}</span>
-        : <button key={label} type="button" aria-pressed={selectedUnit?.title===label} onClick={()=>onSelectUnit(selectedUnit?.title===label?null:{title:label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:color})}><i style={{background:color}}/>{label}</button>)}</div>
+        : <div className="tanga-geology-surface-legend__row" key={label}>
+          <button className="tanga-geology-surface-legend__unit" type="button" aria-pressed={selectedUnit?.title===label} onClick={()=>{if(selectedUnit?.title===label){onSelectUnit(null);return;}if(hiddenUnits.includes(label))onToggleUnit(label);onSelectUnit({title:label,rows:['Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:color});}}><i style={{background:color}}/>{label}</button>
+          <button className="tanga-geology-surface-legend__visibility" type="button" aria-label={`${hiddenUnits.includes(label)?'Show':'Hide'} ${label}`} aria-pressed={!hiddenUnits.includes(label)} onClick={()=>onToggleUnit(label)} title={`${hiddenUnits.includes(label)?'Show':'Hide'} this mapped unit`}>{hiddenUnits.includes(label)?<EyeOff size={14}/>:<Eye size={14}/>}</button>
+        </div>)}</div>
       {step===3&&<p>Map colours match only where unit names resolve.</p>}
     </div>}
     <aside ref={storyPanel} className="tanga-story-panel tanga-story-panel--map" aria-label="Geology map to model story">

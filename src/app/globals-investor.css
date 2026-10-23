@@ -1462,3 +1462,11 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck--present .tanga-story-panel--map{right:16px;width:310px}
   .tanga-geology-surface-legend{left:14px;bottom:135px;width:200px}
 }
+.tanga-geology-surface-legend__row{display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;gap:4px;min-width:0}
+.tanga-geology-surface-legend__unit{display:flex;align-items:center;gap:8px;min-width:0;padding:3px 4px;border:1px solid transparent;border-radius:3px;background:transparent;color:#34443e;text-align:left;font:inherit;cursor:pointer}
+.tanga-geology-surface-legend__unit i{flex:0 0 12px}
+.tanga-geology-surface-legend__unit:hover,.tanga-geology-surface-legend__unit[aria-pressed=true]{background:#6d83731c;border-color:#6d837344}
+.tanga-geology-surface-legend__unit:focus-visible,.tanga-geology-surface-legend__visibility:focus-visible{outline:2px solid #597667;outline-offset:2px}
+.tanga-geology-surface-legend__visibility{display:grid;place-items:center;width:26px;height:24px;padding:0;border:1px solid #cbd0c5;border-radius:3px;background:#f8f7f1;color:#50675a;cursor:pointer}
+.tanga-geology-surface-legend__visibility[aria-pressed=false]{color:#858b82;background:#e4e4dc}
+.tanga-geology-surface-legend__visibility:hover{border-color:#718a72;background:#e5eadf}
