@@ -281,7 +281,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type ThreeCameraCommand = {
   id: number;
-  action: 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+  action: 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'revealPitBlocks' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
   stage?: string;
 };
@@ -2987,6 +2987,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
         scheduleCameraTween(position,centre,1.3,42);
         setStatus(selected?`${selected.label} · conceptual process area`:'Processing plant · conceptual facility detail');return;
+      }
+      if(command.action==='revealPitBlocks'&&mode==='mine_planning'){
+        setStoryPlaying(false);
+        setMiningBeat(2);
+        setMotionPaused(false);
+        setTargetXray(true);
+        revealCommand.current?.('pitcut');
+        setStatus('Grade-selected resource blocks revealed inside the conceptual pit envelopes');
+        return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
         leaveMinePlanView();
