@@ -4448,7 +4448,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
               const plantBounds=new THREE.Box3().setFromObject(processPlant);
               const plantTop=stage.worldToLocal(new THREE.Vector3((plantBounds.min.x+plantBounds.max.x)/2,plantBounds.max.y+12,(plantBounds.min.z+plantBounds.max.z)/2));
-              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'PaulSam planning option 2 · illustrative facilities',x:28,y:30,tone:'#dca06b',anchor:plantTop.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
+              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'Option 2 · 250 × 250 m land allowance',x:28,y:30,tone:'#dca06b',anchor:plantTop.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
             }
             for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell · concept',water:'Settling / reclaim · concept','raw-water':'Raw-water pond · concept',waste:'Waste-rock benches · concept'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story',occlusion:'scene'});
             siteOverviewCallouts = calloutsForProjection;
