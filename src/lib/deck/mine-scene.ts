@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import {CONCEPT, inside, insetCrest, type CandidatePit, type Point2} from './site-planning';
-import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
+import {addPlantDetail, batchPlantMeshes, PLANT_PROCESS_STAGES} from './mine-plant-detail';
 
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
-export function buildConcentrator() {
+export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
+  root.userData.processStages=PLANT_PROCESS_STAGES;
+  root.userData.plantDetailLoaded=false;
   // The pad is a neutral reference surface, not a mapped material. Keep its
   // color steady as the camera moves; the buildings, equipment and terrain
   // retain physically shaded materials for depth.
@@ -211,7 +213,6 @@ export function buildConcentrator() {
   }
   root.userData.flow=flow;
   root.userData.labels=[['ROM / feed',-106,32,20],['Crushing & milling',-50,37,-20],['Flotation',40,30,-24],['Dewatering & product',95,35,45]];
-  addPlantDetail(root, materials);
   // Supporting facilities occupy the southern service yard, clear of the process.
   shed('Administration and laboratory',-20,194,75,44,18);
   shed('Heavy vehicle workshop and spares',-155,194,115,58,24);
@@ -232,6 +233,15 @@ export function buildConcentrator() {
   for(let i=0;i<7;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
   root.userData.siteServices=[-20,25,194];
   batchPlantMeshes(root);
+  root.userData.ensurePlantDetail=()=>{
+    if(root.userData.plantDetailLoaded)return false;
+    const firstDetailIndex=root.children.length;
+    addPlantDetail(root,materials);
+    batchPlantMeshes(root,firstDetailIndex);
+    root.userData.plantDetailLoaded=true;
+    return true;
+  };
+  if(!options.deferPlantDetail)(root.userData.ensurePlantDetail as ()=>boolean)();
   root.scale.set(CONCEPT.plantWidth/400,CONCEPT.plantWidth/400,CONCEPT.plantDepth/280);
   return root;
 }

@@ -3039,6 +3039,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStatus('Site services · workshop, laboratory and water provision');return;
       }
       if(command.action==='plantDetail'&&processPlant){
+        const ensurePlantDetail=processPlant.userData.ensurePlantDetail as (()=>boolean)|undefined;
+        const detailBuildStartedAt=performance.now();
+        const plantDetailBuilt=ensurePlantDetail?.()??false;
+        if(plantDetailBuilt){
+          const knownRoofs=new Set(plantRoofMeshes);
+          processPlant.traverse(object=>{
+            if(object instanceof THREE.Mesh&&object.userData.plantRoof&&!knownRoofs.has(object)){
+              object.userData.roofBaseY=object.position.y;
+              plantRoofMeshes.push(object);
+            }
+          });
+          let manifest:Record<string,unknown>={};
+          try{manifest=JSON.parse(host.dataset.plantDetail??'{}') as Record<string,unknown>;}catch{}
+          host.dataset.plantDetail=JSON.stringify({...manifest,detailLoaded:true,detailBuildMs:Math.round(performance.now()-detailBuildStartedAt),detailSourceMeshes:processPlant.userData.detailMeshCount,detailDrawMeshes:processPlant.userData.batchedMeshCount});
+        }
         leaveMinePlanView();
         facilityFocused=true;
         setStoryPlaying(false); setMiningBeat(3);
@@ -4364,7 +4379,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             haulRampPaths.push(rampPath&&rampPath.length>1?rampPath.slice().reverse():null);
           }
           if (sitePlan.plant) {
-            const plant = buildConcentrator();
+            const plant = buildConcentrator({deferPlantDetail:true});
             const [x, z] = sitePlan.plant;
             const level=placeConcentrator(plant,x,z,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz),{width:250,depth:250});
             for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,plant.userData.conceptPad as ConceptPad);
@@ -4447,7 +4462,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             host.dataset.developmentReference=JSON.stringify({site:2,mappedFeedUtm:DEVELOPMENT_SITE.feedUtm,proposedFeedUtm:[Math.round(feed[0]+PROJECT_UTM_CENTER.easting),Math.round(PROJECT_UTM_CENTER.northing-feed[1])],feedOffsetM:Math.round(apron.offsetM),plantUtm:DEVELOPMENT_SITE.dischargeUtm,registration:'Approximate map tracing; feed apron offset clear of concept pits · EPSG:32737',reportedLengthM:2150,source:DEVELOPMENT_SOURCE});
             sitePlan.audit.push(`Proposed feed apron shifted ${Math.round(apron.offsetM)} m from the old map marker to clear current conceptual pits; corridor screened against pit envelopes only`);
             host.dataset.siteAudit=JSON.stringify(sitePlan.audit);
-            host.dataset.plantDetail = JSON.stringify({sourceMeshes:plant.userData.detailMeshCount,drawMeshes:plant.userData.batchedMeshCount,stages:plant.userData.processStages.length});
+            host.dataset.plantDetail = JSON.stringify({sourceMeshes:plant.userData.detailMeshCount,drawMeshes:plant.userData.batchedMeshCount,stages:plant.userData.processStages.length,detailLoaded:Boolean(plant.userData.plantDetailLoaded)});
             if(terrainResources){
               const utm=terrainResources.meta.bounds_utm;
               const campus=buildMineSiteCampus({plant:[x,z],plantLevel:level,feed,pits:sitePlan.pits,boundary:(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z] as Point2;}),

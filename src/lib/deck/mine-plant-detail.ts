@@ -2,6 +2,15 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 /** Mechanical detail for the illustrative 400 × 280 local-unit plant campus. */
+export const PLANT_PROCESS_STAGES = [
+  {id: 'feed', label: '01 · ROM & crushing', detail: 'Feed hopper, crusher and screened transfer', point: [-104, 25, -16] as [number,number,number]},
+  {id: 'milling', label: '02 · Milling & classification', detail: 'Mill, trunnion drives and cyclone cluster', point: [-30, 17, -18] as [number,number,number]},
+  {id: 'flotation', label: '03 · Flotation', detail: 'Cell banks, launders and slurry pumps', point: [38, 16, -36] as [number,number,number]},
+  {id: 'thickening', label: '04 · Thickening', detail: 'Thickener rake, drive and reclaim-water circuit', point: [103, 14, -31] as [number,number,number]},
+  {id: 'dewatering', label: '05 · Dewatering', detail: 'Filter press and product dryer', point: [69, 12, 44] as [number,number,number]},
+  {id: 'product', label: '06 · Product handling', detail: 'Surge silos and covered loadout', point: [156, 24, 92] as [number,number,number]},
+] as const;
+
 export function addPlantDetail(root: THREE.Group, materials: Record<string, THREE.Material>) {
   const steel = materials.steel, accent = materials.copper, dark = materials.roof;
   const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number, name: string) => {
@@ -117,20 +126,13 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
     cylinder(.45, 20, x, 12, z, 'Plant yard light mast');
     box(5, .7, 2, x + 1.8, 22, z, 'Plant yard light fitting', materials.concrete);
   }
-  root.userData.processStages = [
-    {id: 'feed', label: '01 · ROM & crushing', detail: 'Feed hopper, crusher and screened transfer', point: [-104, 25, -16]},
-    {id: 'milling', label: '02 · Milling & classification', detail: 'Mill, trunnion drives and cyclone cluster', point: [-30, 17, -18]},
-    {id: 'flotation', label: '03 · Flotation', detail: 'Cell banks, launders and slurry pumps', point: [38, 16, -36]},
-    {id: 'thickening', label: '04 · Thickening', detail: 'Thickener rake, drive and reclaim-water circuit', point: [103, 14, -31]},
-    {id: 'dewatering', label: '05 · Dewatering', detail: 'Filter press and product dryer', point: [69, 12, 44]},
-    {id: 'product', label: '06 · Product handling', detail: 'Surge silos and covered loadout', point: [156, 24, 92]},
-  ];
+  root.userData.processStages = PLANT_PROCESS_STAGES;
 }
 
 /** Batch static detail by material/process; keep roof cutaways separately addressable. */
-export function batchPlantMeshes(root: THREE.Group) {
+export function batchPlantMeshes(root: THREE.Group, startIndex = 0) {
   const buckets = new Map<string, {material: THREE.Material; name: string; roof: boolean; stage?:string; geometries: THREE.BufferGeometry[]}>();
-  const children = [...root.children].filter((child): child is THREE.Mesh<THREE.BufferGeometry, THREE.Material> => child instanceof THREE.Mesh && !Array.isArray(child.material) && !child.userData.preserveAnimation);
+  const children = root.children.slice(startIndex).filter((child): child is THREE.Mesh<THREE.BufferGeometry, THREE.Material> => child instanceof THREE.Mesh && !Array.isArray(child.material) && !child.userData.preserveAnimation);
   for (const object of children) {
     object.updateMatrix();
     const roof = Boolean(object.userData.plantRoof);
