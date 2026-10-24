@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {buildConcentrator, placeConcentrator, buildPitSurface} from '../src/lib/deck/mine-scene';
+import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
 import {rectangle, inside} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
@@ -57,6 +58,23 @@ assert.equal(selected.length,4,'Evidence label budget is bounded');
 assert.equal(selected[0],'H0');assert.equal(selected[3],'H11','Selection spans spatial coverage');
 assert.deepEqual(selectPitEvidenceHoles(evidence,[]),[],'No pit means no claimed pit evidence');
 assert.deepEqual(selectPitEvidenceHoles([...evidence,...evidence],[pit]),selected,'Duplicate intervals do not duplicate hole selection');
-console.log('PASS: contour coverage, elevation, crest containment and complete plant bounds');
+const campusPit={ring:rectangle([0,-700],420,320),centre:[0,-700] as [number,number],surface:96,floor:38,depth:58,support:96};
+const campus=buildMineSiteCampus({
+  plant:[0,0],plantLevel:1.5,feed:[-1150,760],pits:[campusPit],
+  boundary:rectangle([0,0],5200,5200),bounds:{minX:-2600,maxX:2600,minZ:-2600,maxZ:2600},
+  height:(x,z)=>x*.01+z*.005,surveyed:()=>true,
+});
+assert.ok(campus.root.userData.accessRoadCount>=2,'The site campus has screened illustrative access spurs when terrain corridors are clear');
+let checkedRoadVertices=0;
+campus.root.traverse(object=>{
+  if(!(object instanceof THREE.Mesh)||!object.name.includes('Illustrative campus access roads'))return;
+  const positions=object.geometry.getAttribute('position');
+  for(let i=0;i<positions.count;i++){
+    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i),terrain=x*.01+z*.005;
+    if(y>=terrain+1.04&&y<=terrain+1.3)checkedRoadVertices++;
+  }
+});
+assert.ok(checkedRoadVertices>100,'Draped access-road vertices remain consistently above the sampled synthetic terrain');
+console.log(`PASS: contour coverage, elevation, crest containment, plant bounds and ${campus.root.userData.accessRoadCount} terrain-screened campus access spurs`);
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

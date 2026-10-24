@@ -4402,7 +4402,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               const campus=buildMineSiteCampus({plant:[x,z],plantLevel:level,feed,pits:sitePlan.pits,boundary:(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z] as Point2;}),
                 bounds:{minX:utm.minX-PROJECT_UTM_CENTER.easting,maxX:utm.maxX-PROJECT_UTM_CENTER.easting,minZ:PROJECT_UTM_CENTER.northing-utm.maxY,maxZ:PROJECT_UTM_CENTER.northing-utm.minY},
                 height:siteHeight,surveyed:(px,pz)=>Boolean(sampleTerrainAtLocal(terrainResources!,px,-pz).surveyed)});
-              siteCampus=campus.root;campusFacilities=campus.facilities;tagDeckLayer(siteCampus,'context');stage.add(siteCampus);
+              siteCampus=campus.root;campusFacilities=campus.facilities;host.dataset.siteAccessRoads=String(campus.root.userData.accessRoadCount??0);tagDeckLayer(siteCampus,'context');stage.add(siteCampus);
               siteCampus.traverse(object=>{if(object instanceof THREE.Mesh){
                 if(!object.userData.tooltipItems)object.userData.tooltipItems=[{title:'Illustrative site service detail',rows:['Parked equipment and concept pipes; no validated route, operating schedule or utility connection.'],tone:'#c9ad7d'}];
                 pickables.push(object);

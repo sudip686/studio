@@ -135,7 +135,8 @@ export function batchPlantMeshes(root: THREE.Group) {
     object.updateMatrix();
     const roof = Boolean(object.userData.plantRoof);
     const stage=typeof object.userData.plantStage==='string'?object.userData.plantStage:undefined;
-    const name = roof ? `${object.name} roof` : /Flotation/i.test(object.name) ? 'Flotation banks and walkways'
+    const name = roof ? `${object.name} roof` : /Conceptual access|Illustrative gravel shoulders/i.test(object.name) ? 'Illustrative campus access roads · unsurveyed'
+      : /Flotation/i.test(object.name) ? 'Flotation banks and walkways'
       : /Milling|Crushing|ROM|Feed|hopper/i.test(object.name) ? 'Crushing and milling equipment'
       : /Dewatering|Product|Filter|Packaged/i.test(object.name) ? 'Dewatering and product handling'
       : /Thickener|water|Reagent/i.test(object.name) ? 'Thickener, water and reagent circuits' : 'Plant structures and services';

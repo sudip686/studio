@@ -34,6 +34,9 @@ export function buildMineSiteCampus(options:Options) {
     fresh:new THREE.MeshBasicMaterial({color:0x579aa4,side:THREE.DoubleSide,toneMapped:false}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
     concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
+    access:new THREE.MeshBasicMaterial({color:0x535853,side:THREE.DoubleSide,toneMapped:false}),
+    shoulder:new THREE.MeshBasicMaterial({color:0x887f6c,side:THREE.DoubleSide,toneMapped:false}),
+    centreline:new THREE.LineBasicMaterial({color:0xc5b99b,toneMapped:false}),
   };
   // Keep earthwork palettes spatially fixed. Procedural sub-metre noise here
   // produced screen-space aliasing on wide pads as the camera orbited, which
@@ -110,6 +113,70 @@ export function buildMineSiteCampus(options:Options) {
   let waste:CampusFacility|null=null;
   if(mine)for(const [w,d] of [[240,180],[180,140],[140,110]]){waste=place('waste','Waste-rock landform · illustrative',[mine[0]+350,mine[1]],w,d,32,true);if(waste)break;}
   for(const [id,f] of [['tailings',tailings],['water',water],['raw-water',rawWater],['waste',waste]] as const)if(!f)omissions.push(`${id}: no display footprint passed terrain / overlap checks; facility withheld`);
+
+  // A restrained, terrain-draped access layer ties the illustrative campus
+  // together. These are display corridors only: PaulSam does not provide
+  // georeferenced service-road centerlines or a civil design. Keep them clear
+  // of conceptual pits, the feed apron and other facility footprints, and omit
+  // a spur when no screened alignment fits the current scene bounds.
+  let accessRoadCount=0;
+  const roadObstacles=[
+    ...pits.map(pit=>pit.ring),
+    rectangle(feed,210,160),
+    rectangle(plant,310,310),
+  ];
+  function bezier(a:Point2,b:Point2,offset:number,t:number):Point2{
+    const dx=b[0]-a[0],dz=b[1]-a[1],length=Math.max(1,Math.hypot(dx,dz));
+    const nx=-dz/length,nz=dx/length;
+    const c1:Point2=[a[0]+dx*.34+nx*offset,a[1]+dz*.34+nz*offset];
+    const c2:Point2=[a[0]+dx*.66+nx*offset,a[1]+dz*.66+nz*offset];
+    const u=1-t;
+    return [u*u*u*a[0]+3*u*u*t*c1[0]+3*u*t*t*c2[0]+t*t*t*b[0],u*u*u*a[1]+3*u*u*t*c1[1]+3*u*t*t*c2[1]+t*t*t*b[1]];
+  }
+  function ribbon(points:Point2[],width:number,offset:number,material:THREE.Material,name:string){
+    const positions:number[]=[];
+    for(let i=0;i<points.length-1;i++){
+      const [ax,az]=points[i],[bx,bz]=points[i+1],dx=bx-ax,dz=bz-az,length=Math.max(.001,Math.hypot(dx,dz)),nx=-dz/length*width/2,nz=dx/length*width/2;
+      const y=(x:number,z:number)=>height(x,z)+offset;
+      const a:[number,number,number]=[ax+nx,y(ax+nx,az+nz),az+nz],b:[number,number,number]=[ax-nx,y(ax-nx,az-nz),az-nz];
+      const c:[number,number,number]=[bx+nx,y(bx+nx,bz+nz),bz+nz],d:[number,number,number]=[bx-nx,y(bx-nx,bz-nz),bz-nz];
+      positions.push(...a,...c,...b,...b,...c,...d);
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();
+    const object=mesh(root,geometry,material,name);object.castShadow=false;object.receiveShadow=true;return object;
+  }
+  for(const facility of facilities){
+    const dx=facility.point[0]-plant[0],dz=facility.point[1]-plant[1],length=Math.max(1,Math.hypot(dx,dz)),ux=dx/length,uz=dz/length;
+    const plantEdge=155/Math.max(Math.abs(ux),Math.abs(uz),.001)+8;
+    const start:Point2=[plant[0]+ux*plantEdge,plant[1]+uz*plantEdge];
+    const halfWidth=facility.width/2,halfDepth=facility.depth/2;
+    const edgeDistance=1/Math.max(Math.abs(ux)/Math.max(1,halfWidth),Math.abs(uz)/Math.max(1,halfDepth));
+    const end:Point2=[facility.point[0]-ux*(edgeDistance+8),facility.point[1]-uz*(edgeDistance+8)];
+    const forbidden=[...roadObstacles,...facilities.filter(other=>other.id!==facility.id).map(other=>rectangle(other.point,other.width+24,other.depth+24))];
+    let chosen:Point2[]|null=null,chosenScore=Infinity;
+    for(const offset of [0,80,-80,160,-160,240,-240,320,-320]){
+      const count=Math.max(24,Math.ceil(length/16)),points=Array.from({length:count+1},(_,i)=>bezier(start,end,offset,i/count));
+      const clear=points.every(([x,z],i)=>{
+        if(x<bounds.minX||x>bounds.maxX||z<bounds.minZ||z>bounds.maxZ)return false;
+        if(forbidden.some(ringPoints=>overlaps(rectangle([x,z],12,12),ringPoints)))return false;
+        return true;
+      });
+      if(!clear)continue;
+      let pathLength=0;for(let i=1;i<points.length;i++)pathLength+=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);
+      const score=pathLength+Math.abs(offset)*.35;if(score<chosenScore){chosen=points;chosenScore=score;}
+    }
+    if(!chosen){omissions.push(`Illustrative ${facility.id} access spur withheld: no clear terrain corridor`);continue;}
+    const surface=ribbon(chosen,8,1.15,materials.access,`Conceptual access surface · ${facility.id}`);
+    surface.userData.illustrative=true;surface.userData.accessFacility=facility.id;
+    // Narrow gravel shoulders make the roadway read against the natural DEM
+    // without adding a survey or engineering claim.
+    ribbon(chosen,11,1.05,materials.shoulder,`Illustrative gravel shoulders · ${facility.id}`);
+    const centerPoints:THREE.Vector3[]=[];
+    for(let i=0;i<chosen.length;i+=Math.max(1,Math.floor(chosen.length/28))){const [x,z]=chosen[i];centerPoints.push(new THREE.Vector3(x,height(x,z)+1.35,z));}
+    if(centerPoints.length>1){const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(centerPoints),materials.centreline);line.name=`Display-only road center cue · ${facility.id}`;line.userData.accessFacility=facility.id;root.add(line);}
+    surface.userData.tooltipItems=[{title:`Illustrative access · ${facility.title}`,rows:['Display corridor only; no georeferenced road centerline or civil design supplied.','Terrain sampled from the current presentation surface; alignment is not a surveyed route.'],tone:'#c9ad7d'}];
+    accessRoadCount++;
+  }
 
   const grading=new THREE.Group();grading.name='Illustrative plant grading';
   join(grading,ring(plant,310,310,(x,z)=>height(x,z)+.2),ring(plant,250,250,options.plantLevel-.26,0),materials.earth,'Conceptual plant earthwork batters');
@@ -201,6 +268,6 @@ export function buildMineSiteCampus(options:Options) {
   }
   // Merge line detail separately, retaining each facility's picking metadata.
   batch(root);
-  root.userData.facilities=facilities;root.userData.omissions=omissions;
+  root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;
   return {root,facilities,omissions};
 }

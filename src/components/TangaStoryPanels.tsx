@@ -159,6 +159,17 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       <div className="tanga-site-panel-subtitle">REPORT BASIS &amp; LIMITS</div>
       <details className="tanga-development-source"><summary>Report location &amp; alternatives</summary><p>Option 2 is the report’s planning assumption: 2.15 km and 24° reported inclination. The map trace is approximately 2.45 km, so its alignment and the 2.15 km table estimate need reconciliation. Options 1 and 3 are alternatives, not additional operating conveyors.</p><img loading="lazy" src="/presentation-assets/paulsam-conveyor-sites.jpg" alt="PaulSam Figure 3.3 showing three candidate feed stations and conveyor alignments on a labelled UTM 37S grid"/><p>Figure 3.3 · PDF p.33 · June 2023. Locations traced approximately from the grid. The proposed feed apron is offset nearby to clear the current conceptual pit envelope. No surveyed plant parcel or engineered alignment is supplied.</p></details>
       <details className="tanga-development-source"><summary>Concept scope &amp; limits</summary><p>Plant candidate: report-based, outside the provisional mine boundary. Added waste and water placements are illustrative and exceed the plant allowance. Capacity, drainage, ground conditions and land approval remain unverified. Lowland additions use regional terrain context. The pad and cut/fill transition are illustrative; terrain, slopes and earthworks require survey and engineering. Compare terrain restores the ungraded source surface.</p></details>
+      <details className="tanga-site-facility-register">
+        <summary>Full site names &amp; location status</summary>
+        <ul>
+          <li><strong>Processing candidate · Option 2</strong><span>Report planning assumption; approximate map registration</span></li>
+          <li><strong>Tailings impoundment</strong><span>Illustrative placement; regional terrain context</span></li>
+          <li><strong>Settling and reclaim-water pond</strong><span>Illustrative placement; regional terrain context</span></li>
+          <li><strong>Raw-water pond</strong><span>Illustrative placement; regional terrain context</span></li>
+          <li><strong>Waste-rock landform</strong><span>Illustrative placement; supplied survey terrain</span></li>
+        </ul>
+        <p>Compact map labels are shortened for readability. Added facilities are conceptual and need siting, environmental and engineering studies; any footprint that fails terrain or conflict screening is withheld from the view.</p>
+      </details>
       {surfaceConceptView&&onSurfaceCompareSplit&&<label className="tanga-story-compare-range" htmlFor="tanga-terrain-comparison-split"><span>Wipe position · {Math.round(surfaceCompareSplit)}% concept</span><input id="tanga-terrain-comparison-split" type="range" min="8" max="92" step="1" value={Math.round(surfaceCompareSplit)} aria-label="Terrain comparison wipe position" aria-valuetext={`${Math.round(surfaceCompareSplit)} percent concept site`} onChange={event=>onSurfaceCompareSplit(Number(event.target.value))}/></label>}
     </div>}
   </aside>;
