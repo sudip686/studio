@@ -143,6 +143,27 @@ function chapterReadinessDetail(stages?: LoadStage[]) {
   return stages.map(stage => `${stage.label}: ${sceneStateText(stage.state)}`).join(' · ');
 }
 
+const CHAPTER_READINESS_STORAGE_KEY='tanga:chapter-readiness:v1';
+function readChapterReadiness(raw:string|null):Partial<Record<WorkbenchMode,LoadStage[]>>{
+  if(!raw)return {};
+  try{
+    const parsed=JSON.parse(raw) as Record<string,unknown>;
+    const validModes=new Set(STORY_STEPS.map(step=>step.mode));
+    const validStates=new Set<SceneLoadState>(['idle','loading','ready','degraded','error']);
+    const result:Partial<Record<WorkbenchMode,LoadStage[]>>={};
+    for(const [mode,value] of Object.entries(parsed)){
+      if(!validModes.has(mode as WorkbenchMode)||!Array.isArray(value))continue;
+      const stages=value.filter((item):item is LoadStage=>Boolean(item&&typeof item==='object'
+        &&typeof (item as LoadStage).id==='string'
+        &&typeof (item as LoadStage).label==='string'
+        &&validStates.has((item as LoadStage).state)
+        &&typeof (item as LoadStage).detail==='string'));
+      if(stages.length===4)result[mode as WorkbenchMode]=stages;
+    }
+    return result;
+  }catch{return {};}
+}
+
 type DeckViewState = {
   longitude: number;
   latitude: number;
@@ -2241,6 +2262,8 @@ export default function TangaDeckWorkbench() {
   const [fallbackPreflight, setFallbackPreflight] = useState<FallbackPreflightResult[] | null>(null);
   const [fallbackPreflightRunning, setFallbackPreflightRunning] = useState(false);
   const [chapterReadiness, setChapterReadiness] = useState<Partial<Record<WorkbenchMode, LoadStage[]>>>({});
+  const [chapterReadinessLoaded,setChapterReadinessLoaded]=useState(false);
+  const chapterReadinessHydratedRef=useRef(false);
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
   const [pitBlockFocusIndex,setPitBlockFocusIndex]=useState<number|null>(null);
   const threeCameraSequenceRef=useRef(0);
@@ -4277,8 +4300,17 @@ export default function TangaDeckWorkbench() {
   const currentLoaderIssue = loadStages.some(stage => stage.state === 'error' || stage.state === 'degraded');
   const currentLoaderPending = loadStages.some(stage => stage.state === 'loading');
   useEffect(() => {
+    try{setChapterReadiness(readChapterReadiness(window.sessionStorage.getItem(CHAPTER_READINESS_STORAGE_KEY)));}
+    catch{setChapterReadiness({});}
+    finally{chapterReadinessHydratedRef.current=true;setChapterReadinessLoaded(true);}
+  },[]);
+  useEffect(() => {
+    if(!chapterReadinessLoaded)return;
+    try{window.sessionStorage.setItem(CHAPTER_READINESS_STORAGE_KEY,JSON.stringify(chapterReadiness));}catch{}
+  },[chapterReadiness,chapterReadinessLoaded]);
+  useEffect(() => {
     const timer=window.setTimeout(() => {
-      if (readHashScene() !== activeMode || loadStages.every(stage => stage.state === 'idle')) return;
+      if (!chapterReadinessHydratedRef.current || readHashScene() !== activeMode || loadStages.every(stage => stage.state === 'idle')) return;
       setChapterReadiness(current => {
         const previous = current[activeMode];
         const unchanged = previous?.length === loadStages.length && previous.every((stage, index) => {
@@ -6194,6 +6226,7 @@ export default function TangaDeckWorkbench() {
             </ul>
             <details className="tanga-presentation-tools__chapter-coverage">
               <summary><strong>Chapter coverage</strong><span>{Object.keys(chapterReadiness).length} / {STORY_STEPS.length} visited</span></summary>
+              <button type="button" className="tanga-presentation-tools__chapter-reset" onClick={()=>setChapterReadiness({})}>Clear session checks</button>
               <ol aria-label="Observed chapter loader states">
                 {STORY_STEPS.map(step=>{
                   const stages=chapterReadiness[step.mode];
