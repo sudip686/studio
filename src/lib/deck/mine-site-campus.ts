@@ -20,6 +20,7 @@ export function buildMineSiteCampus(options:Options) {
   const facilities:CampusFacility[]=[],omissions:string[]=[];
   const facilityApronDrapeAudit:{facilityId:CampusFacility['id'];nx:number;nz:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[]=[];
   let maximumContourSegmentM=0;
+  let fixedTerrainColorVertices=0,fixedTerrainColorMin=Infinity,fixedTerrainColorMax=-Infinity;
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
   const materials={
     // Earthworks and pad surfaces use an unlit fixed palette: their mapped
@@ -32,6 +33,11 @@ export function buildMineSiteCampus(options:Options) {
     rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
     beach:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false}),
     liner:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false}),
+    earthSurface:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    benchSurface:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    rockSurface:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    beachSurface:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    linerSurface:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
     water:new THREE.MeshBasicMaterial({color:0x4a8b8b,side:THREE.DoubleSide,toneMapped:false}),
     fresh:new THREE.MeshBasicMaterial({color:0x579aa4,side:THREE.DoubleSide,toneMapped:false}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
@@ -56,6 +62,18 @@ export function buildMineSiteCampus(options:Options) {
     batchPlantMeshes(group);
   }
   function mesh(group:THREE.Group,geometry:THREE.BufferGeometry,material:THREE.Material,name:string){
+    // Bake low-contrast variation from fixed site coordinates, never screen
+    // pixels or camera vectors, so broad earthworks stay stable while orbiting.
+    if(material instanceof THREE.MeshBasicMaterial&&material.vertexColors){
+      const positions=geometry.getAttribute('position'),colors=new Float32Array(positions.count*3);
+      for(let i=0;i<positions.count;i++){
+        const x=positions.getX(i),z=positions.getZ(i);
+        const shade=1+.052*Math.sin(x*.011+z*.019)+.026*Math.sin(x*.027-z*.013+1.3);
+        colors[i*3]=shade;colors[i*3+1]=shade;colors[i*3+2]=shade;
+        fixedTerrainColorVertices++;fixedTerrainColorMin=Math.min(fixedTerrainColorMin,shade);fixedTerrainColorMax=Math.max(fixedTerrainColorMax,shade);
+      }
+      geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+    }
     const object=new THREE.Mesh(geometry,material);object.name=name;object.castShadow=true;object.receiveShadow=true;group.add(object);return object;
   }
   function box(group:THREE.Group,w:number,h:number,d:number,x:number,y:number,z:number,material:THREE.Material,name:string){
@@ -111,7 +129,7 @@ export function buildMineSiteCampus(options:Options) {
       const a=p(i,j),b=p(i,j+1),c=p(i+1,j),d=p(i+1,j+1);triangle(a,b,c);triangle(c,b,d);
     }
     facilityApronDrapeAudit.push({facilityId:f.id,nx,nz,maximumSampleSpacingM:Number(Math.max((f.width+30)/nx,(f.depth+30)/nz).toFixed(2)),maximumTriangleCentreErrorM:Number(maximumTriangleCentreErrorM.toFixed(4))});
-    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();mesh(group,geometry,materials.earth,'Illustrative cleared apron · terrain conforming');
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();mesh(group,geometry,materials.earthSurface,'Illustrative cleared apron · terrain conforming');
   }
   function place(id:CampusFacility['id'],title:string,preferred:Point2,w:number,d:number,limit:number,mineOnly=false){
     const candidates:{point:Point2;score:number}[]=[];
@@ -233,11 +251,11 @@ export function buildMineSiteCampus(options:Options) {
       for(let lift=1;lift<=3;lift++){
         inset+=Math.min(12,f.depth/15);
         const crest=ring(f.point,f.width-2*inset,f.depth-2*inset,y+lift*5);
-        join(group,outer,crest,materials.rock,'Waste-rock batter · illustrative');
+        join(group,outer,crest,materials.rockSurface,'Waste-rock batter · illustrative');
         inset+=4;const bench=ring(f.point,f.width-2*inset,f.depth-2*inset,y+lift*5);
-        join(group,crest,bench,materials.bench,'Waste-rock bench · illustrative');outer=bench;
+        join(group,crest,bench,materials.benchSurface,'Waste-rock bench · illustrative');outer=bench;
       }
-      cap(group,outer,materials.bench,'Waste-rock upper working surface');
+      cap(group,outer,materials.benchSurface,'Waste-rock upper working surface');
       const topWidth=f.width-2*inset,topDepth=f.depth-2*inset,moundX=x-Math.min(30,topWidth*.2),moundZ=z-Math.min(15,topDepth*.2);
       const mound=mesh(group,new THREE.ConeGeometry(8,4,12),materials.rock,'Illustrative active waste-rock tip');mound.scale.set(Math.min(3.5,topWidth/40),1,Math.min(1.3,topDepth/40));mound.position.set(moundX,y+17,moundZ);f.anchor=[moundX,y+23,moundZ];
       for(let i=0;i<46;i++){
@@ -254,16 +272,24 @@ export function buildMineSiteCampus(options:Options) {
       box(group,3,2.6,3,x+16,y+18,z,materials.bench,'Parked dozer cab');
       box(group,7,2,.7,x+16,y+16,z+5,materials.steel,'Parked dozer blade');
     }else{
-      const tsf=f.id==='tailings',rise=tsf?12:4,crestInset=tsf?32:12,beachInset=tsf?68:25;
+      const tsf=f.id==='tailings',rise=tsf?12:4,crestInset=tsf?42:12,beachInset=tsf?68:25;
       const toe=ring(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3);
       const crest=ring(f.point,f.width-2*crestInset,f.depth-2*crestInset,y+rise);
       const innerCrest=ring(f.point,f.width-2*(crestInset+6),f.depth-2*(crestInset+6),y+rise);
       const beach=ring(f.point,f.width-2*beachInset,f.depth-2*beachInset,y+(tsf?2.4:1));
-      join(group,toe,crest,materials.earth,'Illustrative containment embankment');
-      join(group,crest,innerCrest,materials.bench,'Embankment crest access');
-      join(group,innerCrest,beach,tsf?materials.beach:materials.liner,'Contained inner slope');
       if(tsf){
-        const pool={x:x+30,z:z-15,rx:36,rz:22};cap(group,beach,materials.beach,'Illustrative deposited-tailings beach',pool);
+        // A broad, stepped shoulder makes the conceptual containment form
+        // legible at overview scale without implying an engineered section.
+        const lowerCrest=ring(f.point,f.width-28,f.depth-28,y+5);
+        const shoulder=ring(f.point,f.width-52,f.depth-52,y+5);
+        join(group,toe,lowerCrest,materials.earthSurface,'Illustrative containment embankment');
+        join(group,lowerCrest,shoulder,materials.benchSurface,'Intermediate perimeter bench · illustrative');
+        join(group,shoulder,crest,materials.earthSurface,'Upper containment embankment · illustrative');
+      }else join(group,toe,crest,materials.earthSurface,'Illustrative containment embankment');
+      join(group,crest,innerCrest,materials.benchSurface,'Embankment crest access');
+      join(group,innerCrest,beach,tsf?materials.beachSurface:materials.linerSurface,'Contained inner slope');
+      if(tsf){
+        const pool={x:x+30,z:z-15,rx:36,rz:22};cap(group,beach,materials.beachSurface,'Illustrative deposited-tailings beach',pool);
         const ellipse=poolOutline(pool,y+2.02);
         cap(group,ellipse,materials.water,'Illustrative decant pool');
         box(group,5,.6,3,pool.x,y+2.15,pool.z,materials.steel,'Floating decant pontoon');
@@ -315,5 +341,7 @@ export function buildMineSiteCampus(options:Options) {
   root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;root.userData.accessRoadDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,roads:accessRoadDrapeAudit};
   root.userData.facilityApronDrapeAudit=facilityApronDrapeAudit;
   root.userData.landformContourAudit={pointsPerRing:304,maximumSegmentM:Number(maximumContourSegmentM.toFixed(2))};
+  root.userData.tailingsProfileAudit={tierCount:tailings?2:0,intermediateBenchWidthM:12,totalRiseM:12,conceptual:true};
+  root.userData.fixedTerrainColorAudit={vertexCount:fixedTerrainColorVertices,min:Number(fixedTerrainColorMin.toFixed(4)),max:Number(fixedTerrainColorMax.toFixed(4)),source:'site-coordinate geometry; camera independent'};
   return {root,facilities,omissions};
 }

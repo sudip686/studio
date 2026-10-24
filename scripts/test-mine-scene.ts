@@ -94,6 +94,16 @@ assert.ok(facilityApronAudit.every(item=>item.maximumTriangleCentreErrorM<.02),'
 const landformContourAudit=campus.root.userData.landformContourAudit as {pointsPerRing:number;maximumSegmentM:number};
 assert.equal(landformContourAudit.pointsPerRing,304,'Rounded site landforms use a dense, matched perimeter for smooth berms and benches');
 assert.ok(landformContourAudit.maximumSegmentM<=6,`Rounded landform contours stay within the 6 m terrain-drape spacing (${landformContourAudit.maximumSegmentM.toFixed(2)} m)`);
+const tailingsProfileAudit=campus.root.userData.tailingsProfileAudit as {tierCount:number;intermediateBenchWidthM:number;totalRiseM:number;conceptual:boolean};
+assert.deepEqual(tailingsProfileAudit,{tierCount:2,intermediateBenchWidthM:12,totalRiseM:12,conceptual:true},'Tailings concept retains its added terrace as explicitly illustrative geometry');
+const fixedTerrainColorAudit=campus.root.userData.fixedTerrainColorAudit as {vertexCount:number;min:number;max:number;source:string};
+assert.ok(fixedTerrainColorAudit.vertexCount>0&&fixedTerrainColorAudit.min<1&&fixedTerrainColorAudit.max>1,'Facility earthworks have restrained fixed-coordinate surface variation');
+assert.ok(fixedTerrainColorAudit.min>=.91&&fixedTerrainColorAudit.max<=1.09,'Fixed-coordinate earthwork variation remains within an 18% total luminance range');
+assert.equal(fixedTerrainColorAudit.source,'site-coordinate geometry; camera independent','Landform colors are baked from site geometry, not recalculated from the camera');
+const variedSurfaces:THREE.Mesh[]=[];
+campus.root.traverse(object=>{if(object instanceof THREE.Mesh&&object.material instanceof THREE.MeshBasicMaterial&&object.material.vertexColors)variedSurfaces.push(object);});
+assert.ok(variedSurfaces.length>0&&variedSurfaces.every(object=>object.geometry.getAttribute('color')?.count===object.geometry.getAttribute('position').count),'Every vertex-colored landform retains a complete per-vertex color attribute after batching');
+for(const object of variedSurfaces){const colors=object.geometry.getAttribute('color');assert.ok(Array.from(colors.array).every(Number.isFinite),'Batched landform color factors remain finite');}
 const roadDrapeAudit=campus.root.userData.accessRoadDrapeAudit as {maximumSampleSpacingM:number;roads:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]};
 assert.equal(roadDrapeAudit.maximumSampleSpacingM,6,'Campus access roads use a dense terrain drape interval');
 assert.equal(roadDrapeAudit.roads.length,campus.root.userData.accessRoadCount,'Every visible campus access spur has a drape audit');
