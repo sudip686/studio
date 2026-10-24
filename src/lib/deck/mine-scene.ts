@@ -10,7 +10,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   // The pad is a neutral reference surface, not a mapped material. Keep its
   // color steady as the camera moves; the buildings, equipment and terrain
   // retain physically shaded materials for depth.
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x808b86,metalness:0.18,roughness:0.78}),roof:new THREE.MeshStandardMaterial({color:0x56625e,roughness:0.88}),copper:new THREE.MeshStandardMaterial({color:0x9e7856,metalness:.08,roughness:0.76}),concrete:new THREE.MeshBasicMaterial({color:0x92928a}),serviceRoad:new THREE.MeshBasicMaterial({color:0x4a5551,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x759593,metalness:0.02,roughness:0.76}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x808b86,metalness:0.18,roughness:0.78}),roof:new THREE.MeshStandardMaterial({color:0x56625e,roughness:0.88}),copper:new THREE.MeshStandardMaterial({color:0x9e7856,metalness:.08,roughness:0.76}),concrete:new THREE.MeshBasicMaterial({color:0x92928a}),serviceRoad:new THREE.MeshBasicMaterial({color:0x4a5551,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x759593,metalness:0.02,roughness:0.76}),stockpile:new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.98,metalness:0}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
   // Separate the light, ribbed wall sheets from the darker standing-seam
   // roof panels. One all-over cladding tone made the process halls read as
   // solid toy boxes from the executive overview camera.
@@ -25,6 +25,42 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m:THREE.Material=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
+  // Naturalistic, elongated stockpile geometry replaces the pointed primitive
+  // cones. The broad, slightly irregular crest and rounded ends read as
+  // conceptual material storage without implying surveyed volume or capacity.
+  const buildStockpile=(length:number,width:number,height:number,seed:number)=>{
+    const segments=64,rings=16,positions:number[]=[],colors:number[]=[],indices:number[]=[];
+    const baseTone=new THREE.Color(0x756b5d);
+    positions.push(0,height*.96,0);colors.push(baseTone.r*.94,baseTone.g*.94,baseTone.b*.94);
+    for(let ring=1;ring<=rings;ring++){
+      const q=ring/rings,crest=q<.22?.96:.96*Math.pow((1-q)/.78,.82);
+      for(let segment=0;segment<segments;segment++){
+        const angle=segment/segments*Math.PI*2;
+        const irregularity=1+.018*Math.sin(angle*3+seed)+.009*Math.sin(angle*7-seed*.7);
+        const x=Math.cos(angle)*q*length*.5*irregularity;
+        const z=Math.sin(angle)*q*width*.5*irregularity;
+        const surfaceTone=.96+.035*Math.sin(angle*2+seed)*Math.sin(q*8+seed*.4);
+        positions.push(x,height*crest*surfaceTone,z);
+        const footShade=.92+.08*Math.min(1,q*1.4),grainTone=footShade*(.985+.02*Math.sin(segment*1.7+ring*.6+seed));
+        colors.push(baseTone.r*grainTone,baseTone.g*grainTone,baseTone.b*grainTone);
+      }
+    }
+    for(let segment=0;segment<segments;segment++)indices.push(0,1+(segment+1)%segments,1+segment);
+    for(let ring=0;ring<rings-1;ring++){
+      const inner=1+ring*segments,outer=inner+segments;
+      for(let segment=0;segment<segments;segment++){
+        const next=(segment+1)%segments,a=inner+segment,b=inner+next,c=outer+next,d=outer+segment;
+        indices.push(a,b,c,a,c,d);
+      }
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+    geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+    geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
+    const pile=new THREE.Mesh(geometry,materials.stockpile);
+    pile.position.y=1;pile.name='Illustrative ROM material stockpile';pile.castShadow=true;pile.receiveShadow=true;
+    root.add(pile);return pile;
+  };
   // The pad and graded transition are placed against the existing terrain by
   // placeConcentrator. Avoid a second oversized slab beneath the whole campus:
   // it reads as a floating platform and hides the surrounding ground texture.
@@ -131,7 +167,8 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
     }
   }
   // ROM / receiving and primary crushing.
-  mesh(new THREE.ConeGeometry(22,14,32),materials.rock,-106,8,44,'ROM stockpile');
+  const primaryRomPile=buildStockpile(44,34,13,7);
+  primaryRomPile.position.set(-106,1,44);primaryRomPile.name='Illustrative primary ROM stockpile';
   box(22,12,18,-104,10,-16,materials.steel,'Feed bin');
   mesh(new THREE.CylinderGeometry(12,5,12,4),materials.copper,-104,21,-16,'Receiving hopper').rotation.y=Math.PI/4;
   shed('ROM & crushing',-88,-16,72,58,30,'feed');
@@ -180,10 +217,16 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   }
   // Added operating areas expand the campus rather than stretching equipment.
   shed('Covered blending and feed hall',-85,-109,116,40,32,'feed');
-  for(let i=0;i<3;i++)mesh(new THREE.ConeGeometry(13,12,16),materials.rock,-122+i*36,8,-108,'Covered feed stockpile');
+  for(let i=0;i<3;i++){
+    const pile=buildStockpile(26,19,11,11+i);
+    pile.position.set(-122+i*36,1,-108);pile.name='Illustrative covered-feed stockpile';
+  }
   shed('Product storage and loadout',100,110,166,40,29,'product');
   shed('Maintenance and spares hall',-157,102,58,48,22);
-  for(const z of [-32,30])mesh(new THREE.ConeGeometry(24,18,24),materials.rock,-163,10,z,'ROM receiving yard');
+  for(const [index,z] of [-32,30].entries()){
+    const pile=buildStockpile(48,37,17,21+index);
+    pile.position.set(-163,1,z);pile.name='Illustrative ROM receiving stockpile';
+  }
   // Second flotation train and reclaim-water thickener.
   for(let i=0;i<5;i++){
     box(12,10,18,5+i*17,7,-103,materials.steel,'Secondary flotation train');
