@@ -2130,7 +2130,9 @@ export default function TangaThreeGeologyScene({
   const [status, setStatus] = useState('Preparing geology scene');
   const onRetryRef = useRef(onRetry);
   onRetryRef.current = onRetry;
-  const [targetXray, setTargetXray] = useState(true);
+  // Solid, depth-tested targets are the stable default. X-ray is an explicit
+  // presenter choice because always-on-top categories can visually fight.
+  const [targetXray, setTargetXray] = useState(false);
   const [motionPaused, setMotionPaused] = useState(false);
   const [sectionEnabled,setSectionEnabled]=useState(false);
   const [crossSource,setCrossSource]=useState<SectionSource|null>(null);
@@ -2182,7 +2184,7 @@ export default function TangaThreeGeologyScene({
   const [evidenceVisible,setEvidenceVisible]=useState(true);
   const miningStoryOptions=useRef({beat:0,playing:true,replay:0,holes:true});
   miningStoryOptions.current={beat:miningBeat,playing:storyPlaying,replay:storyReplay,holes:evidenceVisible};
-  const presentationOptions = useRef({targetXray:true,motionPaused:false});
+  const presentationOptions = useRef({targetXray:false,motionPaused:false});
   presentationOptions.current={targetXray,motionPaused};
   useEffect(() => {
     if (mode !== 'topography' || !terrainProfileSweeping) return;
@@ -4189,7 +4191,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             // orbiting. The explicit layer-opacity control can still fade them.
             const material=new THREE.MeshBasicMaterial({color:high?0xe58b32:0x388e96,transparent:false,opacity:1,depthTest:false,depthWrite:false,toneMapped:false});
             const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,subset.length);
-            mesh.name=high?'Target blocks ≥5% TGC':'Target blocks 4.5–5% TGC';mesh.renderOrder=40;
+            mesh.name=high?'Target blocks ≥5% TGC':'Target blocks 4.5–5% TGC';
+            // Give the two categorical passes a fixed order. Three sorts equal
+            // render-order objects by camera depth, which can swap their
+            // always-on-top colors while the presenter orbits in X-ray mode.
+            mesh.renderOrder=high?41:40;
             const dummy=new THREE.Object3D();
             subset.forEach((b,i)=>{dummy.position.set(b.x,b.y,b.z);dummy.scale.set(b.dx,b.dz,b.dy);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);});
             mesh.instanceMatrix.needsUpdate=true;tagDeckLayer(mesh,'blocks');stage.add(mesh);targetMeshes.push(mesh);
@@ -4866,6 +4872,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const opacity=layerSettingsRef.current.blocks.opacity,transparent=opacity<.999;
         if(mesh.material.transparent!==transparent){mesh.material.transparent=transparent;mesh.material.needsUpdate=true;}
         mesh.material.opacity=opacity;
+        mesh.material.depthWrite=!presentationOptions.current.targetXray&&!transparent;
       });
       host.dataset.mineTargetBlocksVisible=String(targetMeshes.some(mesh=>mesh.visible));
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
@@ -5553,7 +5560,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Reveal high-grade model targets, without changing source cell sizes or positions.','Reveal the conceptual benches around the target footprint. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
         <div className="tanga-mine-story__key"><span>● 4.5–&lt;5% TGC</span><span>● ≥5% TGC</span></div>
         <small>{targetCount.toLocaleString()} source cells qualify; {targetDisplayCount.toLocaleString()} shown as a 50 m grid sample across both grade bands. Sampled cells keep their source sizes and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
-        <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on':'Solid pit view'}</button>
+        <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on · turn off':'Enable X-ray targets'}</button>
         </>}
         <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
           <button onClick={()=>{setPlantCutaway(true);setPlantProcess('all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>Inspect whole processing plant</button>
