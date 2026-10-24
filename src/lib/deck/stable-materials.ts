@@ -95,6 +95,22 @@ export function stabilizeSceneMaterialAppearance(root: THREE.Object3D) {
       shadowOwner.receiveShadow = false;
       object.userData.deckCameraStableColor = true;
 
+      // Categorical meshes must participate in the depth buffer. A few
+      // generated layers were authored as always-on-top overlays; when two
+      // differently colored InstancedMeshes overlap, Three.js sorts those
+      // objects relative to the camera and the visible class can flip during
+      // an orbit. Keep opaque evidence surfaces depth-tested and depth-writing
+      // so visibility follows geometry rather than draw order.
+      for (const material of entries) {
+        if (!('depthTest' in material) || !('depthWrite' in material)) continue;
+        const depthMaterial = material as THREE.Material & {depthTest: boolean; depthWrite: boolean; transparent?: boolean; opacity?: number};
+        depthMaterial.depthTest = true;
+        if (!depthMaterial.transparent || (depthMaterial.opacity ?? 1) >= 0.999) {
+          depthMaterial.depthWrite = true;
+        }
+        depthMaterial.needsUpdate = true;
+      }
+
       // Terrain-conforming concept surfaces are only centimetres above the
       // DEM. A small fixed depth bias prevents their color buffers from
       // competing with the terrain during orbit and zoom, without lifting the
