@@ -124,6 +124,7 @@ type LoadStage = {
 
 type FallbackPreflightResult = {
   mode: WorkbenchMode;
+  kind: '3D' | 'Map';
   ok: boolean;
   status: number | null;
   contentType: string;
@@ -945,6 +946,49 @@ const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: s
     src: '/presentation-assets/tanga-fallback-mine-planning.jpg?v=2026-10-24-1',
     alt: 'Tanga terrain with two conceptual pit envelopes and proposed facility pads; no resource blocks are draped over the surface.',
     note: 'Mine-plan terrain preview · saved scene view',
+  },
+};
+
+// A small, local reference image keeps map chapters presentable when the
+// shared MapLibre/DeckGL WebGL context is unavailable. These are source
+// illustrations, not cached map tiles; live labels and geometry return with
+// the renderer.
+const STATIC_MAP_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: string; note: string; fit?: 'cover' | 'contain'}>> = {
+  project: {
+    src: '/presentation-assets/survey-site-aerial.jpg',
+    alt: 'Survey aerial photographs of the Tanga project terrain.',
+    note: 'Survey-site reference · live map unavailable',
+    fit: 'cover',
+  },
+  tanzania: {
+    src: '/presentation-assets/mre-regional-geology.jpg',
+    alt: 'Regional geology map locating the Tanga Graphite Project in Tanzania.',
+    note: 'Regional report map · live map unavailable',
+    fit: 'contain',
+  },
+  work_completed: {
+    src: '/presentation-assets/metallurgy-samples.jpg',
+    alt: 'Photograph of Tanga project drill core used in completed study work.',
+    note: 'Project evidence reference · live map unavailable',
+    fit: 'cover',
+  },
+  ranking: {
+    src: '/presentation-assets/world-map-fallback.jpg',
+    alt: 'Static global reference map behind the dated graphite peer comparison.',
+    note: 'Global locator reference · live map unavailable',
+    fit: 'cover',
+  },
+  accessibility: {
+    src: '/presentation-assets/paulsam-conveyor-sites.jpg',
+    alt: 'PaulSam planning map showing the project boundary and report-drawn feed and conveyor context.',
+    note: 'PaulSam planning map · live map unavailable',
+    fit: 'contain',
+  },
+  comparison: {
+    src: '/presentation-assets/world-map-fallback.jpg',
+    alt: 'Static global reference map behind the evidence and next-decisions chapter.',
+    note: 'Global locator reference · live map unavailable',
+    fit: 'cover',
   },
 };
 
@@ -3330,10 +3374,31 @@ export default function TangaDeckWorkbench() {
     };
   }, [mapInstance]);
 
-  const handleMapError = useCallback(() => {
-    setMapLoadState('degraded');
-    console.info('[Tanga telemetry] map entered degraded state; DeckGL overlays remain available');
-  }, []);
+  const handleMapError = useCallback((event?: any) => {
+    const message = String(event?.error?.message ?? event?.error ?? '');
+    const fatal = !mapInstance || /webgl|context.{0,12}lost|failed to initialize/i.test(message);
+    setMapLoadState(fatal ? 'error' : 'degraded');
+    console.info(`[Tanga telemetry] map entered ${fatal ? 'fallback' : 'degraded'} state; evidence and chapter controls remain available`);
+  }, [mapInstance]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+    const map = mapInstance as any;
+    const onContextLost = () => {
+      setMapLoadState('error');
+      console.info('[Tanga telemetry] map WebGL context lost; showing the chapter reference still');
+    };
+    const onContextRestored = () => {
+      setMapLoadState('ready');
+      console.info('[Tanga telemetry] map WebGL context restored; returning to the live map');
+    };
+    map.on('webglcontextlost', onContextLost);
+    map.on('webglcontextrestored', onContextRestored);
+    return () => {
+      map.off?.('webglcontextlost', onContextLost);
+      map.off?.('webglcontextrestored', onContextRestored);
+    };
+  }, [mapInstance]);
   const markUiInteraction = useCallback(() => {
     uiInteractionUntilRef.current = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + 450;
   }, []);
@@ -4936,16 +5001,22 @@ export default function TangaDeckWorkbench() {
   const runFallbackPreflight = useCallback(async () => {
     if (fallbackPreflightRunning) return;
     setFallbackPreflightRunning(true);
-    const entries = (Object.keys(STATIC_SCENE_FALLBACKS) as WorkbenchMode[]).flatMap(mode => {
-      const fallback = STATIC_SCENE_FALLBACKS[mode];
-      return fallback ? [[mode, fallback] as const] : [];
-    });
-    const results = await Promise.all(entries.map(async ([mode, fallback]) => {
+    const entries = [
+      ...(Object.keys(STATIC_SCENE_FALLBACKS) as WorkbenchMode[]).flatMap(mode => {
+        const fallback = STATIC_SCENE_FALLBACKS[mode];
+        return fallback ? [[mode, '3D' as const, fallback] as const] : [];
+      }),
+      ...(Object.keys(STATIC_MAP_FALLBACKS) as WorkbenchMode[]).flatMap(mode => {
+        const fallback = STATIC_MAP_FALLBACKS[mode];
+        return fallback ? [[mode, 'Map' as const, fallback] as const] : [];
+      }),
+    ];
+    const results = await Promise.all(entries.map(async ([mode, kind, fallback]) => {
       try {
         const response = await fetch(assetUrl(fallback.src), {method:'HEAD', cache:'no-store'});
         const contentType = response.headers.get('content-type') ?? '';
         if (!response.ok || !contentType.startsWith('image/')) {
-          return {mode, ok:false, status:response.status, contentType, dimensions:''};
+          return {mode, kind, ok:false, status:response.status, contentType, dimensions:''};
         }
         const dimensions = await new Promise<string>((resolve, reject) => {
           const image = new Image();
@@ -4955,9 +5026,9 @@ export default function TangaDeckWorkbench() {
           image.onerror = () => reject(new Error('Image could not be decoded'));
           image.src = assetUrl(fallback.src);
         });
-        return {mode, ok:true, status:response.status, contentType, dimensions};
+        return {mode, kind, ok:true, status:response.status, contentType, dimensions};
       } catch {
-        return {mode, ok:false, status:null, contentType:'', dimensions:''};
+        return {mode, kind, ok:false, status:null, contentType:'', dimensions:''};
       }
     }));
     setFallbackPreflight(results);
@@ -5569,6 +5640,13 @@ export default function TangaDeckWorkbench() {
         <figure className={`tanga-deck__static-scene-fallback${threeLoadReport.scene === 'loading' ? ' is-loading' : ''}`} aria-label={`${MODE_LABELS[activeMode]} static scene preview`} aria-live="polite">
           <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
           <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> {threeLoadReport.scene === 'loading' ? 'Interactive 3D loading' : '3D unavailable'}</figcaption>
+        </figure>
+      )}
+
+      {!threeVisible && !isCoverScene && mapLoadState === 'error' && STATIC_MAP_FALLBACKS[activeMode] && (
+        <figure className={`tanga-deck__static-map-fallback is-${STATIC_MAP_FALLBACKS[activeMode]!.fit ?? 'contain'}`} aria-label={`${MODE_LABELS[activeMode]} static map reference`} aria-live="polite">
+          <img src={STATIC_MAP_FALLBACKS[activeMode]!.src} alt={STATIC_MAP_FALLBACKS[activeMode]!.alt} />
+          <figcaption>{STATIC_MAP_FALLBACKS[activeMode]!.note} <span>·</span> The interactive map is retrying</figcaption>
         </figure>
       )}
 
@@ -6240,17 +6318,17 @@ export default function TangaDeckWorkbench() {
               </ol>
               <p>States are collected as you visit chapters in this session. Ready means the observed loaders reported no failure; assets that remain on demand may still be in standby.</p>
             </details>
-            <section className="tanga-presentation-tools__fallback-check" aria-label="Saved 3D fallback image check">
-              <div><strong>Saved 3D fallback images</strong><span>Five stills used while a 3D scene loads or recovers.</span></div>
+            <section className="tanga-presentation-tools__fallback-check" aria-label="Saved scene and map fallback image check">
+              <div><strong>Saved scene and map fallback images</strong><span>Five 3D stills and six map references for renderer recovery.</span></div>
               <button type="button" onClick={runFallbackPreflight} disabled={fallbackPreflightRunning}>
                 <RotateCw size={13} aria-hidden="true" className={fallbackPreflightRunning?'is-spinning':''}/>
-                {fallbackPreflightRunning?'Checking images…':'Check 5 images'}
+                {fallbackPreflightRunning?'Checking images…':'Check 11 images'}
               </button>
             </section>
             {fallbackPreflight && <ul className="tanga-presentation-tools__fallback-results" aria-live="polite">
-              {fallbackPreflight.map(result=><li key={result.mode} className={result.ok?'is-ready':'is-missing'}><span>{MODE_LABELS[result.mode]}</span><strong>{result.ok?`Decoded · ${result.dimensions}`:result.status?`Missing · HTTP ${result.status}`:'Unavailable'}</strong></li>)}
+              {fallbackPreflight.map(result=><li key={`${result.kind}-${result.mode}`} className={result.ok?'is-ready':'is-missing'}><span>{MODE_LABELS[result.mode]} · {result.kind}</span><strong>{result.ok?`Decoded · ${result.dimensions}`:result.status?`Missing · HTTP ${result.status}`:'Unavailable'}</strong></li>)}
             </ul>}
-            <p className="tanga-presentation-tools__readiness-note">A valid still keeps the chapter usable during 3D loading or graphics recovery. The remaining seven chapters use index thumbnails only, not runtime 3D fallbacks.</p>
+            <p className="tanga-presentation-tools__readiness-note">A valid still keeps the chapter usable during scene loading or renderer recovery. Map references do not replace live tiles or georeferenced overlays.</p>
           </div>
         </details>
         {threeVisible && activeMode !== 'metallurgy' && (
