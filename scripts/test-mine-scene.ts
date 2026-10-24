@@ -54,6 +54,14 @@ for(const name of ['Flotation banks and walkways','Crushing and milling equipmen
 assert.ok(plant.children.filter(object=>object.userData.plantRoof).length>=12,'Roof cutaway tags cover the industrial halls');
 const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05,admittedPad);
 assert.ok(Math.abs(level-1.5)<1e-6,'Platform datum is 1.5 m above the median of the symmetric sampled ground');
+const transitionPad:ConceptPad={x:0,z:0,width:100,depth:100,level:10,transition:20};
+const sideBlend=conceptPadHeight(transitionPad,55,50,0),cornerBlend=conceptPadHeight(transitionPad,55,55,0);
+assert.ok(cornerBlend<sideBlend,'The earthwork transition follows a rounded distance around pad corners instead of square-axis blending');
+assert.equal(conceptPadHeight(transitionPad,50,50,0),10,'The facility footprint remains level inside its rectangular land allowance');
+const earthworks=plant.getObjectByName('Illustrative cut and fill transition · not engineered') as THREE.Mesh|undefined;
+assert.ok(earthworks,'The site-conforming cut/fill transition remains separately identified');
+const earthworkPositions=earthworks.geometry.getAttribute('position');
+assert.ok(Array.from(earthworkPositions.array).every(Number.isFinite),'Rounded terrain contours produce finite earthwork vertices');
 const placedBounds=new THREE.Box3();
 for(const child of plant.children)if(child.name!=='Illustrative cut and fill transition · not engineered')placedBounds.union(new THREE.Box3().setFromObject(child));
 assert.ok(placedBounds.min.x>=-admittedPad.width/2 && placedBounds.max.x<=admittedPad.width/2 && placedBounds.min.z>=-admittedPad.depth/2 && placedBounds.max.z<=admittedPad.depth/2,'Building/equipment envelope remains inside the graded pad; the separately named earthwork transition extends beyond it');

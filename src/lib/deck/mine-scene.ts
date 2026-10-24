@@ -292,7 +292,11 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
 export type ConceptPad={x:number;z:number;width:number;depth:number;level:number;transition:number};
 
 function padBlend(pad:ConceptPad,x:number,z:number){
-  const distance=Math.max(0,Math.abs(x-pad.x)-pad.width/2,Math.abs(z-pad.z)-pad.depth/2);
+  // Measure the transition from the rectangular pad edge with a rounded
+  // Euclidean corner. A max-axis distance produced a square, orthogonal berm
+  // around the whole facility that looked like a second platform in overview.
+  const dx=Math.max(0,Math.abs(x-pad.x)-pad.width/2),dz=Math.max(0,Math.abs(z-pad.z)-pad.depth/2);
+  const distance=Math.hypot(dx,dz);
   const t=Math.min(1,distance/pad.transition);return 1-t*t*(3-2*t);
 }
 
@@ -316,18 +320,35 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
   const {level}=pad;
   root.userData.conceptPad=pad;
   const vertices:number[]=[];
-  const ring=(distance:number)=>[[-width/2-distance,-depth/2-distance],[width/2+distance,-depth/2-distance],[width/2+distance,depth/2+distance],[-width/2-distance,depth/2+distance]];
+  // Parallel rounded-rectangle contours keep the engineering pad square while
+  // allowing its unsourced cut/fill transition to blend into the natural
+  // terrain instead of ending in a second hard-edged rectangle.
+  const ring=(distance:number)=>{
+    const halfWidth=width/2,halfDepth=depth/2,segmentsPerCorner=12,segmentsPerSide=Math.ceil(Math.max(width,depth)/5),points:number[][]=[];
+    const arc=(cx:number,cz:number,start:number)=>{
+      for(let i=0;i<segmentsPerCorner;i++){
+        const angle=start+i/segmentsPerCorner*Math.PI/2;
+        points.push([cx+Math.cos(angle)*distance,cz+Math.sin(angle)*distance]);
+      }
+    };
+    const line=(from:number[],to:number[])=>{
+      for(let i=0;i<segmentsPerSide;i++){
+        const t=i/segmentsPerSide;points.push([THREE.MathUtils.lerp(from[0],to[0],t),THREE.MathUtils.lerp(from[1],to[1],t)]);
+      }
+    };
+    const topRight:[number,number]=[halfWidth,halfDepth],topLeft:[number,number]=[-halfWidth,halfDepth],bottomLeft:[number,number]=[-halfWidth,-halfDepth],bottomRight:[number,number]=[halfWidth,-halfDepth];
+    arc(...topRight,0);line([halfWidth,halfDepth+distance],[-halfWidth,halfDepth+distance]);
+    arc(...topLeft,Math.PI/2);line([-halfWidth-distance,halfDepth],[-halfWidth-distance,-halfDepth]);
+    arc(...bottomLeft,Math.PI);line([-halfWidth,-halfDepth-distance],[halfWidth,-halfDepth-distance]);
+    arc(...bottomRight,Math.PI*1.5);line([halfWidth+distance,-halfDepth],[halfWidth+distance,halfDepth]);
+    return points;
+  };
   const vertex=(p:number[])=>[p[0]/root.scale.x,((height(x+p[0],z+p[1])*(1-padBlend(pad,x+p[0],z+p[1]))+level*padBlend(pad,x+p[0],z+p[1]))-level+.3)/root.scale.y,p[1]/root.scale.z];
   for(let strip=0;strip<6;strip++){
     const inner=ring(strip*5),outer=ring((strip+1)*5);
-    for(let edge=0;edge<4;edge++){
-      const next=(edge+1)%4,n=Math.ceil(Math.hypot(outer[next][0]-outer[edge][0],outer[next][1]-outer[edge][1])/5);
-      const point=(r:number[][],t:number)=>[r[edge][0]+(r[next][0]-r[edge][0])*t,r[edge][1]+(r[next][1]-r[edge][1])*t];
-      for(let i=0;i<n;i++){
-        const innerA=point(inner,i/n),innerB=point(inner,(i+1)/n),outerA=point(outer,i/n),outerB=point(outer,(i+1)/n);
-        const a=vertex(innerA),b=vertex(innerB),c=vertex(outerA),d=vertex(outerB);
-        vertices.push(...a,...c,...b,...b,...c,...d);
-      }
+    for(let i=0;i<inner.length;i++){
+      const next=(i+1)%inner.length,a=vertex(inner[i]),b=vertex(inner[next]),c=vertex(outer[i]),d=vertex(outer[next]);
+      vertices.push(...a,...c,...b,...b,...c,...d);
     }
   }
   // Keep this shared plant apron at one fixed palette color. Procedural
