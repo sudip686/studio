@@ -217,7 +217,7 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
   const pad=createConceptPad(x,z,width,depth,height);
   const {level}=pad;
   root.userData.conceptPad=pad;
-  const vertices:number[]=[],earthworkColors:number[]=[];
+  const vertices:number[]=[];
   const ring=(distance:number)=>[[-width/2-distance,-depth/2-distance],[width/2+distance,-depth/2-distance],[width/2+distance,depth/2+distance],[-width/2-distance,depth/2+distance]];
   const vertex=(p:number[])=>[p[0]/root.scale.x,((height(x+p[0],z+p[1])*(1-padBlend(pad,x+p[0],z+p[1]))+level*padBlend(pad,x+p[0],z+p[1]))-level+.3)/root.scale.y,p[1]/root.scale.z];
   for(let strip=0;strip<6;strip++){
@@ -229,19 +229,15 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
         const innerA=point(inner,i/n),innerB=point(inner,(i+1)/n),outerA=point(outer,i/n),outerB=point(outer,(i+1)/n);
         const a=vertex(innerA),b=vertex(innerB),c=vertex(outerA),d=vertex(outerB);
         vertices.push(...a,...c,...b,...b,...c,...d);
-        // Quiet, broad colour variation keeps this display-only cut/fill apron
-        // from reading as a single plastic slab. It is a material treatment,
-        // not mapped soil or a claim about local ground composition.
-        for(const p of [innerA,outerA,innerB,innerB,outerA,outerB]){
-          const mottling=.965+Math.sin(p[0]*.041+Math.sin(p[1]*.019))*Math.cos(p[1]*.037)*.026+Math.sin((p[0]+p[1])*.19)*.008;
-          const color=new THREE.Color(0x766d5e).multiplyScalar(mottling);
-          earthworkColors.push(color.r,color.g,color.b);
-        }
       }
     }
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(earthworkColors,3));geometry.computeVertexNormals();
-  const earthworks=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xffffff,vertexColors:true,side:THREE.DoubleSide}));
+  // Keep this shared plant apron at one fixed palette color. Procedural
+  // per-vertex mottling, even at low amplitude, shimmered as its triangles
+  // crossed screen pixels during orbit and made the resource/pad colors seem
+  // to change with the camera. Shape and relief carry the visual texture.
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();
+  const earthworks=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x766d5e,toneMapped:false,side:THREE.DoubleSide}));
   earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
   root.position.set(x,level,z);return level;
 }
