@@ -62,6 +62,17 @@ The conceptual mine-plan target story now draws 1,380 source cells, selected as 
 
 On the optimized local Next.js production server at `localhost:3013`, Chrome at 1707 × 842 ran a 33-second foreground orbit at renderer scale 0.90. The browser requestAnimationFrame sample contained 1,258 intervals: median 25.0 ms, p90 37.8 ms, p95 50.0 ms, p99 54.3 ms; 84.5% of intervals were at or below 33.4 ms. The scene stayed ready and logged zero JavaScript errors. This sample shows continued desktop frame-time headroom above the plan's 33 ms p95 target; it is not a controlled before/after comparison, a GPU timer, a cold-cache test, or a physical-device certification.
 
+## Resource-cell geometry and 30-second desktop orbit — 24 October 2026
+
+Chrome 155 on Windows used Intel UHD Graphics through ANGLE / Direct3D 11. The optimized Next.js production app ran at 1707 × 842, DPR 1, with the browser tab visible and the Resource scene ready at render scale 1.00. All 155,853 source blocks remained rendered. A 30-second orbit was driven by pointer events on the live OrbitControls canvas; requestAnimationFrame intervals were sampled in-page. Other browser tabs were open, so this remains a desktop diagnostic rather than an isolated, controlled device benchmark.
+
+| Resource geometry | RAF intervals | Median | p90 | p95 | p99 | Max | ≤33.4 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Before: `BoxGeometry` (24 face-split vertices per instance) | 848 | 25.1 ms | 75.1 ms | 112.6 ms | 174.8 ms | 220.6 ms | 54.6% |
+| After: indexed cube (8 shared vertices per instance) | 975 | 21.0 ms | 66.6 ms | 112.4 ms | 146.1 ms | 200.0 ms | 62.3% |
+
+Each cell retains its source position, dimensions, grade class and color. The geometry change reduces per-instance transformed vertices by two thirds without removing or aggregating source blocks. The resource model remained intact at 1707 × 842; capture: `.playwright-mcp/resource-indexed-cells-production-1707x842.png`. Both runs stayed `ready=true` at render scale 1.00 with zero JavaScript errors. The p95 remained about 112 ms, above the 33 ms target. Lower median/p90 and more intervals under 33.4 ms do not establish a robust speed-up because scheduling stalls, other open tabs and the absence of an isolated controlled A/B run remain. Continue desktop resource-rendering investigation; do not close the performance gate from this sample.
+
 ## Reproduction notes
 
 The optimized application was served with `npm start -- -p 3002`. Browser scripts navigated to each chapter through a fresh query and hash, waited for its authored chapter heading, and for Three.js chapters waited on `.tanga-three__canvas[data-ready="true"]`. The browser tab was explicitly foregrounded before timing. A background tab reports no first useful frame because its animation loop intentionally pauses.

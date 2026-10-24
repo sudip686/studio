@@ -74,6 +74,30 @@ const STORY_LABEL_SIZE = {width: 200, height: 88} as const;
 const INTERCEPT_LABEL_SIZE = {width: 184, height: 62} as const;
 
 /**
+ * A unit resource cell for InstancedMesh. MeshBasicMaterial does not need
+ * per-face normals, so share the cube's eight corners instead of BoxGeometry's
+ * 24 face-split vertices. Every instance keeps its source centre and dimensions.
+ */
+function createResourceCellGeometry() {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -.5, -.5, -.5,  .5, -.5, -.5,  .5, .5, -.5,  -.5, .5, -.5,
+    -.5, -.5,  .5,  .5, -.5,  .5,  .5, .5,  .5,  -.5, .5,  .5,
+  ], 3));
+  geometry.setIndex([
+    4, 5, 6, 4, 6, 7, // front (+Z)
+    1, 2, 6, 1, 6, 5, // right (+X)
+    0, 3, 2, 0, 2, 1, // back (-Z)
+    0, 4, 7, 0, 7, 3, // left (-X)
+    3, 7, 6, 3, 6, 2, // top (+Y)
+    0, 1, 5, 0, 5, 4, // bottom (-Y)
+  ]);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/**
  * The part of the canvas host actually on screen, in host-local pixels.
  *
  * The host is sized by the deck stage and can extend past the window — a label
@@ -4007,7 +4031,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           ));
         }
 
-        const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const blockGeometry = createResourceCellGeometry();
         const solidByGrade = new Map<string, ResourceBlock[]>();
         sampled.forEach((block) => {
           const bin = tgcGradeBin(block.carbon);
