@@ -2955,6 +2955,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setMineOrientation('oblique');
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI-0.04;
         facilityFocused=false;calloutsForProjection=siteOverviewCallouts;
+        setMiningBeat(3);
         scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);
         setStatus('Oblique site overview · terrain and proposed facilities');
         return;
