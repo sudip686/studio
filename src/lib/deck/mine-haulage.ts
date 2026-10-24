@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import {inside, contained, overlaps, rectangle, type Point2, type CandidatePit} from './site-planning';
 
-/** Illustrative rim-to-receiving haulage, not an engineered pit ramp. */
+/** Terrain-screened display corridor only; not an approved road alignment. */
 export async function planHaulRoute(start:Point2,end:Point2,boundary:Point2[],pits:CandidatePit[],height:(x:number,z:number)=>number,audit?:(reason:string)=>void,cancelled:()=>boolean=()=>false) {
-  const step=30,width=18,maxGrade=.2;
+  // Only reject discontinuous terrain samples; this loose visual continuity
+  // guard is not a road-gradient recommendation or design check.
+  const step=30,width=18,maxLocalReliefRatio=.45;
   const validity=new Map<string,boolean>(),elevations=new Map<string,number>();
   const pointKey=(p:Point2)=>`${p[0].toFixed(4)},${p[1].toFixed(4)}`;
-  const valid=(p:Point2)=>{const k=pointKey(p);if(validity.has(k))return validity.get(k)!;const result=contained(rectangle(p,width,width),boundary)&&!pits.some(pit=>overlaps(rectangle(p,width,width),pit.ring));validity.set(k,result);return result;};
+  const valid=(p:Point2)=>{const k=pointKey(p);if(validity.has(k))return validity.get(k)!;const result=(!boundary.length||contained(rectangle(p,width,width),boundary))&&!pits.some(pit=>overlaps(rectangle(p,width,width),pit.ring));validity.set(k,result);return result;};
   const elevation=(p:Point2)=>{const k=pointKey(p);if(!elevations.has(k))elevations.set(k,height(...p));return elevations.get(k)!;};
   const clear=(a:Point2,b:Point2)=>{
     const n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/5));
@@ -15,7 +17,7 @@ export async function planHaulRoute(start:Point2,end:Point2,boundary:Point2[],pi
       const p:Point2=[a[0]+(b[0]-a[0])*i/n,a[1]+(b[1]-a[1])*i/n];
       if(!valid(p))return false;
       if(!Number.isFinite(elevation(p)))return false;
-      if(i&&Math.abs(elevation(p)-elevation(prev))>maxGrade*Math.hypot(p[0]-prev[0],p[1]-prev[1])+1e-6)return false;
+      if(i&&Math.abs(elevation(p)-elevation(prev))>maxLocalReliefRatio*Math.hypot(p[0]-prev[0],p[1]-prev[1])+1e-6)return false;
       prev=p;
     }
     return true;
@@ -44,20 +46,24 @@ export async function planHaulRoute(start:Point2,end:Point2,boundary:Point2[],pi
   points.reverse();
   const sampled=points.slice(1).flatMap((b,i)=>{const a=points[i],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/5));return Array.from({length:n},(_,j)=>[a[0]+(b[0]-a[0])*j/n,a[1]+(b[1]-a[1])*j/n] as Point2);});
   sampled.push(end);
-  audit?.(`Screened ${sampled.length} route samples; 18 m corridor, ≤20% grade`);
+  audit?.(`Screened ${sampled.length} display samples with an 18 m corridor and a terrain-continuity guard (neither is an engineering design criterion)`);
   return sampled.map(p=>new THREE.Vector3(p[0],elevation(p)+1,p[1]));
 }
 
 export function buildHaulRoad(points:THREE.Vector3[]) {
-  const group=new THREE.Group();group.name='Illustrative 18 m rim haul corridor';
-  const material=new THREE.MeshStandardMaterial({color:0x776958,roughness:1,side:THREE.DoubleSide});
-  // Segment ribbons preserve the validated polyline rather than smoothing outside it.
+  const group=new THREE.Group();group.name='Illustrative 18 m terrain-following haul corridor';
+  const material=new THREE.MeshBasicMaterial({color:0x8a7b68,side:THREE.DoubleSide,toneMapped:false});
+  const positions:number[]=[],indices:number[]=[];
+  // Segment ribbons preserve the sampled polyline without smoothing it away.
+  // One indexed mesh avoids a draw call for every terrain sample.
   for(let i=1;i<points.length;i++){
     const a=points[i-1],b=points[i],d=b.clone().sub(a),normal=new THREE.Vector3(-d.z,0,d.x).normalize().multiplyScalar(9);
-    const vertices=[a.clone().add(normal),a.clone().sub(normal),b.clone().add(normal),b.clone().sub(normal)];
-    const geometry=new THREE.BufferGeometry().setFromPoints(vertices);geometry.setIndex([0,1,2,2,1,3]);geometry.computeVertexNormals();
-    group.add(new THREE.Mesh(geometry,material));
+    const base=positions.length/3;
+    for(const vertex of [a.clone().add(normal),a.clone().sub(normal),b.clone().add(normal),b.clone().sub(normal)])positions.push(vertex.x,vertex.y,vertex.z);
+    indices.push(base,base+1,base+2,base+2,base+1,base+3);
   }
+  if(positions.length){const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setIndex(indices);geometry.computeVertexNormals();
+    const road=new THREE.Mesh(geometry,material);road.name='Sampled terrain-following gravel road · illustrative';road.receiveShadow=false;road.castShadow=false;group.add(road);}
   return group;
 }
 

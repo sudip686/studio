@@ -2516,6 +2516,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const sectionPlane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
     const sectionPlanes=[sectionPlane];
     const haulTrucks:{mesh:THREE.Group;points:THREE.Vector3[];length:number;offset:number;legDuration:number}[]=[];
+    const haulRampPaths:(THREE.Vector3[]|null)[]=[];
     const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
     let motionTime=0,lastMotionElapsed=0;
     const evidenceGroup=new THREE.Group();evidenceGroup.name='Selected source drill traces';
@@ -4309,27 +4310,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
             pitSurfaces.push(mesh);
-            const ramp=buildConceptualPitRamp(pit);
+            const approximateFeedPoint:Point2=[DEVELOPMENT_SITE.feedUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.feedUtm[1]];
+            const rampBearing=Math.atan2(approximateFeedPoint[1]-pit.centre[1],approximateFeedPoint[0]-pit.centre[0]);
+            const ramp=buildConceptualPitRamp(pit,rampBearing);
             tagDeckLayer(ramp,'context');
             stage.add(ramp);
             pitRamps.push(ramp);
             const rampPath=ramp.userData.displayPath as THREE.Vector3[]|undefined;
-            if(!haulTrucks.length&&rampPath&&rampPath.length>1){
-              const points=rampPath.slice().reverse();
-              const truck=buildHaulTruck();
-              truck.name='Illustrative truck · conceptual internal pit ramp only';
-              truck.scale.setScalar(1.25);
-              truck.position.copy(points[0]);
-              truck.traverse(object=>{if(object instanceof THREE.Mesh)object.castShadow=true;});
-              let length=0;for(let i=1;i<points.length;i++)length+=points[i].distanceTo(points[i-1]);
-              stage.add(truck);
-              haulTrucks.push({mesh:truck,points,length,offset:0,legDuration:Math.max(18,length/7)});
-            }
+            haulRampPaths.push(rampPath&&rampPath.length>1?rampPath.slice().reverse():null);
           }
-          setHaulCount(haulTrucks.length);
-          setHaulStatus('ready');
-          host.dataset.haulTrucks=String(haulTrucks.length);
-          host.dataset.haulRoutes=JSON.stringify([{kind:'display-only internal pit-ramp cue',connectsToFeed:false,engineeringStatus:'conceptual, not an engineered route or speed'}]);
           if (sitePlan.plant) {
             const plant = buildConcentrator();
             const [x, z] = sitePlan.plant;
@@ -4343,6 +4332,49 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if(!apron)throw new Error('No conflict-free feed apron near the mapped candidate; do not render a facility over a pit');
             const feed=apron.point;
             const siteHeight=(px:number,pz:number)=>conceptPadHeight(plant.userData.conceptPad as ConceptPad,px,pz,terrainSurfaceY(terrainResources,px,-pz));
+            // PaulSam describes an approximately 2 km mine-to-feed access road,
+            // but does not supply a georeferenced mine endpoint or road centerline.
+            // Connect the conceptual pit-ramp exit to its approximate mapped feed
+            // point with a terrain-screened display corridor, and label that
+            // generated alignment as illustrative rather than report-mapped.
+            let haulRoute:THREE.Vector3[]|null=null;
+            const haulRouteAttempts:string[]=[];
+            const plannedPits=sitePlan.pits;
+            const activePitIndex=plannedPits.length?plannedPits.reduce((best,pit,index)=>Math.hypot(pit.centre[0]-feed[0],pit.centre[1]-feed[1])<Math.hypot(plannedPits[best].centre[0]-feed[0],plannedPits[best].centre[1]-feed[1])?index:best,0):-1;
+            const activePit=activePitIndex>=0?plannedPits[activePitIndex]:undefined,activeRampPath=activePitIndex>=0?haulRampPaths[activePitIndex]:undefined;
+            if(activeRampPath&&activePit){
+              const rim=activeRampPath[activeRampPath.length-1];
+              const radial=new THREE.Vector2(rim.x-activePit.centre[0],rim.z-activePit.centre[1]).normalize();
+              // The route planner requires a clear road-width start outside the
+              // candidate shell. Step out from the conceptual ramp mouth until
+              // its corridor no longer overlaps the pit envelope.
+              for(let offset=20;offset<=320&&!haulRoute;offset+=20){
+                const start:Point2=[rim.x+radial.x*offset,rim.z+radial.y*offset];
+                const planned=await planHaulRoute(start,feed,[],sitePlan.pits,siteHeight,reason=>haulRouteAttempts.push(`${offset} m: ${reason}`),()=>cancelled);
+                if(planned&&planned.length>1)haulRoute=[...activeRampPath.map(point=>point.clone()),...planned.slice(1)];
+              }
+            }
+            if(haulRoute){
+              const road=buildHaulRoad(haulRoute.slice(Math.max(0,(activeRampPath?.length??1)-1)));
+              road.name='Illustrative pit-to-feed road corridor · generated, not surveyed';
+              tagDeckLayer(road,'context');stage.add(road);
+              host.dataset.haulRouteStatus='generated conceptual corridor from candidate pit to approximate mapped feed point';
+            }else{
+              haulRoute=activeRampPath?.map(point=>point.clone())??null;
+              host.dataset.haulRouteStatus='no terrain-screened pit-to-feed corridor; internal conceptual ramp only';
+            }
+            if(haulRoute&&haulRoute.length>1){
+              const truck=buildHaulTruck();
+              truck.name=host.dataset.haulRouteStatus.startsWith('generated')?'Illustrative truck · generated conceptual pit-to-feed corridor':'Illustrative truck · conceptual internal pit ramp only';
+              truck.scale.setScalar(1.25);truck.position.copy(haulRoute[0]);
+              truck.traverse(object=>{if(object instanceof THREE.Mesh)object.castShadow=true;});stage.add(truck);
+              let length=0;for(let i=1;i<haulRoute.length;i++)length+=haulRoute[i].distanceTo(haulRoute[i-1]);
+              haulTrucks.push({mesh:truck,points:haulRoute,length,offset:0,legDuration:36});
+            }
+            setHaulCount(haulTrucks.length);setHaulStatus('ready');
+            host.dataset.haulTrucks=String(haulTrucks.length);
+            host.dataset.haulRoutes=JSON.stringify([{kind:host.dataset.haulRouteStatus,connectsToFeed:Boolean(host.dataset.haulRouteStatus.startsWith('generated')),engineeringStatus:'illustrative generated centerline; not a surveyed report alignment, approved road design or operating speed'}]);
+            host.dataset.haulRouteAttempts=JSON.stringify(haulRouteAttempts);
             developmentInfrastructure=buildDevelopmentInfrastructure(feed,[x,z],siteHeight,level);
             const feedPad=developmentInfrastructure.userData.conceptPad as ConceptPad|undefined;
             if(feedPad)for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,feedPad);
@@ -4384,9 +4416,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
             processMarker=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshBasicMaterial({color:0xffb760}));plant.add(processMarker);
             // PaulSam separates mine-to-feed haulage from the downhill conveyor.
-            // Keep the animated vehicle on the conceptual internal pit ramp;
-            // no unreported pit-to-feed road is drawn or implied.
-            // Ground-level receiving apron: internal pit ramps and pad access remain unengineered.
+            // The road is a separate generated display corridor, not a reported
+            // alignment. The conveyor remains tied to its approximate report map.
+            // Ground-level receiving apron and internal pit ramps remain conceptual.
+          }else{
+            setHaulCount(0);setHaulStatus('ready');
+            host.dataset.haulRouteStatus='no processing candidate; no pit-to-feed display route';
+            host.dataset.haulTrucks='0';
+            host.dataset.haulRoutes=JSON.stringify([{kind:host.dataset.haulRouteStatus,connectsToFeed:false,engineeringStatus:'not available'}]);
           }
           const pit = sitePlan.pits[0];
           lastMotionElapsed=clock.getElapsedTime();
@@ -4972,7 +5009,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if(siteCampus)siteCampus.visible=beat>=3&&layerSettingsRef.current.context.visible;
       }
       for(const item of haulTrucks){
-        item.mesh.visible=beat===2&&layerSettingsRef.current.context.visible;
+        item.mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;
         const phase=(motionTime/item.legDuration+item.offset)%2,returning=phase>1;
         const at=routePosition(item.points,(returning?2-phase:phase)*item.length);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
@@ -5692,7 +5729,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
-        <small>{haulStatus==='loading'?'Preparing a display-only pit-ramp vehicle cue':haulCount ? `${haulCount} illustrative truck on a conceptual internal pit ramp; no pit-to-feed road or operating speed is shown.` : 'No conceptual pit-ramp vehicle route is available; no pit-to-feed haul road was supplied.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is not throughput or an operating schedule.</small>
+        <small>{haulStatus==='loading'?'Preparing a conceptual pit-to-feed vehicle cue':haulCount ? `${haulCount} illustrative truck follows a generated route from the candidate pit toward the approximate mapped feed point. PaulSam estimates about 2 km mine-to-feed; the report does not georeference the road centerline, so this displayed route is not that measured alignment.` : 'No terrain-screened pit-to-feed route is available; the conceptual pit ramp remains visible without a moving truck.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is presentation pacing, not throughput, operating speed or schedule.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);setTargetXray(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button onClick={()=>{setTargetXray(false);revealCommand.current?.('none');}}>Restore whole pits</button><small>{revealAction==='pitcut'?'Grade-selected blocks are visible through the pit cutaway; their source positions and display thresholds are unchanged.':'Illustrative pit and block-model view; benches are not an optimised reserve shell.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}

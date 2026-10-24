@@ -409,7 +409,7 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
  * A display-only access ribbon inside a candidate pit envelope. This is not a
  * sourced alignment, engineered haul road, or geotechnically checked grade.
  */
-export function buildConceptualPitRamp(pit:CandidatePit) {
+export function buildConceptualPitRamp(pit:CandidatePit,exitBearing=-Math.PI/2) {
   const centre=pit.centre;
   const radiusAt=(angle:number)=>{
     const direction:Point2=[Math.cos(angle),Math.sin(angle)];
@@ -435,7 +435,7 @@ export function buildConceptualPitRamp(pit:CandidatePit) {
   const steps=Math.max(160,Math.ceil(turns*128)),halfWidth=Math.max(5,Math.min(7,CONCEPT.berm*1.05));
   const path:THREE.Vector3[]=[];
   for(let i=0;i<=steps;i++){
-    const t=i/steps,angle=-Math.PI/2+t*turns*Math.PI*2,outerRadius=radiusAt(angle);
+    const t=i/steps,angle=exitBearing+t*turns*Math.PI*2,outerRadius=radiusAt(angle);
     if(!Number.isFinite(outerRadius))continue;
     const radial=outerRadius*(.92-.58*t),x=centre[0]+Math.cos(angle)*radial,z=centre[1]+Math.sin(angle)*radial;
     const ground=pitHeight([x,z],pit)??pit.floor,designY=pit.surface-t*pit.depth*.96;
