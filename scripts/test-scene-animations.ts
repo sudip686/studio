@@ -17,13 +17,14 @@ const blocks=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshBasic
 const pit=new THREE.Mesh(new THREE.BoxGeometry(100,60,100),new THREE.MeshStandardMaterial());stage.add(blocks,pit);
 const vertices=Array.from(pit.geometry.attributes.position.array);
 const original=new THREE.Plane(new THREE.Vector3(1,0,0),5);pit.material.clippingPlanes=[original];
+const originalBlockPlanes=blocks.material.clippingPlanes;
 const controller=createSceneReveal(stage,[blocks],[pit]);
 controller.start('resource');for(let i=0;i<20;i++)controller.update(.1);
 assert.ok(blocks.count>0&&blocks.count<100);
 const count=blocks.count;controller.update(0);assert.equal(blocks.count,count);
 controller.reset();assert.equal(blocks.count,100);
 controller.start('resource');controller.update(0,true);assert.equal(blocks.count,100);
-for(const action of ['pitcut','benches'] as const){controller.start(action);controller.update(.1);assert.notEqual(pit.material.clippingPlanes?.[0],original);controller.reset();assert.equal(pit.material.clippingPlanes?.[0],original);}
+for(const action of ['pitcut','benches'] as const){controller.start(action);controller.update(.1);assert.notEqual(pit.material.clippingPlanes?.[0],original);assert.equal(blocks.material.clippingPlanes?.length,1,'pit cutaway slices block cells with the pit shell');controller.reset();assert.equal(pit.material.clippingPlanes?.[0],original);assert.equal(blocks.material.clippingPlanes,originalBlockPlanes,'block material clipping is restored after the cutaway');}
 assert.deepEqual(Array.from(pit.geometry.attributes.position.array),vertices);
 const inspection=createMetallurgyInspection();
 for(const mode of ['flake','sieve','compare'] as const){inspection.show(mode);assert.equal(inspection.root.children.filter(o=>o.visible).length,1);for(const t of [-1,NaN,Infinity,0,2,100]){inspection.update(t);inspection.root.traverse(o=>assert.ok([...o.position.toArray(),...o.rotation.toArray().slice(0,3)].every(Number.isFinite)));}}

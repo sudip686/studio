@@ -4362,7 +4362,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 matrices[offset+14]=b.z;
                 matrices[offset+15]=1;
               });
-              mesh.instanceMatrix.needsUpdate=true;tagDeckLayer(mesh,'blocks');stage.add(mesh);targetMeshes.push(mesh);
+              mesh.instanceMatrix.needsUpdate=true;tagDeckLayer(mesh,'blocks');stage.add(mesh);targetMeshes.push(mesh);revealBlocks.push(mesh);
             }
           });
           host.dataset.mineTargetBuildMs=String(Math.round(performance.now()-targetBuildStartedAt));

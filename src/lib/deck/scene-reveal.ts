@@ -18,7 +18,15 @@ export function createSceneReveal(stage:THREE.Object3D,blocks:THREE.InstancedMes
     if(next==='resource')blocks.forEach(mesh=>counts.set(mesh,mesh.count));
     if(next==='pitcut'||next==='benches'){
       stage.updateMatrixWorld(true);bounds.makeEmpty();
-      pits.forEach(mesh=>{bounds.union(new THREE.Box3().setFromObject(mesh));for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material]){if(!savedPlanes.has(material))savedPlanes.set(material,material.clippingPlanes);material.clippingPlanes=[plane];material.needsUpdate=true;}});
+      const clippedObjects:THREE.Object3D[]=[...pits,...blocks];
+      pits.forEach(mesh=>bounds.union(new THREE.Box3().setFromObject(mesh)));
+      clippedObjects.forEach(object=>{
+        if(!(object instanceof THREE.Mesh))return;
+        for(const material of Array.isArray(object.material)?object.material:[object.material]){
+          if(!savedPlanes.has(material))savedPlanes.set(material,material.clippingPlanes);
+          material.clippingPlanes=[plane];material.needsUpdate=true;
+        }
+      });
       bounds.applyMatrix4(stage.matrixWorld.clone().invert());
     }
   }
