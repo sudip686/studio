@@ -34,7 +34,7 @@ const TANGA_MRE_HREF = '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estim
 const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmarkHref'>> = {
   'Balama North / Nicanda Hill': {
     dateLabel: 'Primary MRE · September 2016 · 41.5 Mt Indicated',
-    href: 'https://announcements.asx.com.au/asxpdf/20161024/pdf/43c81t8hnq20t0.pdf',
+    href: 'https://announcements.asx.com.au/asxpdf/20160916/pdf/43b7x1brbmy40z.pdf',
     sourceLabel: 'Nicanda Hill 2016 MRE',
     basisNote: 'Triton’s 2016 MRE reports 41.5 Mt Indicated (2015 comparison table: 41.51 Mt); the benchmark’s 41.7 Mt remains unreconciled.',
   },
