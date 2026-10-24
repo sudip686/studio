@@ -6,6 +6,10 @@ import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
 import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-development';
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
 
+const PIT_RESOURCE_GRADE_BANDS=TGC_GRADE_BINS
+  .filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high')
+  .map(bin=>({...bin,displayRange:bin.key==='medium'?'4.5–<6%':bin.key==='high'?'6–<8%':'≥8%'}));
+
 export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   const [open, setOpen] = useState(false);
 
@@ -137,8 +141,8 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       <button type="button" aria-pressed={pitBlockFocusIndex===0} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(0)}>North pit · inspect blocks</button>
       <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}>South pit · inspect blocks</button>
     </div>
-    <div className="tanga-compact-grade-key" aria-label="Resource block graphitic carbon legend"><span>RESOURCE BLOCKS · TGC</span><div><span><i style={{background:'#388e96'}}/>4.5–&lt;5%</span><span><i style={{background:'#e58b32'}}/>≥5%</span></div></div>
-    <p className="tanga-story-panel__qualification">The cutaway exposes all qualifying source cells at 4.5% TGC and above inside each conceptual pit. Grade bands are display thresholds; they do not define an economic cutoff or reserve.</p>
+    <div className="tanga-compact-grade-key" aria-label="Resource blocks colored by the shared TGC grade palette"><span>RESOURCE BLOCKS · TGC</span><div>{PIT_RESOURCE_GRADE_BANDS.map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.displayRange}</span>)}</div></div>
+    <p className="tanga-story-panel__qualification">The cutaway exposes every source cell at ≥4.5% TGC within each conceptual pit. Colors match the resource model; display bands are not economic cutoffs or reserves.</p>
 
     <details className="tanga-development-source"><summary>Report location &amp; alternatives</summary><p>Option 2 is the report’s planning assumption: 2.15 km and 24° reported inclination. The map trace is approximately 2.45 km, so its alignment and the 2.15 km table estimate need reconciliation. Options 1 and 3 are alternatives, not additional operating conveyors.</p><img src="/presentation-assets/paulsam-conveyor-sites.jpg" alt="PaulSam Figure 3.3 showing three candidate feed stations and conveyor alignments on a labelled UTM 37S grid"/><p>Figure 3.3 · PDF p.33 · June 2023. Locations traced approximately from the grid. The proposed feed apron is offset nearby to clear the current conceptual pit envelope. No surveyed plant parcel or engineered alignment is supplied.</p></details>
     <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Inspect the processing plant <ArrowRight size={14}/></button>

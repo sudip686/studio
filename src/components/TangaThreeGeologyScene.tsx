@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
-import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
+import {planSite, inside, rectangleContained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
 import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, pitHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
@@ -762,8 +762,8 @@ function resourceBlockFitsPitCutaway(block: ResourceBlock, pit: SitePlan['pits']
   // and pit-height checks. The broad-phase envelope cannot accept a cell that
   // fails the exact footprint test below.
   if(block.x-halfX<bounds.minX||block.x+halfX>bounds.maxX||block.z-halfZ<bounds.minZ||block.z+halfZ>bounds.maxZ)return false;
-  const footprint = rectangle([block.x, block.z], block.dx, block.dy);
-  if (!contained(footprint, pit.ring)) return false;
+  if (!rectangleContained([block.x, block.z], block.dx, block.dy, pit.ring)) return false;
+  const footprint=rectangle([block.x,block.z],block.dx,block.dy);
   let cutFloor=-Infinity;
   for(const point of footprint){const height=pitHeight(point,pit);if(height===null)return false;cutFloor=Math.max(cutFloor,height);}
   const blockBottom = block.y - block.dz / 2;
@@ -4273,17 +4273,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           setTargetDisplayCount(displayedTargets.length);
           host.dataset.miningTargets=String(targets.length);
           host.dataset.miningTargetsDisplayed=String(displayedTargets.length);
+          const pitGradeBands=TGC_GRADE_BINS.filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high');
+          host.dataset.miningGradeCounts=JSON.stringify(Object.fromEntries(pitGradeBands.map(bin=>[bin.key,targets.filter(block=>tgcGradeBin(block.carbon).key===bin.key).length])));
           displayedByPit.forEach((pitBlocks,pitIndex)=>{
-            for(const high of [false,true]){
-              const subset=pitBlocks.filter(b=>(b.carbon>=5)===high);
+            for(const [bandIndex,band] of pitGradeBands.entries()){
+              const subset=pitBlocks.filter(block=>tgcGradeBin(block.carbon).key===band.key);
               if(!subset.length)continue;
-              // Flat face tones add a readable cube volume while BasicMaterial
-              // keeps the grade palette fixed as the camera and lighting move.
-              const material=new THREE.MeshBasicMaterial({color:high?0xe58b32:0x388e96,vertexColors:true,transparent:false,opacity:1,depthTest:true,depthWrite:true,toneMapped:false});
+              // Match the resource chapter's fixed grade palette. Flat face
+              // tones show cube depth without camera-dependent color changes.
+              const material=new THREE.MeshBasicMaterial({color:band.color,vertexColors:true,transparent:false,opacity:1,depthTest:true,depthWrite:true,toneMapped:false});
               const mesh=new THREE.InstancedMesh(createMinePlanBlockGeometry(),material,subset.length);
-              mesh.name=`${pitIndex===0?'North':'South'} pit · ${high?'≥5%':'4.5–5%'} TGC model cells`;
+              mesh.name=`${pitIndex===0?'North':'South'} pit · ${band.range} model cells`;
               mesh.userData.pitIndex=pitIndex;
-              mesh.renderOrder=high?41:40;
+              mesh.userData.gradeBand=band.key;
+              mesh.renderOrder=40+bandIndex*.01;
               const matrices=mesh.instanceMatrix.array;
               subset.forEach((b,i)=>{
                 const offset=i*16;
@@ -5676,10 +5679,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Locate grade-selected cells from the source block model; display bands are not economic cutoffs.','Reveal the conceptual benches around the selected blocks. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
         {miningBeat>=2&&<div className="tanga-mine-story__pit-block-action">
           <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='pitcut'?'Replay both pit block models':'Reveal resource blocks inside pits'}</button>
-          <small>{targetDisplayCount.toLocaleString()} grade-selected source blocks shown inside the conceptual pit shells. Source positions, dimensions and grades are retained; this is not a reserve shell.</small>
+          <small>{targetDisplayCount.toLocaleString()} grade-selected source blocks shown inside the conceptual pit shells. Colors use the same grade bands as the resource model; source positions, dimensions and grades are retained.</small>
         </div>}
-        <div className="tanga-mine-story__key"><span>● 4.5–&lt;5% TGC</span><span>● ≥5% TGC</span></div>
-        <small>{targetCount.toLocaleString()} source cells at ≥4.5% TGC are shown across both grade bands. Every rendered cell keeps its source dimensions and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
+        <div className="tanga-mine-story__key" aria-label="Resource block grade bands">{TGC_GRADE_BINS.filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high').map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.key==='medium'?'4.5–<6% TGC':bin.key==='high'?'6–<8% TGC':'≥8% TGC'}</span>)}</div>
+        <small>{targetCount.toLocaleString()} source cells at ≥4.5% TGC are shown across three resource grade bands. Every rendered cell keeps its source dimensions and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on · turn off':'Enable X-ray inspection'}</button>
         </>}
         <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
