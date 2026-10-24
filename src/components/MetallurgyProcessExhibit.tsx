@@ -3,12 +3,12 @@
 import {useEffect, useRef, useState} from 'react';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
-import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {cameraEase} from '@/lib/deck/presentation-motion';
 import {buildConcentrator} from '@/lib/deck/mine-scene';
 import MetallurgyEvidenceBoard from './MetallurgyEvidenceBoard';
 import {MET_GROUPS} from '@/lib/deck/metallurgy-plant';
 import {createPlantProcessMotion} from '@/lib/deck/plant-process-motion';
+import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
 
 const PROCESS = [
   {id: 'feed', title: 'Feed & crushing', short: 'Feed', point: [-44, 8, -8] as const, hasRoof: true, input: 'Mine feed · concept', output: 'Prepared feed · concept', description: 'Receive feed, reduce its size and convey it to milling. The industrial hopper and crushers illustrate the preparation step.', motion: 'Feed advances along the receiving conveyor.', basis: 'IMO Appendix D · A.1: laboratory stage crushing and sample splitting. Conveyor, industrial equipment and layout are conceptual.'},
@@ -63,10 +63,10 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#cbd3cf');
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const room = new RoomEnvironment();
-    const environment = pmrem.fromScene(room, .04);
-    room.dispose(); scene.environment = environment.texture;
+    // Use the same view-independent material palette as the shared 3D deck.
+    // Room reflections shift metal and cladding highlights as the plant is
+    // orbited, which can look like the process colors are flickering.
+    scene.environment = null;
     const camera = new THREE.PerspectiveCamera(34, 1, .1, 4000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = .075;
@@ -91,6 +91,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const processMotion = createPlantProcessMotion(plant);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#b8b9b0', roughness: .96}));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.8; ground.receiveShadow = true; scene.add(ground);
+    stabilizeSceneMaterialAppearance(scene);
     scene.add(new THREE.HemisphereLight(0xf7fbff, 0x64736d, 1.05));
     const sun = new THREE.DirectionalLight(0xfff7e7, 1.75);
     sun.position.set(-330, 520, 360); sun.castShadow = true;
@@ -100,7 +101,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const fill = new THREE.DirectionalLight(0xd3e8fa, .48); fill.position.set(400, 180, -350); scene.add(fill);
 
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
-    const direction = new THREE.Vector3(1.1, .86, 1.25).normalize();
+    // Lower the overview orbit to show more façade and spread the campus across
+    // the widescreen canvas; fitOverview still frames the complete boundary.
+    const direction = new THREE.Vector3(1.1, .58, 1.25).normalize();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); dirty = true; };
     onMotionPreference();
@@ -113,7 +116,10 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       target.set(0, 0, 0);
       const bounds = overviewBounds;
       const size = bounds.getSize(new THREE.Vector3());
-      target.y = bounds.min.y + size.y * .36;
+      // The campus has its water allowance and approach yard at the near edge.
+      // Bias the view toward the near edge to keep both in frame at desktop
+      // viewport sizes after fitting the full plant bounds.
+      target.y = bounds.min.y;
       const fitCamera = new THREE.PerspectiveCamera(camera.fov, camera.aspect, .1, 4000);
       let distance = Math.max(size.x, size.z) * .8;
       for (let iteration = 0; iteration < 5; iteration++) {
@@ -126,7 +132,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         }
         distance *= Math.max(.1, extent / .76);
       }
-      distance = Math.max(125, distance * .7);
+      // Keep the complete campus, fence, yard and near-side water allowance in
+      // frame at both desktop sizes while using the lower façade-forward view.
+      distance = Math.max(125, distance * .62);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
     }
@@ -253,7 +261,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(entry => materials.add(entry)); } });
       geometries.forEach(geometry => geometry.dispose()); materials.forEach(entry => entry.dispose());
-      environment.dispose(); pmrem.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
   }, [rendererAttempt]);
 

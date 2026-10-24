@@ -20,27 +20,26 @@ export function buildMineSiteCampus(options:Options) {
   const facilities:CampusFacility[]=[],omissions:string[]=[];
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
   const materials={
-    earth:new THREE.MeshStandardMaterial({color:0x8b775e,roughness:1,side:THREE.DoubleSide}),
-    bench:new THREE.MeshStandardMaterial({color:0xa28b6c,roughness:1,side:THREE.DoubleSide}),
-    rock:new THREE.MeshStandardMaterial({color:0x857e71,roughness:1,side:THREE.DoubleSide}),
-    beach:new THREE.MeshStandardMaterial({color:0xa5a397,roughness:1,side:THREE.DoubleSide}),
-    liner:new THREE.MeshStandardMaterial({color:0x3e4e50,roughness:.95,side:THREE.DoubleSide}),
-    water:new THREE.MeshStandardMaterial({color:0x4a8b8b,roughness:.23,metalness:.15,side:THREE.DoubleSide}),
-    fresh:new THREE.MeshStandardMaterial({color:0x579aa4,roughness:.24,metalness:.12,side:THREE.DoubleSide}),
+    // Earthworks and pad surfaces use an unlit fixed palette: their mapped
+    // colors must not shift with camera angle as the viewer rotates the site.
+    // These hues identify conceptual pads and facilities in the mine-plan
+    // legend. Render them without view-dependent lighting/specular response;
+    // their relief comes from geometry and the fixed earthwork materials.
+    earth:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false}),
+    bench:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false}),
+    rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
+    beach:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false}),
+    liner:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false}),
+    water:new THREE.MeshBasicMaterial({color:0x4a8b8b,side:THREE.DoubleSide,toneMapped:false}),
+    fresh:new THREE.MeshBasicMaterial({color:0x579aa4,side:THREE.DoubleSide,toneMapped:false}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
-    concrete:new THREE.MeshStandardMaterial({color:0xb1aa96,roughness:1}),
+    concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
   };
-  for(const material of [materials.earth,materials.bench,materials.rock,materials.beach]){
-    material.onBeforeCompile=shader=>{
-      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSiteGround;').replace('#include <begin_vertex>','#include <begin_vertex>\nvSiteGround=transformed;');
-      shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
-        varying vec3 vSiteGround;
-        float siteHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-        float siteNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(siteHash(i),siteHash(i+vec2(1.,0.)),f.x),mix(siteHash(i+vec2(0.,1.)),siteHash(i+vec2(1.)),f.x),f.y);}
-      `).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.84+0.18*siteNoise(vSiteGround.xz*0.035)+0.08*siteNoise(vSiteGround.xz*0.6+vec2(vSiteGround.y*0.83,vSiteGround.y*0.37));');
-    };
-    material.customProgramCacheKey=()=> 'tanga-site-earth-grain-v1';
-  }
+  // Keep earthwork palettes spatially fixed. Procedural sub-metre noise here
+  // produced screen-space aliasing on wide pads as the camera orbited, which
+  // looked like the mapped earth colors were flashing. The fixed material
+  // colors and separately colored landform sections provide enough texture
+  // without a view-dependent shader pattern.
   function batch(group:THREE.Group){
     // Survey-conforming ribbons are non-indexed and have no UVs. Match the
     // static equipment before merging; these materials use no texture maps.
@@ -96,7 +95,10 @@ export function buildMineSiteCampus(options:Options) {
       for(let x=-w/2;x<=w/2;x+=5)for(let z=-d/2;z<=d/2;z+=5){values.push(height(candidate.point[0]+x,candidate.point[1]+z));if(surveyed(candidate.point[0]+x,candidate.point[1]+z))coverage++;}
       const low=Math.min(...values),high=Math.max(...values),relief=high-low;if(!Number.isFinite(high)||relief>limit)continue;
       const level=high+1,point=candidate.point;
-      const f:CampusFacility={id,title,width:w,depth:d,point,level,relief,surveyFraction:coverage/values.length,footprint:rectangle(point,w,d),anchor:[point[0]+(id==='water'||id==='raw-water'?w/2-18:0),level+(id==='tailings'?12:id==='waste'?15:8.5),point[1]+(id==='tailings'?-d/2+38:id==='waste'?-15:0)]};
+      // Keep projected leaders above the highest embankment/pump geometry so
+      // the label survives its own facility's occlusion test in close views.
+      const anchorLift=id==='tailings'?25:id==='waste'?24:18;
+      const f:CampusFacility={id,title,width:w,depth:d,level,relief,surveyFraction:coverage/values.length,footprint:rectangle(point,w,d),point,anchor:[point[0]+(id==='water'||id==='raw-water'?w/2-18:0),level+anchorLift,point[1]+(id==='tailings'?-d/2+38:id==='waste'?-15:0)]};
       excluded.push(rectangle(point,w+50,d+50));facilities.push(f);return f;
     }
     return null;
@@ -126,7 +128,7 @@ export function buildMineSiteCampus(options:Options) {
       }
       cap(group,outer,materials.bench,'Waste-rock upper working surface');
       const topWidth=f.width-2*inset,topDepth=f.depth-2*inset,moundX=x-Math.min(30,topWidth*.2),moundZ=z-Math.min(15,topDepth*.2);
-      const mound=mesh(group,new THREE.ConeGeometry(8,4,12),materials.rock,'Illustrative active waste-rock tip');mound.scale.set(Math.min(3.5,topWidth/40),1,Math.min(1.3,topDepth/40));mound.position.set(moundX,y+17,moundZ);f.anchor=[moundX,y+19,moundZ];
+      const mound=mesh(group,new THREE.ConeGeometry(8,4,12),materials.rock,'Illustrative active waste-rock tip');mound.scale.set(Math.min(3.5,topWidth/40),1,Math.min(1.3,topDepth/40));mound.position.set(moundX,y+17,moundZ);f.anchor=[moundX,y+23,moundZ];
       for(let i=0;i<46;i++){
         const dx=Math.sin(i*17.37)*topWidth*.4,dz=Math.cos(i*11.1)*topDepth*.38;
         if(Math.hypot(dx,dz)<9||Math.hypot(dx-16,dz)<7)continue;

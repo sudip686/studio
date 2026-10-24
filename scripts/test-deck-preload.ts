@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {cachedDeckAsset} from '../src/lib/cached-deck-asset';
-import {GEOLOGY_PRELOAD_PATHS, preloadGeologyAssets} from '../src/lib/preload-geology';
+import {preloadDeckAssets} from '../src/lib/preload-deck-assets';
 
 async function main() {
   const entries = new Map<string, Response>();
@@ -29,13 +29,20 @@ async function main() {
       }), {headers: {'content-type': 'application/octet-stream'}});
     },
   });
-  const a = preloadGeologyAssets(), b = preloadGeologyAssets();
-  assert.equal(a, b, 'mounts share one background queue');
+  const a = preloadDeckAssets('subsurface'), b = preloadDeckAssets('subsurface');
+  assert.equal(a, b, 'same-stage requests share one background queue');
   await a;
-  assert.deepEqual(requests, [...GEOLOGY_PRELOAD_PATHS]);
+  assert.deepEqual(requests, ['/api/assets/geologicalModel.glb', '/terrain_texture_hires.jpg']);
   assert.equal(maxActive, 1, 'next request waits for full previous body');
-  await preloadGeologyAssets();
-  assert.equal(requests.length, GEOLOGY_PRELOAD_PATHS.length, 'warm queue performs no downloads');
+  await preloadDeckAssets('subsurface');
+  assert.equal(requests.length, 2, 'warm queue performs no downloads');
+  await preloadDeckAssets('topography');
+  assert.deepEqual(requests.slice(2), [
+    '/terrain_hires_meta.json',
+    '/terrain_context_512.bin',
+    '/survey_height_hires.bin',
+    '/survey_coverage_hires.bin',
+  ], 'each chapter warms only its own scene dependencies');
   entries.clear(); requests.length = 0;
   await Promise.all([cachedDeckAsset('/geologicalModel.glb'), cachedDeckAsset('/geologicalModel.glb')]);
   assert.equal(requests.length, 1, 'foreground and background share an in-flight asset');

@@ -1,6 +1,8 @@
 import {NextResponse} from 'next/server';
 import path from 'node:path';
-import {promises as fs} from 'node:fs';
+import {createReadStream, promises as fs} from 'node:fs';
+import {Readable} from 'node:stream';
+import {maybeGzipStreamResponse} from '@/lib/server/stream-compression';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,6 +38,7 @@ async function assetResponse(request: Request, context: RouteContext) {
   if (!STREAMABLE_ASSETS.has(key) || asset.some((part) => part === '.' || part === '..' || part.includes('\\'))) {
     return NextResponse.json({error: 'Asset not found.'}, {status: 404});
   }
+  const isGeoJson = key.endsWith('.geojson');
 
   const headers = new Headers();
   const range = request.headers.get('range');
@@ -56,6 +59,9 @@ async function assetResponse(request: Request, context: RouteContext) {
       }
       if (!responseHeaders.has('content-type')) responseHeaders.set('content-type', contentTypeFor(key));
       responseHeaders.set('x-content-type-options', 'nosniff');
+      if (isGeoJson && request.method === 'GET' && response.body) {
+        return maybeGzipStreamResponse(response.body, request, {status: response.status, statusText: response.statusText, headers: responseHeaders});
+      }
       return new Response(response.body, {status: response.status, statusText: response.statusText, headers: responseHeaders});
     } catch {
       // A local public file can still serve this request in development.
@@ -64,8 +70,15 @@ async function assetResponse(request: Request, context: RouteContext) {
 
   try {
     const localFile = path.join(process.cwd(), 'public', ...asset);
+    const headers = {'cache-control': 'public, max-age=300', 'content-type': contentTypeFor(key), 'accept-ranges': 'none', 'x-content-type-options': 'nosniff'};
+    if (isGeoJson && request.method === 'GET') {
+      const info = await fs.stat(localFile);
+      if (!info.isFile()) throw new Error('Asset not found.');
+      const body = Readable.toWeb(createReadStream(localFile)) as ReadableStream<Uint8Array>;
+      return maybeGzipStreamResponse(body, request, {headers: {...headers, 'content-length': String(info.size)}});
+    }
     const body = await fs.readFile(localFile);
-    return new Response(body, {headers: {'cache-control': 'public, max-age=300', 'content-length': String(body.byteLength), 'content-type': contentTypeFor(key), 'accept-ranges': 'none'}});
+    return new Response(body, {headers: {...headers, 'content-length': String(body.byteLength)}});
   } catch {
     return NextResponse.json({error: 'Asset delivery is not configured.'}, {status: 404});
   }
