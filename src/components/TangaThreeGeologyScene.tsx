@@ -4397,6 +4397,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             host.dataset.haulRoutes=JSON.stringify([{kind:host.dataset.haulRouteStatus,connectsToFeed:Boolean(host.dataset.haulRouteStatus.startsWith('generated')),engineeringStatus:'illustrative generated centerline; not a surveyed report alignment, approved road design or operating speed'}]);
             host.dataset.haulRouteAttempts=JSON.stringify(haulRouteAttempts);
             developmentInfrastructure=buildDevelopmentInfrastructure(feed,[x,z],siteHeight,level);
+            const conveyorSupports=developmentInfrastructure.userData.conveyorSupports as {x:number;z:number;groundY:number;topY:number;height:number}[]|undefined;
+            if(conveyorSupports?.length){
+              const heights=conveyorSupports.map(support=>support.height);
+              host.dataset.conveyorSupportAudit=JSON.stringify({count:conveyorSupports.length,minimumClearanceM:Number(Math.min(...heights).toFixed(2)),maximumClearanceM:Number(Math.max(...heights).toFixed(2)),footingsSampledIndividually:true});
+            }
             const feedPad=developmentInfrastructure.userData.conceptPad as ConceptPad|undefined;
             if(feedPad)for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,feedPad);
             tagDeckLayer(developmentInfrastructure,'context');stage.add(developmentInfrastructure);

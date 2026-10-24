@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {buildConcentrator, placeConcentrator, buildPitSurface} from '../src/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
 import {rectangle, inside} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
+import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
 
 async function main(){
@@ -75,6 +76,15 @@ campus.root.traverse(object=>{
   }
 });
 assert.ok(checkedRoadVertices>100,'Draped access-road vertices remain consistently above the sampled synthetic terrain');
-console.log(`PASS: contour coverage, elevation, crest containment, plant bounds and ${campus.root.userData.accessRoadCount} terrain-screened campus access spurs`);
+const development=buildDevelopmentInfrastructure([-500,300],[200,-100],(x,z)=>x*.01+z*.005,25);
+const conveyorSupports=development.userData.conveyorSupports as {x:number;z:number;groundY:number;topY:number;height:number}[];
+assert.equal(conveyorSupports.length,62,'Both sides of all 31 conceptual conveyor support stations have individual footings');
+for(const support of conveyorSupports){
+  const terrain=conceptPadHeight(development.userData.conceptPad as ConceptPad,support.x,support.z,support.x*.01+support.z*.005);
+  assert.ok(Math.abs(support.groundY-terrain)<1e-9,'Each support footing uses terrain sampled at its own x/z coordinate');
+  assert.ok(Math.abs(support.height-(support.topY-support.groundY))<1e-9,'Support height joins its own terrain footing to the conveyor crossbeam');
+  assert.ok(support.height>=9.29,'Intermediate support maintains at least 9.3 m of conceptual conveyor clearance across the sampled cross-section');
+}
+console.log(`PASS: contour coverage, elevation, crest containment, plant bounds, ${campus.root.userData.accessRoadCount} terrain-screened access spurs and ${conveyorSupports.length} individually sampled conveyor footings`);
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

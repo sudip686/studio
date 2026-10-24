@@ -63,13 +63,22 @@ export function buildDevelopmentInfrastructure(feed: [number,number], discharge:
   const start=new THREE.Vector3(fx+20,level+18,fz-8);
   const end=new THREE.Vector3(discharge[0]-75,plantLevel+10,discharge[1]+20);
   const count=60,points:THREE.Vector3[]=[];
+  const conveyorSupports:{x:number;z:number;groundY:number;topY:number;height:number}[]=[];
   for(let i=0;i<=count;i++){
     const p=start.clone().lerp(end,i/count);
-    p.y=i===0?start.y:i===count?end.y:padGround(p.x,p.z)+10;
+    const lateralGround=Math.max(padGround(p.x-3,p.z),padGround(p.x,p.z),padGround(p.x+3,p.z));
+    p.y=i===0?start.y:i===count?end.y:lateralGround+10;
     points.push(p);
     if(i%2===0){
-      const ground=padGround(p.x,p.z),h=Math.max(0,p.y-ground);
-      for(const side of [-1,1])box(.8,h,.8,p.x+side*3,ground+h/2,p.z,steel,'Conveyor support · conceptual');
+      for(const side of [-1,1]){
+        // Sample each footing at its own terrain coordinate. The two feet can
+        // sit on different elevations across a slope; reusing the belt centre
+        // height left one side slightly buried or floating.
+        const supportX=p.x+side*3,ground=padGround(supportX,p.z),top=p.y-.7,h=top-ground;
+        if(!Number.isFinite(ground)||!Number.isFinite(top)||h<=0)continue;
+        box(.8,h,.8,supportX,ground+h/2,p.z,steel,'Conveyor support · conceptual');
+        conveyorSupports.push({x:supportX,z:p.z,groundY:ground,topY:top,height:h});
+      }
       box(7,.6,1,p.x,p.y-1,p.z,copper,'Conveyor cross beam');
     }
     if(i){
@@ -82,7 +91,7 @@ export function buildDevelopmentInfrastructure(feed: [number,number], discharge:
     }
   }
   batchPlantMeshes(root);
-  root.userData.feedAnchor=[fx,level+20,fz];root.userData.flow=points;
+  root.userData.feedAnchor=[fx,level+20,fz];root.userData.flow=points;root.userData.conveyorSupports=conveyorSupports;
   root.userData.tooltipItems=[{title:'PaulSam development concept',rows:['Feed point and discharge approximate the Figure 3.3 map. Equipment, support heights and corridor geometry are illustrative.'],tone:'#c99460'}];
   return root;
 }

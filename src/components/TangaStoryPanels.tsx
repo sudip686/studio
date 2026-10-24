@@ -45,7 +45,13 @@ export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
 }
 
 export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, developmentViewId, availableDevelopment = []}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null}) {
-  const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>('site');
+  const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>developmentViewId==='pit-blocks'?'blocks':'site');
+
+  useEffect(()=>{
+    if(chapter!=='mine_planning')return;
+    // Keep the information panel in step with the authored 3D pit-block view.
+    setMinePanelSection(developmentViewId==='pit-blocks'?'blocks':'site');
+  },[chapter,developmentViewId]);
   const developmentView=DEVELOPMENT_FACILITIES.find(view=>view.id===developmentViewId) ?? (developmentViewId==='north-pit'?{title:'Read the northern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Benches and access path are illustrative, with no engineered road or grade.'}:developmentViewId==='south-pit'?{title:'Read the southern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Excavation limits, access and slopes remain illustrative pending engineering.'}:developmentViewId==='pit-blocks'?{title:'Resource blocks in both pits',explanation:'Compare source grade cells within the two conceptual pit cutaways. Focus one excavation or return to the whole-site view.'}:undefined);
   const developmentAvailable=(id:DevelopmentView)=>Boolean(onInspectDevelopment)&&!((id==='tailings'||id==='waste')&&!availableDevelopment.includes(id))&&!(id==='campus'&&!availableDevelopment.length);
   const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
