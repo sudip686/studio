@@ -1301,13 +1301,13 @@ function threeCallouts(
         id: 'terrain-ridges',
         label: 'Ridge relief',
         detail: 'Measured project DEM · 1× vertical scale',
-        x: 37, y: 32, tone: '#e4a85d', anchor: [-1650, 180, -940], side: 'right', kind: 'story',
+        x: 37, y: 32, tone: '#e4a85d', anchor: [-1650, 180, -940], side: 'right', kind: 'story', occlusion: 'scene',
       },
       {
         id: 'terrain-drainage',
         label: 'Slope & elevation',
         detail: 'Relief follows the measured project DEM',
-        x: 62, y: 58, tone: '#84c7d5', anchor: [1260, -20, 980], side: 'left', kind: 'story',
+        x: 62, y: 58, tone: '#84c7d5', anchor: [1260, -20, 980], side: 'left', kind: 'story', occlusion: 'scene',
       },
     ];
   }
@@ -4767,7 +4767,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // A selected facility detail is an intentional x-ray annotation view:
         // keep the selected feature named even when its own roof/embankment
         // covers the anchor. Whole-site labels still use solid/terrain tests.
-        if(callout.occlusion==='scene'&&mode==='mine_planning'&&!facilityFocused&&activeOccluders.length){
+        if(callout.occlusion==='scene'&&!(mode==='mine_planning'&&facilityFocused)&&activeOccluders.length){
           // Cast only to a point just short of the feature. The small tolerance
           // keeps a label attached to its own surface while hiding it behind a
           // nearer ridge, pit wall, or building during orbit and zoom.
@@ -4781,7 +4781,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if(calloutRaycaster.intersectObjects(activeOccluders,false).length)return;
           }
         }
-        if(callout.occlusion==='scene'&&mode==='mine_planning'&&!facilityFocused&&terrainResources&&layerSettingsRef.current.terrain.visible&&terrainSurfaceMaterials.some(material=>material.visible&&material.opacity>.65)){
+        if(callout.occlusion==='scene'&&!(mode==='mine_planning'&&facilityFocused)&&terrainResources&&layerSettingsRef.current.terrain.visible&&terrainSurfaceMaterials.some(material=>material.visible&&material.opacity>.65)){
           // Terrain is checked against the same registered elevation samples
           // used to build the visible surface. This avoids triangle-scanning a
           // 512² mesh on every camera update while keeping ridge occlusion live.
