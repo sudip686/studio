@@ -1446,23 +1446,26 @@ function parseBlockGeoJson(payload: any) {
     const coords = feature.geometry?.coordinates ?? [];
     const props = feature.properties ?? {};
     if (!Array.isArray(coords) || coords.length < 3) continue;
-    const position = localPoint(Number(coords[0]), Number(coords[1]), Number(coords[2] ?? 0));
-    const classification = String(props.RescCalc ?? props.classification ?? 'Unknown');
+    const lon=Number(coords[0]),lat=Number(coords[1]),elevation=Number(coords[2]??0);
+    const [easting,northing]=proj4('WGS84','EPSG:32737',[lon,lat]) as [number,number];
+    const x=easting-PROJECT_UTM_CENTER.easting;
+    const y=(elevation-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION;
+    const z=-(northing-PROJECT_UTM_CENTER.northing);
     const carbon = Number(props['Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'] ?? 0);
+    const dx=Number(props.dX??25),dy=Number(props.dY??25),dz=Number(props.dZ??10);
+    // Project directly into scalar coordinates and reject invalid rows before
+    // allocating a ResourceBlock. The previous path created a THREE.Vector3
+    // for every source feature and then copied valid rows into a second array.
+    if (!(carbon>0) || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z) || !(dx>0) || !(dy>0) || !(dz>0)) continue;
+    const classification = String(props.RescCalc ?? props.classification ?? 'Unknown');
     blocks.push({
-      x: position.x,
-      y: position.y,
-      z: position.z,
-dx: Number(props.dX ?? 25),
-dy: Number(props.dY ?? 25),
-dz: Number(props.dZ ?? 10),
+      x,y,z,dx,dy,dz,
       classification,
       carbon,
     });
   }
-  const validBlocks=blocks.filter((block) => block.carbon > 0 && Number.isFinite(block.x) && Number.isFinite(block.y) && Number.isFinite(block.z) && block.dx > 0 && block.dy > 0 && block.dz > 0);
-  if(measureParse)console.info(`[tanga-perf] block model projection/filter: ${validBlocks.length}/${features.length} cells in ${(performance.now()-parseStarted).toFixed(1)} ms`);
-  return validBlocks;
+  if(measureParse)console.info(`[tanga-perf] block model projection/filter: ${blocks.length}/${features.length} cells in ${(performance.now()-parseStarted).toFixed(1)} ms`);
+  return blocks;
 }
 
 function loadBlocks() {
@@ -4160,13 +4163,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const sampled = selected;
         host.dataset.blockCoverage = JSON.stringify({selected:selected.length,rendered:mode==='resource'?sampled.length:0,total:blocks.length});
         if(mode==='resource'&&sampled.length){
-          const bounds=new THREE.Box3();
+          let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
           for(const b of sampled){
-            bounds.expandByPoint(new THREE.Vector3(b.x-b.dx/2,b.y-b.dz/2,b.z-b.dy/2));
-            bounds.expandByPoint(new THREE.Vector3(b.x+b.dx/2,b.y+b.dz/2,b.z+b.dy/2));
+            minX=Math.min(minX,b.x-b.dx/2);maxX=Math.max(maxX,b.x+b.dx/2);
+            minY=Math.min(minY,b.y-b.dz/2);maxY=Math.max(maxY,b.y+b.dz/2);
+            minZ=Math.min(minZ,b.z-b.dy/2);maxZ=Math.max(maxZ,b.z+b.dy/2);
           }
-          const size=bounds.getSize(new THREE.Vector3()),distance=Math.max(size.x,size.z)*1.5+200;
-          bounds.getCenter(cameraShot.target);
+          const sizeX=maxX-minX,sizeZ=maxZ-minZ,distance=Math.max(sizeX,sizeZ)*1.5+200;
+          cameraShot.target.set((minX+maxX)/2,(minY+maxY)/2,(minZ+maxZ)/2);
           cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.85,distance*.55,distance*.12));
           cameraShot.from.copy(cameraShot.to).multiplyScalar(1.1);
           cameraShot.mid.copy(cameraShot.from).lerp(cameraShot.to,.5);

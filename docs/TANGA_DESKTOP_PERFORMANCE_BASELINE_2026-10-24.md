@@ -33,6 +33,12 @@ All 12 direct chapter entries completed with no failed resource entries, horizon
 - Mine Planning displayed 64,423 source blocks meeting the existing 4.5% TGC presentation threshold, including 64,423 rendered pit cells in the focused inspection view. Their coordinates, dimensions and grade values are retained. This is a display selection inside conceptual pit envelopes, not an economic cutoff or reserve shell. The focused view was visually checked in the current build at `.playwright-mcp/north-pit-focus-current.png`.
 - Adding `powerPreference: 'high-performance'` to Three.js renderer creation did **not** switch this Chrome session to the laptop's RTX 4070. The live WebGL debug renderer still reported Intel UHD Graphics. This option is only a browser hint; no discrete-GPU improvement is claimed.
 
+## Follow-up: resource-block allocation path
+
+The Resource parser now projects source coordinates directly to scalar local offsets, rejects invalid rows before creating a `ResourceBlock`, and returns the populated array without a second filtering copy. Resource camera framing now finds the same source-cell bounds with scalar min/max values rather than allocating two temporary `THREE.Vector3` instances per displayed block. A 5,000-cell synthetic comparison matched the previous `THREE.Box3` min/max bounds and center exactly.
+
+On the final built local Cloudflare/OpenNext preview, Resource parsed 155,853 of 155,952 features in 464.8 ms and reached `ready` in 3.064 s with 155,853 selected and rendered blocks out of 155,853 source cells. Mine Planning reached `ready` in 4.079 s; its opening overview hid grade cells as authored, and the “Resource blocks in the pits” view remained available. Neither view showed a browser JavaScript error or alert. These are warm-preview observations and are not comparable to the cold-origin baseline above, so they do not establish a speed-up. The `/api/block-model` payload still dominates transfer/decode, and the full device, cold-cache, 30-second-orbit, and deployed-host gates remain open.
+
 ## Instrumentation
 
 The workbench exposes `data-map-state`, `data-map-first-idle-ms`, `data-three-state` and `data-three-load-ms` on its root element to support repeatable browser measurements. These values are diagnostic, not user-facing product metrics.
