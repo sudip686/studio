@@ -5462,10 +5462,10 @@ export default function TangaDeckWorkbench() {
         />
       )}
 
-      {threeVisible && threeLoadReport.scene === 'error' && STATIC_SCENE_FALLBACKS[activeMode] && (
-        <figure className="tanga-deck__static-scene-fallback" aria-label={`${MODE_LABELS[activeMode]} static scene fallback`}>
+      {threeVisible && (threeLoadReport.scene === 'loading' || threeLoadReport.scene === 'error') && STATIC_SCENE_FALLBACKS[activeMode] && (
+        <figure className={`tanga-deck__static-scene-fallback${threeLoadReport.scene === 'loading' ? ' is-loading' : ''}`} aria-label={`${MODE_LABELS[activeMode]} static scene preview`} aria-live="polite">
           <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
-          <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> 3D unavailable</figcaption>
+          <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> {threeLoadReport.scene === 'loading' ? 'Interactive 3D loading' : '3D unavailable'}</figcaption>
         </figure>
       )}
 
