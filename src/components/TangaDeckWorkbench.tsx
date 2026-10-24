@@ -4517,6 +4517,7 @@ export default function TangaDeckWorkbench() {
         '.tanga-deck__chapter-title', '.tanga-deck__explore-toggle', '.tanga-deck__data-panel',
         '.tanga-deck__layers', '.tanga-story-panel', '.tanga-geology-surface-legend',
         '.tanga-deck__pager', '.tanga-evidence-sequence', '.tanga-deck__planning-note', '.tanga-story-cue',
+        '.tanga-deck__route-profile',
       ].join(',');
       document.querySelectorAll<HTMLElement>(panelSelector).forEach((element) => {
         if (element.closest('.tanga-deck') !== stageRef.current) return;
