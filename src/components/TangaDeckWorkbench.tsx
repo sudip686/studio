@@ -3434,7 +3434,8 @@ export default function TangaDeckWorkbench() {
     let idleHandle: number | null = null;
     let timerHandle: number | null = null;
     let cancelled = false;
-    const start = () => { if (!cancelled) void preloadDeckAssets(nextPreloadStage); };
+    const controller = new AbortController();
+    const start = () => { if (!cancelled) void preloadDeckAssets(nextPreloadStage,controller.signal); };
     const browserWindow = window as Window & typeof globalThis & {
       requestIdleCallback?: (callback: () => void, options?: {timeout?: number}) => number;
       cancelIdleCallback?: (handle: number) => void;
@@ -3446,6 +3447,7 @@ export default function TangaDeckWorkbench() {
     }
     return () => {
       cancelled = true;
+      controller.abort();
       if (idleHandle !== null) browserWindow.cancelIdleCallback?.(idleHandle);
       if (timerHandle !== null) window.clearTimeout(timerHandle);
     };

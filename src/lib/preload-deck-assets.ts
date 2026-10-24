@@ -21,39 +21,26 @@ const STAGE_ASSETS: Record<DeckPreloadStage, readonly string[]> = {
   resource: ['/api/block-model'],
 };
 
-const pending = new Map<string, Promise<void>>();
-const queues = new Map<DeckPreloadStage, Promise<void>>();
-
-async function warm(path: string) {
-  const existing = pending.get(path);
-  if (existing) return existing;
-
-  const task = (async () => {
-    try {
-      const response = await cachedDeckAsset(assetUrl(path), {priority: 'low'} as RequestInit);
-      if (!response.ok) return;
-      // Consume the body so a successful cacheable asset is written to the
-      // public deck cache. Failures remain opportunistic; the scene retries it.
-      await response.arrayBuffer();
-    } catch {
-      // The scene's normal loader owns user-visible errors and retry behavior.
-    }
-  })().finally(() => pending.delete(path));
-
-  pending.set(path, task);
-  return task;
+async function warm(path: string, signal?: AbortSignal) {
+  if(signal?.aborted)return;
+  try {
+    const response = await cachedDeckAsset(assetUrl(path), {priority: 'low',signal} as RequestInit);
+    if (!response.ok || signal?.aborted) return;
+    // Consume the body so a successful cacheable asset is written to the
+    // public deck cache. Failures remain opportunistic; the scene retries it.
+    await response.arrayBuffer();
+  } catch {
+    // The scene's normal loader owns user-visible errors and retry behavior.
+  }
 }
 
-export function preloadDeckAssets(stage: DeckPreloadStage): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve();
-  const existing = queues.get(stage);
-  if (existing) return existing;
-
-  const queue = (async () => {
-    // Keep the existing single-transfer policy so the next scene's most
-    // important file gets the available bandwidth first.
-    for (const path of STAGE_ASSETS[stage]) await warm(path);
-  })().finally(() => queues.delete(stage));
-  queues.set(stage, queue);
-  return queue;
+export async function preloadDeckAssets(stage: DeckPreloadStage, signal?: AbortSignal): Promise<void> {
+  if (typeof window === 'undefined') return;
+  // Keep the existing single-transfer policy so the next scene's most
+  // important file gets the available bandwidth first. The shared asset cache
+  // deduplicates these cancellable consumers with scene-owned fetches.
+  for (const path of STAGE_ASSETS[stage]) {
+    if(signal?.aborted)break;
+    await warm(path,signal);
+  }
 }
