@@ -759,6 +759,33 @@ function createMinePlanBlockGeometry() {
   return geometry;
 }
 
+/**
+ * Keep source cells legible as individual blocks when the full pit population
+ * is shown. The inset edge is derived from each unit cube's local coordinates,
+ * so it stays fixed to the block while the camera moves and does not alter
+ * source cell dimensions, grades, or positions.
+ */
+function addStableResourceCellEdges(material: THREE.MeshBasicMaterial) {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vResourceCellLocalPosition;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvResourceCellLocalPosition = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vResourceCellLocalPosition;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float cellFaceX = step(0.499, abs(vResourceCellLocalPosition.x));
+        float cellFaceY = step(0.499, abs(vResourceCellLocalPosition.y));
+        float cellFaceZ = step(0.499, abs(vResourceCellLocalPosition.z));
+        float cellEdgeX = smoothstep(0.43, 0.48, abs(vResourceCellLocalPosition.x));
+        float cellEdgeY = smoothstep(0.43, 0.48, abs(vResourceCellLocalPosition.y));
+        float cellEdgeZ = smoothstep(0.43, 0.48, abs(vResourceCellLocalPosition.z));
+        float cellEdge = max(cellFaceX * max(cellEdgeY, cellEdgeZ),
+          max(cellFaceY * max(cellEdgeX, cellEdgeZ), cellFaceZ * max(cellEdgeX, cellEdgeY)));
+        diffuseColor.rgb *= mix(1.0, 0.34, cellEdge);`);
+  };
+  material.customProgramCacheKey = () => 'tanga-resource-cell-edges-v1';
+}
+
 type PitFootprintBounds = {minX:number;maxX:number;minZ:number;maxZ:number};
 
 /** Keep pit cutaway cells wholly inside the conceptual excavation envelope. */
@@ -4395,6 +4422,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               // Match the resource chapter's fixed grade palette. Flat face
               // tones show cube depth without camera-dependent color changes.
               const material=new THREE.MeshBasicMaterial({color:band.color,vertexColors:true,transparent:false,opacity:1,depthTest:true,depthWrite:true,toneMapped:false});
+              addStableResourceCellEdges(material);
               const mesh=new THREE.InstancedMesh(createMinePlanBlockGeometry(),material,subset.length);
               mesh.name=`${pitIndex===0?'North':'South'} pit · ${band.range} model cells`;
               mesh.userData.pitIndex=pitIndex;
