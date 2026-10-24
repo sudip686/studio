@@ -2588,7 +2588,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+      renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, powerPreference: 'high-performance'});
     } catch {
       // Chrome can temporarily block new contexts after a GPU reset. Keep the
       // chapter and its source evidence available while graphics recover.

@@ -2271,6 +2271,7 @@ export default function TangaDeckWorkbench() {
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [mapLoadState, setMapLoadState] = useState<SceneLoadState>('loading');
+  const [mapFirstIdleMs,setMapFirstIdleMs]=useState<number|null>(null);
   // Bumped when the MapLibre instance becomes available, so memos that project
   // through it recompute once it exists.
   // The MapLibre instance itself, held in state rather than only in a ref.
@@ -3261,6 +3262,9 @@ export default function TangaDeckWorkbench() {
     // after the first camera nudge.
     setMapInstance(event?.target ?? null);
     console.info(`[Tanga telemetry] map ready in ${Math.round(performance.now() - appStartedAtRef.current)}ms`);
+    const markFirstIdle=()=>setMapFirstIdleMs(Math.round(performance.now()-appStartedAtRef.current));
+    if(typeof event?.target?.once==='function')event.target.once('idle',markFirstIdle);
+    else requestAnimationFrame(()=>requestAnimationFrame(markFirstIdle));
   }, [disableNativeTerrain]);
   // The deck stage is mounted behind the intro gate and the cover, so the map
   // initialises into a container with no measurable size. MapLibre then falls
@@ -5559,6 +5563,10 @@ export default function TangaDeckWorkbench() {
       )}
       data-act={MODE_ACT[activeMode]}
       data-mode={activeMode}
+      data-map-state={mapLoadState}
+      data-map-first-idle-ms={mapFirstIdleMs ?? undefined}
+      data-three-state={threeLoadReport.scene}
+      data-three-load-ms={threeLoadReport.elapsedMs ?? undefined}
       onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
       onPointerDownCapture={event => { setIsAutoplay(false); setIsExecutiveTour(false); if(!(event.target as Element).closest('.tanga-presentation-tools')) { const tools=stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');if(tools)tools.open=false; } }}
       data-testid="tanga-deck-workbench"
