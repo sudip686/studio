@@ -3540,7 +3540,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       reportLoadState('loading', resources ? 'ready' : 'degraded', resources?.quality ?? assetQuality, 'Loading drillholes and resource data');
       const [drillholes, blocks] = await Promise.all([
         earlyDrills.then(result=>{if(result.error)throw result.error;return result.data!;}),
-        (mode === 'resource' || mode === 'mine_planning' || mode === 'metallurgy') ? loadBlocks() : Promise.resolve([]),
+        // The full block model is used by Resource and Mine Planning only.
+        // Metallurgy presents testwork and the shared plant; downloading and
+        // parsing every block there adds startup cost without adding evidence.
+        (mode === 'resource' || mode === 'mine_planning') ? loadBlocks() : Promise.resolve([]),
       ]);
       if (cancelled) return;
 
