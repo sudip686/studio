@@ -2078,18 +2078,27 @@ function makeCollarLabelSprite(text: string, opacity: number) {
 }
 
 function disposeObject(object: THREE.Object3D) {
+  const disposedTextures = new Set<THREE.Texture>();
+  const disposeMaterial = (material: THREE.Material | undefined) => {
+    if (!material) return;
+    // GLTF materials may own more than the common color/alpha maps. Dispose
+    // every direct texture slot (including normal, roughness, emissive and
+    // environment maps) once per scene teardown. Multiple materials can share
+    // the same Texture instance, so avoid dispatching dispose repeatedly.
+    for (const value of Object.values(material)) {
+      if (value instanceof THREE.Texture && !disposedTextures.has(value)) {
+        disposedTextures.add(value);
+        value.dispose();
+      }
+    }
+    material.dispose();
+  };
   object.traverse((child: any) => {
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) {
-      child.material.forEach((material: any) => {
-        material?.map?.dispose?.();
-        material?.alphaMap?.dispose?.();
-        material?.dispose?.();
-      });
+      child.material.forEach(disposeMaterial);
     } else {
-      child.material?.map?.dispose?.();
-      child.material?.alphaMap?.dispose?.();
-      child.material?.dispose?.();
+      disposeMaterial(child.material);
     }
   });
 }

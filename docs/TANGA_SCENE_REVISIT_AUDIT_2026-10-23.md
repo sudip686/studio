@@ -17,3 +17,10 @@
 ## Limits
 
 This verifies that scene revisits do not accumulate WebGL contexts. It does not measure GPU object counts, JavaScript heap, decoded image memory, or long-duration stability under a full 12-chapter tour. Those remain open in the reliability checklist.
+
+## Follow-up — 24 October 2026
+
+- Extended `disposeObject` in `TangaThreeGeologyScene.tsx` to dispose every direct `THREE.Texture` material property, not only `map` and `alphaMap`. A per-teardown set avoids repeated disposal when materials share one texture. This covers additional GLTF slots such as normal, roughness, metalness, emissive and environment maps.
+- `npm run typecheck`, `npm run build` and `npm run cf:build` passed after the change.
+- A fresh local Chromium revisit through subsurface → drillholes → mine planning → resource → subsurface → mine planning → subsurface reached `data-ready=true` for each chapter, retained one mounted `.tanga-three__canvas`, and reported zero JavaScript errors.
+- An exploratory WebGL2 wrapper observed texture/buffer create/delete calls, but context-loss invalidation did not map cleanly to explicit delete counts. Its live-resource figures are not treated as a leak measurement. GPU-object, heap and decoded-image stability therefore remain unverified.
