@@ -5015,14 +5015,17 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
       host.dataset.truckVisible=String(Boolean(haulTrucks[0]?.mesh.visible));
-      // Grade targets get their own beat, then return over the pit cutaway so
-      // the presenter can read the grade distribution inside the excavation.
-      // The blocks keep source coordinates and remain hidden in the pit view
-      // unless the cutaway is explicitly active.
+      // Once the story reaches the pit concept, keep source grade cells visible
+      // inside the excavation. This makes the relationship between the pit
+      // envelope and the underlying model legible without requiring a second
+      // cutaway command. The story sequence fades the cells in as the pits
+      // appear; manual beat selection remains immediate.
       targetMeshes.forEach(mesh=>{
-        mesh.visible=(beat===2&&revealActionRef.current==='pitcut')&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current);
+        const showPitBlocks=beat>=2&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current);
+        mesh.visible=showPitBlocks;
         mesh.material.depthTest=!presentationOptions.current.targetXray;
-        const opacity=layerSettingsRef.current.blocks.opacity,transparent=opacity<.999;
+        const storyReveal=story.playing&&beat===2&&!reducedMotion.matches?Math.min(1,Math.max(0,(storyAge-8)/1.2)):1;
+        const opacity=layerSettingsRef.current.blocks.opacity*storyReveal,transparent=opacity<.999;
         if(mesh.material.transparent!==transparent){mesh.material.transparent=transparent;mesh.material.needsUpdate=true;}
         mesh.material.opacity=opacity;
         mesh.material.depthWrite=!presentationOptions.current.targetXray&&!transparent;
@@ -5715,7 +5718,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <details><summary>{evidenceHoleIds.length} selected drillholes · inspect source</summary><div className="tanga-mine-story__steps">{evidenceHoleIds.map(id=><button key={id} onClick={()=>{setEvidenceVisible(true);setStoryPlaying(false);setMiningBeat(0);evidenceFocusRef.current?.(id);}}>{id}</button>)}</div><small>Actual source interval coordinates. Spatially distributed collars within the crest footprints; not chosen by highest grade. These show nearby sampling, not verified hole-to-block provenance. No surface snapping; markers locate the first available interval. Use the camera reset to return to both pits.</small></details>
         <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Locate grade-selected cells from the source block model; display bands are not economic cutoffs.','Reveal the conceptual benches around the selected blocks. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
         {miningBeat>=2&&<div className="tanga-mine-story__pit-block-action">
-          <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='pitcut'?'Replay both pit block models':'Reveal resource blocks inside pits'}</button>
+          <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='pitcut'?'Replay pit block cutaway':'Focus resource blocks inside pits'}</button>
           <small>{targetDisplayCount.toLocaleString()} grade-selected source blocks shown inside the conceptual pit shells. Colors use the same grade bands as the resource model; source positions, dimensions and grades are retained.</small>
         </div>}
         <div className="tanga-mine-story__key" aria-label="Resource block grade bands">{TGC_GRADE_BINS.filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high').map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.key==='medium'?'4.5–<6% TGC':bin.key==='high'?'6–<8% TGC':'≥8% TGC'}</span>)}</div>
