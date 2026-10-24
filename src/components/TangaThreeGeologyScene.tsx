@@ -734,15 +734,17 @@ function resourceBlockCenterY(block: ResourceBlock, _voxelScale: number, _resour
   return block.y;
 }
 
-/** Fixed face tones give source blocks volume without camera-dependent grade colors. */
+/** Indexed cube corners keep every source block lightweight and camera-independent. */
 function createMinePlanBlockGeometry() {
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const normals = geometry.getAttribute('normal');
-  const faceTone = new Float32Array(normals.count * 3);
-  for (let i = 0; i < normals.count; i += 1) {
-    const normalY = normals.getY(i);
-    const normalX = Math.abs(normals.getX(i));
-    const tone = normalY > 0.5 ? 1.12 : normalY < -0.5 ? 0.48 : normalX > 0.5 ? 0.76 : 0.64;
+  const geometry = createResourceCellGeometry();
+  const positions = geometry.getAttribute('position');
+  const faceTone = new Float32Array(positions.count * 3);
+  for (let i = 0; i < positions.count; i += 1) {
+    const y = positions.getY(i);
+    const x = positions.getX(i);
+    const z = positions.getZ(i);
+    // Bright tops and darker lower sides add stable depth without PBR flicker.
+    const tone = y > 0 ? 1.08 + (x + z) * 0.025 : y < 0 ? 0.42 + (x + z) * 0.035 : 0.68;
     faceTone[i * 3] = tone;
     faceTone[i * 3 + 1] = tone;
     faceTone[i * 3 + 2] = tone;
@@ -2505,7 +2507,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const planProjection = new THREE.OrthographicCamera();
     let processMarker: THREE.Mesh | null = null;
     let plantDetailKey='';
-    const targetMeshes: THREE.InstancedMesh<THREE.BoxGeometry,THREE.MeshBasicMaterial>[]=[];
+    const targetMeshes: THREE.InstancedMesh<THREE.BufferGeometry,THREE.MeshBasicMaterial>[]=[];
     const pitSurfaces:THREE.Mesh[]=[];
     const pitRamps:THREE.Mesh[]=[];
     const revealBlocks:THREE.InstancedMesh[]=[];
