@@ -114,7 +114,7 @@ export const WORK_MILESTONES = [
 ];
 
 export const NEXT_DECISIONS = [
-  {number: '01', title: 'Close the evidence loop', detail: 'Reconcile collar elevations, survey vertical reference, sample IDs, assays and imagery in one traceable register.'},
-  {number: '02', title: 'Advance study confidence', detail: 'Define the next drilling, metallurgical variability and geological validation work needed for the next study stage.'},
-  {number: '03', title: 'Test development constraints', detail: 'Evaluate access, water, power, environmental, geotechnical and logistics assumptions before engineering a concept.'},
+  {number: '01', title: 'Close the evidence loop', detail: 'Reconcile collar elevations, survey vertical reference, sample IDs, assays and imagery in one traceable register.', chapter: 'drillholes', chapterLabel: 'Review drilling evidence', evidenceLabel: 'AMC MRE · §3.2 / Figure 3.9', evidenceHref: '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf'},
+  {number: '02', title: 'Advance study confidence', detail: 'Define the next drilling, metallurgical variability and geological validation work needed for the next study stage.', chapter: 'metallurgy', chapterLabel: 'Review testwork', evidenceLabel: 'IMO testwork · §3.1 / Table 2', evidenceHref: '/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf'},
+  {number: '03', title: 'Test development constraints', detail: 'Evaluate access, water, power, environmental, geotechnical and logistics assumptions before engineering a concept.', chapter: 'accessibility', chapterLabel: 'Review logistics', evidenceLabel: 'PaulSam · Figure 3.3 excerpt', evidenceHref: '/presentation-assets/paulsam-conveyor-sites.jpg'},
 ];

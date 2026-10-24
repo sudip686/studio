@@ -77,6 +77,7 @@ The detailed workstream checkboxes remain authoritative in [the next-phase check
 - [ ] **BP08 / D:** Complete cross-view feature selection and label review.
   - [x] Correct the drill callout denominator to holes with qualifying intercepts.
 - [ ] **BP09 / E:** Peer and closing-scene composition, benchmark basis and linked evidence.
+  - [x] Link each of the three close-out decisions to its supporting chapter and primary source. Links open in a new tab so the decision view stays available. Desktop checks at 1366×768 and 1707×842 confirmed the panel stays in bounds and all six links are reachable by scrolling; the two report PDFs and PaulSam figure excerpt returned HTTP 200. Captures: `.playwright-mcp/closing-decisions-linked-1366x768.png` and `.playwright-mcp/closing-decisions-linked-1707x842.png`.
 - [ ] **BP10 / G1:** Complete the visual chapter index release check.
   - [x] Add the lazy image cards, chapter questions, current-view indicator and dialog keyboard focus handling.
   - [x] Confirm desktop dialog visibility, chapter 9 jump and return to the requested URL hash.

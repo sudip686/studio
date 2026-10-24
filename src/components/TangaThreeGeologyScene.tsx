@@ -915,19 +915,6 @@ function terrainOpacityForPresentation(mode: GeologyMode, view: SurfaceCameraVie
   return terrainOpacityForView(mode, mode === 'subsurface' ? view : 'default');
 }
 
-/** Blend the ground toward its under-surface view as the camera passes below
- * the horizon. A binary above/below test makes every terrain colour pop at
- * once while orbiting, so use a continuous pitch-based transition instead. */
-function terrainOpacityForCamera(mode: GeologyMode, view: SurfaceCameraView, camera: THREE.Camera, target: THREE.Vector3) {
-  if (view === 'top') return terrainOpacityForView(mode, 'top');
-  const defaultOpacity = terrainOpacityForView(mode, 'default');
-  const belowOpacity = terrainOpacityForView(mode, 'bottom');
-  const distance = Math.max(1, camera.position.distanceTo(target));
-  const belowPitch = Math.max(0, (target.y - camera.position.y) / distance);
-  const blend = THREE.MathUtils.smoothstep(belowPitch, 0, Math.sin(THREE.MathUtils.degToRad(40)));
-  return THREE.MathUtils.lerp(defaultOpacity, belowOpacity, blend);
-}
-
 function makeCameraShot(
   from: THREE.Vector3,
   to: THREE.Vector3,
@@ -2598,13 +2585,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     controls.update();
     controlsRef.current = controls;
     let userTookControl = Boolean(recoveryView);
-    let userGestured = Boolean(recoveryView);
     let interacting = false;
     let lastInteractionAt = -Infinity;
     const onControlStart = () => {
       interacting = true;
       lastInteractionAt = performance.now();
-      userGestured = true;
       userTookControl = true;
       cameraTween = null;
       rotationTween = null;
@@ -4332,8 +4317,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if (cameraCommandRef.current && ['geologyPlan','geologyTilt','geologyDepth'].includes(cameraCommandRef.current.action)) consumeCameraCommand(cameraCommandRef.current);
       }
       // Do not replace an authored scene command with the generic first-load
-      // camera. `userGestured` covers manual input only; a presentation shot
-      // sets `userTookControl` and must retain its own target and framing.
+      // camera; a presentation shot must retain its own target and framing.
       if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userTookControl && !geologyPlan && !facilityFocused) {
         scheduleCameraTween(cameraShot.to.clone(), cameraShot.target.clone(), 2.2, cameraShot.fov);
       }
@@ -4877,13 +4861,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.dampingFactor=1-Math.exp(-Math.min(.2,Math.max(0,elapsed-lastControlsElapsed))*5);
       lastControlsElapsed=elapsed;
       controls.update();
-      if (userGestured) {
-        const orbitView: SurfaceCameraView = camera.position.y < controls.target.y ? 'bottom' : 'default';
-        // Remember explicit top-down mode, but never snap the surface opacity
-        // at the horizon while the viewer is orbiting. The per-frame camera
-        // blend below handles that transition smoothly across every chapter.
-        if (surfaceCameraView !== orbitView) surfaceCameraView = orbitView;
-      }
       const driftYaw = 0; // Hold the registered scene after its authored move.
       let rotationTweenActive = false;
       if (rotationTween) {
@@ -4987,21 +4964,17 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       geologyDepthBlend = reducedMotion.matches ? (mappedSurface ? 0 : 1) : THREE.MathUtils.lerp(geologyDepthBlend,mappedSurface ? 0 : 1,geologyBlendAlpha);
       if(geologySectionLocator)geologySectionLocator.visible=!mappedSurface&&(inspectionActiveRef.current||detail.sectionEnabled);
       {
-        // Only the subsurface chapter uses camera pitch to reveal the model
-        // beneath the surface. Applying that fade to resource and mine-plan
-        // scenes changed the apparent colour of terrain-backed evidence as
-        // presenters orbited, even though its palette was fixed. Hold those
-        // chapters at their authored opacity; their explicit opacity control
-        // remains available, while the subsurface cutaway still follows pitch.
-        const cameraOpacity = (geologyPlan || geologyOblique)
+        // Camera orbit, pan and zoom must never change surface palette or
+        // opacity. Keep the terrain at the chapter's authored opacity; the
+        // mapped-to-depth transition and explicit opacity/preset controls are
+        // the only intentional ways to change it.
+        const authoredOpacity = (geologyPlan || geologyOblique)
           ? .92
-          : mode === 'subsurface'
-            ? terrainOpacityForCamera(mode, surfaceCameraView, camera, controls.target)
-            : terrainOpacityForView(mode, 'default');
-        host.dataset.cameraOpacityPolicy = mode === 'subsurface' ? 'subsurface pitch reveal' : 'chapter fixed';
+          : terrainOpacityForView(mode, mode === 'subsurface' ? surfaceCameraView : 'default');
+        host.dataset.cameraOpacityPolicy = 'chapter fixed · explicit controls only';
         const geologyOpacity = mode === 'subsurface'
-          ? THREE.MathUtils.lerp(.92, cameraOpacity, geologyDepthBlend)
-          : cameraOpacity;
+          ? THREE.MathUtils.lerp(.92, authoredOpacity, geologyDepthBlend)
+          : authoredOpacity;
         const opacity = geologyOpacity * layerSettingsRef.current.terrain.opacity;
         const transparent = opacity < .999;
         for (const material of terrainSurfaceMaterials) {
