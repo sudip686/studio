@@ -131,6 +131,33 @@ type FallbackPreflightResult = {
   dimensions: string;
 };
 
+type ReadinessAsset = {label:string;path:string;required:boolean};
+type AssetReadinessResult = {mode:WorkbenchMode;checkedAt:string;items:Array<ReadinessAsset&{status:number|null;contentType:string;bytes:number|null;ok:boolean}>};
+
+const TERRAIN_READINESS_ASSETS:ReadinessAsset[]=[
+  {label:'Terrain metadata',path:'/terrain_hires_meta.json?v=registered-grid-v2',required:true},
+  {label:'Terrain elevation grid',path:'/terrain_context_512.bin?v=registered-grid-v2',required:true},
+  {label:'Survey elevation grid',path:'/survey_height_hires.bin?v=registered-grid-v2',required:true},
+  {label:'Survey coverage mask',path:'/survey_coverage_hires.bin?v=registered-grid-v2',required:true},
+];
+const TERRAIN_TEXTURE_READINESS_ASSET:ReadinessAsset={label:'Survey terrain imagery',path:'/terrain_texture_hires.jpg?v=survey-2026-10-21',required:true};
+const ASSAY_READINESS_ASSET:ReadinessAsset={label:'Assay intervals',path:'/assay_data.geojson',required:true};
+const LITHOLOGY_READINESS_ASSET:ReadinessAsset={label:'Lithology intervals',path:'/lithology_data.geojson',required:false};
+const CHAPTER_READINESS_ASSETS:Partial<Record<WorkbenchMode,ReadinessAsset[]>>={
+  project:[
+    {label:'Project boundary',path:'/generated/boundaries.geojson',required:true},
+    {label:'Surface roads',path:'/generated/roads.geojson',required:true},
+    {label:'Settlement labels',path:'/generated/labels.geojson',required:true},
+    {label:'Vegetation context',path:'/generated/trees.geojson',required:true},
+  ],
+  topography:[...TERRAIN_READINESS_ASSETS],
+  drillholes:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  subsurface:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Interpreted geology model',path:'/geologicalModel.glb',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  resource:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true}],
+  mine_planning:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  metallurgy:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+};
+
 function chapterReadinessText(stages?: LoadStage[]) {
   if (!stages) return 'Not visited';
   if (stages.some(stage => stage.state === 'error')) return 'Issue';
@@ -2307,6 +2334,8 @@ export default function TangaDeckWorkbench() {
   const [shareStatus, setShareStatus] = useState('');
   const [fallbackPreflight, setFallbackPreflight] = useState<FallbackPreflightResult[] | null>(null);
   const [fallbackPreflightRunning, setFallbackPreflightRunning] = useState(false);
+  const [assetReadiness, setAssetReadiness] = useState<AssetReadinessResult | null>(null);
+  const [assetReadinessRunning, setAssetReadinessRunning] = useState(false);
   const [chapterReadiness, setChapterReadiness] = useState<Partial<Record<WorkbenchMode, LoadStage[]>>>({});
   const [chapterReadinessLoaded,setChapterReadinessLoaded]=useState(false);
   const chapterReadinessHydratedRef=useRef(false);
@@ -5038,6 +5067,27 @@ export default function TangaDeckWorkbench() {
     setFallbackPreflight(results);
     setFallbackPreflightRunning(false);
   }, [fallbackPreflightRunning]);
+  const runChapterAssetPreflight = useCallback(async () => {
+    const assets=CHAPTER_READINESS_ASSETS[activeMode];
+    if(!assets?.length||assetReadinessRunning)return;
+    setAssetReadinessRunning(true);
+    const items=await Promise.all(assets.map(async asset=>{
+      let timer:number|undefined;
+      try{
+        const controller=new AbortController();
+        timer=window.setTimeout(()=>controller.abort(),10000);
+        const response=await fetch(assetUrl(asset.path),{method:'HEAD',cache:'no-store',signal:controller.signal});
+        const contentLength=response.headers.get('content-length');
+        return {...asset,status:response.status,contentType:response.headers.get('content-type')??'',bytes:contentLength?Number(contentLength):null,ok:response.ok};
+      }catch{
+        return {...asset,status:null,contentType:'',bytes:null,ok:false};
+      }finally{
+        if(timer!==undefined)window.clearTimeout(timer);
+      }
+    }));
+    setAssetReadiness({mode:activeMode,checkedAt:new Date().toISOString(),items});
+    setAssetReadinessRunning(false);
+  },[activeMode,assetReadinessRunning]);
 
   const toggleMappedGeologyUnit=useCallback((label:string)=>{
     const hiding=!hiddenGeologyUnits.includes(label);
@@ -6311,6 +6361,28 @@ export default function TangaDeckWorkbench() {
             <ul className="tanga-presentation-tools__readiness-stages" aria-label="Current view loader states">
               {loadStages.map(stage=><li key={stage.id} className={`is-${stage.state}`}><span><i aria-hidden="true"/>{stage.label}</span><strong>{sceneStateText(stage.state)}</strong><small>{stage.detail}</small></li>)}
             </ul>
+            <section className="tanga-presentation-tools__asset-check" aria-label="Required chapter data files">
+              <div className="tanga-presentation-tools__asset-check-head">
+                <div><strong>Chapter data files</strong><span>Same-origin availability for {MODE_LABELS[activeMode]}.</span></div>
+                {Boolean(CHAPTER_READINESS_ASSETS[activeMode]?.length)&&<button type="button" onClick={runChapterAssetPreflight} disabled={assetReadinessRunning}>
+                  <RotateCw size={13} aria-hidden="true" className={assetReadinessRunning?'is-spinning':''}/>
+                  {assetReadinessRunning?'Checking…':'Check files'}
+                </button>}
+              </div>
+              {CHAPTER_READINESS_ASSETS[activeMode]?.length ? <>
+                <ul className="tanga-presentation-tools__asset-results" aria-live="polite">
+                  {CHAPTER_READINESS_ASSETS[activeMode]!.map(asset=>{
+                    const result=assetReadiness?.mode===activeMode?assetReadiness.items.find(item=>item.path===asset.path):undefined;
+                    const state=!result?'not-checked':result.ok?'available':asset.required?'missing':'optional-missing';
+                    const size=result?.bytes==null?'':result.bytes<1_000_000?` · ${Math.max(1,Math.round(result.bytes/1000))} KB`:` · ${(result.bytes/1_000_000).toFixed(1)} MB`;
+                    const detail=!result?'Not checked':result.ok?`HTTP ${result.status}${size}`:result.status?`HTTP ${result.status}`:'Request failed';
+                    return <li key={asset.path} className={`is-${state}`}><span>{asset.label}{!asset.required&&<small> · supporting</small>}</span><strong>{detail}</strong></li>;
+                  })}
+                </ul>
+                {assetReadiness?.mode===activeMode&&<p className={`tanga-presentation-tools__asset-summary${assetReadiness.items.some(item=>item.required&&!item.ok)?' is-issue':''}`}>{assetReadiness.items.filter(item=>item.required&&item.ok).length} / {assetReadiness.items.filter(item=>item.required).length} required files available{assetReadiness.items.some(item=>item.required&&!item.ok)?' · missing files need attention':''}. Checked {new Date(assetReadiness.checkedAt).toLocaleTimeString()}.</p>}
+                <p>HEAD requests check availability and headers only; model data is not downloaded or decoded. Supporting files can be absent without blocking the chapter. Live map tiles are not included.</p>
+              </> : <p>This chapter has no registered standalone model-file check. Its map tiles load for the current extent, and chapter content may load on demand.</p>}
+            </section>
             <details className="tanga-presentation-tools__chapter-coverage">
               <summary><strong>Chapter coverage</strong><span>{Object.keys(chapterReadiness).length} / {STORY_STEPS.length} visited</span></summary>
               <button type="button" className="tanga-presentation-tools__chapter-reset" onClick={()=>setChapterReadiness({})}>Clear session checks</button>
