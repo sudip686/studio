@@ -2543,7 +2543,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         sessionStorage.removeItem(recoveryViewKey);
       }
     } catch { /* Session storage is optional; retain the authored camera. */ }
-    const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 1, mode === 'subsurface' ? 65000 : 26000);
+    const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 0.1, mode === 'subsurface' ? 65000 : 26000);
     camera.fov = recoveryView?.fov ?? cameraShot.fov;
     camera.position.copy(recoveryView ? new THREE.Vector3(...recoveryView.position) : cameraShot.from);
     camera.updateProjectionMatrix();
@@ -2589,6 +2589,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     renderer.setPixelRatio(renderPixelRatio);
     host.dataset.renderScale = renderPixelRatio.toFixed(2);
     renderer.setSize(host.clientWidth, host.clientHeight);
+    host.dataset.depthBuffer = 'adaptive-perspective';
+    host.dataset.depthNear = camera.near.toFixed(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NeutralToneMapping;
     // Neutral daylight keeps mapped category hues distinct.
@@ -4906,6 +4908,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.dampingFactor=1-Math.exp(-Math.min(.2,Math.max(0,elapsed-lastControlsElapsed))*5);
       lastControlsElapsed=elapsed;
       controls.update();
+      // The scene covers a regional terrain extent but also has centimetre
+      // grade transitions and sub-metre pads. Keep the perspective depth
+      // range tight around the current camera distance so those surfaces do
+      // not trade depth (the apparent color flicker reported during orbit).
+      // Adapting the near plane avoids the fragment-shader cost of a log depth
+      // buffer while staying clear of the scene at the minimum 25 m orbit.
+      const depthDistance = camera.position.distanceTo(controls.target);
+      const adaptiveNear = THREE.MathUtils.clamp(depthDistance / 160, 0.1, 100);
+      if (Math.abs(camera.near - adaptiveNear) >= 0.5) {
+        camera.near = adaptiveNear;
+        camera.updateProjectionMatrix();
+        host.dataset.depthNear = camera.near.toFixed(1);
+      }
       const driftYaw = 0; // Hold the registered scene after its authored move.
       let rotationTweenActive = false;
       if (rotationTween) {

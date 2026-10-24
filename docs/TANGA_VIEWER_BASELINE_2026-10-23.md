@@ -76,3 +76,9 @@ Each cell retains its source position, dimensions, grade class and color. The ge
 ## Reproduction notes
 
 The optimized application was served with `npm start -- -p 3002`. Browser scripts navigated to each chapter through a fresh query and hash, waited for its authored chapter heading, and for Three.js chapters waited on `.tanga-three__canvas[data-ready="true"]`. The browser tab was explicitly foregrounded before timing. A background tab reports no first useful frame because its animation loop intentionally pauses.
+
+## GeoJSON streaming and encoding check — 24 October 2026
+
+The local Next.js response-size sample returned 85,356,530 bytes across assay, lithology, asset-lithology and block-model JSON endpoints without `Accept-Encoding`; requesting gzip returned 4,728,386 bytes (about 94.5% less). Browser parsing restored 5,207 features on each 5,207-feature assay/lithology feed and 155,952 block-model features. A byte-range request remained `206` with its original range metadata; `gzip;q=0` returned an uncompressed response. These are local body-size measurements, not a controlled network-wire or cold-cache benchmark.
+
+The OpenNext Cloudflare local preview then returned parseable browser JSON for all four routes with `Content-Encoding: gzip`: three routes decoded 5,207 features and `/api/block-model` decoded 155,952. The previous implementation supplied precompressed bytes that the adapter/runtime mishandled; the Cloudflare build now returns the ordinary JSON stream and lets the Workers runtime/edge negotiate response compression. Cloudflare documents `application/json` and `application/geo+json` among its default compression media types. Production Worker compression still needs a hosted check; local preview does not prove the deployed zone's Compression Rules or wire byte counts.
