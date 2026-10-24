@@ -740,7 +740,7 @@ function resourceBlockCenterY(block: ResourceBlock, _voxelScale: number, _resour
  * scene communicates both target bands without drawing tens of thousands of
  * overlapping boxes. The resource chapter continues to render every cell.
  */
-function sampleMinePlanTargets(blocks: ResourceBlock[], spacing = 50) {
+function sampleMinePlanTargets(blocks: ResourceBlock[], spacing = 25) {
   const representatives = new Map<string, ResourceBlock>();
   for (const block of blocks) {
     const gradeClass = block.carbon >= 5 ? 'high' : 'mid';
@@ -4077,7 +4077,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
         TGC_GRADE_BINS.forEach((bin, binIndex) => {
           const gradeBlocks = solidByGrade.get(bin.key) ?? [];
-          gradeBlocks.sort((a,b)=>a.z-b.z);
           if (!gradeBlocks.length || mode === 'mine_planning') return;
 
           const blockColor = new THREE.Color(bin.color);
@@ -4128,7 +4127,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           });
           mesh.instanceMatrix.needsUpdate = true;
           wireMesh.instanceMatrix.needsUpdate = true;
-          mesh.userData.tooltipItems = gradeBlocks.map(blockTooltip);
+          // Keep original cells for picking, but build the tooltip only when
+          // the viewer selects one. Prebuilding objects for 155k instances
+          // delays the ready frame and duplicates strings needlessly.
+          mesh.userData.resourceBlockSources = gradeBlocks;
           tagDeckLayer(mesh, 'blocks');
           stage.add(mesh);
           tagDeckLayer(wireMesh, 'blocks');
@@ -4450,6 +4452,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return !materials.every(m=>m&&m.opacity<.02)&&!materials.some(m=>m?.clippingPlanes?.some(p=>p.distanceToPoint(hit.point)<0));
       });
       const tooltipForHit=(hit:typeof hits[number])=>{
+        const resourceBlocks=hit.object.userData?.resourceBlockSources as ResourceBlock[]|undefined;
+        const resourceBlock=resourceBlocks?.[hit.instanceId??0];
+        if(resourceBlock)return blockTooltip(resourceBlock);
         const items=hit.object.userData?.tooltipItems as DrillPickInfo[]|undefined;
         return items?.[hit.instanceId??0]??(items?.length===1?items[0]:undefined);
       };
@@ -5585,11 +5590,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <details><summary>{evidenceHoleIds.length} selected drillholes · inspect source</summary><div className="tanga-mine-story__steps">{evidenceHoleIds.map(id=><button key={id} onClick={()=>{setEvidenceVisible(true);setStoryPlaying(false);setMiningBeat(0);evidenceFocusRef.current?.(id);}}>{id}</button>)}</div><small>Actual source interval coordinates. Spatially distributed collars within the crest footprints; not chosen by highest grade. These show nearby sampling, not verified hole-to-block provenance. No surface snapping; markers locate the first available interval. Use the camera reset to return to both pits.</small></details>
         <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Reveal high-grade model targets, without changing source cell sizes or positions.','Reveal the conceptual benches around the target footprint. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
         {miningBeat>=2&&<div className="tanga-mine-story__pit-block-action">
-          <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>{revealAction==='pitcut'?'Replay pit + block cutaway':'Reveal resource blocks inside pit'}</button>
-          <small>{targetDisplayCount.toLocaleString()} grade-selected display cells inside the conceptual pit envelopes. Source positions and grades are preserved; this is not a reserve shell.</small>
+          <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);setTargetXray(true);revealCommand.current?.('pitcut');}}>{revealAction==='pitcut'?'Replay pit + block cutaway':'Reveal resource blocks inside pit'}</button>
+          <small>{targetDisplayCount.toLocaleString()} grade-selected source cells shown on a 25 m sampling grid inside the conceptual pit envelopes. Source positions and grades are preserved; this is not a reserve shell.</small>
         </div>}
         <div className="tanga-mine-story__key"><span>● 4.5–&lt;5% TGC</span><span>● ≥5% TGC</span></div>
-        <small>{targetCount.toLocaleString()} source cells qualify; {targetDisplayCount.toLocaleString()} shown as a 50 m grid sample across both grade bands. Sampled cells keep their source sizes and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
+        <small>{targetCount.toLocaleString()} source cells qualify; {targetDisplayCount.toLocaleString()} shown as a 25 m grid sample across both grade bands. Sampled cells keep their source sizes and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on · turn off':'Enable X-ray targets'}</button>
         </>}
         <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
@@ -5600,7 +5605,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
         <small>{haulStatus==='loading'?'Preparing a display-only pit-ramp vehicle cue':haulCount ? `${haulCount} illustrative truck on a conceptual internal pit ramp; no pit-to-feed road or operating speed is shown.` : 'No conceptual pit-ramp vehicle route is available; no pit-to-feed haul road was supplied.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is not throughput or an operating schedule.</small>
-        <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Grade-selected blocks are visible within the clipped conceptual pit; their source positions and display thresholds are unchanged.':'Illustrative pit and block-model view; benches are not an optimised reserve shell.'}</small></details>
+        <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);setTargetXray(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button onClick={()=>{setTargetXray(false);revealCommand.current?.('none');}}>Restore whole pits</button><small>{revealAction==='pitcut'?'Grade-selected blocks are visible through the pit cutaway; their source positions and display thresholds are unchanged.':'Illustrative pit and block-model view; benches are not an optimised reserve shell.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
