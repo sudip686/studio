@@ -1379,6 +1379,23 @@ function threeCallouts(
   ];
 }
 
+const PLANT_ROOF_STAGE_GROUPS: Record<string, string[]> = {
+  all: [],
+  liberate: ['feed', 'milling'],
+  separate: ['flotation'],
+  dewater: ['dewatering', 'product'],
+};
+const PLANT_CAMERA_STAGE_FOR_FOCUS: Record<string, string> = {
+  feed: 'feed', milling: 'milling', flotation: 'flotation', thickening: 'thickening', dewatering: 'dewatering', product: 'product',
+  liberate: 'milling', separate: 'flotation', dewater: 'dewatering',
+};
+
+function plantRoofMatchesFocus(focus: string, stage: unknown) {
+  if (focus === 'all') return true;
+  const stages = PLANT_ROOF_STAGE_GROUPS[focus] ?? [focus];
+  return typeof stage === 'string' && stages.includes(stage);
+}
+
 function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
   if (mode === 'topography') {
     return [
@@ -2484,6 +2501,7 @@ export default function TangaThreeGeologyScene({
 const cameraShot = cameraShotForMode(mode, lowCamera);
     let sitePlan: SitePlan | null = null;
     let processPlant: THREE.Group | null = null;
+    let plantRoofMeshes: THREE.Mesh[] = [];
     let developmentInfrastructure: THREE.Group | null = null;
     let siteCampus:THREE.Group|null=null;
     let campusFacilities:CampusFacility[]=[];
@@ -2507,6 +2525,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const planProjection = new THREE.OrthographicCamera();
     let processMarker: THREE.Mesh | null = null;
     let plantDetailKey='';
+    let plantRoofProgress=0;
     const targetMeshes: THREE.InstancedMesh<THREE.BufferGeometry,THREE.MeshBasicMaterial>[]=[];
     const pitSurfaces:THREE.Mesh[]=[];
     const pitRamps:THREE.Mesh[]=[];
@@ -4348,6 +4367,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             tagDeckLayer(plant, 'context');
             stage.add(plant);
             processPlant=plant;
+            plantRoofMeshes=[];
+            plant.traverse(object=>{if(object instanceof THREE.Mesh&&object.userData.plantRoof){object.userData.roofBaseY=object.position.y;plantRoofMeshes.push(object);}});
             const mappedFeed:Point2=[DEVELOPMENT_SITE.feedUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.feedUtm[1]];
             const apron=proposeFeedApron(mappedFeed,[x,z],sitePlan.pits,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz));
             if(!apron)throw new Error('No conflict-free feed apron near the mapped candidate; do not render a facility over a pit');
@@ -4993,12 +5014,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         geologyMeshes.forEach((mesh,i)=>{mesh.visible=layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));mesh.position.y=separation*i*85;});
         host.dataset.geologySeparation=separation.toFixed(3);
       }
+      const plantMotionDelta=Math.min(.1,Math.max(0,elapsed-lastMotionElapsed));
+      const targetRoofProgress=detail.plantCutaway?1:0;
+      const plantMotionPaused=presentationOptions.current.motionPaused||document.hidden;
+      if(reducedMotion.matches)plantRoofProgress=targetRoofProgress;
+      else if(!plantMotionPaused)plantRoofProgress=THREE.MathUtils.damp(plantRoofProgress,targetRoofProgress,5,plantMotionDelta);
       if(processPlant&&plantDetailKey!==`${detail.plantCutaway}:${detail.plantProcess}`){
         plantDetailKey=`${detail.plantCutaway}:${detail.plantProcess}`;
-        const processNames:Record<string,RegExp>={liberate:/Milling|Crushing|Feed|ROM|hopper/i,separate:/Flotation/i,dewater:/Dewatering|Filter|product|Packaged/i};
+        const processNames:Record<string,RegExp>={
+          liberate:/Milling|Crushing|Feed|ROM|hopper/i,
+          separate:/Flotation/i,
+          thickening:/Thickener|Reclaim|water/i,
+          dewater:/Dewatering|Filter|product|Packaged/i,
+          feed:/Milling|Crushing|Feed|ROM|hopper/i,
+          milling:/Milling|Cyclone/i,
+          flotation:/Flotation/i,
+          product:/Product|Filter|Packaged|Silo/i,
+        };
         processPlant.traverse(object=>{
           if(!(object instanceof THREE.Mesh))return;
-          if(object.userData.plantRoof)object.visible=!detail.plantCutaway;
           const material=object.material;
           if(material instanceof THREE.MeshStandardMaterial){
             if(!object.userData.detailMaterial){object.material=material.clone();object.userData.detailMaterial=true;}
@@ -5007,9 +5041,35 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             own.emissiveIntensity=.6;
           }
         });
-        host.dataset.plantCutaway=String(detail.plantCutaway);
         host.dataset.plantProcess=detail.plantProcess;
       }
+      plantRoofMeshes.forEach(roof=>{
+        const open=detail.plantCutaway&&plantRoofMatchesFocus(detail.plantProcess,roof.userData.plantStage)?plantRoofProgress:0;
+        roof.position.y=Number(roof.userData.roofBaseY??0)+38*open;
+        if(!roof.userData.roofMaterialClones){
+          const materials=Array.isArray(roof.material)?roof.material:[roof.material];
+          roof.userData.roofBaseOpacities=materials.map(material=>material.opacity);
+          // The process-focus pass already gives standard meshes their own
+          // material. Reuse that copy so the animated opacity does not replace
+          // and leak a second clone every time a roof first opens.
+          if(!roof.userData.detailMaterial){
+            const clones=materials.map(material=>material.clone());
+            roof.material=Array.isArray(roof.material)?clones:clones[0];
+          }
+          roof.userData.roofMaterialClones=true;
+        }
+        const materials=Array.isArray(roof.material)?roof.material:[roof.material];
+        const baseOpacities=roof.userData.roofBaseOpacities as number[];
+        materials.forEach((material,index)=>{
+          material.opacity=THREE.MathUtils.lerp(baseOpacities[index]??1,.16,open);
+          const transparent=material.opacity<.999;
+          if(material.transparent!==transparent){material.transparent=transparent;material.needsUpdate=true;}
+          material.depthWrite=material.opacity>.55;
+        });
+      });
+      host.dataset.plantCutaway=String(plantRoofProgress>.98);
+      host.dataset.plantCutawayProgress=plantRoofProgress.toFixed(3);
+      host.dataset.plantRoofMotion=reducedMotion.matches?'reduced':plantMotionPaused?'paused':'animated';
       // Keep the shared animation clock running for explicit scene reveals in
       // both Story and Explore modes; this clock also drives the mine sequence
       // and the recorded drillhole journey.
@@ -5755,9 +5815,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         </>}
         <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
           <button onClick={()=>{setPlantCutaway(true);setPlantProcess('all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>Inspect whole processing plant</button>
-          <div className="tanga-mine-story__steps">{[['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product silos']].map(([id,label])=><button key={id} onClick={()=>{setPlantCutaway(true);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:id});}}>{label}</button>)}</div>
-          <button aria-pressed={plantCutaway} onClick={()=>{setPlantCutaway(v=>!v);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}>{plantCutaway?'Restore plant roofs':'Cut away plant roofs'}</button>
-          <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{setPlantProcess(e.target.value);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail'});}}><option value="all">Whole campus</option><option value="liberate">Crushing & milling</option><option value="separate">Flotation</option><option value="dewater">Dewatering & product</option></select></label>
+          <div className="tanga-mine-story__steps">{[['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product silos']].map(([id,label])=><button key={id} onClick={()=>{setPlantCutaway(true);setPlantProcess(id);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:id});}}>{label}</button>)}</div>
+          <button aria-pressed={plantCutaway} onClick={()=>{const open=!plantCutaway;setPlantCutaway(open);setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:PLANT_CAMERA_STAGE_FOR_FOCUS[plantProcess]});}}>{plantCutaway?(plantProcess==='all'?'Close plant roofs':'Close selected roof'):(plantProcess==='all'?'Open plant roofs':'Open selected roof')}</button>
+          <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{const focus=e.target.value;setPlantProcess(focus);setPlantCutaway(focus!=='all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:PLANT_CAMERA_STAGE_FOR_FOCUS[focus]});}}><option value="all">Whole campus</option><option value="feed">ROM & crushing</option><option value="milling">Milling & cyclones</option><option value="flotation">Flotation cells</option><option value="thickening">Thickener & water</option><option value="dewatering">Filter press & dryer</option><option value="product">Product silos</option></select></label>
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
         <small>{haulStatus==='loading'?'Preparing a conceptual pit-to-feed vehicle cue':haulCount ? `${haulCount} illustrative truck follows a generated route from the candidate pit toward the approximate mapped feed point. PaulSam estimates about 2 km mine-to-feed; the report does not georeference the road centerline, so this displayed route is not that measured alignment.` : 'No terrain-screened pit-to-feed route is available; the conceptual pit ramp remains visible without a moving truck.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is presentation pacing, not throughput, operating speed or schedule.</small>
