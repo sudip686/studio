@@ -253,6 +253,13 @@ export default function BlockModelCarbonViewer({
     cameraFitOptions,
   ]);
 
+  const lithologyLegendItems = useMemo(() => {
+    return Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
+      label: label.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      color,
+    }));
+  }, []);
+
   if (resourceStatus.blockModel === 'loading' || (resourceStatus.blockModel === 'idle' && !blockModelData)) {
     return (
       <div className="viewer-status-card">
@@ -280,13 +287,6 @@ export default function BlockModelCarbonViewer({
   }
 
   const carbonGradient = `linear-gradient(to right, ${CARBON_PALETTE.join(', ')})`;
-
-  const lithologyLegendItems = useMemo(() => {
-    return Object.entries(LITHOLOGY_COLOR_MAP).map(([label, color]) => ({
-      label: label.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
-      color,
-    }));
-  }, []);
 
   return (
     <>
