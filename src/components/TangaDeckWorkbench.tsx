@@ -4482,7 +4482,7 @@ export default function TangaDeckWorkbench() {
       const panelSelector = [
         '.tanga-deck__chapter-title', '.tanga-deck__explore-toggle', '.tanga-deck__data-panel',
         '.tanga-deck__layers', '.tanga-story-panel', '.tanga-geology-surface-legend',
-        '.tanga-deck__pager', '.tanga-evidence-sequence', '.tanga-deck__planning-note',
+        '.tanga-deck__pager', '.tanga-evidence-sequence', '.tanga-deck__planning-note', '.tanga-story-cue',
       ].join(',');
       document.querySelectorAll<HTMLElement>(panelSelector).forEach((element) => {
         if (element.closest('.tanga-deck') !== stageRef.current) return;
@@ -4498,7 +4498,7 @@ export default function TangaDeckWorkbench() {
     // overlay panels have mounted or returned measurable bounds.
     keepOutRects.push(
       {x:0,y:0,width:stageSize.width,height:145},
-      {x:0,y:stageSize.height-132,width:stageSize.width,height:132},
+      {x:0,y:stageSize.height-180,width:stageSize.width,height:180},
     );
     const primaryIds = new Set(['project','aoi','relief','route','comparison']);
     const candidates = anchored.map((callout, index) => ({
