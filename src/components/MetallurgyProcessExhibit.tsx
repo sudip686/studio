@@ -92,13 +92,16 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#b8b9b0', roughness: .96}));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.8; ground.receiveShadow = true; scene.add(ground);
     stabilizeSceneMaterialAppearance(scene);
-    scene.add(new THREE.HemisphereLight(0xf7fbff, 0x64736d, 1.05));
-    const sun = new THREE.DirectionalLight(0xfff7e7, 1.75);
+    // A brighter, neutral exhibit recipe keeps the architectural shells and
+    // process equipment readable against the ground without washing out their
+    // materials. These lights stay fixed in site space while the camera orbits.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x879189, 1.3));
+    const sun = new THREE.DirectionalLight(0xfffcf4, 1.9);
     sun.position.set(-330, 520, 360); sun.castShadow = true;
     sun.shadow.mapSize.set(1536, 1536); sun.shadow.camera.left = -400; sun.shadow.camera.right = 400;
     sun.shadow.camera.top = 400; sun.shadow.camera.bottom = -400; sun.shadow.camera.far = 1500; sun.shadow.normalBias = .08;
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xd3e8fa, .48); fill.position.set(400, 180, -350); scene.add(fill);
+    const fill = new THREE.DirectionalLight(0xf2f7f8, .82); fill.position.set(400, 180, -350); scene.add(fill);
 
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
     // Lower the overview orbit to show more façade and spread the campus across
@@ -134,7 +137,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       }
       // Keep the complete campus, fence, yard and near-side water allowance in
       // frame at both desktop sizes while using the lower façade-forward view.
-      distance = Math.max(125, distance * .60);
+      distance = Math.max(125, distance * .58);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
     }
