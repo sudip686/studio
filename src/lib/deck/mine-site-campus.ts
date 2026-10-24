@@ -18,6 +18,8 @@ export function buildMineSiteCampus(options:Options) {
   const {plant,feed,pits,boundary,bounds,height,surveyed}=options;
   const root=new THREE.Group();root.name='Illustrative waste and water facilities';
   const facilities:CampusFacility[]=[],omissions:string[]=[];
+  const facilityApronDrapeAudit:{facilityId:CampusFacility['id'];nx:number;nz:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[]=[];
+  let maximumContourSegmentM=0;
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
   const materials={
     // Earthworks and pad surfaces use an unlit fixed palette: their mapped
@@ -60,14 +62,32 @@ export function buildMineSiteCampus(options:Options) {
     const object=mesh(group,new THREE.BoxGeometry(w,h,d),material,name);object.position.set(x,y,z);return object;
   }
   function ring(point:Point2,w:number,d:number,level:number|Height,chamfer=.12){
-    const cut=Math.min(w,d)*chamfer;
-    const local:Point2[]=[[-w/2+cut,-d/2],[w/2-cut,-d/2],[w/2,-d/2+cut],[w/2,d/2-cut],[w/2-cut,d/2],[-w/2+cut,d/2],[-w/2,d/2-cut],[-w/2,-d/2+cut]];
-    return local.map(([x,z])=>new THREE.Vector3(point[0]+x,typeof level==='number'?level:level(point[0]+x,point[1]+z),point[1]+z));
+    // Sample smooth rounded-rectangle contours at a fixed point count so
+    // adjacent berm, bench and water rings pair cleanly across sizes. The
+    // former eight-point chamfer made every facility read as a low-poly box.
+    const radius=Math.min(w,d)*chamfer,cornerSegments=12,sideSegments=64,local:Point2[]=[];
+    const arc=(cx:number,cz:number,start:number)=>{
+      for(let i=0;i<cornerSegments;i++){
+        const angle=start+i/cornerSegments*Math.PI/2;
+        local.push([cx+Math.cos(angle)*radius,cz+Math.sin(angle)*radius]);
+      }
+    };
+    const line=(a:Point2,b:Point2)=>{
+      for(let i=0;i<sideSegments;i++){const t=i/sideSegments;local.push([THREE.MathUtils.lerp(a[0],b[0],t),THREE.MathUtils.lerp(a[1],b[1],t)]);}
+    };
+    arc(w/2-radius,d/2-radius,0);line([w/2-radius,d/2],[-w/2+radius,d/2]);
+    arc(-w/2+radius,d/2-radius,Math.PI/2);line([-w/2,d/2-radius],[-w/2,-d/2+radius]);
+    arc(-w/2+radius,-d/2+radius,Math.PI);line([-w/2+radius,-d/2],[w/2-radius,-d/2]);
+    arc(w/2-radius,-d/2+radius,Math.PI*1.5);line([w/2,-d/2+radius],[w/2,d/2-radius]);
+    const points=local.map(([x,z])=>new THREE.Vector3(point[0]+x,typeof level==='number'?level:level(point[0]+x,point[1]+z),point[1]+z));
+    for(let i=0;i<points.length;i++)maximumContourSegmentM=Math.max(maximumContourSegmentM,points[i].distanceTo(points[(i+1)%points.length]));
+    return points;
   }
   function join(group:THREE.Group,a:THREE.Vector3[],b:THREE.Vector3[],material:THREE.Material,name:string){
-    const positions:number[]=[];
-    for(let i=0;i<a.length;i++){const j=(i+1)%a.length;for(const p of [a[i],b[i],a[j],a[j],b[i],b[j]])positions.push(p.x,p.y,p.z);}
-    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();return mesh(group,geometry,material,name);
+    const positions:number[]=[],indices:number[]=[],count=Math.min(a.length,b.length);
+    for(const point of [...a.slice(0,count),...b.slice(0,count)])positions.push(point.x,point.y,point.z);
+    for(let i=0;i<count;i++){const j=(i+1)%count;indices.push(i,count+i,j,j,count+i,count+j);}
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setIndex(indices);geometry.computeVertexNormals();return mesh(group,geometry,material,name);
   }
   function poolRadius(angle:number){return 1+.08*Math.sin(angle*3)+.04*Math.cos(angle*5);}
   function poolOutline(pool:{x:number;z:number;rx:number;rz:number},y:number){return Array.from({length:64},(_,i)=>{const a=i*Math.PI/32,r=poolRadius(a);return new THREE.Vector3(pool.x+pool.rx*r*Math.cos(a),y,pool.z+pool.rz*r*Math.sin(a));});}
@@ -79,9 +99,18 @@ export function buildMineSiteCampus(options:Options) {
     return mesh(group,geometry,material,name);
   }
   function patch(group:THREE.Group,f:CampusFacility){
-    const positions:number[]=[],nx=Math.ceil((f.width+30)/12),nz=Math.ceil((f.depth+30)/12);
+    const positions:number[]=[],maxSpacing=6,nx=Math.ceil((f.width+30)/maxSpacing),nz=Math.ceil((f.depth+30)/maxSpacing);
+    let maximumTriangleCentreErrorM=0;
     const p=(i:number,j:number)=>{const x=f.point[0]-(f.width+30)/2+i*(f.width+30)/nx,z=f.point[1]-(f.depth+30)/2+j*(f.depth+30)/nz;return [x,height(x,z)+.18,z];};
-    for(let i=0;i<nx;i++)for(let j=0;j<nz;j++)positions.push(...p(i,j),...p(i,j+1),...p(i+1,j),...p(i+1,j),...p(i,j+1),...p(i+1,j+1));
+    const triangle=(a:number[],b:number[],c:number[])=>{
+      positions.push(...a,...b,...c);
+      const x=(a[0]+b[0]+c[0])/3,z=(a[2]+b[2]+c[2])/3,y=(a[1]+b[1]+c[1])/3;
+      maximumTriangleCentreErrorM=Math.max(maximumTriangleCentreErrorM,Math.abs(y-(height(x,z)+.18)));
+    };
+    for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){
+      const a=p(i,j),b=p(i,j+1),c=p(i+1,j),d=p(i+1,j+1);triangle(a,b,c);triangle(c,b,d);
+    }
+    facilityApronDrapeAudit.push({facilityId:f.id,nx,nz,maximumSampleSpacingM:Number(Math.max((f.width+30)/nx,(f.depth+30)/nz).toFixed(2)),maximumTriangleCentreErrorM:Number(maximumTriangleCentreErrorM.toFixed(4))});
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();mesh(group,geometry,materials.earth,'Illustrative cleared apron · terrain conforming');
   }
   function place(id:CampusFacility['id'],title:string,preferred:Point2,w:number,d:number,limit:number,mineOnly=false){
@@ -284,5 +313,7 @@ export function buildMineSiteCampus(options:Options) {
   // Merge line detail separately, retaining each facility's picking metadata.
   batch(root);
   root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;root.userData.accessRoadDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,roads:accessRoadDrapeAudit};
+  root.userData.facilityApronDrapeAudit=facilityApronDrapeAudit;
+  root.userData.landformContourAudit={pointsPerRing:304,maximumSegmentM:Number(maximumContourSegmentM.toFixed(2))};
   return {root,facilities,omissions};
 }

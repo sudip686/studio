@@ -87,6 +87,13 @@ const campus=buildMineSiteCampus({
   height:(x,z)=>5*Math.sin(x/350)+4*Math.cos(z/420),surveyed:()=>true,
 });
 assert.ok(campus.root.userData.accessRoadCount>=2,'The site campus has screened illustrative access spurs when terrain corridors are clear');
+const facilityApronAudit=campus.root.userData.facilityApronDrapeAudit as {facilityId:string;nx:number;nz:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[];
+assert.equal(facilityApronAudit.length,campus.facilities.length,'Every illustrative water, tailings and waste facility exposes a cleared-apron drape audit');
+assert.ok(facilityApronAudit.every(item=>item.nx>2&&item.nz>2&&item.maximumSampleSpacingM<=6),'Facility aprons follow sampled terrain on a maximum 6 m grid');
+assert.ok(facilityApronAudit.every(item=>item.maximumTriangleCentreErrorM<.02),'Facility apron triangles stay within 0.02 m of synthetic rolling terrain at their centres');
+const landformContourAudit=campus.root.userData.landformContourAudit as {pointsPerRing:number;maximumSegmentM:number};
+assert.equal(landformContourAudit.pointsPerRing,304,'Rounded site landforms use a dense, matched perimeter for smooth berms and benches');
+assert.ok(landformContourAudit.maximumSegmentM<=6,`Rounded landform contours stay within the 6 m terrain-drape spacing (${landformContourAudit.maximumSegmentM.toFixed(2)} m)`);
 const roadDrapeAudit=campus.root.userData.accessRoadDrapeAudit as {maximumSampleSpacingM:number;roads:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]};
 assert.equal(roadDrapeAudit.maximumSampleSpacingM,6,'Campus access roads use a dense terrain drape interval');
 assert.equal(roadDrapeAudit.roads.length,campus.root.userData.accessRoadCount,'Every visible campus access spur has a drape audit');
