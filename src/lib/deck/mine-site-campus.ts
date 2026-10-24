@@ -24,7 +24,7 @@ export function buildMineSiteCampus(options:Options) {
     // colors must not shift with camera angle as the viewer rotates the site.
     // These hues identify conceptual pads and facilities in the mine-plan
     // legend. Render them without view-dependent lighting/specular response;
-    // Their relief comes from geometry and deterministic procedural grain.
+    // their relief comes from geometry and the fixed earthwork materials.
     earth:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false}),
     bench:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false}),
     rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
@@ -35,17 +35,11 @@ export function buildMineSiteCampus(options:Options) {
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
     concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
   };
-  for(const material of [materials.earth,materials.bench,materials.rock,materials.beach]){
-    material.onBeforeCompile=shader=>{
-      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSiteGround;').replace('#include <begin_vertex>','#include <begin_vertex>\nvSiteGround=transformed;');
-      shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
-        varying vec3 vSiteGround;
-        float siteHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-        float siteNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(siteHash(i),siteHash(i+vec2(1.,0.)),f.x),mix(siteHash(i+vec2(0.,1.)),siteHash(i+vec2(1.)),f.x),f.y);}
-      `).replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.84+0.18*siteNoise(vSiteGround.xz*0.035)+0.08*siteNoise(vSiteGround.xz*0.6+vec2(vSiteGround.y*0.83,vSiteGround.y*0.37));');
-    };
-    material.customProgramCacheKey=()=> 'tanga-site-earth-grain-v1';
-  }
+  // Keep earthwork palettes spatially fixed. Procedural sub-metre noise here
+  // produced screen-space aliasing on wide pads as the camera orbited, which
+  // looked like the mapped earth colors were flashing. The fixed material
+  // colors and separately colored landform sections provide enough texture
+  // without a view-dependent shader pattern.
   function batch(group:THREE.Group){
     // Survey-conforming ribbons are non-indexed and have no UVs. Match the
     // static equipment before merging; these materials use no texture maps.

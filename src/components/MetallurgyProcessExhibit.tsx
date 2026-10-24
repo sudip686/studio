@@ -132,8 +132,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         }
         distance *= Math.max(.1, extent / .76);
       }
-      // Slightly tighter than the former high-angle frame; the lower horizon
-      // recovers breathing room above the near-side water allowance.
+      // Keep the complete campus, fence, yard and near-side water allowance in
+      // frame at both desktop sizes while using the lower façade-forward view.
       distance = Math.max(125, distance * .62);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);

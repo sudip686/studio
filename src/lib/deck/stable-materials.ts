@@ -53,14 +53,25 @@ export function stabilizeSceneMaterialAppearance(root: THREE.Object3D) {
     // receivers. Shadow-map filtering on large, coplanar instanced layers can
     // shimmer as the camera moves, even when the sun and shadow frustum stay
     // fixed. The terrain and plant structures retain their authored shadows.
-    if (
-      object.userData.deckLayer === 'blocks'
-      || /(?:plant pad|concept pad|illustrative cut and fill transition|terraced conceptual excavation|internal pit access ramp)/i.test(object.name)
-    ) {
+    const fixedPaletteSurface = /(?:plant pad|concept pad|hardstand|cleared apron|cut and fill transition|terraced conceptual excavation|internal pit access ramp|illustrative (?:tailings|waste|water|pond|embankment|beach|liner|grading))/i.test(object.name);
+    if (object.userData.deckLayer === 'blocks' || fixedPaletteSurface) {
       const shadowOwner = object as THREE.Object3D & {castShadow?: boolean; receiveShadow?: boolean};
       shadowOwner.castShadow = false;
       shadowOwner.receiveShadow = false;
       object.userData.deckCameraStableColor = true;
+
+      // Terrain-conforming concept surfaces are only centimetres above the
+      // DEM. A small fixed depth bias prevents their color buffers from
+      // competing with the terrain during orbit and zoom, without lifting the
+      // geometry or changing its recorded site elevation.
+      for (const material of entries) {
+        if (!('polygonOffset' in material)) continue;
+        const polygonMaterial = material as THREE.Material & {polygonOffset: boolean; polygonOffsetFactor: number; polygonOffsetUnits: number};
+        polygonMaterial.polygonOffset = true;
+        polygonMaterial.polygonOffsetFactor = -1;
+        polygonMaterial.polygonOffsetUnits = -2;
+        polygonMaterial.needsUpdate = true;
+      }
     }
   });
 }
