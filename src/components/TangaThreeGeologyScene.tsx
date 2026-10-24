@@ -9,10 +9,10 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
 import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, pitHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
-import {buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
+import {buildGeologyReferenceGrid,buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
 import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
@@ -749,6 +749,18 @@ function sampleMinePlanTargets(blocks: ResourceBlock[], spacing = 50) {
     if (!current || block.carbon > current.carbon) representatives.set(cell, block);
   }
   return Array.from(representatives.values());
+}
+
+/** Keep pit cutaway cells wholly inside the conceptual excavation envelope. */
+function resourceBlockFitsPitCutaway(block: ResourceBlock, pit: SitePlan['pits'][number]) {
+  const footprint = rectangle([block.x, block.z], block.dx, block.dy);
+  if (!contained(footprint, pit.ring)) return false;
+  const cutFloor = Math.max(...footprint.map(point => pitHeight(point, pit) ?? Infinity));
+  const blockBottom = block.y - block.dz / 2;
+  const blockTop = block.y + block.dz / 2;
+  // Do not show cubes that cross a conceptual bench wall or float above the
+  // crest. This is a spatial display filter; source cell geometry is retained.
+  return Number.isFinite(cutFloor) && blockBottom >= cutFloor - 1.5 && blockTop <= pit.surface + 1.5;
 }
 
 function drillPointFromCoords(coords: [number, number, number]) {
@@ -3613,7 +3625,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if(response.ok){
             const data=await response.json() as GeologySurfaceData;
             if(cancelled)return;
-            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,(x,z)=>terrainSurfaceY(terrainResources,x,-z),{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
+            const geologyHeight=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
+            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,geologyHeight,{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
+            const referenceGrid=buildGeologyReferenceGrid(mapped.bounds,PROJECT_UTM_CENTER,geologyHeight);
+            if(referenceGrid)mapped.group.add(referenceGrid);
             geologySurface=mapped.group;tagDeckLayer(geologySurface,'context');stage.add(geologySurface);
             // The camera command can finish while the polygon asset is still
             // loading. Start the reveal when the registered surface actually
@@ -3621,8 +3636,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if(mode==='subsurface')geologyMapRevealStartedAt=motionTime;
             geologySurface.children.forEach(mesh=>pickables.push(mesh));
             if(!mapped.bounds.isEmpty()) {mapped.bounds.getCenter(geologyPlanTarget);mapped.bounds.getSize(geologyPlanExtent);}
-            host.dataset.geologySurfaceUnits=String(mapped.group.children.length);
+            host.dataset.geologySurfaceUnits=String(data.features.length);
             host.dataset.geologySurfaceBasis='Digitized project map; approximate printed-grid registration';
+            host.dataset.geologyReferenceGrid=referenceGrid?'EPSG:32737 · 1 km spacing · approximate registration':'unavailable';
           }
         } catch {host.dataset.geologySurfaceBasis='Map overlay unavailable; existing model retained';}
         if (!Number.isFinite(extent.length()) || Math.abs(centre.x) > 10000 || Math.abs(centre.z) > 10000) {
@@ -4179,7 +4195,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           }
           tagDeckLayer(evidenceGroup,'context');stage.add(evidenceGroup);
           storyMotionStart=motionTime;
-          const targets=blocks.filter(b=>b.carbon>=4.5&&sitePlan!.pits.some(p=>inside([b.x,b.z],p.ring)&&b.y>=p.floor&&b.y<=p.surface));
+          const targets=blocks.filter(b=>b.carbon>=4.5&&sitePlan!.pits.some(p=>resourceBlockFitsPitCutaway(b,p)));
           const displayedTargets=sampleMinePlanTargets(targets);
           setTargetCount(targets.length);
           setTargetDisplayCount(displayedTargets.length);
@@ -5423,6 +5439,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             <small>{navInstrument.scaleDetail}</small>
           </div>
         </div>
+        {mode==='subsurface'&&mappedSurfaceStage&&<div className="tanga-three__grid-reference" role="note" aria-label="Geology map grid: UTM zone 37 south, 1 kilometre reference, approximate registration">
+          <span aria-hidden="true">▦</span><strong>UTM 37S</strong><span>1 km grid</span><small>Approximate map registration</small>
+        </div>}
         <div className="tanga-three__camera-tools" role="group" aria-label="3D camera controls">
           <button type="button" disabled={!sceneReady} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
