@@ -734,21 +734,21 @@ function resourceBlockCenterY(block: ResourceBlock, _voxelScale: number, _resour
   return block.y;
 }
 
-/**
- * The mine-plan target story is a spatial cue, not the full resource model.
- * Keep one highest-grade source cell per 14 m display cell and grade class so the
- * scene communicates both target bands without drawing tens of thousands of
- * overlapping boxes. The resource chapter continues to render every cell.
- */
-function sampleMinePlanTargets(blocks: ResourceBlock[], spacing = 14) {
-  const representatives = new Map<string, ResourceBlock>();
-  for (const block of blocks) {
-    const gradeClass = block.carbon >= 5 ? 'high' : 'mid';
-    const cell = `${gradeClass}:${Math.floor(block.x / spacing)}:${Math.floor(block.z / spacing)}`;
-    const current = representatives.get(cell);
-    if (!current || block.carbon > current.carbon) representatives.set(cell, block);
+/** Fixed face tones give source blocks volume without camera-dependent grade colors. */
+function createMinePlanBlockGeometry() {
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const normals = geometry.getAttribute('normal');
+  const faceTone = new Float32Array(normals.count * 3);
+  for (let i = 0; i < normals.count; i += 1) {
+    const normalY = normals.getY(i);
+    const normalX = Math.abs(normals.getX(i));
+    const tone = normalY > 0.5 ? 1.12 : normalY < -0.5 ? 0.48 : normalX > 0.5 ? 0.76 : 0.64;
+    faceTone[i * 3] = tone;
+    faceTone[i * 3 + 1] = tone;
+    faceTone[i * 3 + 2] = tone;
   }
-  return Array.from(representatives.values());
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceTone, 3));
+  return geometry;
 }
 
 type PitFootprintBounds = {minX:number;maxX:number;minZ:number;maxZ:number};
@@ -1417,6 +1417,8 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
 
 function parseBlockGeoJson(payload: any) {
   const features = Array.isArray(payload.features) ? payload.features : [];
+  const measureParse=typeof window!=='undefined'&&new URLSearchParams(window.location.search).has('measure-block-parse');
+  const parseStarted=measureParse?performance.now():0;
   const blocks: ResourceBlock[] = [];
   for (const feature of features) {
     const coords = feature.geometry?.coordinates ?? [];
@@ -1436,7 +1438,9 @@ dz: Number(props.dZ ?? 10),
       carbon,
     });
   }
-  return blocks.filter((block) => block.carbon > 0 && Number.isFinite(block.x) && Number.isFinite(block.y) && Number.isFinite(block.z) && block.dx > 0 && block.dy > 0 && block.dz > 0);
+  const validBlocks=blocks.filter((block) => block.carbon > 0 && Number.isFinite(block.x) && Number.isFinite(block.y) && Number.isFinite(block.z) && block.dx > 0 && block.dy > 0 && block.dz > 0);
+  if(measureParse)console.info(`[tanga-perf] block model projection/filter: ${validBlocks.length}/${features.length} cells in ${(performance.now()-parseStarted).toFixed(1)} ms`);
+  return validBlocks;
 }
 
 function loadBlocks() {
@@ -3040,8 +3044,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStoryPlaying(false); setMiningBeat(2);
         calloutsForProjection = siteOverviewCallouts;
         const pits=[...(sitePlan?.pits??[])].sort((a,b)=>a.centre[1]-b.centre[1]);
-        const pit=pits[command.action==='northPit'?0:1];
+        const pitIndex=command.action==='northPit'?0:1;
+        const pit=pits[pitIndex];
         if(!pit){setStatus('Pit detail is not ready; return to the overview and retry');return;}
+        // A named pit inspection is a complete action: reveal the cutaway and
+        // isolate its resource cells as well as moving the camera. Requiring a
+        // separate "both pits" action first made these detail controls appear
+        // broken from the initial mine-planning view.
+        activePitBlockFocusRef.current=pitIndex;
+        setTargetXray(false);
+        revealCommand.current?.('pitcut');
         const bounds=new THREE.Box3();
         for(const [x,z] of pit.ring)bounds.expandByPoint(new THREE.Vector3(x,pit.surface-pit.depth*.3,z));
         const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
@@ -3049,7 +3061,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const position=centre.clone().add(new THREE.Vector3(span*.8,span*.8,span*.2));
         stage.localToWorld(centre);stage.localToWorld(position);
         scheduleCameraTween(position,centre,2,42);
-        setStatus(command.action==='northPit'?'North pit conceptual detail':'South pit conceptual detail');
+        setStatus(`${command.action==='northPit'?'North':'South'} pit · source blocks within conceptual cutaway`);
         return;
       }
 
@@ -4250,8 +4262,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const pitBounds=orderedPits.map(pit=>({minX:Math.min(...pit.ring.map(([x])=>x)),maxX:Math.max(...pit.ring.map(([x])=>x)),minZ:Math.min(...pit.ring.map(([,z])=>z)),maxZ:Math.max(...pit.ring.map(([,z])=>z))}));
           const targetsByPit=orderedPits.map((pit,index)=>blocks.filter(b=>b.carbon>=4.5&&resourceBlockFitsPitCutaway(b,pit,terrainResources,pitBounds[index])));
           const targets=targetsByPit.flat();
-          const displayedByPit=targetsByPit.map(items=>sampleMinePlanTargets(items));
-          const displayedTargets=displayedByPit.flat();
+          // Draw every selected source cell in the pit shell. A sparse display
+          // sample left visible gaps and read as a grade carpet over the terrain.
+          const displayedByPit=targetsByPit;
+          const displayedTargets=targets;
           setTargetCount(targets.length);
           setTargetDisplayCount(displayedTargets.length);
           host.dataset.miningTargets=String(targets.length);
@@ -4260,11 +4274,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             for(const high of [false,true]){
               const subset=pitBlocks.filter(b=>(b.carbon>=5)===high);
               if(!subset.length)continue;
-              // Mine-plan targets are categorical evidence; opaque fills keep
-              // their orange/teal classes stable over satellite terrain while
-              // orbiting. The explicit layer-opacity control can still fade them.
-              const material=new THREE.MeshBasicMaterial({color:high?0xe58b32:0x388e96,transparent:false,opacity:1,depthTest:true,depthWrite:true,toneMapped:false});
-              const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,subset.length);
+              // Flat face tones add a readable cube volume while BasicMaterial
+              // keeps the grade palette fixed as the camera and lighting move.
+              const material=new THREE.MeshBasicMaterial({color:high?0xe58b32:0x388e96,vertexColors:true,transparent:false,opacity:1,depthTest:true,depthWrite:true,toneMapped:false});
+              const mesh=new THREE.InstancedMesh(createMinePlanBlockGeometry(),material,subset.length);
               mesh.name=`${pitIndex===0?'North':'South'} pit · ${high?'≥5%':'4.5–5%'} TGC model cells`;
               mesh.userData.pitIndex=pitIndex;
               mesh.renderOrder=high?41:40;
@@ -4945,7 +4958,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // The blocks keep source coordinates and remain hidden in the pit view
       // unless the cutaway is explicitly active.
       targetMeshes.forEach(mesh=>{
-        mesh.visible=(beat===1||(beat===2&&revealActionRef.current==='pitcut'))&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current);
+        mesh.visible=(beat===2&&revealActionRef.current==='pitcut')&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current);
         mesh.material.depthTest=!presentationOptions.current.targetXray;
         const opacity=layerSettingsRef.current.blocks.opacity,transparent=opacity<.999;
         if(mesh.material.transparent!==transparent){mesh.material.transparent=transparent;mesh.material.needsUpdate=true;}
@@ -5638,13 +5651,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         </div>
         <button aria-pressed={evidenceVisible} onClick={()=>setEvidenceVisible(v=>!v)}>{evidenceVisible?'Hide evidence holes':'Show evidence holes'}</button>
         <details><summary>{evidenceHoleIds.length} selected drillholes · inspect source</summary><div className="tanga-mine-story__steps">{evidenceHoleIds.map(id=><button key={id} onClick={()=>{setEvidenceVisible(true);setStoryPlaying(false);setMiningBeat(0);evidenceFocusRef.current?.(id);}}>{id}</button>)}</div><small>Actual source interval coordinates. Spatially distributed collars within the crest footprints; not chosen by highest grade. These show nearby sampling, not verified hole-to-block provenance. No surface snapping; markers locate the first available interval. Use the camera reset to return to both pits.</small></details>
-        <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Reveal high-grade model targets, without changing source cell sizes or positions.','Reveal the conceptual benches around the target footprint. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
+        <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Locate grade-selected cells from the source block model; display bands are not economic cutoffs.','Reveal the conceptual benches around the selected blocks. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
         {miningBeat>=2&&<div className="tanga-mine-story__pit-block-action">
           <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='pitcut'?'Replay both pit block models':'Reveal resource blocks inside pits'}</button>
-          <small>{targetDisplayCount.toLocaleString()} grade-selected source cells sampled on a 14 m display grid. Each rendered block keeps its source position, size and grade; this is not a reserve shell.</small>
+          <small>{targetDisplayCount.toLocaleString()} grade-selected source blocks shown inside the conceptual pit shells. Source positions, dimensions and grades are retained; this is not a reserve shell.</small>
         </div>}
         <div className="tanga-mine-story__key"><span>● 4.5–&lt;5% TGC</span><span>● ≥5% TGC</span></div>
-        <small>{targetCount.toLocaleString()} source cells qualify; {targetDisplayCount.toLocaleString()} shown across both grade bands. Sampled cells keep their source sizes and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
+        <small>{targetCount.toLocaleString()} source cells at ≥4.5% TGC are shown across both grade bands. Every rendered cell keeps its source dimensions and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on · turn off':'Enable X-ray inspection'}</button>
         </>}
         <details open={miningBeat>=3}><summary>Explore processing equipment</summary>
