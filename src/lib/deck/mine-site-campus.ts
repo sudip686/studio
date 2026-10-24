@@ -120,6 +120,7 @@ export function buildMineSiteCampus(options:Options) {
   // of conceptual pits, the feed apron and other facility footprints, and omit
   // a spur when no screened alignment fits the current scene bounds.
   let accessRoadCount=0;
+  const accessRoadDrapeAudit:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]=[];
   const roadObstacles=[
     ...pits.map(pit=>pit.ring),
     rectangle(feed,210,160),
@@ -132,6 +133,18 @@ export function buildMineSiteCampus(options:Options) {
     const c2:Point2=[a[0]+dx*.66+nx*offset,a[1]+dz*.66+nz*offset];
     const u=1-t;
     return [u*u*u*a[0]+3*u*u*t*c1[0]+3*u*t*t*c2[0]+t*t*t*b[0],u*u*u*a[1]+3*u*u*t*c1[1]+3*u*t*t*c2[1]+t*t*t*b[1]];
+  }
+  const maximumRoadSampleSpacingM=6;
+  function sampleRoad(a:Point2,b:Point2,offset:number){
+    const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    let count=Math.max(24,Math.ceil(length/maximumRoadSampleSpacingM));
+    while(true){
+      const points=Array.from({length:count+1},(_,i)=>bezier(a,b,offset,i/count));
+      let longest=0;
+      for(let i=1;i<points.length;i++)longest=Math.max(longest,Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]));
+      if(longest<=maximumRoadSampleSpacingM)return points;
+      count=Math.ceil(count*longest/maximumRoadSampleSpacingM*1.01);
+    }
   }
   function ribbon(points:Point2[],width:number,offset:number,material:THREE.Material,name:string){
     const positions:number[]=[];
@@ -155,7 +168,7 @@ export function buildMineSiteCampus(options:Options) {
     const forbidden=[...roadObstacles,...facilities.filter(other=>other.id!==facility.id).map(other=>rectangle(other.point,other.width+24,other.depth+24))];
     let chosen:Point2[]|null=null,chosenScore=Infinity;
     for(const offset of [0,80,-80,160,-160,240,-240,320,-320]){
-      const count=Math.max(24,Math.ceil(length/16)),points=Array.from({length:count+1},(_,i)=>bezier(start,end,offset,i/count));
+      const points=sampleRoad(start,end,offset);
       const clear=points.every(([x,z],i)=>{
         if(x<bounds.minX||x>bounds.maxX||z<bounds.minZ||z>bounds.maxZ)return false;
         if(forbidden.some(ringPoints=>overlaps(rectangle([x,z],12,12),ringPoints)))return false;
@@ -166,6 +179,8 @@ export function buildMineSiteCampus(options:Options) {
       const score=pathLength+Math.abs(offset)*.35;if(score<chosenScore){chosen=points;chosenScore=score;}
     }
     if(!chosen){omissions.push(`Illustrative ${facility.id} access spur withheld: no clear terrain corridor`);continue;}
+    let maximumSegmentM=0;for(let i=1;i<chosen.length;i++)maximumSegmentM=Math.max(maximumSegmentM,Math.hypot(chosen[i][0]-chosen[i-1][0],chosen[i][1]-chosen[i-1][1]));
+    accessRoadDrapeAudit.push({facilityId:facility.id,sampleCount:chosen.length,maximumSegmentM:Number(maximumSegmentM.toFixed(2))});
     const surface=ribbon(chosen,8,1.15,materials.access,`Conceptual access surface · ${facility.id}`);
     surface.userData.illustrative=true;surface.userData.accessFacility=facility.id;
     // Narrow gravel shoulders make the roadway read against the natural DEM
@@ -268,6 +283,6 @@ export function buildMineSiteCampus(options:Options) {
   }
   // Merge line detail separately, retaining each facility's picking metadata.
   batch(root);
-  root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;
+  root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;root.userData.accessRoadDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,roads:accessRoadDrapeAudit};
   return {root,facilities,omissions};
 }

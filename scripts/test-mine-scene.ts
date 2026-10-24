@@ -63,19 +63,33 @@ const campusPit={ring:rectangle([0,-700],420,320),centre:[0,-700] as [number,num
 const campus=buildMineSiteCampus({
   plant:[0,0],plantLevel:1.5,feed:[-1150,760],pits:[campusPit],
   boundary:rectangle([0,0],5200,5200),bounds:{minX:-2600,maxX:2600,minZ:-2600,maxZ:2600},
-  height:(x,z)=>x*.01+z*.005,surveyed:()=>true,
+  height:(x,z)=>5*Math.sin(x/350)+4*Math.cos(z/420),surveyed:()=>true,
 });
 assert.ok(campus.root.userData.accessRoadCount>=2,'The site campus has screened illustrative access spurs when terrain corridors are clear');
+const roadDrapeAudit=campus.root.userData.accessRoadDrapeAudit as {maximumSampleSpacingM:number;roads:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]};
+assert.equal(roadDrapeAudit.maximumSampleSpacingM,6,'Campus access roads use a dense terrain drape interval');
+assert.equal(roadDrapeAudit.roads.length,campus.root.userData.accessRoadCount,'Every visible campus access spur has a drape audit');
+assert.ok(roadDrapeAudit.roads.every(road=>road.sampleCount>2&&road.maximumSegmentM<=6),'Road centerline samples stay within the terrain drape spacing');
 let checkedRoadVertices=0;
+let maximumTriangleDrapeError=0;
 campus.root.traverse(object=>{
   if(!(object instanceof THREE.Mesh)||!object.name.includes('Illustrative campus access roads'))return;
   const positions=object.geometry.getAttribute('position');
   for(let i=0;i<positions.count;i++){
-    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i),terrain=x*.01+z*.005;
+    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i),terrain=5*Math.sin(x/350)+4*Math.cos(z/420);
     if(y>=terrain+1.04&&y<=terrain+1.3)checkedRoadVertices++;
+  }
+  if(!object.name.includes('Conceptual access surface'))return;
+  for(let i=0;i+2<positions.count;i+=3){
+    const x=(positions.getX(i)+positions.getX(i+1)+positions.getX(i+2))/3;
+    const y=(positions.getY(i)+positions.getY(i+1)+positions.getY(i+2))/3;
+    const z=(positions.getZ(i)+positions.getZ(i+1)+positions.getZ(i+2))/3;
+    const terrain=5*Math.sin(x/350)+4*Math.cos(z/420);
+    maximumTriangleDrapeError=Math.max(maximumTriangleDrapeError,Math.abs(y-terrain-1.15));
   }
 });
 assert.ok(checkedRoadVertices>100,'Draped access-road vertices remain consistently above the sampled synthetic terrain');
+assert.ok(maximumTriangleDrapeError<0.02,`Road triangle interpolation follows rolling terrain (max error ${maximumTriangleDrapeError.toFixed(3)} m)`);
 const development=buildDevelopmentInfrastructure([-500,300],[200,-100],(x,z)=>x*.01+z*.005,25);
 const conveyorSupports=development.userData.conveyorSupports as {x:number;z:number;groundY:number;topY:number;height:number}[];
 assert.equal(conveyorSupports.length,62,'Both sides of all 31 conceptual conveyor support stations have individual footings');
@@ -85,6 +99,6 @@ for(const support of conveyorSupports){
   assert.ok(Math.abs(support.height-(support.topY-support.groundY))<1e-9,'Support height joins its own terrain footing to the conveyor crossbeam');
   assert.ok(support.height>=9.29,'Intermediate support maintains at least 9.3 m of conceptual conveyor clearance across the sampled cross-section');
 }
-console.log(`PASS: contour coverage, elevation, crest containment, plant bounds, ${campus.root.userData.accessRoadCount} terrain-screened access spurs and ${conveyorSupports.length} individually sampled conveyor footings`);
+console.log(`PASS: contour coverage, elevation, crest containment, plant bounds, ${roadDrapeAudit.roads.length} access spurs draped at ≤6 m with ${maximumTriangleDrapeError.toFixed(3)} m synthetic-terrain error and ${conveyorSupports.length} individually sampled conveyor footings`);
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
