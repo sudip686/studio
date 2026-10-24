@@ -118,3 +118,32 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
   }
   return {group,bounds};
 }
+
+/** A subtle 1 km UTM reference grid draped over the digitized surface-map bounds. */
+export function buildGeologyReferenceGrid(bounds:THREE.Box3, origin:{easting:number;northing:number}, height:(x:number,z:number)=>number, spacing=1000) {
+  if(bounds.isEmpty()||!Number.isFinite(spacing)||spacing<=0)return null;
+  const minE=origin.easting+bounds.min.x,maxE=origin.easting+bounds.max.x;
+  const minN=origin.northing-bounds.max.z,maxN=origin.northing-bounds.min.z;
+  if(![minE,maxE,minN,maxN].every(Number.isFinite)||maxE<=minE||maxN<=minN)return null;
+  const positions:number[]=[];
+  const addLine=(axis:'easting'|'northing',coordinate:number,min:number,max:number)=>{
+    const count=Math.max(1,Math.ceil((max-min)/50));
+    for(let i=0;i<count;i++){
+      const a=min+(max-min)*i/count,b=min+(max-min)*(i+1)/count;
+      const eastA=axis==='easting'?coordinate:a,northA=axis==='northing'?coordinate:a;
+      const eastB=axis==='easting'?coordinate:b,northB=axis==='northing'?coordinate:b;
+      const ax=eastA-origin.easting,az=origin.northing-northA,bx=eastB-origin.easting,bz=origin.northing-northB;
+      positions.push(ax,height(ax,az)+6,az,bx,height(bx,bz)+6,bz);
+    }
+  };
+  for(let e=Math.ceil(minE/spacing)*spacing;e<=maxE;e+=spacing)addLine('easting',e,minN,maxN);
+  for(let n=Math.ceil(minN/spacing)*spacing;n<=maxN;n+=spacing)addLine('northing',n,minE,maxE);
+  if(!positions.length)return null;
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  const grid=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0x26342c,transparent:true,opacity:.38,depthWrite:false,depthTest:true,toneMapped:false}));
+  grid.name='UTM 37S · 1 km reference grid · approximate registration';
+  grid.userData.geologicUnit='reference-grid';
+  grid.renderOrder=32;
+  return grid;
+}

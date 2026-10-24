@@ -8,7 +8,7 @@ export function buildConcentrator() {
   // The pad is a neutral reference surface, not a mapped material. Keep its
   // color steady as the camera moves; the buildings, equipment and terrain
   // retain physically shaded materials for depth.
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),serviceRoad:new THREE.MeshBasicMaterial({color:0x414b4b,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),serviceRoad:new THREE.MeshBasicMaterial({color:0x414b4b,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x718b8c,metalness:0.04,roughness:0.58}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
   const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
@@ -59,6 +59,14 @@ export function buildConcentrator() {
       }
       box(w+1,.8,.8,x,h-.35,z+sign*d/2,materials.steel,`${name} eave girder`);
       box(w+1,.4,.55,x,h+.05,z+sign*d/2,materials.roof,`${name} rain gutter`);
+      // Close the lower wall bays with restrained corrugated cladding, leaving
+      // a clerestory strip and the main process portals readable. The steel
+      // frame and roof cutaway still expose the equipment during inspection.
+      for(let bay=0;bay<bayCount;bay++){
+        const bayX=x-w/2+(bay+.5)*bayWidth;
+        box(bayWidth-.8,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),cladding,`${name} corrugated wall panel`);
+        box(bayWidth-.8,h*.12,.36,bayX,h*.79,z+sign*(d/2-.18),materials.water,`${name} clerestory glazing`);
+      }
     }
     for(let i=0;i<=bayCount;i++)for(const k of [-d/2,d/2])box(.8,h,.8,x-w/2+i*bayWidth,h/2,z+k,materials.copper,`${name} portal column`);
     const frontPortal=stage
@@ -84,6 +92,22 @@ export function buildConcentrator() {
       }else box(1,h,d,x+sign*w/2,h/2,z,materials.steel);
     }
     for(let i=0;i<6;i++)box(w/9,3,.3,x-w*.4+i*w*.16,h-5,z+d/2+.5,materials.water,'High-level glazing');
+    // A continuous ridge cover and inset rooflights give each otherwise plain
+    // hall a factory roof silhouette at the investor-view camera distance.
+    const ridge=box(w+1,.75,1.5,x,h+rise+.2,z,materials.roof,`${name} roof ridge cap`);
+    ridge.userData.plantRoof=true;if(stage)ridge.userData.plantStage=stage;
+    for(const sign of [-1,1]){
+      const rooflight=box(w*.68,.18,d*.075,x,h+rise*.6,sign*d*.2,materials.water,`${name} rooflight`);
+      rooflight.rotation.x=sign*Math.atan2(rise,d/2);
+      rooflight.userData.plantRoof=true;if(stage)rooflight.userData.plantStage=stage;
+    }
+    if(w>=60){
+      for(const sign of [-1,1]){
+        const ventBase=box(5,1.2,5,x+w*.28,h+rise+1.1,sign*3,materials.roof,`${name} roof ventilator base`);
+        const vent=mesh(new THREE.CylinderGeometry(1.7,2.5,3.2,12),materials.steel,x+w*.28,h+rise+3.3,sign*3,`${name} roof ventilator`);
+        for(const feature of [ventBase,vent]){feature.userData.plantRoof=true;if(stage)feature.userData.plantStage=stage;}
+      }
+    }
   }
   // ROM / receiving and primary crushing.
   mesh(new THREE.ConeGeometry(22,14,32),materials.rock,-106,8,44,'ROM stockpile');

@@ -9,10 +9,10 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
 import {planSite, inside, contained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, pitHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
-import {buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
+import {buildGeologyReferenceGrid,buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
 import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
@@ -749,6 +749,18 @@ function sampleMinePlanTargets(blocks: ResourceBlock[], spacing = 50) {
     if (!current || block.carbon > current.carbon) representatives.set(cell, block);
   }
   return Array.from(representatives.values());
+}
+
+/** Keep pit cutaway cells wholly inside the conceptual excavation envelope. */
+function resourceBlockFitsPitCutaway(block: ResourceBlock, pit: SitePlan['pits'][number]) {
+  const footprint = rectangle([block.x, block.z], block.dx, block.dy);
+  if (!contained(footprint, pit.ring)) return false;
+  const cutFloor = Math.max(...footprint.map(point => pitHeight(point, pit) ?? Infinity));
+  const blockBottom = block.y - block.dz / 2;
+  const blockTop = block.y + block.dz / 2;
+  // Do not show cubes that cross a conceptual bench wall or float above the
+  // crest. This is a spatial display filter; source cell geometry is retained.
+  return Number.isFinite(cutFloor) && blockBottom >= cutFloor - 1.5 && blockTop <= pit.surface + 1.5;
 }
 
 function drillPointFromCoords(coords: [number, number, number]) {
@@ -2143,6 +2155,8 @@ export default function TangaThreeGeologyScene({
   const explodedRef=useRef(false);explodedRef.current=exploded;
   const revealCommand=useRef<((action:RevealAction)=>void)|null>(null);
   const [revealAction,setRevealAction]=useState<RevealAction>('none');
+  const revealActionRef=useRef<RevealAction>(revealAction);
+  revealActionRef.current=revealAction;
   const [spotlight,setSpotlight]=useState('');
   const spotlightRef=useRef('');spotlightRef.current=spotlight;
   const [journeyHoles,setJourneyHoles]=useState<string[]>([]),[journeyHole,setJourneyHole]=useState(''),[journeyReadout,setJourneyReadout]=useState('');
@@ -3125,7 +3139,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     const stage = new THREE.Group();
     const displayReveal=createSceneReveal(stage,revealBlocks,pitSurfaces);
-    revealCommand.current=action=>{displayReveal.start(action);setRevealAction(action);};
+    revealCommand.current=action=>{displayReveal.start(action);revealActionRef.current=action;setRevealAction(action);};
     let journeyUpdate:((time:number)=>void)|null=null;
     groupRef.current = stage;
     stageRef.current = stage;
@@ -3611,7 +3625,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if(response.ok){
             const data=await response.json() as GeologySurfaceData;
             if(cancelled)return;
-            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,(x,z)=>terrainSurfaceY(terrainResources,x,-z),{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
+            const geologyHeight=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
+            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,geologyHeight,{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
+            const referenceGrid=buildGeologyReferenceGrid(mapped.bounds,PROJECT_UTM_CENTER,geologyHeight);
+            if(referenceGrid)mapped.group.add(referenceGrid);
             geologySurface=mapped.group;tagDeckLayer(geologySurface,'context');stage.add(geologySurface);
             // The camera command can finish while the polygon asset is still
             // loading. Start the reveal when the registered surface actually
@@ -3619,8 +3636,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if(mode==='subsurface')geologyMapRevealStartedAt=motionTime;
             geologySurface.children.forEach(mesh=>pickables.push(mesh));
             if(!mapped.bounds.isEmpty()) {mapped.bounds.getCenter(geologyPlanTarget);mapped.bounds.getSize(geologyPlanExtent);}
-            host.dataset.geologySurfaceUnits=String(mapped.group.children.length);
+            host.dataset.geologySurfaceUnits=String(data.features.length);
             host.dataset.geologySurfaceBasis='Digitized project map; approximate printed-grid registration';
+            host.dataset.geologyReferenceGrid=referenceGrid?'EPSG:32737 · 1 km spacing · approximate registration':'unavailable';
           }
         } catch {host.dataset.geologySurfaceBasis='Map overlay unavailable; existing model retained';}
         if (!Number.isFinite(extent.length()) || Math.abs(centre.x) > 10000 || Math.abs(centre.z) > 10000) {
@@ -4177,7 +4195,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           }
           tagDeckLayer(evidenceGroup,'context');stage.add(evidenceGroup);
           storyMotionStart=motionTime;
-          const targets=blocks.filter(b=>b.carbon>=4.5&&sitePlan!.pits.some(p=>inside([b.x,b.z],p.ring)&&b.y>=p.floor&&b.y<=p.surface));
+          const targets=blocks.filter(b=>b.carbon>=4.5&&sitePlan!.pits.some(p=>resourceBlockFitsPitCutaway(b,p)));
           const displayedTargets=sampleMinePlanTargets(targets);
           setTargetCount(targets.length);
           setTargetDisplayCount(displayedTargets.length);
@@ -4864,10 +4882,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
       host.dataset.truckVisible=String(Boolean(haulTrucks[0]?.mesh.visible));
-      // Grade targets get their own beat. Clear them as the pit is revealed so
-      // conceptual benches and the internal haul-truck cue have a clean view.
+      // Grade targets get their own beat, then return over the pit cutaway so
+      // the presenter can read the grade distribution inside the excavation.
+      // The blocks keep source coordinates and remain hidden in the pit view
+      // unless the cutaway is explicitly active.
       targetMeshes.forEach(mesh=>{
-        mesh.visible=beat===1&&layerSettingsRef.current.blocks.visible;
+        mesh.visible=(beat===1||(beat===2&&revealActionRef.current==='pitcut'))&&layerSettingsRef.current.blocks.visible;
         mesh.material.depthTest=!presentationOptions.current.targetXray;
         const opacity=layerSettingsRef.current.blocks.opacity,transparent=opacity<.999;
         if(mesh.material.transparent!==transparent){mesh.material.transparent=transparent;mesh.material.needsUpdate=true;}
@@ -5419,6 +5439,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             <small>{navInstrument.scaleDetail}</small>
           </div>
         </div>
+        {mode==='subsurface'&&mappedSurfaceStage&&<div className="tanga-three__grid-reference" role="note" aria-label="Geology map grid: UTM zone 37 south, 1 kilometre reference, approximate registration">
+          <span aria-hidden="true">▦</span><strong>UTM 37S</strong><span>1 km grid</span><small>Approximate map registration</small>
+        </div>}
         <div className="tanga-three__camera-tools" role="group" aria-label="3D camera controls">
           <button type="button" disabled={!sceneReady} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
@@ -5558,6 +5581,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <button aria-pressed={evidenceVisible} onClick={()=>setEvidenceVisible(v=>!v)}>{evidenceVisible?'Hide evidence holes':'Show evidence holes'}</button>
         <details><summary>{evidenceHoleIds.length} selected drillholes · inspect source</summary><div className="tanga-mine-story__steps">{evidenceHoleIds.map(id=><button key={id} onClick={()=>{setEvidenceVisible(true);setStoryPlaying(false);setMiningBeat(0);evidenceFocusRef.current?.(id);}}>{id}</button>)}</div><small>Actual source interval coordinates. Spatially distributed collars within the crest footprints; not chosen by highest grade. These show nearby sampling, not verified hole-to-block provenance. No surface snapping; markers locate the first available interval. Use the camera reset to return to both pits.</small></details>
         <p>{['Start with sampling: inspect eight spatially selected source drillholes.','Reveal high-grade model targets, without changing source cell sizes or positions.','Reveal the conceptual benches around the target footprint. This is not an optimised reserve shell.','Bring the processing complex into the site story; material flow remains illustrative.'][miningBeat]}</p>
+        {miningBeat>=2&&<div className="tanga-mine-story__pit-block-action">
+          <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>{revealAction==='pitcut'?'Replay pit + block cutaway':'Reveal resource blocks inside pit'}</button>
+          <small>{targetDisplayCount.toLocaleString()} grade-selected display cells inside the conceptual pit envelopes. Source positions and grades are preserved; this is not a reserve shell.</small>
+        </div>}
         <div className="tanga-mine-story__key"><span>● 4.5–&lt;5% TGC</span><span>● ≥5% TGC</span></div>
         <small>{targetCount.toLocaleString()} source cells qualify; {targetDisplayCount.toLocaleString()} shown as a 50 m grid sample across both grade bands. Sampled cells keep their source sizes and coordinates.<br/>Display thresholds, not economic cutoffs or reserves.</small>
         <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on · turn off':'Enable X-ray targets'}</button>
@@ -5570,7 +5597,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
         <small>{haulStatus==='loading'?'Preparing a display-only pit-ramp vehicle cue':haulCount ? `${haulCount} illustrative truck on a conceptual internal pit ramp; no pit-to-feed road or operating speed is shown.` : 'No conceptual pit-ramp vehicle route is available; no pit-to-feed haul road was supplied.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is not throughput or an operating schedule.</small>
-        <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
+        <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Grade-selected blocks are visible within the clipped conceptual pit; their source positions and display thresholds are unchanged.':'Illustrative pit and block-model view; benches are not an optimised reserve shell.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}

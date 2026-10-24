@@ -13767,6 +13767,10 @@ button.tanga-deck__pager-count {
 .tanga-mine-story details { margin:10px 0; }.tanga-mine-story summary { cursor:pointer; }
 .tanga-deck .tanga-mine-story { max-height:calc(100svh - 390px); scrollbar-width:thin; scrollbar-color:#87603c #10171d; }
 .tanga-mine-story__key { display:grid; gap:5px; color:#67b8ba; }.tanga-mine-story__key span+span{color:#ffad52;}
+.tanga-mine-story__pit-block-action{margin:10px 0;padding:9px;border:1px solid #dda36c66;border-radius:8px;background:linear-gradient(135deg,#33291fbb,#17262dcc)}
+.tanga-deck .tanga-mine-story .tanga-mine-story__pit-block-action button{margin:0;padding:9px 10px;border-color:#d69b61;background:#51391f;color:#fff2df;font-size:11px;font-weight:700;letter-spacing:.02em;text-align:center}
+.tanga-deck .tanga-mine-story .tanga-mine-story__pit-block-action button:hover:not(:disabled){background:#694a29;border-color:#f0bf81}
+.tanga-mine-story__pit-block-action small{margin:7px 0 0;font-size:10px!important;line-height:1.45}
 .tanga-met-report { top:150px; left:auto; right:24px; width:370px; max-height:calc(100svh - 256px); }
 .tanga-met-report header small { letter-spacing:.14em; color:#e4a56c; font-size:9px; }
 .tanga-met-report__intro{font-size:11px;color:#e6ded2;line-height:1.45;}
