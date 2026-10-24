@@ -4457,7 +4457,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(mode==='mine_planning'){
         mineCampusReady=true;
         const pending=cameraCommandRef.current;
-        if(pending&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit'].includes(pending.action))consumeCameraCommand(pending);
+        if(pending&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit','revealPitBlocks'].includes(pending.action))consumeCameraCommand(pending);
       }
       if (mode === 'subsurface') {
         geologyModelReady = true;
