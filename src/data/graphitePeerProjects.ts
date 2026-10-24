@@ -24,6 +24,7 @@ export type GraphitePeerEvidence = {
   href: string;
   sourceLabel: string;
   benchmarkHref?: string;
+  basisNote?: string;
 };
 
 const PUBLISHED_BENCHMARK_HREF = 'https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/';
@@ -35,6 +36,7 @@ const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmar
     dateLabel: 'Primary MRE · September 2016 · 41.5 Mt Indicated',
     href: 'https://announcements.asx.com.au/asxpdf/20161024/pdf/43c81t8hnq20t0.pdf',
     sourceLabel: 'Nicanda Hill 2016 MRE',
+    basisNote: 'Triton’s 2016 MRE reports 41.5 Mt Indicated (2015 comparison table: 41.51 Mt); the benchmark’s 41.7 Mt remains unreconciled.',
   },
   Sarytogan: {
     dateLabel: '2023 MRE · approximately 36 Mt Indicated contained',
@@ -77,9 +79,10 @@ const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmar
     sourceLabel: 'Balama Central 2018 MRE summary',
   },
   Bunyu: {
-    dateLabel: 'Resource statement · 30 June 2022 · primary M&I check differs from 2.3 Mt benchmark',
-    href: 'https://announcements.asx.com.au/asxpdf/20230927/pdf/05vbgy3sdc39kk.pdf',
-    sourceLabel: 'Bunyu 2022 resource statement',
+    dateLabel: 'Stage 1 FS update · 14 Aug 2023 · ≈2.25 Mt contained M&I',
+    href: 'https://announcements.asx.com.au/asxpdf/20230814/pdf/05slswdzgwlddt.pdf',
+    sourceLabel: 'Bunyu Stage 1 MRE',
+    basisNote: 'The 2.3 Mt figure is consistent with the limited 2023 Stage 1 M&I subset (~2.25 Mt), not the broader global resource (~8.8 Mt M&I).',
   },
 };
 
