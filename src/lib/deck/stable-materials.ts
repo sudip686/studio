@@ -9,9 +9,45 @@ import * as THREE from 'three';
 export function stabilizeSceneMaterialAppearance(root: THREE.Object3D) {
   root.traverse((object) => {
     const materialOwner = object as THREE.Object3D & {material?: THREE.Material | THREE.Material[]};
-    const entries = materialOwner.material
+    const fixedPaletteSurface = /(?:plant pad|concept pad|hardstand|cleared apron|cut and fill transition|terraced conceptual excavation|internal pit access ramp|illustrative (?:tailings|waste|water|pond|embankment|beach|liner|grading))/i.test(object.name);
+    const fixedColorLayer = object.userData.deckLayer === 'blocks' || fixedPaletteSurface;
+    let entries = materialOwner.material
       ? Array.isArray(materialOwner.material) ? materialOwner.material : [materialOwner.material]
       : [];
+
+    // Grade cells and proposed earthworks are categorical display colors.
+    // Convert any future lit material on these layers to an unlit equivalent
+    // so orbiting cannot change their palette through diffuse/specular shading.
+    if (object instanceof THREE.Mesh && fixedColorLayer && entries.some((material) => !(material instanceof THREE.MeshBasicMaterial))) {
+      entries = entries.map((material) => {
+        if (material instanceof THREE.MeshBasicMaterial) return material;
+        const source = material as THREE.MeshStandardMaterial & {vertexColors?: boolean; wireframe?: boolean};
+        const fixed = new THREE.MeshBasicMaterial({
+          color: source.color ?? 0xffffff,
+          map: source.map ?? null,
+          alphaMap: source.alphaMap ?? null,
+          alphaTest: source.alphaTest ?? 0,
+          opacity: source.opacity ?? 1,
+          transparent: source.transparent ?? false,
+          side: source.side ?? THREE.FrontSide,
+          vertexColors: source.vertexColors ?? false,
+          wireframe: source.wireframe ?? false,
+          toneMapped: false,
+        });
+        fixed.depthWrite = source.depthWrite;
+        fixed.depthTest = source.depthTest;
+        fixed.clippingPlanes = source.clippingPlanes;
+        fixed.clipIntersection = source.clipIntersection;
+        fixed.clipShadows = source.clipShadows;
+        fixed.polygonOffset = source.polygonOffset;
+        fixed.polygonOffsetFactor = source.polygonOffsetFactor;
+        fixed.polygonOffsetUnits = source.polygonOffsetUnits;
+        fixed.userData = {...source.userData};
+        fixed.userData.deckCameraStableColor = true;
+        return fixed;
+      });
+      materialOwner.material = Array.isArray(materialOwner.material) ? entries : entries[0];
+    }
 
     for (const material of entries) {
       if ('fog' in material && material.fog) {
@@ -53,8 +89,7 @@ export function stabilizeSceneMaterialAppearance(root: THREE.Object3D) {
     // receivers. Shadow-map filtering on large, coplanar instanced layers can
     // shimmer as the camera moves, even when the sun and shadow frustum stay
     // fixed. The terrain and plant structures retain their authored shadows.
-    const fixedPaletteSurface = /(?:plant pad|concept pad|hardstand|cleared apron|cut and fill transition|terraced conceptual excavation|internal pit access ramp|illustrative (?:tailings|waste|water|pond|embankment|beach|liner|grading))/i.test(object.name);
-    if (object.userData.deckLayer === 'blocks' || fixedPaletteSurface) {
+    if (fixedColorLayer) {
       const shadowOwner = object as THREE.Object3D & {castShadow?: boolean; receiveShadow?: boolean};
       shadowOwner.castShadow = false;
       shadowOwner.receiveShadow = false;
