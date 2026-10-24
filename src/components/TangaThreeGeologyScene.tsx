@@ -2388,9 +2388,11 @@ export default function TangaThreeGeologyScene({
     let cancelTerrainUpgrade: (() => void) | null = null;
     consumedCameraCommandIdRef.current=0;
     const sceneStartedAt = performance.now();
+    let sceneReadyAt: number | null = null;
     const publishLoadState = (sceneState: SceneLoadState, terrainState: SceneLoadState, quality: AssetQuality, message: string) => {
+      if(sceneState==='ready'&&sceneReadyAt===null)sceneReadyAt=performance.now();
       setSceneReady(sceneState === 'ready');
-      onLoadState?.({scene: sceneState, terrain: terrainState, quality, message, elapsedMs: Math.round(performance.now() - sceneStartedAt)});
+      onLoadState?.({scene: sceneState, terrain: terrainState, quality, message, elapsedMs: Math.round((sceneReadyAt??performance.now()) - sceneStartedAt)});
     };
     // Readiness follows usable scene data, not the optional cinematic camera
     // move. The view can be interrupted immediately and a slow/suspended RAF
