@@ -2598,6 +2598,24 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       disposeObject(scene);
       return;
     }
+    const sceneMemoryDiagnostics = new URLSearchParams(window.location.search).get('scene-memory') === '1';
+    if (sceneMemoryDiagnostics) {
+      delete host.dataset.sceneGpuResources;
+      delete host.dataset.sceneGpuResourcesAtUnmount;
+    }
+    const captureSceneGpuResources = (destination: 'live' | 'unmount') => {
+      if (!sceneMemoryDiagnostics) return;
+      const memory = renderer.info.memory;
+      const snapshot = JSON.stringify({
+        geometries: memory.geometries,
+        textures: memory.textures,
+        programs: renderer.info.programs?.length ?? 0,
+        drawCalls: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles,
+        contextLost: renderer.getContext().isContextLost(),
+      });
+      host.dataset[destination === 'live' ? 'sceneGpuResources' : 'sceneGpuResourcesAtUnmount'] = snapshot;
+    };
     let wasContextLost = false;
     const onContextLost = (event: Event) => {
       event.preventDefault();
@@ -5236,6 +5254,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const projectionTick = Math.floor(elapsed * (interacting || cameraTween || (!userTookControl && flyProgress < 1) || performance.now() - lastInteractionAt < 500 ? 30 : 10));
       if (projectionTick !== lastProjectionTick) {
         lastProjectionTick = projectionTick;
+        captureSceneGpuResources('live');
         if(haulTrucks[0])host.dataset.truckPosition=haulTrucks[0].mesh.position.toArray().map(v=>v.toFixed(2)).join(',');
         if(developmentMarkers[0])host.dataset.conveyorMaterialPosition=developmentMarkers[0].group.position.toArray().map(v=>v.toFixed(2)).join(',');
         host.dataset.cameraMoving = String(Boolean(cameraTween) || (!userTookControl && flyProgress < 1));
@@ -5325,6 +5344,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       cancelAnimationFrame(frame);
       observer.disconnect();
       document.removeEventListener('visibilitychange',onVisibilityChange);
+      captureSceneGpuResources('unmount');
       clearTimeout(pickTimer);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
