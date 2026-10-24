@@ -8,7 +8,7 @@ export function buildConcentrator() {
   // The pad is a neutral reference surface, not a mapped material. Keep its
   // color steady as the camera moves; the buildings, equipment and terrain
   // retain physically shaded materials for depth.
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),serviceRoad:new THREE.MeshBasicMaterial({color:0x414b4b,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x4d7478,metalness:0.04,roughness:0.44}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
   const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
@@ -28,11 +28,13 @@ export function buildConcentrator() {
   // coplanar slab top caused depth-buffer z-fighting (color shimmer) while the
   // camera orbited. Footings still begin at y=0 and overlap the slab cleanly.
   box(400,3,280,0,-1.15,0,materials.concrete,'Plant pad');
-  // A perimeter service lane and drainage edge make the pad read as a site.
-  box(392,.15,7,0,.1,135,materials.roof,'Conceptual service lane');
-  box(392,.15,5,0,.1,-135,materials.roof,'Service lane');
-  for(const x of [-195,195])box(4,.15,268,x,.1,0,materials.roof);
-  for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,.22,135,materials.concrete);
+  // A conceptual perimeter service loop sits just above the shared pad slab.
+  // Previously its road deck and markings were below the slab top and hidden.
+  const serviceRoadY=.46;
+  box(392,.15,7,0,serviceRoadY,135,materials.serviceRoad,'Conceptual perimeter service lane');
+  box(392,.15,5,0,serviceRoadY,-135,materials.serviceRoad,'Conceptual service lane');
+  for(const x of [-195,195])box(4,.15,268,x,serviceRoadY,0,materials.serviceRoad,'Conceptual perimeter service lane');
+  for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,.58,135,materials.roadMarking,'Illustrative service-lane marking');
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
