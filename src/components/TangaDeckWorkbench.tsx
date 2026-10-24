@@ -899,9 +899,9 @@ const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: s
     note: 'Displayed resource model · saved scene view',
   },
   mine_planning: {
-    src: '/presentation-assets/tanga-fallback-mine-planning.jpg',
-    alt: 'Static view of the Tanga conceptual mine layout and illustrative site facilities.',
-    note: 'Conceptual mine layout · saved scene view',
+    src: '/presentation-assets/tanga-fallback-mine-planning.jpg?v=2026-10-24-1',
+    alt: 'Tanga terrain with two conceptual pit envelopes and proposed facility pads; no resource blocks are draped over the surface.',
+    note: 'Mine-plan terrain preview · saved scene view',
   },
 };
 
