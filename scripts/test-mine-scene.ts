@@ -73,7 +73,13 @@ assert.equal(await planHaulRoute([-350,0],[350,0],rectangle([0,0],1200,1000),[],
 assert.equal(await planHaulRoute([-350,0],[350,0],rectangle([0,0],1200,1000),[],()=>NaN),null,'Invalid terrain is rejected');
 assert.equal(await planHaulRoute([-350,0],[350,0],rectangle([0,0],1200,1000),[],()=>100,undefined,()=>true),null,'Navigation cancellation stops queued route work');
 assert.ok(routePosition(route,0).position.distanceTo(route[0])<1e-6);
-assert.ok(buildHaulTruck().children.length<20,'Low-poly bounded truck assembly');
+const haulTruck=buildHaulTruck();
+assert.ok(haulTruck.children.length<=6,'Detailed truck assembly is batched by material');
+assert.ok(haulTruck.userData.components.includes('Haul truck windshield')&&haulTruck.userData.components.includes('Haul truck dump-bed tailgate'),'Truck has an enclosed cab and dump-body form');
+assert.equal(haulTruck.userData.componentCounts['Haul truck tire'],6,'Haul truck has three axles');
+haulTruck.updateMatrixWorld(true);
+const truckBounds=new THREE.Box3().setFromObject(haulTruck),truckSize=truckBounds.getSize(new THREE.Vector3());
+assert.ok(truckSize.x<=6.1&&truckSize.z<11&&truckSize.y<7,'Truck proportions remain within the screened concept envelope');
 const evidence:EvidenceInterval[]=Array.from({length:12},(_,i)=>({holeId:`H${i}`,depthFrom:0,from:[0,100,-140+i*25],to:[0,60,-140+i*25]}));
 const selected=selectPitEvidenceHoles(evidence,[pit]);
 assert.equal(selected.length,4,'Evidence label budget is bounded');
