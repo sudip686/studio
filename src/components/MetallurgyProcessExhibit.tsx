@@ -134,7 +134,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       }
       // Keep the complete campus, fence, yard and near-side water allowance in
       // frame at both desktop sizes while using the lower façade-forward view.
-      distance = Math.max(125, distance * .62);
+      distance = Math.max(125, distance * .60);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
     }

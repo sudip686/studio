@@ -8,13 +8,18 @@ export function buildConcentrator() {
   // The pad is a neutral reference surface, not a mapped material. Keep its
   // color steady as the camera moves; the buildings, equipment and terrain
   // retain physically shaded materials for depth.
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),serviceRoad:new THREE.MeshBasicMaterial({color:0x414b4b,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x718b8c,metalness:0.04,roughness:0.58}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
-  const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x808b86,metalness:0.18,roughness:0.78}),roof:new THREE.MeshStandardMaterial({color:0x56625e,roughness:0.88}),copper:new THREE.MeshStandardMaterial({color:0x9e7856,metalness:.08,roughness:0.76}),concrete:new THREE.MeshBasicMaterial({color:0x92928a}),serviceRoad:new THREE.MeshBasicMaterial({color:0x4a5551,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x759593,metalness:0.02,roughness:0.76}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
+  // Separate the light, ribbed wall sheets from the darker standing-seam
+  // roof panels. One all-over cladding tone made the process halls read as
+  // solid toy boxes from the executive overview camera.
+  const cladding=new THREE.MeshStandardMaterial({color:0x74817b,roughness:.9,metalness:.02});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.94+0.06*smoothstep(-0.5,0.5,sin(vRoofPoint.x*4.0));');
   };
   cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
+  const wallCladding=new THREE.MeshStandardMaterial({color:0xa2aca5,roughness:.92,metalness:.01});
+  const roofSeam=new THREE.MeshStandardMaterial({color:0x929d96,roughness:.86,metalness:.03});
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m:THREE.Material=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
@@ -49,6 +54,20 @@ export function buildConcentrator() {
       roof.rotation.x=slope;
       roof.userData.plantRoof=true;
       if(stage)roof.userData.plantStage=stage;
+      // Long standing seams give the broad roof planes a scaled industrial
+      // sheet profile from the overview camera; one instanced strip per hall
+      // side keeps the added detail light and opens with its selected roof.
+      const seamCount=Math.max(4,Math.floor(w/10));
+      const seams=new THREE.InstancedMesh(new THREE.BoxGeometry(.28,.18,roofLength*.94),roofSeam,seamCount);
+      const seamDummy=new THREE.Object3D();
+      for(let seam=0;seam<seamCount;seam++){
+        const seamX=x-w/2+(seam+.5)*w/seamCount;
+        seamDummy.position.set(seamX,h+rise/2+.36,z+sign*d/4);
+        seamDummy.rotation.set(slope,0,0);seamDummy.updateMatrix();seams.setMatrixAt(seam,seamDummy.matrix);
+      }
+      seams.instanceMatrix.needsUpdate=true;seams.name=`${name} standing-seam roof ribs`;seams.castShadow=true;seams.userData.plantRoof=true;
+      if(stage)seams.userData.plantStage=stage;
+      root.add(seams);
       // Repeated portal rafters and eave members make the process halls read
       // as steel-framed buildings at whole-campus scale, not smooth toy boxes.
       for(let bay=0;bay<=bayCount;bay++){
@@ -64,7 +83,7 @@ export function buildConcentrator() {
       // frame and roof cutaway still expose the equipment during inspection.
       for(let bay=0;bay<bayCount;bay++){
         const bayX=x-w/2+(bay+.5)*bayWidth;
-        box(bayWidth-.8,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),cladding,`${name} corrugated wall panel`);
+        box(bayWidth-.8,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),wallCladding,`${name} corrugated wall panel`);
         box(bayWidth-.8,h*.12,.36,bayX,h*.79,z+sign*(d/2-.18),materials.water,`${name} clerestory glazing`);
       }
     }
