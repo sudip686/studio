@@ -3445,13 +3445,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const pad=processPlant?.userData.conceptPad as ConceptPad|undefined;if(pad)gradeConceptPad(terrainGeometry,pad);
         }
         const hasSatelliteTexture = mode !== 'topography' && Boolean(terrainTexture);
-        const texturedTerrain = new THREE.Mesh(
-          terrainGeometry,
-          hasSatelliteTexture
-            // Keep the source satellite basemap's real colours. PBR lighting,
-            // warm tinting and the old near-monochrome shader shifted it away
-            // from a recognisable map and made the drillhole scene feel flat.
-            ? new THREE.MeshBasicMaterial({
+        const satelliteTerrainMaterial = hasSatelliteTexture
+          ? new THREE.MeshBasicMaterial({
             map: terrainTexture,
             color: 0xffffff,
             colorWrite: true,
@@ -3466,7 +3461,22 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             polygonOffset: true,
             polygonOffsetFactor: 2,
           })
-            : new THREE.MeshLambertMaterial({
+          : null;
+        if (satelliteTerrainMaterial) {
+          // Lift dark satellite midtones in linear color space. This keeps the
+          // basemap legible like a mapping surface without a canvas CSS filter
+          // that also changes the grade palette and HUD compositing.
+          satelliteTerrainMaterial.onBeforeCompile = shader => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+              '#include <color_fragment>',
+              '#include <color_fragment>\ndiffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(0.94));'
+            );
+          };
+          satelliteTerrainMaterial.customProgramCacheKey = () => 'tanga-satellite-terrain-midtones-v1';
+        }
+        const texturedTerrain = new THREE.Mesh(
+          terrainGeometry,
+          satelliteTerrainMaterial ?? new THREE.MeshLambertMaterial({
             map: mode === 'topography' ? null : terrainTexture,
             color: 0xffffff,
             transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
