@@ -123,9 +123,9 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
     <span className="tanga-site-concept-tag">Proposed site · illustrative facilities</span>
     <div className="tanga-site-status-key" role="group" aria-label="Site feature evidence status">
-      <span><i data-status="report"/>Report candidate</span>
-      <span><i data-status="approximate"/>Approx. map trace</span>
-      <span><i data-status="illustrative"/>Illustrative</span>
+      <span data-status="report"><i aria-hidden="true"/>Report candidate</span>
+      <span data-status="approximate"><i aria-hidden="true"/>Approx. map trace</span>
+      <span data-status="illustrative"><i aria-hidden="true"/>Illustrative</span>
     </div>
     <select className="tanga-development-select" aria-label="Mine site view" value={developmentViewId ?? 'overview'} onChange={event=>onInspectDevelopment?.(event.target.value as DevelopmentView)}>{(developmentViewId==='north-pit'||developmentViewId==='south-pit')&&<option value={developmentViewId} disabled>{developmentViewId==='north-pit'?'North pit':'South pit'}</option>}{DEVELOPMENT_FACILITIES.map(view=><option key={view.id} value={view.id} disabled={!developmentAvailable(view.id)}>{view.label}</option>)}</select>
     <div className="tanga-site-orientation" role="group" aria-label="Site camera view">
