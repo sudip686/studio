@@ -297,6 +297,8 @@ type TangaThreeGeologySceneProps = {
   rotationKey: number;
   cameraDropKey: number;
   cameraCommand?: ThreeCameraCommand | null;
+  recoveryView?: WebGlRecoveryView | null;
+  onRecoveryViewChange?: (view: WebGlRecoveryView | null) => void;
   assetQuality?: AssetQuality;
   /**
    * How many data labels the scene may draw. `key` keeps the deck calm for a
@@ -2132,6 +2134,19 @@ function disposeObject(object: THREE.Object3D) {
   });
 }
 
+export type WebGlRecoveryView = {
+  mode: GeologyMode;
+  position: [number, number, number];
+  target: [number, number, number];
+  fov: number;
+  geologyStage?: 'plan' | 'mapped-relief' | 'interpreted-depth';
+};
+
+// The scene remounts after WEBGL_lose_context is restored. Keep the payload in
+// module memory as the primary handoff, with sessionStorage as a page-reload
+// fallback for browsers that tear down the document while recovering graphics.
+const webGlRecoveryViews = new Map<string, WebGlRecoveryView>();
+
 export default function TangaThreeGeologyScene({
   visible,
   mode,
@@ -2139,6 +2154,8 @@ export default function TangaThreeGeologyScene({
   rotationKey,
   cameraDropKey,
   cameraCommand,
+  recoveryView: parentRecoveryView,
+  onRecoveryViewChange,
   assetQuality = 'preview',
   onLoadState,
   labelDensity = 'key',
@@ -2589,11 +2606,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       applyTerrainSurfaceView();
     };
     const recoveryViewKey = `tanga-webgl-recovery:${mode}`;
-    let recoveryView: {position: [number, number, number]; target: [number, number, number]; fov: number} | null = null;
+    let recoveryView: WebGlRecoveryView | null = parentRecoveryView?.mode === mode
+      ? parentRecoveryView
+      : webGlRecoveryViews.get(mode) ?? null;
+    if (recoveryView) webGlRecoveryViews.delete(mode);
     try {
       const stored = sessionStorage.getItem(recoveryViewKey);
-      if (stored) {
-        const candidate = JSON.parse(stored) as {position?: number[]; target?: number[]; fov?: number};
+      if (!recoveryView && stored) {
+        const candidate = JSON.parse(stored) as {position?: number[]; target?: number[]; fov?: number; geologyStage?: string};
         const validVector = (value?: number[]): value is [number, number, number] =>
           Array.isArray(value) && value.length === 3 && value.every((coordinate) => Number.isFinite(coordinate) && Math.abs(coordinate) <= 1e7);
         const distance = validVector(candidate.position) && validVector(candidate.target)
@@ -2601,10 +2621,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           : 0;
         const maxDistance = mode === 'subsurface' ? 34000 : 16000;
         if (validVector(candidate.position) && validVector(candidate.target) && distance >= 25 && distance <= maxDistance && Number.isFinite(candidate.fov) && candidate.fov! >= 10 && candidate.fov! <= 90) {
-          recoveryView = {position: candidate.position, target: candidate.target, fov: candidate.fov!};
+          recoveryView = {
+            mode,
+            position: candidate.position,
+            target: candidate.target,
+            fov: candidate.fov!,
+            ...(mode==='subsurface'&&['plan','mapped-relief','interpreted-depth'].includes(candidate.geologyStage??'')?{geologyStage:candidate.geologyStage as 'plan'|'mapped-relief'|'interpreted-depth'}:{}),
+          };
         }
-        sessionStorage.removeItem(recoveryViewKey);
       }
+      if (stored) sessionStorage.removeItem(recoveryViewKey);
     } catch { /* Session storage is optional; retain the authored camera. */ }
     const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 0.1, mode === 'subsurface' ? 65000 : 26000);
     camera.fov = recoveryView?.fov ?? cameraShot.fov;
@@ -2645,12 +2671,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const onContextLost = (event: Event) => {
       event.preventDefault();
       wasContextLost = true;
+      const recovery: WebGlRecoveryView = {
+        mode,
+        position: camera.position.toArray() as [number, number, number],
+        target: controlsRef.current?.target.toArray() as [number, number, number] ?? DEFAULT_CAMERA_TARGET.toArray() as [number, number, number],
+        fov: camera.fov,
+        geologyStage: mode === 'subsurface'
+          ? ['plan','mapped-relief','interpreted-depth'].includes(host.dataset.geologyStage ?? '')
+            ? host.dataset.geologyStage as WebGlRecoveryView['geologyStage']
+            : undefined
+          : undefined,
+      };
+      webGlRecoveryViews.set(mode, recovery);
+      onRecoveryViewChange?.(recovery);
       try {
-        sessionStorage.setItem(recoveryViewKey, JSON.stringify({
-          position: camera.position.toArray(),
-          target: controlsRef.current?.target.toArray() ?? DEFAULT_CAMERA_TARGET.toArray(),
-          fov: camera.fov,
-        }));
+        sessionStorage.setItem(recoveryViewKey, JSON.stringify(recovery));
       } catch { /* Camera recovery is best-effort if storage is disabled. */ }
       setStatus('WebGL context lost; the 3D scene is unavailable. Waiting for graphics recovery…');
       setSceneReady(false);
@@ -3277,7 +3312,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     cameraCommandHandlerRef.current = consumeCameraCommand;
     const pendingCameraCommand = cameraCommandRef.current;
-    if (pendingCameraCommand) consumeCameraCommand(pendingCameraCommand);
+    if (pendingCameraCommand && !recoveryView) consumeCameraCommand(pendingCameraCommand);
 
     const terrainLayer = new THREE.Group();
     terrainLayer.name = 'terrain-surface-layer';
@@ -4568,8 +4603,30 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       if (mode === 'subsurface') {
         geologyModelReady = true;
-        if (cameraCommandRef.current && ['geologyPlan','geologyTilt','geologyDepth'].includes(cameraCommandRef.current.action)) consumeCameraCommand(cameraCommandRef.current);
+        if (recoveryView) {
+          const action: ThreeCameraCommand['action'] = recoveryView.geologyStage === 'plan'
+            ? 'geologyPlan'
+            : recoveryView.geologyStage === 'mapped-relief'
+              ? 'geologyTilt'
+              : 'geologyDepth';
+          // Rebuild the saved geology stage after its geometry and layer state
+          // exist, then restore the exact pre-loss camera. Stage actions can
+          // author a transition camera, which must not replace the saved view.
+          consumeCameraCommand({id: -1, action});
+          cameraTween = null;
+          camera.position.set(...recoveryView.position);
+          controls.target.set(...recoveryView.target);
+          camera.fov = recoveryView.fov;
+          camera.updateProjectionMatrix();
+          controls.update();
+        } else if (cameraCommandRef.current && ['geologyPlan','geologyTilt','geologyDepth'].includes(cameraCommandRef.current.action)) {
+          consumeCameraCommand(cameraCommandRef.current);
+        }
       }
+      // Keep the deck-owned recovery payload until the rebuilt scene and its
+      // restored authored state have reached the ready sequence. If renderer
+      // creation fails again, an in-place retry still receives the same view.
+      if (recoveryView) onRecoveryViewChange?.(null);
       // Do not replace an authored scene command with the generic first-load
       // camera; a presentation shot must retain its own target and framing.
       if ((mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface' || mode === 'resource') && !userTookControl && !geologyPlan && !facilityFocused) {

@@ -57,6 +57,7 @@ const loadThreeSceneModule = () => import('./TangaThreeGeologyScene');
 // initial bundle and undo the dynamic split above.
 type LabelDensity = import('./TangaThreeGeologyScene').LabelDensity;
 type SceneAssayFacts = import('./TangaThreeGeologyScene').AssayFacts;
+type ThreeSceneRecoveryView = import('./TangaThreeGeologyScene').WebGlRecoveryView;
 
 /** Scenes where the drilling is on screen, so an intercept panel makes sense. */
 const INTERCEPT_PANEL_MODES = new Set<WorkbenchMode>(['drillholes', 'subsurface', 'resource']);
@@ -2332,6 +2333,7 @@ export default function TangaDeckWorkbench() {
   useEffect(() => { if (activeMode === 'ranking') setPeerMreRevealed(false); }, [activeMode]);
   const [threeSceneRequested, setThreeSceneRequested] = useState(false);
   const [threeSceneRevision, setThreeSceneRevision] = useState(0);
+  const [threeSceneRecoveryView, setThreeSceneRecoveryView] = useState<ThreeSceneRecoveryView | null>(null);
   const [shareStatus, setShareStatus] = useState('');
   const [fallbackPreflight, setFallbackPreflight] = useState<FallbackPreflightResult[] | null>(null);
   const [fallbackPreflightRunning, setFallbackPreflightRunning] = useState(false);
@@ -5707,6 +5709,8 @@ export default function TangaDeckWorkbench() {
           rotationKey={0}
           cameraDropKey={0}
           cameraCommand={threeCameraCommand}
+          recoveryView={threeSceneRecoveryView}
+          onRecoveryViewChange={setThreeSceneRecoveryView}
           assetQuality={assetQuality}
           onLoadState={handleThreeLoadState}
           onRetry={() => { setThreeCameraCommand(null); setThreeLoadReport(DEFAULT_THREE_LOAD_REPORT); setThreeSceneRevision((revision) => revision + 1); }}
