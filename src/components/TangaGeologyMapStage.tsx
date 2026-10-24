@@ -3,6 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowRight, ExternalLink, Eye, EyeOff} from 'lucide-react';
+import Image from 'next/image';
 import {MAPPED_SURFACE_UNITS, MODEL_ROCK_UNITS} from '@/lib/deck/geology-palette';
 
 export type GeologyUnitSelection = {title:string;rows:string[];tone:string};
@@ -50,7 +51,14 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
       <div ref={storyPanel} className="tanga-geology-story__body">
         <p className="tanga-story-panel__intro">{intros[step] ?? intros[0]}</p>
         {selectedUnit&&<section className="tanga-geology-selected-unit" aria-live="polite"><header><i style={{background:selectedUnit.tone}}/><strong>{selectedUnit.title}</strong><button type="button" onClick={()=>onSelectUnit(null)} aria-label="Clear selected map unit">×</button></header>{selectedUnit.rows.map(row=><p key={row}>{row}</p>)}</section>}
-        <details className="tanga-geology-basis"><summary>Source &amp; interpretation limits</summary><p className="tanga-story-datum-note">{step<2?'Surface polygons are colour-traced from the scanned project map and registered from its printed grid. They are approximate map interpretations, not original shapefiles or surveyed contacts.':'Mapped surface areas and modelled volumes are distinct interpretations. Similar names and shared colours are presentation cues only; no verified surface-to-depth crosswalk is available. Map contacts are not extruded into the model, whose boundaries remain a separate interpretation.'}</p><a href="/geology_map.jpg" target="_blank" rel="noreferrer">Open original project map <ExternalLink size={13}/></a></details>
+      <details className="tanga-geology-basis"><summary>Source sheet &amp; interpretation limits</summary>
+        <p className="tanga-story-datum-note">{step<2?'Surface polygons are colour-traced from the scanned project map and registered from its printed grid. They are approximate map interpretations, not original shapefiles or surveyed contacts.':'Mapped surface areas and modelled volumes are distinct interpretations. Similar names and shared colours are presentation cues only; no verified surface-to-depth crosswalk is available. Map contacts are not extruded into the model, whose boundaries remain a separate interpretation.'}</p>
+        <figure className="tanga-geology-source-sheet">
+          <Image src="/geology_map.jpg" width={1240} height={1755} sizes="(max-width: 760px) 220px, 300px" loading="lazy" alt="Original scanned Tanga geology sheet with its coordinate grid, rock-unit legend and contextual map symbols." />
+          <figcaption>Reference scan only. Other outlines and drilling symbols on the sheet are not projected into the 3D view; the mapped rock-unit polygons are approximate interpretations.</figcaption>
+        </figure>
+        <a href="/geology_map.jpg" target="_blank" rel="noreferrer">Open full-resolution project map <ExternalLink size={13}/></a>
+      </details>
       </div>
       <footer className="tanga-geology-story__footer">
         <span className="tanga-geology-basis-tag">{step<2?'8 mapped classes · approximate registration':'Separate interpreted volumes · true vertical scale'}</span>
