@@ -3447,9 +3447,12 @@ export default function TangaDeckWorkbench() {
     }
     return () => {
       cancelled = true;
-      controller.abort();
       if (idleHandle !== null) browserWindow.cancelIdleCallback?.(idleHandle);
       if (timerHandle !== null) window.clearTimeout(timerHandle);
+      // Give the destination chapter a short mount window to subscribe to an
+      // in-flight preload before releasing its final consumer. If no scene
+      // joins during the handoff, the controller still cancels the request.
+      window.setTimeout(() => controller.abort(), 900);
     };
   }, [nextPreloadStage]);
 

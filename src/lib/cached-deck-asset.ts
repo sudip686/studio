@@ -5,6 +5,14 @@ const ALLOWED=/\/(geologicalModel\.glb|height_hires\.bin|terrain_context_512\.bi
 type PendingAsset={controller:AbortController;promise:Promise<Response>;consumers:number;settled:boolean;cancelled:boolean};
 const pending=new Map<string,PendingAsset>();
 
+function isCacheableAssetPath(pathname:string){
+  // R2-backed public assets are exposed through the same-origin streaming
+  // route in this app. Check its underlying asset path as well as direct URLs
+  // so preload and scene consumers participate in the same shared request.
+  const assetPath=pathname.replace(/^\/api\/assets(?=\/)/,'');
+  return ALLOWED.test(assetPath);
+}
+
 function abortError(){return new DOMException('The asset request was cancelled','AbortError');}
 
 function subscribe(job:PendingAsset,key:string,signal?:AbortSignal):Promise<Response>{
@@ -34,7 +42,7 @@ function subscribe(job:PendingAsset,key:string,signal?:AbortSignal):Promise<Resp
 }
 
 export async function cachedDeckAsset(url:string,init?:RequestInit):Promise<Response>{
-  if(typeof window==='undefined'||!('caches' in window)||!ALLOWED.test(new URL(url,window.location.href).pathname))return fetch(url,init);
+  if(typeof window==='undefined'||!('caches' in window)||!isCacheableAssetPath(new URL(url,window.location.href).pathname))return fetch(url,init);
   if(init?.signal?.aborted)throw abortError();
   const key=new URL(url,window.location.href).href;
   const active=pending.get(key);if(active&&!active.cancelled)return subscribe(active,key,init?.signal??undefined);
