@@ -18,7 +18,7 @@ export function buildMineSiteCampus(options:Options) {
   const {plant,feed,pits,boundary,bounds,height,surveyed}=options;
   const root=new THREE.Group();root.name='Illustrative waste and water facilities';
   const facilities:CampusFacility[]=[],omissions:string[]=[];
-  const facilityApronDrapeAudit:{facilityId:CampusFacility['id'];nx:number;nz:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[]=[];
+  const facilityApronDrapeAudit:{facilityId:CampusFacility['id'];nx:number;nz:number;triangleCount:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[]=[];
   let maximumContourSegmentM=0;
   let fixedTerrainColorVertices=0,fixedTerrainColorMin=Infinity,fixedTerrainColorMax=-Infinity;
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
@@ -101,6 +101,26 @@ export function buildMineSiteCampus(options:Options) {
     for(let i=0;i<points.length;i++)maximumContourSegmentM=Math.max(maximumContourSegmentM,points[i].distanceTo(points[(i+1)%points.length]));
     return points;
   }
+  function containmentRing(point:Point2,w:number,d:number,level:number|Height){
+    // Lowland water and tailings concepts read more like shallow containment
+    // basins than large rectangular pads. Keep a smooth, slightly asymmetric
+    // superellipse inside the same screened footprint; the fixed, modest
+    // contour variation is presentation geometry and is not an engineered
+    // embankment alignment.
+    const count=304,raw:Array<[number,number]>=[];
+    for(let i=0;i<count;i++){
+      const angle=i/count*Math.PI*2,c=Math.cos(angle),s=Math.sin(angle);
+      const radius=1+.022*Math.sin(3*angle+.6)+.012*Math.cos(5*angle-1.1);
+      raw.push([Math.sign(c)*Math.pow(Math.abs(c),.87)*radius,Math.sign(s)*Math.pow(Math.abs(s),.87)*radius]);
+    }
+    const maxX=Math.max(...raw.map(([x])=>Math.abs(x))),maxZ=Math.max(...raw.map(([,z])=>Math.abs(z)));
+    const points=raw.map(([x,z])=>{
+      const px=point[0]+x/maxX*w/2,pz=point[1]+z/maxZ*d/2;
+      return new THREE.Vector3(px,typeof level==='number'?level:level(px,pz),pz);
+    });
+    for(let i=0;i<points.length;i++)maximumContourSegmentM=Math.max(maximumContourSegmentM,points[i].distanceTo(points[(i+1)%points.length]));
+    return points;
+  }
   function join(group:THREE.Group,a:THREE.Vector3[],b:THREE.Vector3[],material:THREE.Material,name:string){
     const positions:number[]=[],indices:number[]=[],count=Math.min(a.length,b.length);
     for(const point of [...a.slice(0,count),...b.slice(0,count)])positions.push(point.x,point.y,point.z);
@@ -117,18 +137,24 @@ export function buildMineSiteCampus(options:Options) {
     return mesh(group,geometry,material,name);
   }
   function patch(group:THREE.Group,f:CampusFacility){
-    const positions:number[]=[],maxSpacing=6,nx=Math.ceil((f.width+30)/maxSpacing),nz=Math.ceil((f.depth+30)/maxSpacing);
-    let maximumTriangleCentreErrorM=0;
+    const positions:number[]=[],maxSpacing=2,nx=Math.ceil((f.width+30)/maxSpacing),nz=Math.ceil((f.depth+30)/maxSpacing),apronWidth=f.width+30,apronDepth=f.depth+30;
+    let maximumTriangleCentreErrorM=0,triangleCount=0;
     const p=(i:number,j:number)=>{const x=f.point[0]-(f.width+30)/2+i*(f.width+30)/nx,z=f.point[1]-(f.depth+30)/2+j*(f.depth+30)/nz;return [x,height(x,z)+.18,z];};
     const triangle=(a:number[],b:number[],c:number[])=>{
-      positions.push(...a,...b,...c);
       const x=(a[0]+b[0]+c[0])/3,z=(a[2]+b[2]+c[2])/3,y=(a[1]+b[1]+c[1])/3;
+      // Clip the cleared, terrain-following apron to a rounded footprint. A
+      // rectangular draped sheet around the basin read as a floating CAD pad
+      // in the oblique site view. This screen is display geometry only and
+      // does not change the report candidate or the cleared-apron dimensions.
+      const rounded=Math.pow(Math.abs((x-f.point[0])/(apronWidth/2)),2.3)+Math.pow(Math.abs((z-f.point[1])/(apronDepth/2)),2.3);
+      if(rounded>1)return;
+      positions.push(...a,...b,...c);triangleCount++;
       maximumTriangleCentreErrorM=Math.max(maximumTriangleCentreErrorM,Math.abs(y-(height(x,z)+.18)));
     };
     for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){
       const a=p(i,j),b=p(i,j+1),c=p(i+1,j),d=p(i+1,j+1);triangle(a,b,c);triangle(c,b,d);
     }
-    facilityApronDrapeAudit.push({facilityId:f.id,nx,nz,maximumSampleSpacingM:Number(Math.max((f.width+30)/nx,(f.depth+30)/nz).toFixed(2)),maximumTriangleCentreErrorM:Number(maximumTriangleCentreErrorM.toFixed(4))});
+    facilityApronDrapeAudit.push({facilityId:f.id,nx,nz,triangleCount,maximumSampleSpacingM:Number(Math.max((f.width+30)/nx,(f.depth+30)/nz).toFixed(2)),maximumTriangleCentreErrorM:Number(maximumTriangleCentreErrorM.toFixed(4))});
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();mesh(group,geometry,materials.earthSurface,'Illustrative cleared apron · terrain conforming');
   }
   function place(id:CampusFacility['id'],title:string,preferred:Point2,w:number,d:number,limit:number,mineOnly=false){
@@ -272,16 +298,17 @@ export function buildMineSiteCampus(options:Options) {
       box(group,3,2.6,3,x+16,y+18,z,materials.bench,'Parked dozer cab');
       box(group,7,2,.7,x+16,y+16,z+5,materials.steel,'Parked dozer blade');
     }else{
-      const tsf=f.id==='tailings',rise=tsf?12:4,crestInset=tsf?42:12,beachInset=tsf?68:25;
-      const toe=ring(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3);
-      const crest=ring(f.point,f.width-2*crestInset,f.depth-2*crestInset,y+rise);
-      const innerCrest=ring(f.point,f.width-2*(crestInset+6),f.depth-2*(crestInset+6),y+rise);
-      const beach=ring(f.point,f.width-2*beachInset,f.depth-2*beachInset,y+(tsf?2.4:1));
+      const tsf=f.id==='tailings',basin=f.id==='tailings'||f.id==='water'||f.id==='raw-water',rise=tsf?12:4,crestInset=tsf?42:12,beachInset=tsf?68:25;
+      const contour=basin?containmentRing:ring;
+      const toe=contour(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3);
+      const crest=contour(f.point,f.width-2*crestInset,f.depth-2*crestInset,y+rise);
+      const innerCrest=contour(f.point,f.width-2*(crestInset+6),f.depth-2*(crestInset+6),y+rise);
+      const beach=contour(f.point,f.width-2*beachInset,f.depth-2*beachInset,y+(tsf?2.4:1));
       if(tsf){
         // A broad, stepped shoulder makes the conceptual containment form
         // legible at overview scale without implying an engineered section.
-        const lowerCrest=ring(f.point,f.width-28,f.depth-28,y+5);
-        const shoulder=ring(f.point,f.width-52,f.depth-52,y+5);
+        const lowerCrest=contour(f.point,f.width-28,f.depth-28,y+5);
+        const shoulder=contour(f.point,f.width-52,f.depth-52,y+5);
         join(group,toe,lowerCrest,materials.earthSurface,'Illustrative containment embankment');
         join(group,lowerCrest,shoulder,materials.benchSurface,'Intermediate perimeter bench · illustrative');
         join(group,shoulder,crest,materials.earthSurface,'Upper containment embankment · illustrative');

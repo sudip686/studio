@@ -93,9 +93,10 @@ const campus=buildMineSiteCampus({
   height:(x,z)=>5*Math.sin(x/350)+4*Math.cos(z/420),surveyed:()=>true,
 });
 assert.ok(campus.root.userData.accessRoadCount>=2,'The site campus has screened illustrative access spurs when terrain corridors are clear');
-const facilityApronAudit=campus.root.userData.facilityApronDrapeAudit as {facilityId:string;nx:number;nz:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[];
+const facilityApronAudit=campus.root.userData.facilityApronDrapeAudit as {facilityId:string;nx:number;nz:number;triangleCount:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[];
 assert.equal(facilityApronAudit.length,campus.facilities.length,'Every illustrative water, tailings and waste facility exposes a cleared-apron drape audit');
-assert.ok(facilityApronAudit.every(item=>item.nx>2&&item.nz>2&&item.maximumSampleSpacingM<=6),'Facility aprons follow sampled terrain on a maximum 6 m grid');
+assert.ok(facilityApronAudit.every(item=>item.nx>2&&item.nz>2&&item.maximumSampleSpacingM<=2.01),'Rounded facility aprons follow sampled terrain on a maximum 2 m grid');
+assert.ok(facilityApronAudit.every(item=>item.triangleCount>0&&item.triangleCount<2*item.nx*item.nz),'Facility aprons follow rounded landform footprints instead of forming full rectangular pads');
 assert.ok(facilityApronAudit.every(item=>item.maximumTriangleCentreErrorM<.02),'Facility apron triangles stay within 0.02 m of synthetic rolling terrain at their centres');
 const landformContourAudit=campus.root.userData.landformContourAudit as {pointsPerRing:number;maximumSegmentM:number};
 assert.equal(landformContourAudit.pointsPerRing,304,'Rounded site landforms use a dense, matched perimeter for smooth berms and benches');
