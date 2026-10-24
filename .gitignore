@@ -28,6 +28,7 @@ public/*.kmz
 # next.js
 /.next/
 /.next-local/
+/.next-*/
 /out/
 /.open-next/
 /.wrangler/
