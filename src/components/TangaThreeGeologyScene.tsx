@@ -4236,6 +4236,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
         // Original coordinates and hard containment; this is not an economic design.
         if (mode === 'mine_planning' && sitePlan) {
+          const targetBuildStartedAt=performance.now();
           const localIntervals=drillholes.map(s=>({...s,from:drillPointFromCoords(s.from).toArray() as [number,number,number],to:drillPointFromCoords(s.to).toArray() as [number,number,number]}));
           const ids=selectPitEvidenceHoles(localIntervals,sitePlan.pits);
           setEvidenceHoleIds(ids);host.dataset.evidenceHoles=ids.join(',');
@@ -4283,11 +4284,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               mesh.name=`${pitIndex===0?'North':'South'} pit · ${high?'≥5%':'4.5–5%'} TGC model cells`;
               mesh.userData.pitIndex=pitIndex;
               mesh.renderOrder=high?41:40;
-              const dummy=new THREE.Object3D();
-              subset.forEach((b,i)=>{dummy.position.set(b.x,b.y,b.z);dummy.scale.set(b.dx,b.dz,b.dy);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);});
+              const matrices=mesh.instanceMatrix.array;
+              subset.forEach((b,i)=>{
+                const offset=i*16;
+                matrices[offset]=b.dx;
+                matrices[offset+5]=b.dz;
+                matrices[offset+10]=b.dy;
+                matrices[offset+12]=b.x;
+                matrices[offset+13]=b.y;
+                matrices[offset+14]=b.z;
+                matrices[offset+15]=1;
+              });
               mesh.instanceMatrix.needsUpdate=true;tagDeckLayer(mesh,'blocks');stage.add(mesh);targetMeshes.push(mesh);
             }
           });
+          host.dataset.mineTargetBuildMs=String(Math.round(performance.now()-targetBuildStartedAt));
           for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePit(mesh.geometry, sitePlan.pits);
           sitePlan.audit.push('Internal pit access ribbons are display-only concepts; no engineered alignment or checked gradient was supplied');
           for (const pit of sitePlan.pits) {
