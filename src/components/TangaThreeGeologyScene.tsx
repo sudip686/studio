@@ -5104,13 +5104,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
       host.dataset.truckVisible=String(Boolean(haulTrucks[0]?.mesh.visible));
-      // Once the story reaches the pit concept, keep source grade cells visible
-      // inside the excavation. This makes the relationship between the pit
-      // envelope and the underlying model legible without requiring a second
-      // cutaway command. The story sequence fades the cells in as the pits
-      // appear; manual beat selection remains immediate.
+      // Show grade cells only during the pit-concept beat. Site overview and
+      // processing shots use the same camera/story state for their own work;
+      // carrying the blocks into those views makes the opening site read as a
+      // grade carpet. The dedicated pit shot keeps source cells in context.
       targetMeshes.forEach(mesh=>{
-        const showPitBlocks=beat>=2&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current);
+        const showPitBlocks=beat===2&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current);
         mesh.visible=showPitBlocks;
         mesh.material.depthTest=!presentationOptions.current.targetXray;
         const storyReveal=story.playing&&beat===2&&!reducedMotion.matches?Math.min(1,Math.max(0,(storyAge-8)/1.2)):1;

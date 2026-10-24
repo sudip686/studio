@@ -369,8 +369,13 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
     const a=sample(outer,count),b=inner.length?sample(inner,count):[],base=positions.length/3,color=new THREE.Color(tone),lift=1.2;
     for(const [ring,level] of [[a,upper],[b,lower]] as const){
       for(const [x,z] of ring){
-        positions.push(x,Math.min(height(x,z),level)+lift,z);
-        colors.push(color.r,color.g,color.b);
+        const y=Math.min(height(x,z),level)+lift;
+        positions.push(x,y,z);
+        // Fixed, low-amplitude tonal variation adds rough-rock material depth
+        // without inventing mapped geology or changing with the camera.
+        const striation=Math.sin(x*.031+z*.017+y*.23)*Math.sin(z*.026-x*.012);
+        const value=.98+striation*.035;
+        colors.push(color.r*value,color.g*value,color.b*value);
       }
     }
     if(b.length){
@@ -402,7 +407,7 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();
   // The mine-plan sun is fixed in site coordinates, so diffuse shading adds
   // readable bench walls and contact shadows without changing with the camera.
-  const mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0xffffff,vertexColors:true,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
+  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.94,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
 }
 
 /**
