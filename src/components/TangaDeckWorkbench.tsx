@@ -2346,6 +2346,7 @@ export default function TangaDeckWorkbench() {
   const chapterReadinessHydratedRef=useRef(false);
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
   const [pitBlockFocusIndex,setPitBlockFocusIndex]=useState<number|null>(null);
+  const [pitGradeFocus,setPitGradeFocus]=useState<string|null>(null);
   const threeCameraSequenceRef=useRef(0);
   const [selectedPeerProject, setSelectedPeerProject] = useState<GraphitePeerProjectRow | null>(null);
   const [stageSize, setStageSize] = useState({width: 1600, height: 950});
@@ -5721,6 +5722,7 @@ export default function TangaDeckWorkbench() {
           onGeologyLegendMount={setGeologyLegendMount}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
+          pitGradeFocus={pitGradeFocus}
           terrainCompare={{enabled: surfaceConceptView, split: surfaceCompareSplit}}
           onTerrainCompareSplit={setSurfaceCompareSplit}
           inspectionMode={isExploreMode}
@@ -6871,6 +6873,8 @@ export default function TangaDeckWorkbench() {
         onSiteOrientation={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? orientation => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand(orientation==='plan'?'sitePlan':'siteOblique');} : undefined}
         onRevealPitBlocks={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? (pitIndex) => {setIsAutoplay(false);setIsExecutiveTour(false);const shotId=pitIndex===0?'north-pit':pitIndex===1?'south-pit':'pit-blocks';setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===shotId)));issueThreeCameraCommand('revealPitBlocks',undefined,pitIndex);} : undefined}
         pitBlockFocusIndex={pitBlockFocusIndex}
+        pitGradeFocus={pitGradeFocus}
+        onPitGradeFocusChange={grade=>{setPitGradeFocus(grade);if(grade&&activeMode==='mine_planning'&&activeShot?.id!=='pit-blocks'){setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='pit-blocks')));issueThreeCameraCommand('revealPitBlocks');}}}
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}

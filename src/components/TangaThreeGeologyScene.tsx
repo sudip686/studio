@@ -306,6 +306,7 @@ type TangaThreeGeologySceneProps = {
    */
   labelDensity?: LabelDensity;
   layerSettings?: DeckLayerSettings;
+  pitGradeFocus?: string | null;
   terrainCompare?: {enabled: boolean; split: number};
   onTerrainCompareSplit?: (split: number) => void;
   inspectionMode?: boolean;
@@ -2160,6 +2161,7 @@ export default function TangaThreeGeologyScene({
   onLoadState,
   labelDensity = 'key',
   layerSettings = DEFAULT_LAYER_SETTINGS,
+  pitGradeFocus = null,
   terrainCompare = {enabled: false, split: 50},
   onTerrainCompareSplit,
   inspectionMode = false,
@@ -2206,6 +2208,8 @@ export default function TangaThreeGeologyScene({
   // presenter choice because always-on-top categories can visually fight.
   const [targetXray, setTargetXray] = useState(false);
   const activePitBlockFocusRef = useRef<number | null>(null);
+  const pitGradeFocusRef = useRef<string | null>(pitGradeFocus);
+  pitGradeFocusRef.current = pitGradeFocus;
   const [motionPaused, setMotionPaused] = useState(false);
   const [sectionEnabled,setSectionEnabled]=useState(false);
   const [crossSource,setCrossSource]=useState<SectionSource|null>(null);
@@ -5186,7 +5190,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // carrying the blocks into those views makes the opening site read as a
       // grade carpet. The dedicated pit shot keeps source cells in context.
       targetMeshes.forEach(mesh=>{
-        const showPitBlocks=beat===2&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current);
+        const showPitBlocks=beat===2&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current)&&(!pitGradeFocusRef.current||mesh.userData.gradeBand===pitGradeFocusRef.current);
         mesh.visible=showPitBlocks;
         mesh.material.depthTest=!presentationOptions.current.targetXray;
         const storyReveal=story.playing&&beat===2&&!reducedMotion.matches?Math.min(1,Math.max(0,(storyAge-8)/1.2)):1;

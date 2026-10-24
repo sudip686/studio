@@ -1363,6 +1363,13 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-compact-grade-key>div{display:flex;gap:9px 12px;flex-wrap:wrap;margin-top:10px}
 .tanga-compact-grade-key>div>span{display:flex;align-items:center;gap:5px;font-size:9px;color:#dce2e2;white-space:nowrap}
 .tanga-compact-grade-key i{display:block;width:9px;height:9px;border-radius:2px}
+.tanga-pit-grade-key>div{gap:7px}
+.tanga-pit-grade-filter{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:5px 8px;border:1px solid #617482;border-radius:7px;background:#1b2b34;color:#dce2e2;font:inherit;font-size:9px;white-space:nowrap;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease}
+.tanga-pit-grade-filter:hover:not(:disabled){border-color:#e4ae75;background:#2c363b;color:#fff0dc}
+.tanga-pit-grade-filter[aria-pressed="true"]{border-color:#f0b979;background:#493b2b;color:#fff0dc;box-shadow:inset 0 0 0 1px #f0b97955}
+.tanga-pit-grade-filter:focus-visible{outline:2px solid #f6be91;outline-offset:2px}
+.tanga-pit-grade-filter:disabled{opacity:.55;cursor:not-allowed}
+.tanga-pit-grade-state{display:block;margin-top:8px;color:#b6c4cc;font-size:9px;line-height:1.4}
 .tanga-terrain-scale{display:flex;align-items:center;gap:17px;margin:22px 0;padding:18px 0;border-block:1px solid #c9d8de26}
 .tanga-terrain-scale strong{color:#e9bd8b;font-size:46px;line-height:1;letter-spacing:-.04em;font-weight:500}
 .tanga-terrain-scale span{font-size:11px;line-height:1.6;color:#b6c4cc}
