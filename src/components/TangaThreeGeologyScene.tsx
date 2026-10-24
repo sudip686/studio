@@ -176,7 +176,19 @@ function applyDeckLayers(stage: THREE.Object3D, settings: DeckLayerSettings) {
       }
       if ('depthWrite' in m) {
         const baseDepthWrite = Boolean(m.userData.deckBaseDepthWrite);
-        (m as THREE.Material & {depthWrite:boolean}).depthWrite = layerFaded ? false : baseDepthWrite;
+        const stablePalette = Boolean(object.userData.deckCameraStableColor || m.userData.deckCameraStableColor);
+        // A layer opacity change can happen after the scene's materials have
+        // been stabilized. Restoring the value captured before stabilization
+        // would re-enable draw-order competition for opaque block/pad colors,
+        // making them appear to flicker while OrbitControls moves the camera.
+        (m as THREE.Material & {depthWrite:boolean}).depthWrite = layerFaded || hasActiveHighlight
+          ? false
+          : stablePalette
+            ? true
+            : baseDepthWrite;
+      }
+      if ('depthTest' in m && (object.userData.deckCameraStableColor || m.userData.deckCameraStableColor)) {
+        (m as THREE.Material & {depthTest:boolean}).depthTest = true;
       }
     }
   });
