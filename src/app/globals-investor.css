@@ -1163,6 +1163,43 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-presentation-tools__grid .tanga-deck__pager-btn{display:flex!important;position:relative;width:64px!important;height:61px!important;border-radius:6px!important;padding:7px 4px 29px;flex-shrink:0}
 .tanga-presentation-tools__grid .tanga-deck__pager-btn::after{content:attr(title);position:absolute;bottom:5px;left:3px;right:3px;font-size:8px;line-height:1.15;text-align:center;max-height:20px;overflow:hidden;color:#bdcbd1}
 .tanga-presentation-tools__status{position:absolute;right:0;bottom:52px;z-index:2;padding:0 8px;color:#e9f0ef;font-size:10px;white-space:nowrap;pointer-events:none}
+.tanga-presentation-tools__grid:has(.tanga-presentation-tools__readiness[open]){bottom:32px;width:min(380px,calc(100vw - 28px));grid-template-columns:repeat(3,minmax(0,1fr));justify-items:center;max-height:calc(100svh - 100px);overflow-y:auto;overscroll-behavior:contain}
+.tanga-presentation-tools__readiness{grid-column:1/-1;justify-self:stretch;min-width:0;border:1px solid #c9d8de35;border-radius:8px;background:#17232c;color:#e7e9e7}
+.tanga-presentation-tools__readiness>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 11px;cursor:pointer;list-style:none}
+.tanga-presentation-tools__readiness>summary::-webkit-details-marker{display:none}
+.tanga-presentation-tools__readiness>summary:focus-visible{outline:2px solid #e2ad78;outline-offset:2px;border-radius:7px}
+.tanga-presentation-tools__readiness>summary strong{font-size:11px;color:#f0f2ee}
+.tanga-presentation-tools__readiness>summary span{font-size:9px;color:#aebec3;text-align:right}
+.tanga-presentation-tools__readiness-body{max-height:min(32vh,260px);overflow:auto;overscroll-behavior:contain;padding:0 11px 11px;font-size:10px;line-height:1.4}
+.tanga-presentation-tools__readiness-body>p{margin:5px 0 9px;color:#b7c5ca}
+.tanga-presentation-tools__readiness-summary{display:grid;gap:3px;padding:8px 9px;border:1px solid #9ab0b42e;border-left:2px solid #71c4ad;border-radius:5px;background:#e8f0ed08}
+.tanga-presentation-tools__readiness-summary.is-pending{border-left-color:#e3ad73}
+.tanga-presentation-tools__readiness-summary.is-issue{border-left-color:#e17c67}
+.tanga-presentation-tools__readiness-summary strong{font-size:11px;color:#eff2ed}
+.tanga-presentation-tools__readiness-summary span{font-size:9px;color:#aebec3}
+.tanga-presentation-tools__readiness-stages,.tanga-presentation-tools__fallback-results{display:grid;gap:4px;margin:8px 0;padding:0;list-style:none}
+.tanga-presentation-tools__readiness-stages li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:6px 8px;border:1px solid #c9d8de20;border-radius:5px;background:#ffffff05}
+.tanga-presentation-tools__readiness-stages li>span{display:flex;align-items:center;gap:6px;color:#e2e6e3}
+.tanga-presentation-tools__readiness-stages li i{width:6px;height:6px;border-radius:50%;background:#71838b}
+.tanga-presentation-tools__readiness-stages li.is-ready i{background:#71c4ad}
+.tanga-presentation-tools__readiness-stages li.is-loading i{background:#e3ad73;box-shadow:0 0 8px #e3ad73}
+.tanga-presentation-tools__readiness-stages li.is-error i,.tanga-presentation-tools__readiness-stages li.is-degraded i{background:#e17c67}
+.tanga-presentation-tools__readiness-stages li>strong{font-size:9px;color:#dce3df}
+.tanga-presentation-tools__readiness-stages li>small{grid-column:1/-1;overflow:hidden;color:#99aeb5;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.tanga-presentation-tools__fallback-check{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #c9d8de20}
+.tanga-presentation-tools__fallback-check>div{display:grid;gap:2px}
+.tanga-presentation-tools__fallback-check>div strong{font-size:10px;color:#e7e9e7}
+.tanga-presentation-tools__fallback-check>div span{font-size:9px;color:#aebec3}
+.tanga-presentation-tools__fallback-check button{display:flex;align-items:center;gap:5px;min-height:30px;padding:5px 8px;border:1px solid #c9d8de36;border-radius:5px;background:#22333a;color:#f0f2ee;font:inherit;white-space:nowrap;cursor:pointer}
+.tanga-presentation-tools__fallback-check button:hover:not(:disabled){border-color:#e2ad78;background:#3a3025}
+.tanga-presentation-tools__fallback-check button:focus-visible{outline:2px solid #e2ad78;outline-offset:2px}
+.tanga-presentation-tools__fallback-check button:disabled{opacity:.65;cursor:progress}
+.tanga-presentation-tools__fallback-results li{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:4px;background:#ffffff06;color:#c6d1d2;font-size:9px}
+.tanga-presentation-tools__fallback-results li strong{color:#8fd1ba;font-weight:600}
+.tanga-presentation-tools__fallback-results li.is-missing strong{color:#ed998a}
+.tanga-presentation-tools__readiness-note{padding-top:7px;border-top:1px solid #c9d8de20!important;font-size:9px}
+.tanga-presentation-tools__fallback-check .is-spinning{animation:tanga-readiness-spin .9s linear infinite}
+@keyframes tanga-readiness-spin{to{transform:rotate(360deg)}}
 .tanga-deck--present .tanga-deck__pager{gap:10px!important;padding:8px 12px!important}
 .tanga-deck--present .tanga-deck__pager-label{font-size:9px;letter-spacing:.08em}
 .tanga-geology-map-sheet{left:300px;right:400px;top:208px;bottom:104px;border-radius:8px;box-shadow:none}

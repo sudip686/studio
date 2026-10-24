@@ -122,6 +122,14 @@ type LoadStage = {
   detail: string;
 };
 
+type FallbackPreflightResult = {
+  mode: WorkbenchMode;
+  ok: boolean;
+  status: number | null;
+  contentType: string;
+  dimensions: string;
+};
+
 type DeckViewState = {
   longitude: number;
   latitude: number;
@@ -2217,6 +2225,8 @@ export default function TangaDeckWorkbench() {
   const [threeSceneRequested, setThreeSceneRequested] = useState(false);
   const [threeSceneRevision, setThreeSceneRevision] = useState(0);
   const [shareStatus, setShareStatus] = useState('');
+  const [fallbackPreflight, setFallbackPreflight] = useState<FallbackPreflightResult[] | null>(null);
+  const [fallbackPreflightRunning, setFallbackPreflightRunning] = useState(false);
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
   const [pitBlockFocusIndex,setPitBlockFocusIndex]=useState<number|null>(null);
   const threeCameraSequenceRef=useRef(0);
@@ -4250,6 +4260,8 @@ export default function TangaDeckWorkbench() {
     threeSceneRequested,
     voiceStageState,
   ]);
+  const currentLoaderIssue = loadStages.some(stage => stage.state === 'error' || stage.state === 'degraded');
+  const currentLoaderPending = loadStages.some(stage => stage.state === 'loading');
   // Measured relief for the project tile. Both the topography panel and the
   // terrain callout read from this, so the deck can only ever state one
   // elevation range — previously they disagreed by a factor of two.
@@ -4860,6 +4872,36 @@ export default function TangaDeckWorkbench() {
     }
     window.setTimeout(() => setShareStatus(''), 3200);
   }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, selectedGeologyUnit, sharedLayers, hiddenGeologyUnits]);
+  const runFallbackPreflight = useCallback(async () => {
+    if (fallbackPreflightRunning) return;
+    setFallbackPreflightRunning(true);
+    const entries = (Object.keys(STATIC_SCENE_FALLBACKS) as WorkbenchMode[]).flatMap(mode => {
+      const fallback = STATIC_SCENE_FALLBACKS[mode];
+      return fallback ? [[mode, fallback] as const] : [];
+    });
+    const results = await Promise.all(entries.map(async ([mode, fallback]) => {
+      try {
+        const response = await fetch(assetUrl(fallback.src), {method:'HEAD', cache:'no-store'});
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!response.ok || !contentType.startsWith('image/')) {
+          return {mode, ok:false, status:response.status, contentType, dimensions:''};
+        }
+        const dimensions = await new Promise<string>((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => image.naturalWidth > 0 && image.naturalHeight > 0
+            ? resolve(`${image.naturalWidth} × ${image.naturalHeight}`)
+            : reject(new Error('Image decoded without dimensions'));
+          image.onerror = () => reject(new Error('Image could not be decoded'));
+          image.src = assetUrl(fallback.src);
+        });
+        return {mode, ok:true, status:response.status, contentType, dimensions};
+      } catch {
+        return {mode, ok:false, status:null, contentType:'', dimensions:''};
+      }
+    }));
+    setFallbackPreflight(results);
+    setFallbackPreflightRunning(false);
+  }, [fallbackPreflightRunning]);
 
   const toggleMappedGeologyUnit=useCallback((label:string)=>{
     const hiding=!hiddenGeologyUnits.includes(label);
@@ -6088,7 +6130,7 @@ export default function TangaDeckWorkbench() {
             </div>
           )}
         </div>
-        <details key={activeMode} className="tanga-presentation-tools" onClick={event=>{if((event.target as Element).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
+        <details key={activeMode} className="tanga-presentation-tools" onClick={event=>{const target=event.target as Element;if(target.closest('button')&&!target.closest('.tanga-presentation-tools__readiness'))event.currentTarget.open=false;}} onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
           <summary aria-label="Presentation tools" title="Presentation tools"><Layers size={16}/><span>Tools</span></summary>
           <div className="tanga-presentation-tools__grid">
         <section className="tanga-tour-mobile" aria-label="Guided presentation">
@@ -6111,6 +6153,30 @@ export default function TangaDeckWorkbench() {
           <p>Timing applies to chapter playback. The full story follows authored timings.</p>
         </section>
         <button type="button" className="tanga-deck__pager-btn tanga-deck__pager-btn--tool" onClick={copyCurrentView} aria-label="Copy link to this view" title="Copy a link to this chapter and authored view"><Copy size={16} strokeWidth={2.2}/></button>
+        <details className="tanga-presentation-tools__readiness">
+          <summary><strong>Presenter readiness</strong><span>Current view and fallback check</span></summary>
+          <div className="tanga-presentation-tools__readiness-body">
+            <p>This reports loader states for the current view. Open other chapters once to check their data; this does not certify offline map coverage.</p>
+            <div className={`tanga-presentation-tools__readiness-summary${currentLoaderIssue?' is-issue':currentLoaderPending?' is-pending':' is-clear'}`}>
+              <strong>{currentLoaderIssue?'Current view needs attention':currentLoaderPending?'Current view is still loading':'No active loader errors for this view'}</strong>
+              <span>{MODE_LABELS[activeMode]} · build {presentationBuild.revision} · {presentationBuild.target}</span>
+            </div>
+            <ul className="tanga-presentation-tools__readiness-stages" aria-label="Current view loader states">
+              {loadStages.map(stage=><li key={stage.id} className={`is-${stage.state}`}><span><i aria-hidden="true"/>{stage.label}</span><strong>{sceneStateText(stage.state)}</strong><small>{stage.detail}</small></li>)}
+            </ul>
+            <section className="tanga-presentation-tools__fallback-check" aria-label="Saved 3D fallback image check">
+              <div><strong>Saved 3D fallback images</strong><span>Five stills used while a 3D scene loads or recovers.</span></div>
+              <button type="button" onClick={runFallbackPreflight} disabled={fallbackPreflightRunning}>
+                <RotateCw size={13} aria-hidden="true" className={fallbackPreflightRunning?'is-spinning':''}/>
+                {fallbackPreflightRunning?'Checking images…':'Check 5 images'}
+              </button>
+            </section>
+            {fallbackPreflight && <ul className="tanga-presentation-tools__fallback-results" aria-live="polite">
+              {fallbackPreflight.map(result=><li key={result.mode} className={result.ok?'is-ready':'is-missing'}><span>{MODE_LABELS[result.mode]}</span><strong>{result.ok?`Decoded · ${result.dimensions}`:result.status?`Missing · HTTP ${result.status}`:'Unavailable'}</strong></li>)}
+            </ul>}
+            <p className="tanga-presentation-tools__readiness-note">A valid still keeps the chapter usable during 3D loading or graphics recovery. The remaining seven chapters use index thumbnails only, not runtime 3D fallbacks.</p>
+          </div>
+        </details>
         {threeVisible && activeMode !== 'metallurgy' && (
           <button
             type="button"
