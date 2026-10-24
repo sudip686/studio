@@ -4558,6 +4558,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         onSelectGeologyUnitRef.current?.(tooltip);
         window.dispatchEvent(new Event('tanga:manual-exploration'));
       }
+      if (select && mode === 'resource') {
+        const resourceBlocks=hit.object.userData?.resourceBlockSources as ResourceBlock[]|undefined;
+        const resourceBlock=resourceBlocks?.[hit.instanceId??0];
+        if(resourceBlock){
+          const gradeKey=tgcGradeBin(resourceBlock.carbon).key;
+          setLockedGrade(current=>current===gradeKey?null:gradeKey);
+          window.dispatchEvent(new Event('tanga:manual-exploration'));
+        }
+      }
       setHoverTooltip({
         x: clamp(event.clientX - rect.left + 16, 14, rect.width - 276),
         y: clamp(event.clientY - rect.top + 16, 76, rect.height - 156),
