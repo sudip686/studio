@@ -133,6 +133,7 @@ type FallbackPreflightResult = {
 
 type ReadinessAsset = {label:string;path:string;required:boolean};
 type AssetReadinessResult = {mode:WorkbenchMode;checkedAt:string;items:Array<ReadinessAsset&{status:number|null;contentType:string;bytes:number|null;ok:boolean}>};
+type AllChapterAssetReadinessResult = {checkedAt:string;chapters:Array<{mode:WorkbenchMode;items:Array<ReadinessAsset&{status:number|null;contentType:string;bytes:number|null;ok:boolean}>}>};
 
 const TERRAIN_READINESS_ASSETS:ReadinessAsset[]=[
   {label:'Terrain metadata',path:'/terrain_hires_meta.json?v=registered-grid-v2',required:true},
@@ -2336,6 +2337,8 @@ export default function TangaDeckWorkbench() {
   const [fallbackPreflightRunning, setFallbackPreflightRunning] = useState(false);
   const [assetReadiness, setAssetReadiness] = useState<AssetReadinessResult | null>(null);
   const [assetReadinessRunning, setAssetReadinessRunning] = useState(false);
+  const [allChapterAssetReadiness, setAllChapterAssetReadiness] = useState<AllChapterAssetReadinessResult | null>(null);
+  const [allChapterAssetReadinessRunning, setAllChapterAssetReadinessRunning] = useState(false);
   const [chapterReadiness, setChapterReadiness] = useState<Partial<Record<WorkbenchMode, LoadStage[]>>>({});
   const [chapterReadinessLoaded,setChapterReadinessLoaded]=useState(false);
   const chapterReadinessHydratedRef=useRef(false);
@@ -5088,6 +5091,34 @@ export default function TangaDeckWorkbench() {
     setAssetReadiness({mode:activeMode,checkedAt:new Date().toISOString(),items});
     setAssetReadinessRunning(false);
   },[activeMode,assetReadinessRunning]);
+  const runAllChapterAssetPreflight = useCallback(async () => {
+    if(allChapterAssetReadinessRunning)return;
+    setAllChapterAssetReadinessRunning(true);
+    const chapterAssets=STORY_STEPS.map(step=>({mode:step.mode,assets:CHAPTER_READINESS_ASSETS[step.mode]??[]}));
+    const uniqueAssets=new globalThis.Map<string,ReadinessAsset>();
+    chapterAssets.forEach(({assets})=>assets.forEach(asset=>{
+      const current=uniqueAssets.get(asset.path);
+      uniqueAssets.set(asset.path,current?{...current,required:current.required||asset.required}:asset);
+    }));
+    const checkedAssets=await Promise.all([...uniqueAssets.values()].map(async asset=>{
+      let timer:number|undefined;
+      try{
+        const controller=new AbortController();
+        timer=window.setTimeout(()=>controller.abort(),10000);
+        const response=await fetch(assetUrl(asset.path),{method:'HEAD',cache:'no-store',signal:controller.signal});
+        const contentLength=response.headers.get('content-length');
+        return {path:asset.path,status:response.status,contentType:response.headers.get('content-type')??'',bytes:contentLength?Number(contentLength):null,ok:response.ok};
+      }catch{
+        return {path:asset.path,status:null,contentType:'',bytes:null,ok:false};
+      }finally{
+        if(timer!==undefined)window.clearTimeout(timer);
+      }
+    }));
+    const resultsByPath=new globalThis.Map(checkedAssets.map(result=>[result.path,result]));
+    const chapters=chapterAssets.map(({mode,assets})=>({mode,items:assets.map(asset=>({...asset,...resultsByPath.get(asset.path)!}))}));
+    setAllChapterAssetReadiness({checkedAt:new Date().toISOString(),chapters});
+    setAllChapterAssetReadinessRunning(false);
+  },[allChapterAssetReadinessRunning]);
 
   const toggleMappedGeologyUnit=useCallback((label:string)=>{
     const hiding=!hiddenGeologyUnits.includes(label);
@@ -6397,6 +6428,43 @@ export default function TangaDeckWorkbench() {
                 })}
               </ol>
               <p>States are collected as you visit chapters in this session. Ready means the observed loaders reported no failure; assets that remain on demand may still be in standby.</p>
+              <section className="tanga-presentation-tools__all-asset-check" aria-label="All chapter asset availability">
+                <div className="tanga-presentation-tools__asset-check-head">
+                  <div><strong>All chapter files</strong><span>Same-origin files registered for all 12 chapters.</span></div>
+                  <button type="button" onClick={runAllChapterAssetPreflight} disabled={allChapterAssetReadinessRunning}>
+                    <RotateCw size={13} aria-hidden="true" className={allChapterAssetReadinessRunning?'is-spinning':''}/>
+                    {allChapterAssetReadinessRunning?'Checking…':'Check all files'}
+                  </button>
+                </div>
+                {allChapterAssetReadiness&&<>
+                  {(()=>{
+                    const items=allChapterAssetReadiness.chapters.flatMap(chapter=>chapter.items);
+                    const required=items.filter(item=>item.required);
+                    const available=required.filter(item=>item.ok).length;
+                    const missing=required.length-available;
+                    return <p className={`tanga-presentation-tools__asset-summary${missing?' is-issue':''}`} aria-live="polite">{available} / {required.length} required files available across {allChapterAssetReadiness.chapters.length} chapters{missing?` · ${missing} missing`:''}. Checked {new Date(allChapterAssetReadiness.checkedAt).toLocaleTimeString()}.</p>;
+                  })()}
+                  <div className="tanga-presentation-tools__asset-chapters" aria-live="polite">
+                    {allChapterAssetReadiness.chapters.map(chapter=>{
+                      const required=chapter.items.filter(item=>item.required);
+                      const available=required.filter(item=>item.ok).length;
+                      const status=chapter.items.length?`${available}/${required.length} required`:'No standalone files';
+                      return <details key={chapter.mode}>
+                        <summary><strong>{MODE_LABELS[chapter.mode]}</strong><span>{status}</span></summary>
+                        {chapter.items.length?<ul className="tanga-presentation-tools__asset-results">
+                          {chapter.items.map(asset=>{
+                            const state=asset.ok?'is-available':asset.required?'is-missing':'is-optional-missing';
+                            const size=asset.bytes==null?'':asset.bytes<1_000_000?` · ${Math.max(1,Math.round(asset.bytes/1000))} KB`:` · ${(asset.bytes/1_000_000).toFixed(1)} MB`;
+                            const detail=asset.ok?`HTTP ${asset.status}${size}`:asset.status?`HTTP ${asset.status}`:'Request failed';
+                            return <li key={asset.path} className={state}><span>{asset.label}{!asset.required&&<small> · supporting</small>}</span><strong>{detail}</strong></li>;
+                          })}
+                        </ul>:<p>No standalone files are registered for this chapter. Live map tiles and on-demand services are outside this file check.</p>}
+                      </details>;
+                    })}
+                  </div>
+                  <p>Checks availability and headers only; no files are downloaded or decoded. Live map tiles, voice services and full offline coverage are not certified.</p>
+                </>}
+              </section>
             </details>
             <section className="tanga-presentation-tools__fallback-check" aria-label="Saved scene and map fallback image check">
               <div><strong>Saved scene and map fallback images</strong><span>Five 3D stills and six map references for renderer recovery.</span></div>

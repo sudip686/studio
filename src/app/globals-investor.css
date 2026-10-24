@@ -1225,6 +1225,18 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-presentation-tools__chapter-coverage li.is-issue>strong,.tanga-presentation-tools__chapter-coverage li.is-fallback>strong{color:#ed998a}
 .tanga-presentation-tools__chapter-coverage li>small{grid-column:1/-1;overflow:hidden;color:#99aeb5;font-size:8px;text-overflow:ellipsis;white-space:nowrap}
 .tanga-presentation-tools__chapter-coverage>p{margin:0;padding:7px;border-top:1px solid #c9d8de20;color:#99aeb5;font-size:9px}
+.tanga-presentation-tools__all-asset-check{margin:7px;padding:8px;border-top:1px solid #c9d8de20;border-radius:5px;background:#ffffff04}
+.tanga-presentation-tools__all-asset-check>.tanga-presentation-tools__asset-summary{margin:6px 0;color:#8fd1ba;font-size:9px;font-weight:600}
+.tanga-presentation-tools__all-asset-check>.tanga-presentation-tools__asset-summary.is-issue{color:#ed998a}
+.tanga-presentation-tools__all-asset-check>p:last-child{margin:6px 0 0;color:#99aeb5;font-size:8px;line-height:1.45}
+.tanga-presentation-tools__asset-chapters{display:grid;gap:4px;max-height:180px;overflow:auto;overscroll-behavior:contain}
+.tanga-presentation-tools__asset-chapters>details{border:1px solid #c9d8de20;border-radius:4px;background:#ffffff03}
+.tanga-presentation-tools__asset-chapters>details>summary{display:flex;justify-content:space-between;gap:8px;padding:6px;cursor:pointer;list-style:none}
+.tanga-presentation-tools__asset-chapters>details>summary::-webkit-details-marker{display:none}
+.tanga-presentation-tools__asset-chapters>details>summary strong{color:#e2e6e3;font-size:9px;font-weight:600}
+.tanga-presentation-tools__asset-chapters>details>summary span{color:#aebec3;font-size:8px}
+.tanga-presentation-tools__asset-chapters>details>p{margin:0;padding:6px;border-top:1px solid #c9d8de18;color:#99aeb5;font-size:8px;line-height:1.4}
+.tanga-presentation-tools__asset-chapters .tanga-presentation-tools__asset-results{margin:0;padding:0 5px 5px}
 .tanga-presentation-tools__fallback-check{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #c9d8de20}
 .tanga-presentation-tools__fallback-check>div{display:grid;gap:2px}
 .tanga-presentation-tools__fallback-check>div strong{font-size:10px;color:#e7e9e7}
