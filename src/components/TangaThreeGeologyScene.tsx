@@ -331,7 +331,6 @@ type ResourceBlock = {
   dz: number;
   classification: string;
   carbon: number;
-  color: [number, number, number];
 };
 
 type DrillSegment = {
@@ -752,11 +751,19 @@ function sampleMinePlanTargets(blocks: ResourceBlock[], spacing = 14) {
   return Array.from(representatives.values());
 }
 
+type PitFootprintBounds = {minX:number;maxX:number;minZ:number;maxZ:number};
+
 /** Keep pit cutaway cells wholly inside the conceptual excavation envelope. */
-function resourceBlockFitsPitCutaway(block: ResourceBlock, pit: SitePlan['pits'][number], resources: TangaTerrainResources | null) {
+function resourceBlockFitsPitCutaway(block: ResourceBlock, pit: SitePlan['pits'][number], resources: TangaTerrainResources | null, bounds: PitFootprintBounds) {
+  const halfX=block.dx/2,halfZ=block.dy/2;
+  // Reject almost all of the full-site block model before polygon containment
+  // and pit-height checks. The broad-phase envelope cannot accept a cell that
+  // fails the exact footprint test below.
+  if(block.x-halfX<bounds.minX||block.x+halfX>bounds.maxX||block.z-halfZ<bounds.minZ||block.z+halfZ>bounds.maxZ)return false;
   const footprint = rectangle([block.x, block.z], block.dx, block.dy);
   if (!contained(footprint, pit.ring)) return false;
-  const cutFloor = Math.max(...footprint.map(point => pitHeight(point, pit) ?? Infinity));
+  let cutFloor=-Infinity;
+  for(const point of footprint){const height=pitHeight(point,pit);if(height===null)return false;cutFloor=Math.max(cutFloor,height);}
   const blockBottom = block.y - block.dz / 2;
   const blockTop = block.y + block.dz / 2;
   const groundTop=terrainSurfaceY(resources,block.x,-block.z);
@@ -860,12 +867,6 @@ function drillKey(props: Record<string, any>) {
     Number(props.depth_from ?? 0).toFixed(2),
     Number(props.depth_to ?? 0).toFixed(2),
   ].join('|');
-}
-
-function classificationColor(value: string) {
-  if (value === 'Indicated') return new THREE.Color('#2dd4bf');
-  if (value === 'Inferred') return new THREE.Color('#facc15');
-  return new THREE.Color('#94a3b8');
 }
 
 function resourceFocusLabel(focus: ResourceFocus) {
@@ -1416,16 +1417,15 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
 
 function parseBlockGeoJson(payload: any) {
   const features = Array.isArray(payload.features) ? payload.features : [];
-
-  return features.map((feature: any) => {
+  const blocks: ResourceBlock[] = [];
+  for (const feature of features) {
     const coords = feature.geometry?.coordinates ?? [];
     const props = feature.properties ?? {};
+    if (!Array.isArray(coords) || coords.length < 3) continue;
     const position = localPoint(Number(coords[0]), Number(coords[1]), Number(coords[2] ?? 0));
     const classification = String(props.RescCalc ?? props.classification ?? 'Unknown');
     const carbon = Number(props['Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'] ?? 0);
-    const color = classificationColor(classification);
-
-    return {
+    blocks.push({
       x: position.x,
       y: position.y,
       z: position.z,
@@ -1434,9 +1434,9 @@ dy: Number(props.dY ?? 25),
 dz: Number(props.dZ ?? 10),
       classification,
       carbon,
-      color: [color.r, color.g, color.b] as [number, number, number],
-    };
-  }).filter((block: ResourceBlock) => Number.isFinite(block.x) && Number.isFinite(block.z));
+    });
+  }
+  return blocks.filter((block) => block.carbon > 0 && Number.isFinite(block.x) && Number.isFinite(block.y) && Number.isFinite(block.z) && block.dx > 0 && block.dy > 0 && block.dz > 0);
 }
 
 function loadBlocks() {
@@ -1447,7 +1447,6 @@ function loadBlocks() {
     blockPromise = cachedDeckAsset('/api/block-model', {cache: 'force-cache'})
       .then(response => {if (!response.ok) throw new Error('Block model unavailable'); return response.json();})
       .then(parseBlockGeoJson)
-      .then((blocks: ResourceBlock[]) => blocks.filter(b => b.carbon > 0 && Number.isFinite(b.y) && b.dx > 0 && b.dy > 0 && b.dz > 0))
       .catch(error => {blockPromise = null; throw error;});
   }
   return blockPromise;
@@ -4248,7 +4247,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           tagDeckLayer(evidenceGroup,'context');stage.add(evidenceGroup);
           storyMotionStart=motionTime;
           const orderedPits=[...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]);
-          const targetsByPit=orderedPits.map(pit=>blocks.filter(b=>b.carbon>=4.5&&resourceBlockFitsPitCutaway(b,pit,terrainResources)));
+          const pitBounds=orderedPits.map(pit=>({minX:Math.min(...pit.ring.map(([x])=>x)),maxX:Math.max(...pit.ring.map(([x])=>x)),minZ:Math.min(...pit.ring.map(([,z])=>z)),maxZ:Math.max(...pit.ring.map(([,z])=>z))}));
+          const targetsByPit=orderedPits.map((pit,index)=>blocks.filter(b=>b.carbon>=4.5&&resourceBlockFitsPitCutaway(b,pit,terrainResources,pitBounds[index])));
           const targets=targetsByPit.flat();
           const displayedByPit=targetsByPit.map(items=>sampleMinePlanTargets(items));
           const displayedTargets=displayedByPit.flat();

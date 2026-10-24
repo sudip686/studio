@@ -784,6 +784,9 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-story-panel__qualification { margin: 12px 0 0; color: rgba(245,241,235,.5); font-size: 10px; line-height: 1.5; }
 .tanga-story-panel__link,.tanga-story-panel__compare { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; padding: 11px 12px; border: 1px solid rgba(230,151,96,.33); border-radius: 10px; background: rgba(230,151,96,.085); color: #f5b483; font: inherit; font-size: 11px; font-weight: 650; text-align: left; cursor: pointer; transition: background .18s ease,border-color .18s ease,transform .18s ease; }
 .tanga-story-panel__link:hover,.tanga-story-panel__compare:hover { transform: translateY(-1px); border-color: rgba(230,151,96,.58); background: rgba(230,151,96,.14); }
+.tanga-story-panel__pit-block-reveal{min-height:42px;border-color:#cf8e4c99;background:linear-gradient(100deg,#583b24aa,#242c30);color:#ffd09d;box-shadow:inset 3px 0 #e58b32;font-size:12px}
+.tanga-story-panel__pit-block-reveal:hover:not(:disabled){border-color:#f0b979;background:linear-gradient(100deg,#704825cc,#30393b)}
+.tanga-story-panel__pit-block-reveal:disabled{opacity:.56;cursor:wait}
 .tanga-pit-focus-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}
 .tanga-pit-focus-actions button{min-height:36px;padding:7px 8px;border:1px solid #617482;border-radius:7px;background:#1b2b34;color:#e7e2d9;font:inherit;font-size:10px;font-weight:600;cursor:pointer}
 .tanga-pit-focus-actions button:hover:not(:disabled){border-color:#e4ae75;background:#2c363b;color:#fff0dc}
