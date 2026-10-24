@@ -22,11 +22,13 @@ const IMO_PROCESS_REPORT='/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%2
 type ProcessId = typeof PROCESS[number]['id'];
 type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofBaseY?: number; roofOpacity?: number}};
 type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void};
+type FactoryRecoveryView = {position: [number, number, number]; target: [number, number, number]; fov: number; processTime: number};
 
 /** Conceptual connected plant tour. Laboratory measurements stay in the evidence board. */
 export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: boolean; onToggle: () => void}) {
   const host = useRef<HTMLDivElement>(null);
   const viewCommand = useRef<ViewCommand | null>(null);
+  const recoveryViewRef = useRef<FactoryRecoveryView | null>(null);
   const pausedRef = useRef(paused); pausedRef.current = paused;
   const [stage, setStage] = useState<ProcessId>('feed');
   const [openRoof, setOpenRoof] = useState(false);
@@ -43,13 +45,14 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
   useEffect(() => {
     const element = host.current;
     if (!element) return;
+    const recoveryView = recoveryViewRef.current;
     setError('');
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({antialias: true, alpha: false, powerPreference: 'high-performance'}); }
     catch { setError('3D factory unavailable. Open the laboratory evidence board to review the reported results.'); return; }
 
     let disposed = false, contextLost = false, userOrbit = false, tween = false, dirty = true;
-    let frame = 0, last = performance.now(), elapsed = 0, cameraStart = 0, cameraTour = false;
+    let frame = 0, last = performance.now(), elapsed = recoveryView?.processTime ?? 0, cameraStart = 0, cameraTour = false;
     let selected: ProcessId = stageRef.current;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -191,18 +194,30 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const onChange = () => { dirty = true; };
     const onStart = () => { tween = false; userOrbit = true; window.dispatchEvent(new Event('tanga:manual-exploration')); };
     controls.addEventListener('change', onChange); controls.addEventListener('start', onStart);
-    const onContextLost = (event: Event) => { event.preventDefault(); contextLost = true; element.dataset.ready = 'false'; setError('Graphics context lost. The 3D factory will rebuild when graphics recover.'); };
+    const onContextLost = (event: Event) => {
+      event.preventDefault(); contextLost = true; element.dataset.ready = 'false';
+      recoveryViewRef.current = {position: camera.position.toArray() as [number, number, number], target: controls.target.toArray() as [number, number, number], fov: camera.fov, processTime: elapsed};
+      setError('Graphics context lost. The 3D factory will rebuild when graphics recover.');
+    };
     const onContextRestored = () => { if (!contextLost) return; contextLost = false; setError('Graphics restored; rebuilding the factory…'); window.setTimeout(() => { if (!disposed) setRendererAttempt(value => value + 1); }, 0); };
     renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
     renderer.domElement.addEventListener('webglcontextrestored', onContextRestored, false);
 
     updateRoofTargets();
-    if (overviewRef.current) fitOverview(false); else frameStage(stageRef.current, false);
+    if (recoveryView) {
+      // Recreate the industrial scene without discarding the presenter's
+      // inspection angle, selected target or process-motion phase.
+      target.fromArray(recoveryView.target); destination.fromArray(recoveryView.position);
+      fromTarget.copy(target); fromPosition.copy(destination); direction.copy(destination).sub(target).normalize();
+      camera.position.copy(destination); camera.fov = recoveryView.fov; camera.updateProjectionMatrix();
+      controls.target.copy(target); controls.update(); userOrbit = true; tween = false; cameraTour = false;
+      recoveryViewRef.current = null; dirty = true;
+    } else if (overviewRef.current) fitOverview(false); else frameStage(stageRef.current, false);
     const draw = (now: number) => {
       if (disposed) return;
       const dt = Math.min(.08, Math.max(0, (now - last) / 1000)); last = now;
       if (!document.hidden && element.getClientRects().length) {
-        const animateProcess = !pausedRef.current && !reducedMotion.matches;
+        const animateProcess = !contextLost && !pausedRef.current && !reducedMotion.matches;
         if (animateProcess) elapsed += dt;
         const activity=processMotion.update(dt, overviewRef.current?'overview':selected, animateProcess&&(overviewRef.current||openRoofRef.current));
         let roofMoving = false;
