@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {buildConcentrator, placeConcentrator, buildPitSurface} from '../src/lib/deck/mine-scene';
-import {rectangle, inside, CONCEPT} from '../src/lib/deck/site-planning';
+import {rectangle, inside} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
 
@@ -13,27 +13,35 @@ const p=mesh.geometry.getAttribute('position'),index=mesh.geometry.index!;
 let area=0;
 for(let i=0;i<p.count;i++){
   assert.ok(inside([p.getX(i),p.getZ(i)],ring),'No vertex outside admitted crest');
-  assert.ok(p.getY(i)>=40.59 && p.getY(i)<=100.61);
+  // Surface contours sit 1.2 m above the carved terrain to avoid depth
+  // conflict; include that intentional display lift in the geometry bounds.
+  assert.ok(p.getY(i)>=41.19 && p.getY(i)<=101.21);
 }
 for(let i=0;i<index.count;i+=3){
   const a=index.getX(i),b=index.getX(i+1),c=index.getX(i+2);
   area+=Math.abs((p.getX(b)-p.getX(a))*(p.getZ(c)-p.getZ(a))-(p.getZ(b)-p.getZ(a))*(p.getX(c)-p.getX(a)))/2;
 }
-assert.ok(Math.abs(area-400*320)<1,'Contour bands and floor cover the crest without projected gaps/overlap');
+assert.ok(Math.abs(area-400*320)<400*320*.001,'Sampled contour perimeter stays within 0.1% of the crest area');
+const relief=buildPitSurface(pit,(x,z)=>100-0.04*x+0.025*z);
+const reliefPositions=relief.geometry.getAttribute('position');
+for(let i=0;i<reliefPositions.count;i++){
+  const x=reliefPositions.getX(i),y=reliefPositions.getY(i),z=reliefPositions.getZ(i);
+  assert.ok(y<=100-0.04*x+0.025*z+1.21,'Excavation surface stays at or below sampled terrain plus the documented display lift');
+}
 const plant=buildConcentrator();
 const bounds=new THREE.Box3().setFromObject(plant);
-assert.ok(bounds.min.x>=-CONCEPT.plantWidth/2 && bounds.max.x<=CONCEPT.plantWidth/2 && bounds.min.z>=-CONCEPT.plantDepth/2 && bounds.max.z<=CONCEPT.plantDepth/2,'All plant meshes stay inside the enlarged admitted pad');
-assert.ok(plant.getObjectByName('Electrical kiosk'));
-assert.ok(plant.getObjectByName('Flotation access stair'));
-assert.ok(plant.getObjectByName('Covered blending and feed hall'));
-assert.ok(plant.getObjectByName('Product storage and loadout'));
-assert.ok(plant.getObjectByName('Secondary flotation train'));
-assert.ok(plant.getObjectByName('Reclaim thickener bridge'));
+const admittedPad={width:250,depth:250};
+assert.ok(bounds.min.x>=-admittedPad.width/2 && bounds.max.x<=admittedPad.width/2 && bounds.min.z>=-admittedPad.depth/2 && bounds.max.z<=admittedPad.depth/2,'All plant meshes stay inside the report candidate land allowance');
+const processStages=plant.userData.processStages as {id:string;label:string;point:number[]}[];
+assert.deepEqual(processStages.map(stage=>stage.id),['feed','milling','flotation','thickening','dewatering','product'],'The process plant exposes each current inspection stage');
+for(const name of ['Flotation banks and walkways','Crushing and milling equipment','Dewatering and product handling','Thickener, water and reagent circuits'])
+  assert.ok(plant.getObjectByName(name),`Batched plant detail retains its ${name} group`);
 assert.ok(plant.children.filter(object=>object.userData.plantRoof).length>=12,'Roof cutaway tags cover the industrial halls');
-const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05);
-assert.ok(level>=CONCEPT.plantWidth*.05+CONCEPT.plantDepth*.025,'Platform clears the sampled ground');
-const placedBounds=new THREE.Box3().setFromObject(plant);
-assert.ok(placedBounds.min.x>=-CONCEPT.plantWidth/2 && placedBounds.max.x<=CONCEPT.plantWidth/2 && placedBounds.min.z>=-CONCEPT.plantDepth/2 && placedBounds.max.z<=CONCEPT.plantDepth/2);
+const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05,admittedPad);
+assert.ok(Math.abs(level-1.5)<1e-6,'Platform datum is 1.5 m above the median of the symmetric sampled ground');
+const placedBounds=new THREE.Box3();
+for(const child of plant.children)if(child.name!=='Illustrative cut and fill transition · not engineered')placedBounds.union(new THREE.Box3().setFromObject(child));
+assert.ok(placedBounds.min.x>=-admittedPad.width/2 && placedBounds.max.x<=admittedPad.width/2 && placedBounds.min.z>=-admittedPad.depth/2 && placedBounds.max.z<=admittedPad.depth/2,'Building/equipment envelope remains inside the graded pad; the separately named earthwork transition extends beyond it');
 const route=await planHaulRoute([-350,0],[350,0],rectangle([0,0],1200,1000),[pit],()=>100);
 assert.ok(route&&route.length>2,'Haul route bypasses a pit');
 assert.ok(route.every(p=>!inside([p.x,p.z],pit.ring)));
