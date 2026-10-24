@@ -2143,6 +2143,8 @@ export default function TangaThreeGeologyScene({
   const explodedRef=useRef(false);explodedRef.current=exploded;
   const revealCommand=useRef<((action:RevealAction)=>void)|null>(null);
   const [revealAction,setRevealAction]=useState<RevealAction>('none');
+  const revealActionRef=useRef<RevealAction>(revealAction);
+  revealActionRef.current=revealAction;
   const [spotlight,setSpotlight]=useState('');
   const spotlightRef=useRef('');spotlightRef.current=spotlight;
   const [journeyHoles,setJourneyHoles]=useState<string[]>([]),[journeyHole,setJourneyHole]=useState(''),[journeyReadout,setJourneyReadout]=useState('');
@@ -3125,7 +3127,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
     const stage = new THREE.Group();
     const displayReveal=createSceneReveal(stage,revealBlocks,pitSurfaces);
-    revealCommand.current=action=>{displayReveal.start(action);setRevealAction(action);};
+    revealCommand.current=action=>{displayReveal.start(action);revealActionRef.current=action;setRevealAction(action);};
     let journeyUpdate:((time:number)=>void)|null=null;
     groupRef.current = stage;
     stageRef.current = stage;
@@ -4864,10 +4866,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
       }
       host.dataset.truckVisible=String(Boolean(haulTrucks[0]?.mesh.visible));
-      // Grade targets get their own beat. Clear them as the pit is revealed so
-      // conceptual benches and the internal haul-truck cue have a clean view.
+      // Grade targets get their own beat, then return over the pit cutaway so
+      // the presenter can read the grade distribution inside the excavation.
+      // The blocks keep source coordinates and remain hidden in the pit view
+      // unless the cutaway is explicitly active.
       targetMeshes.forEach(mesh=>{
-        mesh.visible=beat===1&&layerSettingsRef.current.blocks.visible;
+        mesh.visible=(beat===1||(beat===2&&revealActionRef.current==='pitcut'))&&layerSettingsRef.current.blocks.visible;
         mesh.material.depthTest=!presentationOptions.current.targetXray;
         const opacity=layerSettingsRef.current.blocks.opacity,transparent=opacity<.999;
         if(mesh.material.transparent!==transparent){mesh.material.transparent=transparent;mesh.material.needsUpdate=true;}
@@ -5570,7 +5574,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
         <small>{haulStatus==='loading'?'Preparing a display-only pit-ramp vehicle cue':haulCount ? `${haulCount} illustrative truck on a conceptual internal pit ramp; no pit-to-feed road or operating speed is shown.` : 'No conceptual pit-ramp vehicle route is available; no pit-to-feed haul road was supplied.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is not throughput or an operating schedule.</small>
-        <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>Reveal pit cutaway</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Pit surfaces clipped; target blocks retain their true positions.':'Illustrative bench reveal, not an excavation schedule or reserve design.'}</small></details>
+        <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('pitcut');}}>{revealAction==='pitcut'?'Replay pit + resource cutaway':'Show resource blocks inside pit'}</button><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button disabled={!sceneReady} onClick={()=>revealCommand.current?.('none')}>Restore whole pits</button><small>{revealAction==='pitcut'?'Grade-selected blocks are visible within the clipped conceptual pit; their source positions and display thresholds are unchanged.':'Illustrative pit and block-model view; benches are not an optimised reserve shell.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}

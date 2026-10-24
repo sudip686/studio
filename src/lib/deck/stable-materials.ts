@@ -9,7 +9,12 @@ import * as THREE from 'three';
 export function stabilizeSceneMaterialAppearance(root: THREE.Object3D) {
   root.traverse((object) => {
     const materialOwner = object as THREE.Object3D & {material?: THREE.Material | THREE.Material[]};
-    const fixedPaletteSurface = /(?:plant pad|concept pad|hardstand|cleared apron|cut and fill transition|terraced conceptual excavation|internal pit access ramp|illustrative (?:tailings|waste|water|pond|embankment|beach|liner|grading))/i.test(object.name);
+    // Treat all cartographic/site-surface categories as fixed palette layers,
+    // including facility surfaces whose authored names vary between chapters.
+    // A narrow list missed names such as "Conceptual plant earthwork batters"
+    // and "Waste-rock bench", allowing their shadows/depth behavior to differ
+    // from the other pads when the camera moved.
+    const fixedPaletteSurface = /(?:\b(?:pad|apron|hardstand|earthwork|bench|berm|service lane|road marking|haul road)\b|cut and fill transition|terraced conceptual excavation|internal pit access ramp|illustrative (?:tailings|waste|water|pond|embankment|beach|liner|grading))/i.test(object.name);
     const fixedColorLayer = object.userData.deckLayer === 'blocks' || fixedPaletteSurface;
     let entries = materialOwner.material
       ? Array.isArray(materialOwner.material) ? materialOwner.material : [materialOwner.material]
