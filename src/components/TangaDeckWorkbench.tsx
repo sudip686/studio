@@ -6851,6 +6851,8 @@ export default function TangaDeckWorkbench() {
         chapter={activeMode as TangaChapterId}
         developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id}
         availableDevelopment={availableMineFacilities}
+        siteContextVisible={layerSettings.context.visible}
+        onShowSiteContext={activeMode === 'mine_planning' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setLayerSettings(current=>({...current,context:{...current.context,visible:true}}));} : undefined}
         onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }}
         onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined}
         surfaceConceptView={surfaceConceptView}

@@ -1466,6 +1466,13 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher button{min-width:0;min-height:30px;padding:5px 6px;border:1px solid transparent;border-radius:5px;background:transparent;color:#b9c7ce;font:inherit;font-size:10px;font-weight:650;cursor:pointer}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher button[aria-pressed="true"]{border-color:#d9905d66;background:#473429;color:#ffe0bf}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher button:focus-visible{outline:2px solid #f6be91;outline-offset:2px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden{display:grid;gap:7px;margin:8px 0;padding:9px 10px;border:1px solid #dca46a66;border-left:3px solid #dca46a;border-radius:7px;background:#19242b;color:#e6edf0}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden>div{display:grid;gap:3px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden strong{font-size:10px;font-weight:700;color:#ffe0bf}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden span{font-size:9px;line-height:1.45;color:#c2cdd1}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden button{display:flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:6px 9px;border:1px solid #dca46a75;border-radius:5px;background:#493728;color:#fff0df;font:inherit;font-size:10px;font-weight:700;cursor:pointer}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden button:hover{background:#5b432f;border-color:#efbd86}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden button:focus-visible{outline:2px solid #ffd0a7;outline-offset:2px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content{display:grid;gap:6px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content .tanga-site-status-key{margin:0;padding:4px 0;min-height:34px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content .tanga-development-select{min-height:36px;margin:0;padding-block:6px}

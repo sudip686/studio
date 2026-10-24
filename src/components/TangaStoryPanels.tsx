@@ -44,7 +44,7 @@ export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   </>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, developmentViewId, availableDevelopment = []}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; siteContextVisible?:boolean; onShowSiteContext?:()=>void}) {
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>developmentViewId==='pit-blocks'?'blocks':'site');
 
   useEffect(()=>{
@@ -132,6 +132,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
     <h2>{developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
     <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
+    {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
+      <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
+      {onShowSiteContext&&<button type="button" onClick={onShowSiteContext}>Show site concept <ArrowRight size={14}/></button>}
+    </div>}
     <div className="tanga-site-panel-switcher" role="group" aria-label="Mine plan information">
       {([['site','Site'],['blocks','Pit blocks'],['sources','Sources']] as const).map(([section,label])=><button key={section} type="button" aria-pressed={minePanelSection===section} onClick={()=>setMinePanelSection(section)}>{label}</button>)}
     </div>
