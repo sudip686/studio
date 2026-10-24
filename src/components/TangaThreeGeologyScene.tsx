@@ -314,6 +314,7 @@ type ThreeCallout = {
   x: number;
   y: number;
   tone: string;
+  /** Coordinates in the callout owner's local space (the scene stage when no owner is assigned). */
   anchor: [number, number, number];
   side?: 'left' | 'right' | 'top' | 'bottom';
   /**
@@ -4540,6 +4541,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return materials.some(material=>material.visible&&material.depthWrite&&material.opacity>.65);
       });
       const cameraWorld=camera.getWorldPosition(new THREE.Vector3());
+      const cameraForward=camera.getWorldDirection(new THREE.Vector3());
 
       visible.forEach((callout) => {
         const anchor = calloutAnchors.get(callout.id);
@@ -4548,6 +4550,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         while(owner){if(!owner.visible)return;owner=owner.parent;}
         const anchorWorld = anchor.clone();
         (calloutObjects.get(callout.id) ?? stage).localToWorld(anchorWorld);
+        // A point behind a perspective camera can still project to an in-range
+        // depth value with inverted screen coordinates. Reject it in world
+        // space before NDC clipping so labels never jump across the canvas.
+        if(anchorWorld.clone().sub(cameraWorld).dot(cameraForward)<=0)return;
         const projected = anchorWorld.project(camera);
         const rawAnchorX = (projected.x * 0.5 + 0.5) * width;
         const rawAnchorY = (-projected.y * 0.5 + 0.5) * height;
@@ -4657,6 +4663,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       setProjectedFrame({width, height, items});
     };
     const projectToScreen = (point: THREE.Vector3, width: number, height: number) => {
+      const cameraWorld=camera.getWorldPosition(new THREE.Vector3());
+      const cameraForward=camera.getWorldDirection(new THREE.Vector3());
+      if(point.clone().sub(cameraWorld).dot(cameraForward)<=0)return null;
       const projected = point.clone().project(camera);
       if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y) || !Number.isFinite(projected.z)) return null;
       if (projected.z < -1 || projected.z > 1) return null;
