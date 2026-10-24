@@ -1186,6 +1186,20 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-presentation-tools__readiness-stages li.is-error i,.tanga-presentation-tools__readiness-stages li.is-degraded i{background:#e17c67}
 .tanga-presentation-tools__readiness-stages li>strong{font-size:9px;color:#dce3df}
 .tanga-presentation-tools__readiness-stages li>small{grid-column:1/-1;overflow:hidden;color:#99aeb5;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.tanga-presentation-tools__chapter-coverage{margin:8px 0;border:1px solid #c9d8de20;border-radius:5px;background:#ffffff04}
+.tanga-presentation-tools__chapter-coverage>summary{display:flex;justify-content:space-between;gap:8px;padding:8px;cursor:pointer;list-style:none}
+.tanga-presentation-tools__chapter-coverage>summary::-webkit-details-marker{display:none}
+.tanga-presentation-tools__chapter-coverage>summary strong{color:#e7e9e7;font-size:10px}
+.tanga-presentation-tools__chapter-coverage>summary span{color:#aebec3;font-size:9px}
+.tanga-presentation-tools__chapter-coverage ol{display:grid;gap:4px;margin:0;padding:0 7px 7px;list-style:none}
+.tanga-presentation-tools__chapter-coverage li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:6px 7px;border:1px solid #c9d8de20;border-radius:4px;background:#ffffff04}
+.tanga-presentation-tools__chapter-coverage li>span{color:#e2e6e3;font-size:9px}
+.tanga-presentation-tools__chapter-coverage li>strong{color:#aebec3;font-size:9px}
+.tanga-presentation-tools__chapter-coverage li.is-ready>strong{color:#8fd1ba}
+.tanga-presentation-tools__chapter-coverage li.is-loading>strong{color:#e3ad73}
+.tanga-presentation-tools__chapter-coverage li.is-issue>strong,.tanga-presentation-tools__chapter-coverage li.is-fallback>strong{color:#ed998a}
+.tanga-presentation-tools__chapter-coverage li>small{grid-column:1/-1;overflow:hidden;color:#99aeb5;font-size:8px;text-overflow:ellipsis;white-space:nowrap}
+.tanga-presentation-tools__chapter-coverage>p{margin:0;padding:7px;border-top:1px solid #c9d8de20;color:#99aeb5;font-size:9px}
 .tanga-presentation-tools__fallback-check{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #c9d8de20}
 .tanga-presentation-tools__fallback-check>div{display:grid;gap:2px}
 .tanga-presentation-tools__fallback-check>div strong{font-size:10px;color:#e7e9e7}

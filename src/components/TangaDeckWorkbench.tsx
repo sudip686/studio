@@ -130,6 +130,19 @@ type FallbackPreflightResult = {
   dimensions: string;
 };
 
+function chapterReadinessText(stages?: LoadStage[]) {
+  if (!stages) return 'Not visited';
+  if (stages.some(stage => stage.state === 'error')) return 'Issue';
+  if (stages.some(stage => stage.state === 'loading')) return 'Loading';
+  if (stages.some(stage => stage.state === 'degraded')) return 'Fallback';
+  return stages.some(stage => stage.state === 'ready') ? 'Ready' : 'Standby';
+}
+
+function chapterReadinessDetail(stages?: LoadStage[]) {
+  if (!stages) return 'Not checked in this session';
+  return stages.map(stage => `${stage.label}: ${sceneStateText(stage.state)}`).join(' · ');
+}
+
 type DeckViewState = {
   longitude: number;
   latitude: number;
@@ -2227,6 +2240,7 @@ export default function TangaDeckWorkbench() {
   const [shareStatus, setShareStatus] = useState('');
   const [fallbackPreflight, setFallbackPreflight] = useState<FallbackPreflightResult[] | null>(null);
   const [fallbackPreflightRunning, setFallbackPreflightRunning] = useState(false);
+  const [chapterReadiness, setChapterReadiness] = useState<Partial<Record<WorkbenchMode, LoadStage[]>>>({});
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
   const [pitBlockFocusIndex,setPitBlockFocusIndex]=useState<number|null>(null);
   const threeCameraSequenceRef=useRef(0);
@@ -4262,6 +4276,20 @@ export default function TangaDeckWorkbench() {
   ]);
   const currentLoaderIssue = loadStages.some(stage => stage.state === 'error' || stage.state === 'degraded');
   const currentLoaderPending = loadStages.some(stage => stage.state === 'loading');
+  useEffect(() => {
+    const timer=window.setTimeout(() => {
+      if (readHashScene() !== activeMode || loadStages.every(stage => stage.state === 'idle')) return;
+      setChapterReadiness(current => {
+        const previous = current[activeMode];
+        const unchanged = previous?.length === loadStages.length && previous.every((stage, index) => {
+          const next = loadStages[index];
+          return stage.id === next.id && stage.state === next.state && stage.detail === next.detail;
+        });
+        return unchanged ? current : {...current, [activeMode]: loadStages};
+      });
+    },0);
+    return () => window.clearTimeout(timer);
+  }, [activeMode, loadStages]);
   // Measured relief for the project tile. Both the topography panel and the
   // terrain callout read from this, so the deck can only ever state one
   // elevation range — previously they disagreed by a factor of two.
@@ -6164,6 +6192,20 @@ export default function TangaDeckWorkbench() {
             <ul className="tanga-presentation-tools__readiness-stages" aria-label="Current view loader states">
               {loadStages.map(stage=><li key={stage.id} className={`is-${stage.state}`}><span><i aria-hidden="true"/>{stage.label}</span><strong>{sceneStateText(stage.state)}</strong><small>{stage.detail}</small></li>)}
             </ul>
+            <details className="tanga-presentation-tools__chapter-coverage">
+              <summary><strong>Chapter coverage</strong><span>{Object.keys(chapterReadiness).length} / {STORY_STEPS.length} visited</span></summary>
+              <ol aria-label="Observed chapter loader states">
+                {STORY_STEPS.map(step=>{
+                  const stages=chapterReadiness[step.mode];
+                  const state=chapterReadinessText(stages);
+                  return <li key={step.mode} className={`is-${state.toLowerCase().replace(/\s+/g,'-')}`}>
+                    <span>{step.act} · {MODE_LABELS[step.mode]}</span><strong>{state}</strong>
+                    <small>{chapterReadinessDetail(stages)}</small>
+                  </li>;
+                })}
+              </ol>
+              <p>States are collected as you visit chapters in this session. Ready means the observed loaders reported no failure; assets that remain on demand may still be in standby.</p>
+            </details>
             <section className="tanga-presentation-tools__fallback-check" aria-label="Saved 3D fallback image check">
               <div><strong>Saved 3D fallback images</strong><span>Five stills used while a 3D scene loads or recovers.</span></div>
               <button type="button" onClick={runFallbackPreflight} disabled={fallbackPreflightRunning}>
