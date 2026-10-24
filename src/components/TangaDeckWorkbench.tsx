@@ -104,6 +104,7 @@ type ThreeCameraCommand = {
   id: number;
   action: ThreeCameraAction;
   degrees?: 90 | 180 | 360;
+  pitIndex?: number;
 };
 
 type ThreeLoadReport = {
@@ -2217,6 +2218,7 @@ export default function TangaDeckWorkbench() {
   const [threeSceneRevision, setThreeSceneRevision] = useState(0);
   const [shareStatus, setShareStatus] = useState('');
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
+  const [pitBlockFocusIndex,setPitBlockFocusIndex]=useState<number|null>(null);
   const threeCameraSequenceRef=useRef(0);
   const [selectedPeerProject, setSelectedPeerProject] = useState<GraphitePeerProjectRow | null>(null);
   const [stageSize, setStageSize] = useState({width: 1600, height: 950});
@@ -2489,9 +2491,10 @@ export default function TangaDeckWorkbench() {
     mode === 'drillholes' || mode === 'subsurface' || mode === 'resource' || mode === 'mine_planning' || mode === 'metallurgy'
   ), [activeMode]);
 
-  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360) => {
+  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360, pitIndex?: number) => {
     setThreeSceneRequested(true);
-    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees});
+    setPitBlockFocusIndex(action==='revealPitBlocks'?(pitIndex??null):null);
+    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees,pitIndex});
   }, []);
 
   const rotateNinety = useCallback(() => {
@@ -6486,7 +6489,8 @@ export default function TangaDeckWorkbench() {
         onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}}
         onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined}
         onSiteOrientation={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? orientation => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand(orientation==='plan'?'sitePlan':'siteOblique');} : undefined}
-        onRevealPitBlocks={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand('revealPitBlocks');} : undefined}
+        onRevealPitBlocks={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? (pitIndex) => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand('revealPitBlocks',undefined,pitIndex);} : undefined}
+        pitBlockFocusIndex={pitBlockFocusIndex}
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
