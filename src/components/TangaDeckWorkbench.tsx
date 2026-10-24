@@ -66,7 +66,7 @@ const DEPTH_BRACKET_MODES = new Set<WorkbenchMode>(['subsurface', 'resource', 'm
 
 /** Button and tooltip copy for each annotation-density tier. */
 const LABEL_DENSITY_COPY: Record<LabelDensity, {label: string; title: string}> = {
-  key: {label: 'Key labels', title: 'Key labels — callouts + top 3 intercepts'},
+  key: {label: 'Key labels', title: 'Key labels — story callouts + strongest intercept'},
   all: {label: 'All data labels', title: 'All data labels — every strong intercept that fits'},
   off: {label: 'Labels off', title: 'Labels off — clean stage'},
 };
@@ -5137,7 +5137,7 @@ export default function TangaDeckWorkbench() {
     : (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
   // Annotation density, cycled with Ctrl+A:
-  //   key → authored scene callouts plus the three strongest drill intercepts
+  //   key → authored scene callouts plus the strongest anchored drill intercept
   //   all → the dense data-label view, for detailed questions
   //   off → a clean stage for photography/screenshotting
   // Three tiers rather than a boolean, because the useful density for a

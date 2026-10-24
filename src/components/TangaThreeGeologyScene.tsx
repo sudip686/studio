@@ -59,7 +59,10 @@ export type LabelDensity = 'off' | 'key' | 'all';
 /** Intercept labels drawn at each density tier. */
 const INTERCEPT_LABEL_BUDGET: Record<LabelDensity, number> = {
   off: 0,
-  key: 3,
+  // Keep one strong anchored intercept in the default story view; the ranked
+  // evidence panel already carries the top three values, and All labels remains
+  // available for detailed investigation.
+  key: 1,
   all: 18,
 };
 
