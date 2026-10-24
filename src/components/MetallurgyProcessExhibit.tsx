@@ -120,9 +120,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const bounds = overviewBounds;
       const size = bounds.getSize(new THREE.Vector3());
       // The campus has its water allowance and approach yard at the near edge.
-      // Bias the view toward the near edge to keep both in frame at desktop
-      // viewport sizes after fitting the full plant bounds.
-      target.y = bounds.min.y;
+      // Aim below the low edge so near-side features clear the canvas caption
+      // while the far perimeter keeps a small but visible top margin.
+      target.y = bounds.min.y - Math.max(8, size.y * .14);
       const fitCamera = new THREE.PerspectiveCamera(camera.fov, camera.aspect, .1, 4000);
       let distance = Math.max(size.x, size.z) * .8;
       for (let iteration = 0; iteration < 5; iteration++) {
@@ -135,8 +135,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         }
         distance *= Math.max(.1, extent / .76);
       }
-      // Keep the complete campus, fence, yard and near-side water allowance in
-      // frame at both desktop sizes while using the lower façade-forward view.
+      // Keep the full campus, fence, yard and near-side water allowance in
+      // frame while using more of the canvas for the plant itself. Keep enough
+      // clearance for the near-side water allowance and perimeter at 1366 px.
       distance = Math.max(125, distance * .56);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
