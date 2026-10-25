@@ -3232,13 +3232,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         revealCommand.current?.('pitcut');
         pitBlockRetryRef.current?.();
         const bounds=new THREE.Box3();
-        for(const [x,z] of pit.ring)bounds.expandByPoint(new THREE.Vector3(x,pit.surface-pit.depth*.3,z));
+        for(const [x,z] of pit.ring)bounds.expandByPoint(new THREE.Vector3(x,pit.surface-pit.depth*.45,z));
         const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
-        const span=Math.max(size.x,size.z)*.95+150;
-        // Lower the named pit inspection camera to show the stepped wall and
-        // block depth together. The original high oblique view flattened the
-        // 10 m vertical source cells into a grade carpet over the excavation.
-        const position=centre.clone().add(new THREE.Vector3(span*.8,span*.42,span*.2));
+        // Frame an individual excavation as a close, low-oblique cutaway. The
+        // earlier distant camera made the source cells read as a grade patch
+        // on the hillside; this angle exposes their cube faces against the
+        // stepped benches while preserving the registered source elevations.
+        const span=Math.max(size.x,size.z)*.7+90;
+        const position=centre.clone().add(new THREE.Vector3(span*.9,span*.32,span*.34));
         stage.localToWorld(centre);stage.localToWorld(position);
         scheduleCameraTween(position,centre,2,42);
         setStatus(`${command.action==='northPit'?'North':'South'} pit · source blocks within conceptual cutaway`);
