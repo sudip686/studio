@@ -44,7 +44,14 @@ export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   </>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void}) {
+function SceneMotionControl({paused,onToggle}:{paused:boolean;onToggle:()=>void}) {
+  return <div className="tanga-story-motion" role="group" aria-label="3D scene animation">
+    <span><i aria-hidden="true" data-state={paused?'paused':'playing'}/>{paused?'Scene motion paused':'Scene motion active'}</span>
+    <button type="button" aria-pressed={paused} onClick={onToggle}>{paused?'Resume motion':'Pause motion'}</button>
+  </div>;
+}
+
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void}) {
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
 
   useEffect(()=>{
@@ -87,6 +94,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <div className="tanga-story-panel__eyebrow">SURVEY SURFACE · AUGUST 2025</div>
     <h2>Read the ground before the concept</h2>
     <p className="tanga-story-panel__intro">The ridges and valleys provide a measured surface reference for drilling, geology and the proposed site.</p>
+    {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-terrain-scale"><strong>1×</strong><span>True vertical scale<br/>Relief is not exaggerated</span></div>
     <ol className="tanga-terrain-reading"><li><b>01</b><span>Orient to the full surveyed surface.</span></li><li><b>02</b><span>Advance to the ridge profile for a lower, raking view.</span></li><li><b>03</b><span>Follow the recorded drilling beneath this surface.</span></li></ol>
     <p className="tanga-story-panel__qualification">The displayed mesh is resampled for interaction. Terrain context does not establish drainage design, ground conditions or buildability.</p>
@@ -96,6 +104,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <div className="tanga-story-panel__eyebrow">OBSERVATION · DRILL CORE</div>
     <h2>Start with what was sampled</h2>
     <p className="tanga-story-panel__intro">Core records provide direct observations at discrete intervals. The interpretation between holes carries a different level of certainty.</p>
+    {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <img className="tanga-story-project-image" src="/presentation-assets/verified-core-example.jpg" alt="Photograph of labelled Tanga graphite drill core with a cut line and sampling intervals"/>
     <div className="tanga-story-image-caption"><span>AMC MRE · Figure 3.9</span><small>Report image · not the selected 3D hole</small></div>
     <div className="tanga-compact-grade-key" aria-label="Recorded interval TGC legend"><span>RECORDED INTERVAL TGC</span><div>{ASSAY_INTERVAL_BINS.map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.label}</span>)}</div></div>
@@ -108,6 +117,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <div className="tanga-story-panel__eyebrow">SAMPLE TRACE · TGF002</div>
     <h2>Connect the observations</h2>
     </header>
+    {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-geology-story__body">
     <div className="tanga-sample-crosswalk"><span>Petrography <b>TGF002</b></span><i>↔</i><span>Hole <b>TGDD1009</b></span><i>↔</i><span>Assay <b>TD0058</b></span></div>
     <img className="tanga-story-micrograph" src="/presentation-assets/petrography-tgdd1009-18m.jpg" alt="Photomicrograph for Tanga petrography sample TGF002"/>
@@ -121,6 +131,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <div className="tanga-story-panel__eyebrow">REPORTED MRE · AMC · DECEMBER 2025</div>
     <h2>Scale, grade and location</h2>
     <p className="tanga-story-panel__intro">The report describes the estimate. The 3D cells show where modelled grades sit within the deposit.</p>
+    {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-story-resource-number"><strong>148<span>Mt</span></strong><small>Indicated mineral resource</small></div>
     <dl className="tanga-story-resource-facts"><div><dt>Reported grade</dt><dd>4.94% TGC</dd></div><div><dt>Contained graphite</dt><dd>≈7.31 Mt</dd></div></dl>
     <div className="tanga-compact-grade-key" aria-label="Displayed block TGC legend"><span>DISPLAYED BLOCK TGC</span><div>{TGC_GRADE_BINS.map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.range}</span>)}</div></div>
@@ -132,6 +143,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
     <h2>{developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
     <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
+    {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
       <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
       {onShowSiteContext&&<button type="button" onClick={onShowSiteContext}>Show site concept <ArrowRight size={14}/></button>}

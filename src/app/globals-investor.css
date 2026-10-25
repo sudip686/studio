@@ -1488,6 +1488,13 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher button{min-width:0;min-height:30px;padding:5px 6px;border:1px solid transparent;border-radius:5px;background:transparent;color:#b9c7ce;font:inherit;font-size:10px;font-weight:650;cursor:pointer}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher button[aria-pressed="true"]{border-color:#d9905d66;background:#473429;color:#ffe0bf}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher button:focus-visible{outline:2px solid #f6be91;outline-offset:2px}
+.tanga-deck--present .tanga-story-motion{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 10px;padding:7px 8px;border:1px solid #9fb4bd2e;border-radius:7px;background:#111b21;color:#c5d0d4}
+.tanga-deck--present .tanga-story-motion>span{display:flex;align-items:center;gap:7px;font-size:9px;line-height:1.25}
+.tanga-deck--present .tanga-story-motion>span i{width:7px;height:7px;border-radius:50%;background:#69b7a5;box-shadow:0 0 8px #69b7a577}
+.tanga-deck--present .tanga-story-motion>span i[data-state="paused"]{background:#c99b69;box-shadow:0 0 8px #c99b6977}
+.tanga-deck--present .tanga-story-motion button{flex:0 0 auto;min-height:30px;padding:5px 9px;border:1px solid #78919d66;border-radius:5px;background:#1c2b34;color:#e6ece9;font:inherit;font-size:9px;font-weight:650;cursor:pointer}
+.tanga-deck--present .tanga-story-motion button:hover{border-color:#82c6c4;background:#29424e}
+.tanga-deck--present .tanga-story-motion button:focus-visible{outline:2px solid #f6be91;outline-offset:2px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden{display:grid;gap:7px;margin:8px 0;padding:9px 10px;border:1px solid #dca46a66;border-left:3px solid #dca46a;border-radius:7px;background:#19242b;color:#e6edf0}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden>div{display:grid;gap:3px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-context-hidden strong{font-size:10px;font-weight:700;color:#ffe0bf}

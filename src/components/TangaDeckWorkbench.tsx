@@ -5274,6 +5274,8 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
+  const [sceneMotionPaused, setSceneMotionPaused] = useState(false);
+  useEffect(() => { setSceneMotionPaused(false); }, [activeMode, activeShotIndex]);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);setIsHighlightsTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
@@ -5791,6 +5793,8 @@ export default function TangaDeckWorkbench() {
           onInspectEvidence={()=>{setIsAutoplay(false);setIsExecutiveTour(false);}}
           onSiteFacilities={setAvailableMineFacilities}
           onAssayFacts={setAssayFacts}
+          motionPaused={sceneMotionPaused}
+          onMotionPausedChange={setSceneMotionPaused}
         />
       )}
 
@@ -6979,6 +6983,8 @@ export default function TangaDeckWorkbench() {
         pitGradeFocus={pitGradeFocus}
         onPitGradeFocusChange={grade=>{setPitGradeFocus(grade);if(grade&&activeMode==='mine_planning'&&activeShot?.id!=='pit-blocks'){setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='pit-blocks')));issueThreeCameraCommand('revealPitBlocks');}}}
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
+        sceneMotionPaused={sceneMotionPaused}
+        onToggleSceneMotion={() => setSceneMotionPaused(value => !value)}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}

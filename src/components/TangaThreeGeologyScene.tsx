@@ -317,6 +317,8 @@ type TangaThreeGeologySceneProps = {
   onSelectGeologyUnit?: (unit: DrillPickInfo) => void;
   onGeologyLegendMount?: (element: HTMLDivElement | null) => void;
   onSiteFacilities?: (ids:string[])=>void;
+  motionPaused?: boolean;
+  onMotionPausedChange?: (paused:boolean)=>void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
   onAssayFacts?: (facts: AssayFacts | null) => void;
   onLoadState?: (state: {
@@ -2314,6 +2316,8 @@ export default function TangaThreeGeologyScene({
   onGeologyLegendMount,
   onSiteFacilities,
   onAssayFacts,
+  motionPaused: externalMotionPaused,
+  onMotionPausedChange,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const geologyRailBodyRef = useRef<HTMLDivElement | null>(null);
@@ -2352,7 +2356,13 @@ export default function TangaThreeGeologyScene({
   const activePitBlockFocusRef = useRef<number | null>(null);
   const pitGradeFocusRef = useRef<string | null>(pitGradeFocus);
   pitGradeFocusRef.current = pitGradeFocus;
-  const [motionPaused, setMotionPaused] = useState(false);
+  const [localMotionPaused, setLocalMotionPaused] = useState(false);
+  const motionPaused = externalMotionPaused ?? localMotionPaused;
+  const setMotionPaused = (update:boolean|((previous:boolean)=>boolean)) => {
+    const next = typeof update === 'function' ? update(motionPaused) : update;
+    setLocalMotionPaused(next);
+    onMotionPausedChange?.(next);
+  };
   const [sectionEnabled,setSectionEnabled]=useState(false);
   const [crossSource,setCrossSource]=useState<SectionSource|null>(null);
   const crossViewRef=useRef<((section:SectionDefinition|null,flat:boolean,moveCamera?:boolean)=>void)|null>(null);
