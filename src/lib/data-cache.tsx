@@ -564,6 +564,9 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
   const [loadRevision, setLoadRevision] = useState(0);
   const autoRetryCountRef = useRef(0);
   const blockModelLoadRef = useRef<Promise<void> | null>(null);
+  const blockModelControllerRef = useRef<AbortController | null>(null);
+  const blockModelGenerationRef = useRef(0);
+  const blockModelProviderActiveRef = useRef(false);
 
   const refetch = useCallback(() => {
     setCache((current) =>
@@ -602,13 +605,28 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
 
     if (!shouldLoad) return;
 
-    blockModelLoadRef.current = fetchJson({
+    const generation = ++blockModelGenerationRef.current;
+    const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+    blockModelControllerRef.current = controller;
+    const isCurrentLoad = () => generation === blockModelGenerationRef.current && !controller?.signal.aborted;
+    let loadPromise: Promise<void>;
+
+    loadPromise = fetchJson({
       label: 'block model data',
       candidates: resourceCandidates.blockModel,
+      // This payload is substantially larger than assay/lithology GeoJSON.
+      // A short shared timeout caused healthy HTTP 200 responses to be
+      // abandoned while their streamed body was still being decoded, which
+      // restarted the same transfer and left the chapter loading indefinitely.
+      attempts: 1,
+      timeoutMs: 60_000,
+      signal: controller?.signal,
       validate: isGeoJsonFeatureCollection,
     })
       .then((payload) => {
+        if (!isCurrentLoad()) return;
         const blockSegments = parseBlockModelFeatures(payload);
+        if (!isCurrentLoad()) return;
         if (blockSegments.length === 0) {
           throw new Error('Block model payload loaded but no blocks were parsed.');
         }
@@ -629,6 +647,7 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
         );
       })
       .catch((error) => {
+        if (!isCurrentLoad()) return;
         setCache((current) =>
           deriveCacheState({
             ...current,
@@ -644,8 +663,25 @@ export const DataCacheProvider = ({ children }: { children: ReactNode }) => {
         );
       })
       .finally(() => {
-        blockModelLoadRef.current = null;
+        if (blockModelLoadRef.current === loadPromise) blockModelLoadRef.current = null;
+        if (blockModelControllerRef.current === controller) blockModelControllerRef.current = null;
       });
+    blockModelLoadRef.current = loadPromise;
+  }, []);
+
+  useEffect(() => {
+    blockModelProviderActiveRef.current = true;
+    return () => {
+      blockModelProviderActiveRef.current = false;
+      // React Strict Mode replays effect cleanup/setup during development. Let
+      // that same-turn setup retain the in-flight shared request; a real
+      // unmount leaves the ref false and cancels before its next network task.
+      queueMicrotask(() => {
+        if (blockModelProviderActiveRef.current) return;
+        blockModelGenerationRef.current += 1;
+        blockModelControllerRef.current?.abort(new Error('The block model load was superseded.'));
+      });
+    };
   }, []);
 
   useEffect(() => {

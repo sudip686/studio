@@ -8,10 +8,10 @@ for(const t of [-1,NaN,Infinity,0,.001,1,1000]){
 }
 assert.ok(lab.pickables.length>100);
 for(let i=0;i<5;i++)assert.ok(lab.pickables.some(m=>m.userData.stage===i));
-assert.equal(lab.pickables.filter(m=>m.userData.bin).length,7);
-assert.equal(MET_GROUPS[0].coarse,'>57%');
-assert.equal(MET_GROUPS[1].coarse,'Not supplied for the whole group');
-assert.equal(MET_GROUPS[5].recovery,'75.8%');
-assert.equal(MET_GROUPS[5].carbon,'Not supplied');
+assert.equal(lab.pickables.filter(m=>m.userData.bin).length,MET_GROUPS.length);
+assert.equal(MET_GROUPS[0].coarse,'34.6%');
+assert.equal(MET_GROUPS[1].coarse,'42.2%');
+assert.equal(MET_GROUPS[5].recovery,'93.0%');
+assert.equal(MET_GROUPS[5].carbon,'98.4% TC');
 assert.ok(MET_GROUPS.every(g=>g.fine==='Not separately reported'));
 console.log('PASS: lab stage coverage, sample jars, finite negative/nonfinite animation times, and no invented fine fraction');

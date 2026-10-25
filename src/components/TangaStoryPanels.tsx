@@ -6,6 +6,10 @@ import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
 import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-development';
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
 
+const PIT_RESOURCE_GRADE_BANDS=TGC_GRADE_BINS
+  .filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high')
+  .map(bin=>({...bin,displayRange:bin.key==='medium'?'4.5–<6%':bin.key==='high'?'6–<8%':'≥8%'}));
+
 export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   const [open, setOpen] = useState(false);
 
@@ -40,8 +44,15 @@ export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   </>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, developmentViewId, availableDevelopment = []}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void}) {
-  const developmentView=DEVELOPMENT_FACILITIES.find(view=>view.id===developmentViewId) ?? (developmentViewId==='north-pit'?{title:'Read the northern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Benches and access path are illustrative, with no engineered road or grade.'}:developmentViewId==='south-pit'?{title:'Read the southern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Excavation limits, access and slopes remain illustrative pending engineering.'}:undefined);
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void}) {
+  const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
+
+  useEffect(()=>{
+    if(chapter!=='mine_planning')return;
+    // Keep the information panel in step with the authored 3D pit-block view.
+    setMinePanelSection(['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
+  },[chapter,developmentViewId]);
+  const developmentView=DEVELOPMENT_FACILITIES.find(view=>view.id===developmentViewId) ?? (developmentViewId==='north-pit'?{title:'Read the northern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Benches and access path are illustrative, with no engineered road or grade.'}:developmentViewId==='south-pit'?{title:'Read the southern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Excavation limits, access and slopes remain illustrative pending engineering.'}:developmentViewId==='pit-blocks'?{title:'Resource blocks in both pits',explanation:'Compare source grade cells within the two conceptual pit cutaways. Focus one excavation or return to the whole-site view.'}:undefined);
   const developmentAvailable=(id:DevelopmentView)=>Boolean(onInspectDevelopment)&&!((id==='tailings'||id==='waste')&&!availableDevelopment.includes(id))&&!(id==='campus'&&!availableDevelopment.length);
   const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
   const milestone = WORK_MILESTONES[milestoneIndex];
@@ -121,23 +132,58 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
     <h2>{developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
     <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
-    <span className="tanga-site-concept-tag">Proposed site · illustrative facilities</span>
-    <div className="tanga-site-status-key" role="group" aria-label="Site feature evidence status">
-      <span><i data-status="report"/>Report candidate</span>
-      <span><i data-status="approximate"/>Approx. map trace</span>
-      <span><i data-status="illustrative"/>Illustrative</span>
+    {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
+      <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
+      {onShowSiteContext&&<button type="button" onClick={onShowSiteContext}>Show site concept <ArrowRight size={14}/></button>}
+    </div>}
+    <div className="tanga-site-panel-switcher" role="group" aria-label="Mine plan information">
+      {([['site','Site'],['blocks','Pit blocks'],['sources','Sources']] as const).map(([section,label])=><button key={section} type="button" aria-pressed={minePanelSection===section} onClick={()=>setMinePanelSection(section)}>{label}</button>)}
     </div>
-    <select className="tanga-development-select" aria-label="Mine site view" value={developmentViewId ?? 'overview'} onChange={event=>onInspectDevelopment?.(event.target.value as DevelopmentView)}>{(developmentViewId==='north-pit'||developmentViewId==='south-pit')&&<option value={developmentViewId} disabled>{developmentViewId==='north-pit'?'North pit':'South pit'}</option>}{DEVELOPMENT_FACILITIES.map(view=><option key={view.id} value={view.id} disabled={!developmentAvailable(view.id)}>{view.label}</option>)}</select>
-    <div className="tanga-site-orientation" role="group" aria-label="Site camera view">
-      <button type="button" disabled={!onSiteOrientation} onClick={()=>onSiteOrientation?.('plan')}>North-up plan</button>
-      <button type="button" disabled={!onSiteOrientation} onClick={()=>onSiteOrientation?.('oblique')}>Oblique view</button>
-    </div>
-
-    <details className="tanga-development-source"><summary>Report location &amp; alternatives</summary><p>Option 2 is the report’s planning assumption: 2.15 km and 24° reported inclination. The map trace is approximately 2.45 km, so its alignment and the 2.15 km table estimate need reconciliation. Options 1 and 3 are alternatives, not additional operating conveyors.</p><img src="/presentation-assets/paulsam-conveyor-sites.jpg" alt="PaulSam Figure 3.3 showing three candidate feed stations and conveyor alignments on a labelled UTM 37S grid"/><p>Figure 3.3 · PDF p.33 · June 2023. Locations traced approximately from the grid. The proposed feed apron is offset nearby to clear the current conceptual pit envelope. No surveyed plant parcel or engineered alignment is supplied.</p></details>
-    <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Inspect the processing plant <ArrowRight size={14}/></button>
-    {onToggleSurfaceConcept && <button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView ? 'Close terrain comparison' : 'Compare original terrain'} <ArrowRight size={14}/></button>}
-    {surfaceConceptView && onSurfaceCompareSplit && <label className="tanga-story-compare-range" htmlFor="tanga-terrain-comparison-split"><span>Wipe position · {Math.round(surfaceCompareSplit)}% concept</span><input id="tanga-terrain-comparison-split" type="range" min="8" max="92" step="1" value={Math.round(surfaceCompareSplit)} aria-label="Terrain comparison wipe position" aria-valuetext={`${Math.round(surfaceCompareSplit)} percent concept site`} onChange={event=>onSurfaceCompareSplit(Number(event.target.value))}/></label>}
-    <details className="tanga-development-source"><summary>Concept scope &amp; limits</summary><p>Plant candidate: report-based, outside the provisional mine boundary. Added waste and water placements are illustrative and exceed the plant allowance. Capacity, drainage, ground conditions and land approval remain unverified. Lowland additions use regional terrain context. The pad and cut/fill transition are illustrative; terrain, slopes and earthworks require survey and engineering. Compare original terrain restores the ungraded source surface.</p></details>
+    {minePanelSection==='site'&&<div className="tanga-site-panel-content">
+      <div className="tanga-site-status-key" role="group" aria-label="Site feature evidence status">
+        <span data-status="report"><i aria-hidden="true"/>Report candidate</span>
+        <span data-status="approximate"><i aria-hidden="true"/>Approx. map trace</span>
+        <span data-status="illustrative"><i aria-hidden="true"/>Illustrative</span>
+      </div>
+      <select className="tanga-development-select" aria-label="Mine site view" value={developmentViewId ?? 'overview'} onChange={event=>onInspectDevelopment?.(event.target.value as DevelopmentView)}>{developmentViewId==='pit-blocks'&&<option value="pit-blocks" disabled>Both pit cutaways</option>}{(developmentViewId==='north-pit'||developmentViewId==='south-pit')&&<option value={developmentViewId} disabled>{developmentViewId==='north-pit'?'North pit':'South pit'}</option>}{DEVELOPMENT_FACILITIES.map(view=><option key={view.id} value={view.id} disabled={!developmentAvailable(view.id)}>{view.label}</option>)}</select>
+      <div className="tanga-site-orientation" role="group" aria-label="Site camera view">
+        <button type="button" disabled={!onSiteOrientation} onClick={()=>onSiteOrientation?.('plan')}>North-up plan</button>
+        <button type="button" disabled={!onSiteOrientation} onClick={()=>onSiteOrientation?.('oblique')}>Oblique view</button>
+      </div>
+      <div className="tanga-site-panel-actions">
+        <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Processing plant <ArrowRight size={14}/></button>
+        {onToggleSurfaceConcept&&<button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView?'Close terrain comparison':'Compare terrain'} <ArrowRight size={14}/></button>}
+      </div>
+    </div>}
+    {minePanelSection==='blocks'&&<div className="tanga-site-panel-content">
+      <div className="tanga-site-panel-subtitle">SOURCE BLOCK MODEL · OPEN PIT</div>
+      {pitBlocksStatus!=='ready'&&<small className="tanga-pit-grade-state tanga-pit-block-status" data-state={pitBlocksStatus} role="status">{pitBlocksStatus==='loading'?'Source cells are loading. You can still explore the pit cutaway.':'Source block data failed to load. Choose Inspect to retry.'}</small>}
+      <button type="button" className="tanga-story-panel__compare tanga-story-panel__pit-block-reveal" aria-label={pitBlocksStatus==='error'?'Retry source block model and focus both conceptual pits':'Focus resource blocks inside both conceptual pits'} aria-pressed={pitBlockFocusIndex===null} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.()}>{pitBlocksStatus==='error'?'Retry blocks & inspect pits':'Inspect blocks in both pits'} <ArrowRight size={14}/></button>
+      <div className="tanga-pit-focus-actions" role="group" aria-label="Focus source blocks inside pit shells">
+        <button type="button" aria-pressed={pitBlockFocusIndex===0} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(0)}>North pit · inspect blocks</button>
+        <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}>South pit · inspect blocks</button>
+      </div>
+      <div className="tanga-compact-grade-key tanga-pit-grade-key" aria-label="Filter resource blocks by TGC grade band"><span>RESOURCE BLOCKS · TGC</span><div role="group" aria-label="Show resource blocks by grade band">{PIT_RESOURCE_GRADE_BANDS.map(bin=><button key={bin.key} type="button" className="tanga-pit-grade-filter" aria-pressed={pitGradeFocus===bin.key} disabled={!onPitGradeFocusChange} onClick={()=>onPitGradeFocusChange?.(pitGradeFocus===bin.key?null:bin.key)}><i style={{background:bin.color}}/>{bin.displayRange}</button>)}</div><small className="tanga-pit-grade-state" role="status">{pitGradeFocus ? `Showing ${PIT_RESOURCE_GRADE_BANDS.find(bin=>bin.key===pitGradeFocus)?.displayRange ?? 'selected'} TGC blocks` : 'All displayed grade bands'}</small></div>
+      <p className="tanga-story-panel__qualification">All source cells at ≥4.5% TGC within each conceptual pit. Colors match the resource model; display bands are not economic cutoffs or reserves.</p>
+    </div>}
+    {minePanelSection==='sources'&&<div className="tanga-site-panel-content">
+      <div className="tanga-site-panel-subtitle">REPORT BASIS &amp; LIMITS</div>
+      <details className="tanga-development-source"><summary>Report location &amp; alternatives</summary><p>Option 2 is the report’s planning assumption: 2.15 km and 24° reported inclination. The map trace is approximately 2.45 km, so its alignment and the 2.15 km table estimate need reconciliation. Options 1 and 3 are alternatives, not additional operating conveyors.</p><img loading="lazy" src="/presentation-assets/paulsam-conveyor-sites.jpg" alt="PaulSam Figure 3.3 showing three candidate feed stations and conveyor alignments on a labelled UTM 37S grid"/><p>Figure 3.3 · PDF p.33 · June 2023. Locations traced approximately from the grid. The proposed feed apron is offset nearby to clear the current conceptual pit envelope. No surveyed plant parcel or engineered alignment is supplied.</p></details>
+      <details className="tanga-development-source"><summary>Concept scope &amp; limits</summary><p>Plant candidate: report-based, outside the provisional mine boundary. At the uphill feed-in point, PaulSam Table 5.9 gives a 30 × 50 m (1,500 m²) built-up allowance; Table 5.1 lists 1,200 m² for the operatives shed and amenities. The model follows Table 5.9, while the exterior and approximate map placement remain illustrative. Added waste and water placements are illustrative and exceed the plant allowance. Capacity, drainage, ground conditions and land approval remain unverified. The roadside swales are visual cues only; no alignment, flow direction or hydraulic design is sourced. Lowland additions use regional terrain context. The pad and cut/fill transition are illustrative; terrain, slopes and earthworks require survey and engineering. Compare terrain restores the ungraded source surface.</p></details>
+      <details className="tanga-site-facility-register">
+        <summary>Full site names &amp; location status</summary>
+        <ul>
+          <li><strong>Feed-in point &amp; operatives shed</strong><span>Report allowance; approximate Figure 3.3 map registration; illustrative exterior</span></li>
+          <li><strong>Processing candidate · Option 2</strong><span>Report planning assumption; approximate map registration</span></li>
+          <li><strong>Tailings impoundment</strong><span>Illustrative placement; regional terrain context</span></li>
+          <li><strong>Settling and reclaim-water pond</strong><span>Illustrative placement; regional terrain context</span></li>
+          <li><strong>Raw-water pond</strong><span>Illustrative placement; regional terrain context</span></li>
+          <li><strong>Waste-rock landform</strong><span>Illustrative placement; supplied survey terrain</span></li>
+        </ul>
+        <p>Compact map labels are shortened for readability. Added facilities are conceptual and need siting, environmental and engineering studies; any footprint that fails terrain or conflict screening is withheld from the view.</p>
+      </details>
+      {surfaceConceptView&&onSurfaceCompareSplit&&<label className="tanga-story-compare-range" htmlFor="tanga-terrain-comparison-split"><span>Wipe position · {Math.round(surfaceCompareSplit)}% concept</span><input id="tanga-terrain-comparison-split" type="range" min="8" max="92" step="1" value={Math.round(surfaceCompareSplit)} aria-label="Terrain comparison wipe position" aria-valuetext={`${Math.round(surfaceCompareSplit)} percent concept site`} onChange={event=>onSurfaceCompareSplit(Number(event.target.value))}/></label>}
+    </div>}
   </aside>;
 
   if (chapter === 'accessibility') return <aside className="tanga-story-panel tanga-story-panel--logistics" aria-label="Report development and export chain">
@@ -158,7 +204,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
         <p>{decision.detail}</p>
         <nav className="tanga-decision-links" aria-label={`${decision.title} supporting evidence`}>
           <a href={`/?v=1#${decision.chapter}`} target="_blank" rel="noreferrer">{decision.chapterLabel}<ArrowRight size={13}/></a>
-          <a href={decision.evidenceHref} target="_blank" rel="noreferrer">{decision.evidenceLabel}<ArrowRight size={13}/></a>
+          <details className="tanga-decision-source">
+            <summary>{decision.evidenceLabel}</summary>
+            <a href={decision.evidenceHref} target="_blank" rel="noreferrer">Open source evidence<ArrowRight size={13}/></a>
+          </details>
         </nav>
       </div>
     </li>)}</ol>

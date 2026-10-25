@@ -20,21 +20,29 @@ export type GraphitePeerProject = {
 };
 
 export type GraphitePeerEvidence = {
+  benchmarkDateLabel: string;
+  benchmarkCategoryLabel: string;
   dateLabel: string;
   href: string;
   sourceLabel: string;
   benchmarkHref?: string;
+  basisNote?: string;
 };
 
 const PUBLISHED_BENCHMARK_HREF = 'https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/';
 const EPANKO_MRE_HREF = 'https://www.ecograf.com.au/wp-content/uploads/2024/03/06_EGR_ASX_127-Increase-in-MRE_11-March-2024.pdf';
 const TANGA_MRE_HREF = '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf';
+const BENCHMARK_ROW_CONTEXT = {
+  benchmarkDateLabel: 'Published ranking · 7 Nov 2023',
+  benchmarkCategoryLabel: 'Not itemized by benchmark source',
+} as const;
 
-const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmarkHref'>> = {
+const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmarkHref' | 'benchmarkDateLabel' | 'benchmarkCategoryLabel'>> = {
   'Balama North / Nicanda Hill': {
     dateLabel: 'Primary MRE · September 2016 · 41.5 Mt Indicated',
-    href: 'https://announcements.asx.com.au/asxpdf/20161024/pdf/43c81t8hnq20t0.pdf',
+    href: 'https://announcements.asx.com.au/asxpdf/20160916/pdf/43b7x1brbmy40z.pdf',
     sourceLabel: 'Nicanda Hill 2016 MRE',
+    basisNote: 'Triton’s 2016 MRE reports 41.5 Mt Indicated (2015 comparison table: 41.51 Mt); the benchmark’s 41.7 Mt remains unreconciled.',
   },
   Sarytogan: {
     dateLabel: '2023 MRE · approximately 36 Mt Indicated contained',
@@ -57,9 +65,10 @@ const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmar
     sourceLabel: 'Siviour September 2023 MRE',
   },
   Epanko: {
-    dateLabel: 'Updated MRE · 11 March 2024 · 6.71 Mt Measured + Indicated contained',
+    dateLabel: 'Later MRE · 11 March 2024 · 6.71 Mt Measured + Indicated contained',
     href: EPANKO_MRE_HREF,
     sourceLabel: 'Epanko 2024 MRE',
+    basisNote: 'The historical chart retains 4.8 Mt from the 7 Nov 2023 benchmark. EcoGraf’s later 2024 MRE is linked as context and is not substituted into one row of the dated set.',
   },
   'La Loutre': {
     dateLabel: '2023 MRE · 2.969 Mt Indicated contained',
@@ -77,22 +86,23 @@ const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmar
     sourceLabel: 'Balama Central 2018 MRE summary',
   },
   Bunyu: {
-    dateLabel: 'Resource statement · 30 June 2022 · primary M&I check differs from 2.3 Mt benchmark',
-    href: 'https://announcements.asx.com.au/asxpdf/20230927/pdf/05vbgy3sdc39kk.pdf',
-    sourceLabel: 'Bunyu 2022 resource statement',
+    dateLabel: 'Stage 1 FS update · 14 Aug 2023 · ≈2.25 Mt contained M&I',
+    href: 'https://announcements.asx.com.au/asxpdf/20230814/pdf/05slswdzgwlddt.pdf',
+    sourceLabel: 'Bunyu Stage 1 MRE',
+    basisNote: 'The 2.3 Mt figure is consistent with the limited 2023 Stage 1 M&I subset (~2.25 Mt), not the broader global resource (~8.8 Mt M&I).',
   },
 };
 
 /** Trace the estimate used in the selected row without implying a current global census. */
 export function graphitePeerEvidence(project: Pick<GraphitePeerProject, 'project' | 'isTanga'>): GraphitePeerEvidence {
   if (project.isTanga) {
-    return {dateLabel: 'Final MRE · 19 Dec 2025', href: TANGA_MRE_HREF, sourceLabel: 'AMC Tanga MRE'};
+    return {benchmarkDateLabel: 'Tanga estimate · 19 Dec 2025', benchmarkCategoryLabel: 'Indicated', dateLabel: 'Final MRE · 19 Dec 2025 · 148 Mt Indicated', href: TANGA_MRE_HREF, sourceLabel: 'AMC Tanga MRE'};
   }
   const primarySource = PEER_PRIMARY_EVIDENCE[project.project];
   if (primarySource) {
-    return {...primarySource, benchmarkHref: PUBLISHED_BENCHMARK_HREF};
+    return {...BENCHMARK_ROW_CONTEXT, ...primarySource, benchmarkHref: PUBLISHED_BENCHMARK_HREF};
   }
-  return {dateLabel: 'Published benchmark · 7 Nov 2023', href: PUBLISHED_BENCHMARK_HREF, sourceLabel: 'Mining Intelligence / Costmine'};
+  return {...BENCHMARK_ROW_CONTEXT, dateLabel: 'No row-level primary estimate has been verified', href: PUBLISHED_BENCHMARK_HREF, sourceLabel: 'Mining Intelligence / Costmine'};
 }
 
 export const GRAPHITE_PEER_PROJECTS: GraphitePeerProject[] = [
@@ -199,16 +209,16 @@ export const GRAPHITE_PEER_PROJECTS: GraphitePeerProject[] = [
     owner: 'EcoGraf Ltd. with Government of Tanzania free-carried interest',
     listing: 'ASX: EGR',
     status: 'BFS / permitted',
-    resource: '6.7 Mt M&I contained graphite',
-    totalResource: '290.8 Mt at 7.2% TGC; 21.01 Mt contained graphite total.',
-    reportedContainedBasis: '6.7 Mt M&I contained graphite: 2.5 Mt Measured + 4.2 Mt Indicated',
+    resource: '4.8 Mt reported contained graphite',
+    totalResource: '2023 benchmark row: 4.8 Mt. Later 2024 MRE: 88.0 Mt M&I at 7.6% TGC; 6.71 Mt contained graphite.',
+    reportedContainedBasis: '4.8 Mt contained graphite reported in the 7 Nov 2023 benchmark',
     tgcGrade: 'Total 290.8 Mt @ 7.2% TGC',
     flakeDistribution: 'Concentrate sizing: 20.0% jumbo, 35.4% large, 30.3% medium, 7.4% small, 6.9% fines.',
     metallurgy: 'BFS-stage concentrate and downstream battery-anode testwork referenced.',
-    containedGraphiteMt: 6.7,
+    containedGraphiteMt: 4.8,
     lon: 36.61,
     lat: -8.54,
-    sourceLabel: 'Epanko MRE table: 21.01 Mt total; 6.7 Mt M&I contained graphite',
+    sourceLabel: 'Mining Intelligence 2023 peer ranking; later MRE linked in inspector',
   },
   {
     baselineRank: 7,

@@ -41,6 +41,33 @@ A fresh local production origin (`localhost:3011`) was opened directly at `#subs
 
 Eight large same-origin responses reported `Content-Length` headers totaling 37,523,709 bytes (37.5 MB): survey aerial 428,420; assay GeoJSON 4,874,074; terrain texture 6,242,357; terrain context 1,435,648; survey height 5,742,592; survey coverage 1,435,648; geological model GLB 12,517,520; lithology GeoJSON 4,847,450 bytes. The request was not bandwidth-throttled. These origin body sizes are not measured wire-transfer totals, and the resource timing API returned no encoded-size entries for these assets in this run. This single local sample exceeds the proposed 8-second 3D target and needs a repeat under the named network/device conditions before release decisions.
 
+## Cold-cache desktop chapter diagnostics — 24 October 2026
+
+An additional foreground Chromium run used the optimized local production server on `localhost:3020` at 1707 × 842. Before each chapter, the origin's Cache Storage and service-worker registrations were cleared; Playwright routed every request with `Cache-Control: no-cache` and `Pragma: no-cache` to bypass the browser HTTP cache. This run was unthrottled and on the same desktop environment listed above. For 3D chapters, readiness is the populated `.tanga-three__canvas[data-ready="true"]` signal; Metallurgy uses `.tanga-process-canvas[data-ready="true"]`. The six non-3D chapters use visible heading plus network quiet as a first-content proxy, not a visual-tile-ready signal. Transfer values sum Resource Timing `transferSize` entries after the readiness condition; browser timing does not include inaccessible cross-origin response sizes and is not a packet capture. RAF samples are short startup windows (1.0–1.8 s), not the planned 30-second orbit distribution.
+
+| Chapter | Signal | Signal time | Encoded transferSize | RAF median / p95 | Request failures |
+|---|---|---:|---:|---:|---|
+| Meet Tanga | Heading + network quiet | 2.56 s | 1.47 MB | 4.2 / 29.4 ms | 0 |
+| Place it on the map | Heading + network quiet | 3.91 s | 1.47 MB | 25.1 / 58.3 ms | 0 |
+| Work completed | Heading + network quiet | 1.34 s | 9.94 MB | 4.2 / 54.2 ms | 0 |
+| Read the landscape | Three.js ready | 2.91 s | 15.20 MB | 20.9 / 58.1 ms | 0 |
+| Follow a recorded hole | Three.js ready | 4.80 s | 45.19 MB | 8.3 / 129.3 ms | 0 |
+| Reveal the host rock | Three.js ready | 4.94 s | 39.07 MB | 16.7 / 70.7 ms | 0 |
+| Understand the model | Three.js ready | 16.22 s | 101.93 MB | 29.2 / 83.3 ms | 0 |
+| The global peer field | Heading + network quiet | 1.08 s | 1.19 MB | 29.1 / 104.2 ms | 0 |
+| Fit a concept to ground | Three.js ready | 13.53 s | 102.49 MB | — | 0 |
+| Examine the testwork | Factory canvas ready | 2.64 s | 1.70 MB | 12.4 / 54.1 ms | 0 |
+| Connect to the port | Heading + network quiet | 2.79 s | 1.50 MB | 24.9 / 75.0 ms | 1 aborted external ArcGIS tile request during chapter navigation |
+| Evidence to decisions | Heading + network quiet | 1.34 s | 1.42 MB | 45.8 / 175.0 ms | 0 |
+
+The map/story chapter signal is a content proxy; tile completion and screenshot focal quality are not implied. The aborted ArcGIS request was an in-flight external basemap tile when the next chapter replaced the page; it did not show an application error. Frame samples were taken immediately after entry with many other browser tabs open, so scheduling spikes and the high desktop p95 values are diagnostics rather than a controlled hardware comparison. Resource and Mine Planning are dominated by `/api/block-model`: one detailed cold Resource sample measured 75.64 MB encoded / 75.64 MB decoded in 8.83 s for that response alone. The measured cold transfer and readiness show that these two chapters still miss the intended 8-second 3D startup budget on this unthrottled local run. Captures are `.playwright-mcp/cold-desktop-*-measured-3020.png` and `.playwright-mcp/cold-desktop-*-ready-3020.png`.
+
+A separate read-only request to the public Vercel `/api/block-model` endpoint returned `200` with `Content-Encoding: gzip`; `curl` received 4,082,491 body bytes in 3.44 s. The local Next server used for the diagnostic is serving a Cloudflare-target build whose route intentionally leaves compression to the edge, explaining why its `transferSize` was 75.6 MB. This Vercel probe measures the API response only; the served UI revision was not verified as the current branch, and it is not a cold full-page chapter measurement.
+
+A fresh cache-bypassed browser entry to the public Vercel Resource chapter at 1707 × 842 reached `.tanga-three__canvas[data-ready="true"]` in 27.38 s with no failed requests. Resource Timing summed 14.77 MB transferred / 105.14 MB decoded across same-origin-visible entries. `/api/block-model` itself returned gzip, transferring 4.08 MB and decoding 75.64 MB in 2.54 s. The more than 20-second gap between the dominant response completing and the scene-ready marker indicates substantial post-download parse/scene work; this is an inference from timing, not a CPU profile. No browser JavaScript errors were recorded. Capture: `.playwright-mcp/cold-production-resource-vercel-bypass.png`. The Vercel page's build revision was not verified against this branch, so use this as a public deployment diagnostic, not branch acceptance.
+
+These results close only a repeatable local desktop diagnostic pass. They do not complete the cold-cache acceptance gate: full-device 30-second orbit distributions, a controlled network profile, named physical laptop/phone measurements, and hosted full-page chapter timing remain open. Do not infer a mobile result from the emulated viewport or report a local Next.js measurement as deployed Vercel/Cloudflare transfer behavior.
+
 ## Adaptive governor retest: 30-second desktop subsurface orbit
 
 After changing the resolution governor to inspect the 90-frame p90 rather than the mean, a foreground 1707 x 842 subsurface orbit collected 857 requestAnimationFrame intervals over 30 seconds. Median was 33.3 ms; p90 41.9 ms; p95 50.1 ms; p99 70.8 ms; one 962.3 ms outlier occurred; 59.3% of frames were at or below 33.4 ms. The governor stepped render scale from 1.00 down to 0.75. Console errors were zero; the browser continued to emit graphics-buffer warnings.

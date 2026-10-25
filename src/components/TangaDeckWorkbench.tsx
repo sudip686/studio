@@ -35,7 +35,14 @@ import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {MAPPED_SURFACE_UNITS} from '@/lib/deck/geology-palette';
 import {presentationBuild} from '@/lib/presentation-build';
-import {preloadDeckAssets, type DeckPreloadStage} from '@/lib/preload-deck-assets';
+import {
+  DECK_PRELOAD_ASSETS,
+  DECK_PRELOAD_ASSET_LABELS,
+  prepareDeckAssets,
+  preloadDeckAssets,
+  type DeckAssetPreparationItem,
+  type DeckPreloadStage,
+} from '@/lib/preload-deck-assets';
 import {
   type CameraAction,
   type CommandIntent,
@@ -57,6 +64,7 @@ const loadThreeSceneModule = () => import('./TangaThreeGeologyScene');
 // initial bundle and undo the dynamic split above.
 type LabelDensity = import('./TangaThreeGeologyScene').LabelDensity;
 type SceneAssayFacts = import('./TangaThreeGeologyScene').AssayFacts;
+type ThreeSceneRecoveryView = import('./TangaThreeGeologyScene').WebGlRecoveryView;
 
 /** Scenes where the drilling is on screen, so an intercept panel makes sense. */
 const INTERCEPT_PANEL_MODES = new Set<WorkbenchMode>(['drillholes', 'subsurface', 'resource']);
@@ -66,7 +74,7 @@ const DEPTH_BRACKET_MODES = new Set<WorkbenchMode>(['subsurface', 'resource', 'm
 
 /** Button and tooltip copy for each annotation-density tier. */
 const LABEL_DENSITY_COPY: Record<LabelDensity, {label: string; title: string}> = {
-  key: {label: 'Key labels', title: 'Key labels — callouts + top 3 intercepts'},
+  key: {label: 'Key labels', title: 'Key labels — story callouts + strongest intercept'},
   all: {label: 'All data labels', title: 'All data labels — every strong intercept that fits'},
   off: {label: 'Labels off', title: 'Labels off — clean stage'},
 };
@@ -96,7 +104,7 @@ type SceneLoadState = 'idle' | 'loading' | 'ready' | 'degraded' | 'error';
 type AssetQuality = 'preview' | 'standard' | 'high';
 type GraphitePeerProjectRow = ReturnType<typeof graphitePeerRows>[number];
 
-type ThreeCameraAction = 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
+type ThreeCameraAction = 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'revealPitBlocks' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
 
 const DEVELOPMENT_CAMERAS:Record<DevelopmentView,ThreeCameraAction>={overview:'developmentOverview',feed:'feedPoint',plant:'plantDetail',services:'siteServices',tailings:'tailingsView',waste:'wasteView',campus:'campusView'};
 
@@ -104,6 +112,7 @@ type ThreeCameraCommand = {
   id: number;
   action: ThreeCameraAction;
   degrees?: 90 | 180 | 360;
+  pitIndex?: number;
 };
 
 type ThreeLoadReport = {
@@ -120,6 +129,84 @@ type LoadStage = {
   state: SceneLoadState;
   detail: string;
 };
+
+type FallbackPreflightResult = {
+  mode: WorkbenchMode;
+  kind: '3D' | 'Map';
+  ok: boolean;
+  status: number | null;
+  contentType: string;
+  dimensions: string;
+};
+
+type ReadinessAsset = {label:string;path:string;required:boolean};
+type AssetReadinessResult = {mode:WorkbenchMode;checkedAt:string;items:Array<ReadinessAsset&{status:number|null;contentType:string;bytes:number|null;ok:boolean}>};
+type AllChapterAssetReadinessResult = {checkedAt:string;chapters:Array<{mode:WorkbenchMode;items:Array<ReadinessAsset&{status:number|null;contentType:string;bytes:number|null;ok:boolean}>}>};
+type DeckPreparationState = {running:boolean;cancelling:boolean;startedAt:string;completedAt:string|null;items:Record<string,DeckAssetPreparationItem>};
+
+const TERRAIN_READINESS_ASSETS:ReadinessAsset[]=[
+  {label:'Terrain metadata',path:'/terrain_hires_meta.json?v=registered-grid-v2',required:true},
+  {label:'Terrain elevation grid',path:'/terrain_context_512.bin?v=registered-grid-v2',required:true},
+  {label:'Survey elevation grid',path:'/survey_height_hires.bin?v=registered-grid-v2',required:true},
+  {label:'Survey coverage mask',path:'/survey_coverage_hires.bin?v=registered-grid-v2',required:true},
+];
+const TERRAIN_TEXTURE_READINESS_ASSET:ReadinessAsset={label:'Survey terrain imagery',path:'/terrain_texture_hires.jpg?v=survey-2026-10-21',required:true};
+const ASSAY_READINESS_ASSET:ReadinessAsset={label:'Assay intervals',path:'/assay_data.geojson',required:true};
+const LITHOLOGY_READINESS_ASSET:ReadinessAsset={label:'Lithology intervals',path:'/lithology_data.geojson',required:false};
+const CHAPTER_READINESS_ASSETS:Partial<Record<WorkbenchMode,ReadinessAsset[]>>={
+  project:[
+    {label:'Project boundary',path:'/generated/boundaries.geojson',required:true},
+    {label:'Surface roads',path:'/generated/roads.geojson',required:true},
+    {label:'Settlement labels',path:'/generated/labels.geojson',required:true},
+    {label:'Vegetation context',path:'/generated/trees.geojson',required:true},
+  ],
+  topography:[...TERRAIN_READINESS_ASSETS],
+  drillholes:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  subsurface:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Interpreted geology model',path:'/geologicalModel.glb',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  resource:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true}],
+  mine_planning:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  metallurgy:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+};
+
+function chapterReadinessText(stages?: LoadStage[]) {
+  if (!stages) return 'Not visited';
+  if (stages.some(stage => stage.state === 'error')) return 'Issue';
+  if (stages.some(stage => stage.state === 'loading')) return 'Loading';
+  if (stages.some(stage => stage.state === 'degraded')) return 'Fallback';
+  return stages.some(stage => stage.state === 'ready') ? 'Ready' : 'Standby';
+}
+
+function chapterReadinessDetail(stages?: LoadStage[]) {
+  if (!stages) return 'Not checked in this session';
+  return stages.map(stage => `${stage.label}: ${sceneStateText(stage.state)}`).join(' · ');
+}
+
+function preparationSize(bytes:number){
+  if(bytes<=0)return '0 B';
+  if(bytes<1_000_000)return `${Math.max(1,Math.round(bytes/1000))} KB`;
+  return `${(bytes/1_000_000).toFixed(1)} MB`;
+}
+
+const CHAPTER_READINESS_STORAGE_KEY='tanga:chapter-readiness:v1';
+function readChapterReadiness(raw:string|null):Partial<Record<WorkbenchMode,LoadStage[]>>{
+  if(!raw)return {};
+  try{
+    const parsed=JSON.parse(raw) as Record<string,unknown>;
+    const validModes=new Set(STORY_STEPS.map(step=>step.mode));
+    const validStates=new Set<SceneLoadState>(['idle','loading','ready','degraded','error']);
+    const result:Partial<Record<WorkbenchMode,LoadStage[]>>={};
+    for(const [mode,value] of Object.entries(parsed)){
+      if(!validModes.has(mode as WorkbenchMode)||!Array.isArray(value))continue;
+      const stages=value.filter((item):item is LoadStage=>Boolean(item&&typeof item==='object'
+        &&typeof (item as LoadStage).id==='string'
+        &&typeof (item as LoadStage).label==='string'
+        &&validStates.has((item as LoadStage).state)
+        &&typeof (item as LoadStage).detail==='string'));
+      if(stages.length===4)result[mode as WorkbenchMode]=stages;
+    }
+    return result;
+  }catch{return {};}
+}
 
 type DeckViewState = {
   longitude: number;
@@ -769,6 +856,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
   ],
   mine_planning: [
     {id: 'shell', label: 'Mine-plan overview', detail: 'Read the proposed site in its natural terrain setting', threeAction: 'siteOblique'},
+    {id: 'pit-blocks', label: 'Resource blocks in the pits', detail: 'Compare the source grade model inside both conceptual pit cutaways', threeAction: 'revealPitBlocks'},
     {id: 'north-pit', label: 'North pit', detail: 'Inspect the northern conceptual excavation', threeAction: 'northPit'},
     {id: 'south-pit', label: 'South pit', detail: 'Inspect the southern conceptual excavation', threeAction: 'southPit'},
     {id: 'waste',label: 'Waste-rock landform',detail:'Read illustrative benches and working areas',threeAction:'wasteView'},
@@ -898,9 +986,52 @@ const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: s
     note: 'Displayed resource model · saved scene view',
   },
   mine_planning: {
-    src: '/presentation-assets/tanga-fallback-mine-planning.jpg',
-    alt: 'Static view of the Tanga conceptual mine layout and illustrative site facilities.',
-    note: 'Conceptual mine layout · saved scene view',
+    src: '/presentation-assets/tanga-fallback-mine-planning.jpg?v=2026-10-24-1',
+    alt: 'Tanga terrain with two conceptual pit envelopes and proposed facility pads; no resource blocks are draped over the surface.',
+    note: 'Mine-plan terrain preview · saved scene view',
+  },
+};
+
+// A small, local reference image keeps map chapters presentable when the
+// shared MapLibre/DeckGL WebGL context is unavailable. These are source
+// illustrations, not cached map tiles; live labels and geometry return with
+// the renderer.
+const STATIC_MAP_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: string; note: string; fit?: 'cover' | 'contain'}>> = {
+  project: {
+    src: '/presentation-assets/survey-site-aerial.jpg',
+    alt: 'Survey aerial photographs of the Tanga project terrain.',
+    note: 'Survey-site reference · live map unavailable',
+    fit: 'cover',
+  },
+  tanzania: {
+    src: '/presentation-assets/mre-regional-geology.jpg',
+    alt: 'Regional geology map locating the Tanga Graphite Project in Tanzania.',
+    note: 'Regional report map · live map unavailable',
+    fit: 'contain',
+  },
+  work_completed: {
+    src: '/presentation-assets/metallurgy-samples.jpg',
+    alt: 'Photograph of Tanga project drill core used in completed study work.',
+    note: 'Project evidence reference · live map unavailable',
+    fit: 'cover',
+  },
+  ranking: {
+    src: '/presentation-assets/world-map-fallback.jpg',
+    alt: 'Static global reference map behind the dated graphite peer comparison.',
+    note: 'Global locator reference · live map unavailable',
+    fit: 'cover',
+  },
+  accessibility: {
+    src: '/presentation-assets/paulsam-conveyor-sites.jpg',
+    alt: 'PaulSam planning map showing the project boundary and report-drawn feed and conveyor context.',
+    note: 'PaulSam planning map · live map unavailable',
+    fit: 'contain',
+  },
+  comparison: {
+    src: '/presentation-assets/world-map-fallback.jpg',
+    alt: 'Static global reference map behind the evidence and next-decisions chapter.',
+    note: 'Global locator reference · live map unavailable',
+    fit: 'cover',
   },
 };
 
@@ -2183,6 +2314,7 @@ export default function TangaDeckWorkbench() {
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [mapLoadState, setMapLoadState] = useState<SceneLoadState>('loading');
+  const [mapFirstIdleMs,setMapFirstIdleMs]=useState<number|null>(null);
   // Bumped when the MapLibre instance becomes available, so memos that project
   // through it recompute once it exists.
   // The MapLibre instance itself, held in state rather than only in a ref.
@@ -2215,8 +2347,22 @@ export default function TangaDeckWorkbench() {
   useEffect(() => { if (activeMode === 'ranking') setPeerMreRevealed(false); }, [activeMode]);
   const [threeSceneRequested, setThreeSceneRequested] = useState(false);
   const [threeSceneRevision, setThreeSceneRevision] = useState(0);
+  const [threeSceneRecoveryView, setThreeSceneRecoveryView] = useState<ThreeSceneRecoveryView | null>(null);
   const [shareStatus, setShareStatus] = useState('');
+  const [fallbackPreflight, setFallbackPreflight] = useState<FallbackPreflightResult[] | null>(null);
+  const [fallbackPreflightRunning, setFallbackPreflightRunning] = useState(false);
+  const [assetReadiness, setAssetReadiness] = useState<AssetReadinessResult | null>(null);
+  const [assetReadinessRunning, setAssetReadinessRunning] = useState(false);
+  const [allChapterAssetReadiness, setAllChapterAssetReadiness] = useState<AllChapterAssetReadinessResult | null>(null);
+  const [allChapterAssetReadinessRunning, setAllChapterAssetReadinessRunning] = useState(false);
+  const [deckPreparation,setDeckPreparation]=useState<DeckPreparationState|null>(null);
+  const deckPreparationAbortRef=useRef<AbortController|null>(null);
+  const [chapterReadiness, setChapterReadiness] = useState<Partial<Record<WorkbenchMode, LoadStage[]>>>({});
+  const [chapterReadinessLoaded,setChapterReadinessLoaded]=useState(false);
+  const chapterReadinessHydratedRef=useRef(false);
   const [threeCameraCommand, setThreeCameraCommand] = useState<ThreeCameraCommand | null>(null);
+  const [pitBlockFocusIndex,setPitBlockFocusIndex]=useState<number|null>(null);
+  const [pitGradeFocus,setPitGradeFocus]=useState<string|null>(null);
   const threeCameraSequenceRef=useRef(0);
   const [selectedPeerProject, setSelectedPeerProject] = useState<GraphitePeerProjectRow | null>(null);
   const [stageSize, setStageSize] = useState({width: 1600, height: 950});
@@ -2454,6 +2600,10 @@ export default function TangaDeckWorkbench() {
     if (overrides.resourceFocus) setResourceFocus(overrides.resourceFocus);
     setActiveShotIndex(0);
     setThreeCameraCommand(null);
+    if (mode === 'topography') {
+      setThreeLoadReport({...DEFAULT_THREE_LOAD_REPORT, scene: 'loading', terrain: 'loading', message: 'Loading measured terrain'});
+      setStatusText('Three.js loading measured terrain');
+    }
     if (mode === 'subsurface') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'geologyPlan'});
     else if (mode === 'mine_planning') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'siteOblique'});
     setActiveMode(mode);
@@ -2489,9 +2639,10 @@ export default function TangaDeckWorkbench() {
     mode === 'drillholes' || mode === 'subsurface' || mode === 'resource' || mode === 'mine_planning' || mode === 'metallurgy'
   ), [activeMode]);
 
-  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360) => {
+  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360, pitIndex?: number) => {
     setThreeSceneRequested(true);
-    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees});
+    setPitBlockFocusIndex(action==='revealPitBlocks'?(pitIndex??null):null);
+    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees,pitIndex});
   }, []);
 
   const rotateNinety = useCallback(() => {
@@ -3166,6 +3317,9 @@ export default function TangaDeckWorkbench() {
     // after the first camera nudge.
     setMapInstance(event?.target ?? null);
     console.info(`[Tanga telemetry] map ready in ${Math.round(performance.now() - appStartedAtRef.current)}ms`);
+    const markFirstIdle=()=>setMapFirstIdleMs(Math.round(performance.now()-appStartedAtRef.current));
+    if(typeof event?.target?.once==='function')event.target.once('idle',markFirstIdle);
+    else requestAnimationFrame(()=>requestAnimationFrame(markFirstIdle));
   }, [disableNativeTerrain]);
   // The deck stage is mounted behind the intro gate and the cover, so the map
   // initialises into a container with no measurable size. MapLibre then falls
@@ -3279,10 +3433,31 @@ export default function TangaDeckWorkbench() {
     };
   }, [mapInstance]);
 
-  const handleMapError = useCallback(() => {
-    setMapLoadState('degraded');
-    console.info('[Tanga telemetry] map entered degraded state; DeckGL overlays remain available');
-  }, []);
+  const handleMapError = useCallback((event?: any) => {
+    const message = String(event?.error?.message ?? event?.error ?? '');
+    const fatal = !mapInstance || /webgl|context.{0,12}lost|failed to initialize/i.test(message);
+    setMapLoadState(fatal ? 'error' : 'degraded');
+    console.info(`[Tanga telemetry] map entered ${fatal ? 'fallback' : 'degraded'} state; evidence and chapter controls remain available`);
+  }, [mapInstance]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+    const map = mapInstance as any;
+    const onContextLost = () => {
+      setMapLoadState('error');
+      console.info('[Tanga telemetry] map WebGL context lost; showing the chapter reference still');
+    };
+    const onContextRestored = () => {
+      setMapLoadState('ready');
+      console.info('[Tanga telemetry] map WebGL context restored; returning to the live map');
+    };
+    map.on('webglcontextlost', onContextLost);
+    map.on('webglcontextrestored', onContextRestored);
+    return () => {
+      map.off?.('webglcontextlost', onContextLost);
+      map.off?.('webglcontextrestored', onContextRestored);
+    };
+  }, [mapInstance]);
   const markUiInteraction = useCallback(() => {
     uiInteractionUntilRef.current = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + 450;
   }, []);
@@ -3426,12 +3601,18 @@ export default function TangaDeckWorkbench() {
         : activeMode === 'subsurface'
           ? 'resource'
           : null;
+  // Prioritize the current chapter's first useful 3D frame. Assay/lithology
+  // payloads are sizable and can compete with measured-terrain startup when
+  // a viewer opens Topography directly; they still warm during that chapter
+  // as soon as its scene has settled.
+  const nextPreloadSceneReady = activeMode !== 'topography' || threeLoadReport.scene === 'ready';
   useEffect(() => {
-    if (!nextPreloadStage) return;
+    if (!nextPreloadStage || !nextPreloadSceneReady) return;
     let idleHandle: number | null = null;
     let timerHandle: number | null = null;
     let cancelled = false;
-    const start = () => { if (!cancelled) void preloadDeckAssets(nextPreloadStage); };
+    const controller = new AbortController();
+    const start = () => { if (!cancelled) void preloadDeckAssets(nextPreloadStage,controller.signal); };
     const browserWindow = window as Window & typeof globalThis & {
       requestIdleCallback?: (callback: () => void, options?: {timeout?: number}) => number;
       cancelIdleCallback?: (handle: number) => void;
@@ -3445,8 +3626,12 @@ export default function TangaDeckWorkbench() {
       cancelled = true;
       if (idleHandle !== null) browserWindow.cancelIdleCallback?.(idleHandle);
       if (timerHandle !== null) window.clearTimeout(timerHandle);
+      // Give the destination chapter a short mount window to subscribe to an
+      // in-flight preload before releasing its final consumer. If no scene
+      // joins during the handoff, the controller still cancels the request.
+      window.setTimeout(() => controller.abort(), 900);
     };
-  }, [nextPreloadStage]);
+  }, [nextPreloadSceneReady, nextPreloadStage]);
 
   const layers = useMemo(() => {
     const showGraphitePeers = activeMode === 'comparison' && isExploreMode;
@@ -4242,6 +4427,31 @@ export default function TangaDeckWorkbench() {
     threeSceneRequested,
     voiceStageState,
   ]);
+  const currentLoaderIssue = loadStages.some(stage => stage.state === 'error' || stage.state === 'degraded');
+  const currentLoaderPending = loadStages.some(stage => stage.state === 'loading');
+  useEffect(() => {
+    try{setChapterReadiness(readChapterReadiness(window.sessionStorage.getItem(CHAPTER_READINESS_STORAGE_KEY)));}
+    catch{setChapterReadiness({});}
+    finally{chapterReadinessHydratedRef.current=true;setChapterReadinessLoaded(true);}
+  },[]);
+  useEffect(() => {
+    if(!chapterReadinessLoaded)return;
+    try{window.sessionStorage.setItem(CHAPTER_READINESS_STORAGE_KEY,JSON.stringify(chapterReadiness));}catch{}
+  },[chapterReadiness,chapterReadinessLoaded]);
+  useEffect(() => {
+    const timer=window.setTimeout(() => {
+      if (!chapterReadinessHydratedRef.current || readHashScene() !== activeMode || loadStages.every(stage => stage.state === 'idle')) return;
+      setChapterReadiness(current => {
+        const previous = current[activeMode];
+        const unchanged = previous?.length === loadStages.length && previous.every((stage, index) => {
+          const next = loadStages[index];
+          return stage.id === next.id && stage.state === next.state && stage.detail === next.detail;
+        });
+        return unchanged ? current : {...current, [activeMode]: loadStages};
+      });
+    },0);
+    return () => window.clearTimeout(timer);
+  }, [activeMode, loadStages]);
   // Measured relief for the project tile. Both the topography panel and the
   // terrain callout read from this, so the deck can only ever state one
   // elevation range — previously they disagreed by a factor of two.
@@ -4332,7 +4542,8 @@ export default function TangaDeckWorkbench() {
       const panelSelector = [
         '.tanga-deck__chapter-title', '.tanga-deck__explore-toggle', '.tanga-deck__data-panel',
         '.tanga-deck__layers', '.tanga-story-panel', '.tanga-geology-surface-legend',
-        '.tanga-deck__pager', '.tanga-evidence-sequence', '.tanga-deck__planning-note',
+        '.tanga-deck__pager', '.tanga-evidence-sequence', '.tanga-deck__planning-note', '.tanga-story-cue',
+        '.tanga-deck__route-profile',
       ].join(',');
       document.querySelectorAll<HTMLElement>(panelSelector).forEach((element) => {
         if (element.closest('.tanga-deck') !== stageRef.current) return;
@@ -4348,7 +4559,7 @@ export default function TangaDeckWorkbench() {
     // overlay panels have mounted or returned measurable bounds.
     keepOutRects.push(
       {x:0,y:0,width:stageSize.width,height:145},
-      {x:0,y:stageSize.height-132,width:stageSize.width,height:132},
+      {x:0,y:stageSize.height-180,width:stageSize.width,height:180},
     );
     const primaryIds = new Set(['project','aoi','relief','route','comparison']);
     const candidates = anchored.map((callout, index) => ({
@@ -4639,16 +4850,17 @@ export default function TangaDeckWorkbench() {
   const isFirstStory = activeStoryIndex <= 0 && activeShotIndex <= 0;
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1 && activeShotIndex >= activeShots.length - 1;
 
-  // Prefetch the Three.js scene chunk once the user is a few scenes in (but
-  // before the first 3D scene), so arriving at it is instant. Idle-scheduled so
-  // it never competes with the current scene's work.
+  // Prefetch the Three.js scene chunk before the first 3D scene. An unbounded
+  // idle callback can starve while the map is streaming tiles, leaving a large
+  // scene import to start at the same time as the first 3D chapter. The timeout
+  // preserves idle-first scheduling but guarantees the download gets underway.
   useEffect(() => {
-    if (threeSceneRequested || activeStoryIndex < 3) return;
-    const w = window as unknown as {requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void};
+    if (threeSceneRequested || activeStoryIndex < 2) return;
+    const w = window as unknown as {requestIdleCallback?: (cb: () => void, options?: {timeout: number}) => number; cancelIdleCallback?: (id: number) => void};
     let idle: number | undefined;
     let timer: number | undefined;
     const warm = () => { void loadThreeSceneModule(); };
-    if (w.requestIdleCallback) idle = w.requestIdleCallback(warm);
+    if (w.requestIdleCallback) idle = w.requestIdleCallback(warm, {timeout: 1200});
     else timer = window.setTimeout(warm, 500);
     return () => {
       if (idle !== undefined && w.cancelIdleCallback) w.cancelIdleCallback(idle);
@@ -4852,6 +5064,124 @@ export default function TangaDeckWorkbench() {
     }
     window.setTimeout(() => setShareStatus(''), 3200);
   }, [activeMode, activeShareViewId, activeShotIndex, selectedPeerKey, selectedGeologyUnit, sharedLayers, hiddenGeologyUnits]);
+  const runFallbackPreflight = useCallback(async () => {
+    if (fallbackPreflightRunning) return;
+    setFallbackPreflightRunning(true);
+    const entries = [
+      ...(Object.keys(STATIC_SCENE_FALLBACKS) as WorkbenchMode[]).flatMap(mode => {
+        const fallback = STATIC_SCENE_FALLBACKS[mode];
+        return fallback ? [[mode, '3D' as const, fallback] as const] : [];
+      }),
+      ...(Object.keys(STATIC_MAP_FALLBACKS) as WorkbenchMode[]).flatMap(mode => {
+        const fallback = STATIC_MAP_FALLBACKS[mode];
+        return fallback ? [[mode, 'Map' as const, fallback] as const] : [];
+      }),
+    ];
+    const results = await Promise.all(entries.map(async ([mode, kind, fallback]) => {
+      try {
+        const response = await fetch(assetUrl(fallback.src), {method:'HEAD', cache:'no-store'});
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!response.ok || !contentType.startsWith('image/')) {
+          return {mode, kind, ok:false, status:response.status, contentType, dimensions:''};
+        }
+        const dimensions = await new Promise<string>((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => image.naturalWidth > 0 && image.naturalHeight > 0
+            ? resolve(`${image.naturalWidth} × ${image.naturalHeight}`)
+            : reject(new Error('Image decoded without dimensions'));
+          image.onerror = () => reject(new Error('Image could not be decoded'));
+          image.src = assetUrl(fallback.src);
+        });
+        return {mode, kind, ok:true, status:response.status, contentType, dimensions};
+      } catch {
+        return {mode, kind, ok:false, status:null, contentType:'', dimensions:''};
+      }
+    }));
+    setFallbackPreflight(results);
+    setFallbackPreflightRunning(false);
+  }, [fallbackPreflightRunning]);
+  const runChapterAssetPreflight = useCallback(async () => {
+    const assets=CHAPTER_READINESS_ASSETS[activeMode];
+    if(!assets?.length||assetReadinessRunning)return;
+    setAssetReadinessRunning(true);
+    const items=await Promise.all(assets.map(async asset=>{
+      let timer:number|undefined;
+      try{
+        const controller=new AbortController();
+        timer=window.setTimeout(()=>controller.abort(),10000);
+        const response=await fetch(assetUrl(asset.path),{method:'HEAD',cache:'no-store',signal:controller.signal});
+        const contentLength=response.headers.get('content-length');
+        return {...asset,status:response.status,contentType:response.headers.get('content-type')??'',bytes:contentLength?Number(contentLength):null,ok:response.ok};
+      }catch{
+        return {...asset,status:null,contentType:'',bytes:null,ok:false};
+      }finally{
+        if(timer!==undefined)window.clearTimeout(timer);
+      }
+    }));
+    setAssetReadiness({mode:activeMode,checkedAt:new Date().toISOString(),items});
+    setAssetReadinessRunning(false);
+  },[activeMode,assetReadinessRunning]);
+  const runAllChapterAssetPreflight = useCallback(async () => {
+    if(allChapterAssetReadinessRunning)return;
+    setAllChapterAssetReadinessRunning(true);
+    const chapterAssets=STORY_STEPS.map(step=>({mode:step.mode,assets:CHAPTER_READINESS_ASSETS[step.mode]??[]}));
+    const uniqueAssets=new globalThis.Map<string,ReadinessAsset>();
+    chapterAssets.forEach(({assets})=>assets.forEach(asset=>{
+      const current=uniqueAssets.get(asset.path);
+      uniqueAssets.set(asset.path,current?{...current,required:current.required||asset.required}:asset);
+    }));
+    const checkedAssets=await Promise.all([...uniqueAssets.values()].map(async asset=>{
+      let timer:number|undefined;
+      try{
+        const controller=new AbortController();
+        timer=window.setTimeout(()=>controller.abort(),10000);
+        const response=await fetch(assetUrl(asset.path),{method:'HEAD',cache:'no-store',signal:controller.signal});
+        const contentLength=response.headers.get('content-length');
+        return {path:asset.path,status:response.status,contentType:response.headers.get('content-type')??'',bytes:contentLength?Number(contentLength):null,ok:response.ok};
+      }catch{
+        return {path:asset.path,status:null,contentType:'',bytes:null,ok:false};
+      }finally{
+        if(timer!==undefined)window.clearTimeout(timer);
+      }
+    }));
+    const resultsByPath=new globalThis.Map(checkedAssets.map(result=>[result.path,result]));
+    const chapters=chapterAssets.map(({mode,assets})=>({mode,items:assets.map(asset=>({...asset,...resultsByPath.get(asset.path)!}))}));
+    setAllChapterAssetReadiness({checkedAt:new Date().toISOString(),chapters});
+    setAllChapterAssetReadinessRunning(false);
+  },[allChapterAssetReadinessRunning]);
+
+  const prepareAllDeckAssets = useCallback(async () => {
+    if(deckPreparation?.running)return;
+    const controller=new AbortController();
+    deckPreparationAbortRef.current=controller;
+    const startedAt=new Date().toISOString();
+    const initialItems=Object.entries(DECK_PRELOAD_ASSETS).flatMap(([stage,stagePaths])=>
+      stagePaths.map(path=>[path,{stage:stage as DeckPreloadStage,path,status:'not-prepared',bytes:0} satisfies DeckAssetPreparationItem] as const)
+    );
+    setDeckPreparation({
+      running:true,
+      cancelling:false,
+      startedAt,
+      completedAt:null,
+      items:Object.fromEntries(initialItems),
+    });
+    try{
+      await prepareDeckAssets(item=>{
+        setDeckPreparation(current=>current?{...current,items:{...current.items,[item.path]:item}}:current);
+      },controller.signal);
+    }finally{
+      if(deckPreparationAbortRef.current===controller)deckPreparationAbortRef.current=null;
+      setDeckPreparation(current=>current?{...current,running:false,cancelling:false,completedAt:new Date().toISOString()}:current);
+    }
+  },[deckPreparation?.running]);
+
+  const cancelDeckAssetPreparation=useCallback(()=>{
+    if(!deckPreparationAbortRef.current)return;
+    setDeckPreparation(current=>current?{...current,cancelling:true}:current);
+    deckPreparationAbortRef.current.abort();
+  },[]);
+
+  useEffect(()=>()=>deckPreparationAbortRef.current?.abort(),[]);
 
   const toggleMappedGeologyUnit=useCallback((label:string)=>{
     const hiding=!hiddenGeologyUnits.includes(label);
@@ -4951,7 +5281,7 @@ export default function TangaDeckWorkbench() {
     : (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
   // Annotation density, cycled with Ctrl+A:
-  //   key → authored scene callouts plus the three strongest drill intercepts
+  //   key → authored scene callouts plus the strongest anchored drill intercept
   //   all → the dense data-label view, for detailed questions
   //   off → a clean stage for photography/screenshotting
   // Three tiers rather than a boolean, because the useful density for a
@@ -5377,6 +5707,10 @@ export default function TangaDeckWorkbench() {
       )}
       data-act={MODE_ACT[activeMode]}
       data-mode={activeMode}
+      data-map-state={mapLoadState}
+      data-map-first-idle-ms={mapFirstIdleMs ?? undefined}
+      data-three-state={threeLoadReport.scene}
+      data-three-load-ms={threeLoadReport.elapsedMs ?? undefined}
       onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
       onPointerDownCapture={event => { setIsAutoplay(false); setIsExecutiveTour(false); if(!(event.target as Element).closest('.tanga-presentation-tools')) { const tools=stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');if(tools)tools.open=false; } }}
       data-testid="tanga-deck-workbench"
@@ -5436,6 +5770,8 @@ export default function TangaDeckWorkbench() {
           rotationKey={0}
           cameraDropKey={0}
           cameraCommand={threeCameraCommand}
+          recoveryView={threeSceneRecoveryView}
+          onRecoveryViewChange={setThreeSceneRecoveryView}
           assetQuality={assetQuality}
           onLoadState={handleThreeLoadState}
           onRetry={() => { setThreeCameraCommand(null); setThreeLoadReport(DEFAULT_THREE_LOAD_REPORT); setThreeSceneRevision((revision) => revision + 1); }}
@@ -5445,6 +5781,7 @@ export default function TangaDeckWorkbench() {
           onGeologyLegendMount={setGeologyLegendMount}
           labelDensity={labelDensity}
           layerSettings={layerSettings}
+          pitGradeFocus={pitGradeFocus}
           terrainCompare={{enabled: surfaceConceptView, split: surfaceCompareSplit}}
           onTerrainCompareSplit={setSurfaceCompareSplit}
           inspectionMode={isExploreMode}
@@ -5454,10 +5791,17 @@ export default function TangaDeckWorkbench() {
         />
       )}
 
-      {threeVisible && threeLoadReport.scene === 'error' && STATIC_SCENE_FALLBACKS[activeMode] && (
-        <figure className="tanga-deck__static-scene-fallback" aria-label={`${MODE_LABELS[activeMode]} static scene fallback`}>
+      {threeVisible && (threeLoadReport.scene === 'loading' || threeLoadReport.scene === 'error') && STATIC_SCENE_FALLBACKS[activeMode] && (
+        <figure className={`tanga-deck__static-scene-fallback${threeLoadReport.scene === 'loading' ? ' is-loading' : ''}`} aria-label={`${MODE_LABELS[activeMode]} static scene preview`} aria-live="polite">
           <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
-          <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> 3D unavailable</figcaption>
+          <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> {threeLoadReport.scene === 'loading' ? 'Interactive 3D loading' : '3D unavailable'}</figcaption>
+        </figure>
+      )}
+
+      {!threeVisible && !isCoverScene && mapLoadState === 'error' && STATIC_MAP_FALLBACKS[activeMode] && (
+        <figure className={`tanga-deck__static-map-fallback is-${STATIC_MAP_FALLBACKS[activeMode]!.fit ?? 'contain'}`} aria-label={`${MODE_LABELS[activeMode]} static map reference`} aria-live="polite">
+          <img src={STATIC_MAP_FALLBACKS[activeMode]!.src} alt={STATIC_MAP_FALLBACKS[activeMode]!.alt} />
+          <figcaption>{STATIC_MAP_FALLBACKS[activeMode]!.note} <span>·</span> The interactive map is retrying</figcaption>
         </figure>
       )}
 
@@ -6080,7 +6424,7 @@ export default function TangaDeckWorkbench() {
             </div>
           )}
         </div>
-        <details key={activeMode} className="tanga-presentation-tools" onClick={event=>{if((event.target as Element).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
+        <details key={activeMode} className="tanga-presentation-tools" onClick={event=>{const target=event.target as Element;if(target.closest('button')&&!target.closest('.tanga-presentation-tools__readiness'))event.currentTarget.open=false;}} onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape')event.currentTarget.open=false;}}>
           <summary aria-label="Presentation tools" title="Presentation tools"><Layers size={16}/><span>Tools</span></summary>
           <div className="tanga-presentation-tools__grid">
         <section className="tanga-tour-mobile" aria-label="Guided presentation">
@@ -6103,6 +6447,144 @@ export default function TangaDeckWorkbench() {
           <p>Timing applies to chapter playback. The full story follows authored timings.</p>
         </section>
         <button type="button" className="tanga-deck__pager-btn tanga-deck__pager-btn--tool" onClick={copyCurrentView} aria-label="Copy link to this view" title="Copy a link to this chapter and authored view"><Copy size={16} strokeWidth={2.2}/></button>
+        <details className="tanga-presentation-tools__readiness">
+          <summary><strong>Presenter readiness</strong><span>Current view and fallback check</span></summary>
+          <div className="tanga-presentation-tools__readiness-body">
+            <p>This reports loader states for the current view. Open other chapters once to check their data; this does not certify offline map coverage.</p>
+            <div className={`tanga-presentation-tools__readiness-summary${currentLoaderIssue?' is-issue':currentLoaderPending?' is-pending':' is-clear'}`}>
+              <strong>{currentLoaderIssue?'Current view needs attention':currentLoaderPending?'Current view is still loading':'No active loader errors for this view'}</strong>
+              <span>{MODE_LABELS[activeMode]} · build {presentationBuild.revision} · {presentationBuild.target}</span>
+            </div>
+            <ul className="tanga-presentation-tools__readiness-stages" aria-label="Current view loader states">
+              {loadStages.map(stage=><li key={stage.id} className={`is-${stage.state}`}><span><i aria-hidden="true"/>{stage.label}</span><strong>{sceneStateText(stage.state)}</strong><small>{stage.detail}</small></li>)}
+            </ul>
+            <section className="tanga-presentation-tools__asset-check" aria-label="Required chapter data files">
+              <div className="tanga-presentation-tools__asset-check-head">
+                <div><strong>Chapter data files</strong><span>Same-origin availability for {MODE_LABELS[activeMode]}.</span></div>
+                {Boolean(CHAPTER_READINESS_ASSETS[activeMode]?.length)&&<button type="button" onClick={runChapterAssetPreflight} disabled={assetReadinessRunning}>
+                  <RotateCw size={13} aria-hidden="true" className={assetReadinessRunning?'is-spinning':''}/>
+                  {assetReadinessRunning?'Checking…':'Check files'}
+                </button>}
+              </div>
+              {CHAPTER_READINESS_ASSETS[activeMode]?.length ? <>
+                <ul className="tanga-presentation-tools__asset-results" aria-live="polite">
+                  {CHAPTER_READINESS_ASSETS[activeMode]!.map(asset=>{
+                    const result=assetReadiness?.mode===activeMode?assetReadiness.items.find(item=>item.path===asset.path):undefined;
+                    const state=!result?'not-checked':result.ok?'available':asset.required?'missing':'optional-missing';
+                    const size=result?.bytes==null?'':result.bytes<1_000_000?` · ${Math.max(1,Math.round(result.bytes/1000))} KB`:` · ${(result.bytes/1_000_000).toFixed(1)} MB`;
+                    const detail=!result?'Not checked':result.ok?`HTTP ${result.status}${size}`:result.status?`HTTP ${result.status}`:'Request failed';
+                    return <li key={asset.path} className={`is-${state}`}><span>{asset.label}{!asset.required&&<small> · supporting</small>}</span><strong>{detail}</strong></li>;
+                  })}
+                </ul>
+                {assetReadiness?.mode===activeMode&&<p className={`tanga-presentation-tools__asset-summary${assetReadiness.items.some(item=>item.required&&!item.ok)?' is-issue':''}`}>{assetReadiness.items.filter(item=>item.required&&item.ok).length} / {assetReadiness.items.filter(item=>item.required).length} required files available{assetReadiness.items.some(item=>item.required&&!item.ok)?' · missing files need attention':''}. Checked {new Date(assetReadiness.checkedAt).toLocaleTimeString()}.</p>}
+                <p>HEAD requests check availability and headers only; model data is not downloaded or decoded. Supporting files can be absent without blocking the chapter. Live map tiles are not included.</p>
+              </> : <p>This chapter has no registered standalone model-file check. Its map tiles load for the current extent, and chapter content may load on demand.</p>}
+            </section>
+            <details className="tanga-presentation-tools__chapter-coverage">
+              <summary><strong>Chapter coverage</strong><span>{Object.keys(chapterReadiness).length} / {STORY_STEPS.length} visited</span></summary>
+              <button type="button" className="tanga-presentation-tools__chapter-reset" onClick={()=>setChapterReadiness({})}>Clear session checks</button>
+              <ol aria-label="Observed chapter loader states">
+                {STORY_STEPS.map(step=>{
+                  const stages=chapterReadiness[step.mode];
+                  const state=chapterReadinessText(stages);
+                  return <li key={step.mode} className={`is-${state.toLowerCase().replace(/\s+/g,'-')}`}>
+                    <span>{step.act} · {MODE_LABELS[step.mode]}</span><strong>{state}</strong>
+                    <small>{chapterReadinessDetail(stages)}</small>
+                  </li>;
+                })}
+              </ol>
+              <p>States are collected as you visit chapters in this session. Ready means the observed loaders reported no failure; assets that remain on demand may still be in standby.</p>
+              <section className="tanga-presentation-tools__all-asset-check" aria-label="All chapter asset availability">
+                <div className="tanga-presentation-tools__asset-check-head">
+                  <div><strong>All chapter files</strong><span>Same-origin files registered for all 12 chapters.</span></div>
+                  <button type="button" onClick={runAllChapterAssetPreflight} disabled={allChapterAssetReadinessRunning}>
+                    <RotateCw size={13} aria-hidden="true" className={allChapterAssetReadinessRunning?'is-spinning':''}/>
+                    {allChapterAssetReadinessRunning?'Checking…':'Check all files'}
+                  </button>
+                </div>
+                {allChapterAssetReadiness&&<>
+                  {(()=>{
+                    const items=allChapterAssetReadiness.chapters.flatMap(chapter=>chapter.items);
+                    const required=items.filter(item=>item.required);
+                    const available=required.filter(item=>item.ok).length;
+                    const missing=required.length-available;
+                    return <p className={`tanga-presentation-tools__asset-summary${missing?' is-issue':''}`} aria-live="polite">{available} / {required.length} required files available across {allChapterAssetReadiness.chapters.length} chapters{missing?` · ${missing} missing`:''}. Checked {new Date(allChapterAssetReadiness.checkedAt).toLocaleTimeString()}.</p>;
+                  })()}
+                  <div className="tanga-presentation-tools__asset-chapters" aria-live="polite">
+                    {allChapterAssetReadiness.chapters.map(chapter=>{
+                      const required=chapter.items.filter(item=>item.required);
+                      const available=required.filter(item=>item.ok).length;
+                      const status=chapter.items.length?`${available}/${required.length} required`:'No standalone files';
+                      return <details key={chapter.mode}>
+                        <summary><strong>{MODE_LABELS[chapter.mode]}</strong><span>{status}</span></summary>
+                        {chapter.items.length?<ul className="tanga-presentation-tools__asset-results">
+                          {chapter.items.map(asset=>{
+                            const state=asset.ok?'is-available':asset.required?'is-missing':'is-optional-missing';
+                            const size=asset.bytes==null?'':asset.bytes<1_000_000?` · ${Math.max(1,Math.round(asset.bytes/1000))} KB`:` · ${(asset.bytes/1_000_000).toFixed(1)} MB`;
+                            const detail=asset.ok?`HTTP ${asset.status}${size}`:asset.status?`HTTP ${asset.status}`:'Request failed';
+                            return <li key={asset.path} className={state}><span>{asset.label}{!asset.required&&<small> · supporting</small>}</span><strong>{detail}</strong></li>;
+                          })}
+                        </ul>:<p>No standalone files are registered for this chapter. Live map tiles and on-demand services are outside this file check.</p>}
+                      </details>;
+                    })}
+                  </div>
+                  <p>Checks availability and headers only; no files are downloaded or decoded. Live map tiles, voice services and full offline coverage are not certified.</p>
+                </>}
+              </section>
+            </details>
+            <section className="tanga-presentation-tools__all-asset-check" aria-label="Prepare 3D presentation data">
+              <div className="tanga-presentation-tools__asset-check-head">
+                <div><strong>Prepare 3D sequence data</strong><span>{Object.values(DECK_PRELOAD_ASSETS).flat().length} source files · four scene stages</span></div>
+                {deckPreparation?.running
+                  ? <button type="button" onClick={cancelDeckAssetPreparation}>Cancel preparation</button>
+                  : <button type="button" onClick={prepareAllDeckAssets}>
+                    <RotateCw size={13} aria-hidden="true"/>
+                    {deckPreparation?.completedAt?'Prepare again':'Prepare assets'}
+                  </button>}
+              </div>
+              <p>Fetches the registered 3D scene data into the app’s 24-hour best-effort browser cache when storage permits; this may use up to about 119 MB. Browser storage may evict files. Live map tiles, voice services and full offline use are not included.</p>
+              {deckPreparation&&(()=>{
+                const items=Object.values(deckPreparation.items);
+                const cached=items.filter(item=>item.status==='cached').length;
+                const loaded=items.filter(item=>item.status==='loaded-not-cached').length;
+                const failed=items.filter(item=>item.status==='failed'&&item.path!=='/lithology_data.geojson').length;
+                const optionalMissing=items.filter(item=>item.status==='failed'&&item.path==='/lithology_data.geojson').length;
+                const active=items.find(item=>item.status==='preparing');
+                const bytes=items.reduce((sum,item)=>sum+item.bytes,0);
+                const countLabel=deckPreparation.running
+                  ? `${items.filter(item=>['cached','loaded-not-cached','failed'].includes(item.status)).length} / ${items.length} files processed`
+                  : deckPreparation.completedAt
+                    ? `${cached} cached${loaded?` · ${loaded} fetched but not retained`:''}${failed?` · ${failed} required failed`:''}${optionalMissing?' · optional lithology unavailable':''}`
+                    : 'Not prepared in this session';
+                return <>
+                  <p className={`tanga-presentation-tools__asset-summary${failed?' is-issue':''}`} aria-live="polite">
+                    {countLabel} · {preparationSize(bytes)} read{active?` · ${DECK_PRELOAD_ASSET_LABELS[active.path]??active.path}`:''}{deckPreparation.cancelling?' · cancelling after the current request':''}
+                  </p>
+                  <ul className="tanga-presentation-tools__asset-results" aria-live="polite">
+                    {Object.entries(DECK_PRELOAD_ASSETS).flatMap(([stage,paths])=>paths.map(path=>{
+                      const item=deckPreparation.items[path];
+                      const optional=path==='/lithology_data.geojson';
+                      const state=item.status==='cached'?'available':item.status==='loaded-not-cached'?'loaded':item.status==='failed'?(optional?'optional-missing':'missing'):item.status==='preparing'?'preparing':item.status==='cancelled'?'cancelled':'not-checked';
+                      const status=item.status==='cached'?`Cached · ${preparationSize(item.bytes)}`:item.status==='loaded-not-cached'?`Fetched · ${preparationSize(item.bytes)}`:item.status==='preparing'?`Fetching · ${preparationSize(item.bytes)}`:item.status==='failed'?`Failed · ${item.error??'request error'}`:item.status==='cancelled'?'Cancelled':item.status==='not-prepared'?'Not prepared':'Not started';
+                      return <li key={`${stage}-${path}`} className={`is-${state}`}><span>{DECK_PRELOAD_ASSET_LABELS[path]??path}<small> · {MODE_LABELS[stage as WorkbenchMode]??stage}</small></span><strong>{status}</strong></li>;
+                    }))}
+                  </ul>
+                </>;
+              })()}
+            </section>
+            <section className="tanga-presentation-tools__fallback-check" aria-label="Saved scene and map fallback image check">
+              <div><strong>Saved scene and map fallback images</strong><span>Five 3D stills and six map references for renderer recovery.</span></div>
+              <button type="button" onClick={runFallbackPreflight} disabled={fallbackPreflightRunning}>
+                <RotateCw size={13} aria-hidden="true" className={fallbackPreflightRunning?'is-spinning':''}/>
+                {fallbackPreflightRunning?'Checking images…':'Check 11 images'}
+              </button>
+            </section>
+            {fallbackPreflight && <ul className="tanga-presentation-tools__fallback-results" aria-live="polite">
+              {fallbackPreflight.map(result=><li key={`${result.kind}-${result.mode}`} className={result.ok?'is-ready':'is-missing'}><span>{MODE_LABELS[result.mode]} · {result.kind}</span><strong>{result.ok?`Decoded · ${result.dimensions}`:result.status?`Missing · HTTP ${result.status}`:'Unavailable'}</strong></li>)}
+            </ul>}
+            <p className="tanga-presentation-tools__readiness-note">A valid still keeps the chapter usable during scene loading or renderer recovery. Map references do not replace live tiles or georeferenced overlays.</p>
+          </div>
+        </details>
         {threeVisible && activeMode !== 'metallurgy' && (
           <button
             type="button"
@@ -6475,6 +6957,8 @@ export default function TangaDeckWorkbench() {
         chapter={activeMode as TangaChapterId}
         developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id}
         availableDevelopment={availableMineFacilities}
+        siteContextVisible={layerSettings.context.visible}
+        onShowSiteContext={activeMode === 'mine_planning' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setLayerSettings(current=>({...current,context:{...current.context,visible:true}}));} : undefined}
         onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }}
         onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined}
         surfaceConceptView={surfaceConceptView}
@@ -6486,6 +6970,11 @@ export default function TangaDeckWorkbench() {
         onMilestoneChange={id => {setIsAutoplay(false);setIsExecutiveTour(false);setSelectedMilestoneId(id);setActiveShotIndex(Math.max(0,STORY_SHOTS.work_completed.findIndex(shot => shot.id === id)));}}
         onInspectDevelopment={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? view => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===(view==='overview'?'shell':view))));issueThreeCameraCommand(DEVELOPMENT_CAMERAS[view]);} : undefined}
         onSiteOrientation={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? orientation => {setIsAutoplay(false);setIsExecutiveTour(false);issueThreeCameraCommand(orientation==='plan'?'sitePlan':'siteOblique');} : undefined}
+        onRevealPitBlocks={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? (pitIndex) => {setIsAutoplay(false);setIsExecutiveTour(false);const shotId=pitIndex===0?'north-pit':pitIndex===1?'south-pit':'pit-blocks';setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id===shotId)));issueThreeCameraCommand('revealPitBlocks',undefined,pitIndex);} : undefined}
+        pitBlocksStatus={activeMode==='mine_planning'&&threeLoadReport.message.toLowerCase().includes('source block model unavailable')?'error':activeMode==='mine_planning'&&threeLoadReport.message.toLowerCase().includes('loading source block cells')?'loading':'ready'}
+        pitBlockFocusIndex={pitBlockFocusIndex}
+        pitGradeFocus={pitGradeFocus}
+        onPitGradeFocusChange={grade=>{setPitGradeFocus(grade);if(grade&&activeMode==='mine_planning'&&activeShot?.id!=='pit-blocks'){setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='pit-blocks')));issueThreeCameraCommand('revealPitBlocks');}}}
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}

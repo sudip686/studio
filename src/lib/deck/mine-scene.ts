@@ -1,23 +1,66 @@
 import * as THREE from 'three';
 import {CONCEPT, inside, insetCrest, type CandidatePit, type Point2} from './site-planning';
-import {addPlantDetail, batchPlantMeshes} from './mine-plant-detail';
+import {addPlantDetail, batchPlantMeshes, PLANT_PROCESS_STAGES} from './mine-plant-detail';
 
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
-export function buildConcentrator() {
+export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
+  root.userData.processStages=PLANT_PROCESS_STAGES;
+  root.userData.plantDetailLoaded=false;
   // The pad is a neutral reference surface, not a mapped material. Keep its
   // color steady as the camera moves; the buildings, equipment and terrain
   // retain physically shaded materials for depth.
-  const materials={steel:new THREE.MeshStandardMaterial({color:0x77817e,metalness:0.34,roughness:0.65}),roof:new THREE.MeshStandardMaterial({color:0x3e4a49,roughness:0.82}),copper:new THREE.MeshStandardMaterial({color:0x987653,metalness:.16,roughness:0.68}),concrete:new THREE.MeshBasicMaterial({color:0x858278}),serviceRoad:new THREE.MeshBasicMaterial({color:0x414b4b,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x718b8c,metalness:0.04,roughness:0.58}),rock:new THREE.MeshLambertMaterial({color:0x756b5d}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
-  const cladding=new THREE.MeshStandardMaterial({color:0x697572,roughness:.84,metalness:.08});
+  const materials={steel:new THREE.MeshStandardMaterial({color:0x808b86,metalness:0.18,roughness:0.78}),roof:new THREE.MeshStandardMaterial({color:0x56625e,roughness:0.88}),copper:new THREE.MeshStandardMaterial({color:0x9e7856,metalness:.08,roughness:0.76}),concrete:new THREE.MeshBasicMaterial({color:0x92928a}),serviceRoad:new THREE.MeshBasicMaterial({color:0x4a5551,toneMapped:false}),roadMarking:new THREE.MeshBasicMaterial({color:0xc8b58e,toneMapped:false}),water:new THREE.MeshStandardMaterial({color:0x759593,metalness:0.02,roughness:0.76}),stockpile:new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.98,metalness:0}),interior:new THREE.MeshBasicMaterial({color:0x202b2d,toneMapped:false})};
+  // Separate the light, ribbed wall sheets from the darker standing-seam
+  // roof panels. One all-over cladding tone made the process halls read as
+  // solid toy boxes from the executive overview camera.
+  const cladding=new THREE.MeshStandardMaterial({color:0x74817b,roughness:.9,metalness:.02});
   cladding.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRoofPoint=transformed;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.94+0.06*smoothstep(-0.5,0.5,sin(vRoofPoint.x*4.0));');
   };
   cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
+  const wallCladding=new THREE.MeshStandardMaterial({color:0xa2aca5,roughness:.92,metalness:.01});
+  const roofSeam=new THREE.MeshStandardMaterial({color:0x929d96,roughness:.86,metalness:.03});
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m:THREE.Material=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
+  // Naturalistic, elongated stockpile geometry replaces the pointed primitive
+  // cones. The broad, slightly irregular crest and rounded ends read as
+  // conceptual material storage without implying surveyed volume or capacity.
+  const buildStockpile=(length:number,width:number,height:number,seed:number)=>{
+    const segments=64,rings=16,positions:number[]=[],colors:number[]=[],indices:number[]=[];
+    const baseTone=new THREE.Color(0x756b5d);
+    positions.push(0,height*.96,0);colors.push(baseTone.r*.94,baseTone.g*.94,baseTone.b*.94);
+    for(let ring=1;ring<=rings;ring++){
+      const q=ring/rings,crest=q<.22?.96:.96*Math.pow((1-q)/.78,.82);
+      for(let segment=0;segment<segments;segment++){
+        const angle=segment/segments*Math.PI*2;
+        const irregularity=1+.018*Math.sin(angle*3+seed)+.009*Math.sin(angle*7-seed*.7);
+        const x=Math.cos(angle)*q*length*.5*irregularity;
+        const z=Math.sin(angle)*q*width*.5*irregularity;
+        const surfaceTone=.96+.035*Math.sin(angle*2+seed)*Math.sin(q*8+seed*.4);
+        positions.push(x,height*crest*surfaceTone,z);
+        const footShade=.92+.08*Math.min(1,q*1.4),grainTone=footShade*(.985+.02*Math.sin(segment*1.7+ring*.6+seed));
+        colors.push(baseTone.r*grainTone,baseTone.g*grainTone,baseTone.b*grainTone);
+      }
+    }
+    for(let segment=0;segment<segments;segment++)indices.push(0,1+(segment+1)%segments,1+segment);
+    for(let ring=0;ring<rings-1;ring++){
+      const inner=1+ring*segments,outer=inner+segments;
+      for(let segment=0;segment<segments;segment++){
+        const next=(segment+1)%segments,a=inner+segment,b=inner+next,c=outer+next,d=outer+segment;
+        indices.push(a,b,c,a,c,d);
+      }
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+    geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+    geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
+    const pile=new THREE.Mesh(geometry,materials.stockpile);
+    pile.position.y=1;pile.name='Illustrative ROM material stockpile';pile.castShadow=true;pile.receiveShadow=true;
+    root.add(pile);return pile;
+  };
   // The pad and graded transition are placed against the existing terrain by
   // placeConcentrator. Avoid a second oversized slab beneath the whole campus:
   // it reads as a floating platform and hides the surrounding ground texture.
@@ -28,13 +71,15 @@ export function buildConcentrator() {
   // coplanar slab top caused depth-buffer z-fighting (color shimmer) while the
   // camera orbited. Footings still begin at y=0 and overlap the slab cleanly.
   box(400,3,280,0,-1.15,0,materials.concrete,'Plant pad');
-  // A conceptual perimeter service loop sits just above the shared pad slab.
-  // Previously its road deck and markings were below the slab top and hidden.
-  const serviceRoadY=.46;
+  // Set the service deck onto the shared pad datum and lift only the thin
+  // paint bands by 1 mm above the road top to keep them crisp without floating.
+  const serviceRoadY=.425;
   box(392,.15,7,0,serviceRoadY,135,materials.serviceRoad,'Conceptual perimeter service lane');
   box(392,.15,5,0,serviceRoadY,-135,materials.serviceRoad,'Conceptual service lane');
   for(const x of [-195,195])box(4,.15,268,x,serviceRoadY,0,materials.serviceRoad,'Conceptual perimeter service lane');
-  for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,.58,135,materials.roadMarking,'Illustrative service-lane marking');
+  const serviceRoadTopY=serviceRoadY+.075;
+  const serviceRoadMarkY=serviceRoadTopY+.011;
+  for(let x=-185;x<=185;x+=14)box(5,.02,.5,x,serviceRoadMarkY,135,materials.roadMarking,'Illustrative service-lane marking');
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
@@ -49,6 +94,20 @@ export function buildConcentrator() {
       roof.rotation.x=slope;
       roof.userData.plantRoof=true;
       if(stage)roof.userData.plantStage=stage;
+      // Long standing seams give the broad roof planes a scaled industrial
+      // sheet profile from the overview camera; one instanced strip per hall
+      // side keeps the added detail light and opens with its selected roof.
+      const seamCount=Math.max(4,Math.floor(w/10));
+      const seams=new THREE.InstancedMesh(new THREE.BoxGeometry(.28,.18,roofLength*.94),roofSeam,seamCount);
+      const seamDummy=new THREE.Object3D();
+      for(let seam=0;seam<seamCount;seam++){
+        const seamX=x-w/2+(seam+.5)*w/seamCount;
+        seamDummy.position.set(seamX,h+rise/2+.36,z+sign*d/4);
+        seamDummy.rotation.set(slope,0,0);seamDummy.updateMatrix();seams.setMatrixAt(seam,seamDummy.matrix);
+      }
+      seams.instanceMatrix.needsUpdate=true;seams.name=`${name} standing-seam roof ribs`;seams.castShadow=true;seams.userData.plantRoof=true;
+      if(stage)seams.userData.plantStage=stage;
+      root.add(seams);
       // Repeated portal rafters and eave members make the process halls read
       // as steel-framed buildings at whole-campus scale, not smooth toy boxes.
       for(let bay=0;bay<=bayCount;bay++){
@@ -64,7 +123,7 @@ export function buildConcentrator() {
       // frame and roof cutaway still expose the equipment during inspection.
       for(let bay=0;bay<bayCount;bay++){
         const bayX=x-w/2+(bay+.5)*bayWidth;
-        box(bayWidth-.8,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),cladding,`${name} corrugated wall panel`);
+        box(bayWidth-.8,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),wallCladding,`${name} corrugated wall panel`);
         box(bayWidth-.8,h*.12,.36,bayX,h*.79,z+sign*(d/2-.18),materials.water,`${name} clerestory glazing`);
       }
     }
@@ -110,7 +169,8 @@ export function buildConcentrator() {
     }
   }
   // ROM / receiving and primary crushing.
-  mesh(new THREE.ConeGeometry(22,14,32),materials.rock,-106,8,44,'ROM stockpile');
+  const primaryRomPile=buildStockpile(44,34,13,7);
+  primaryRomPile.position.set(-106,1,44);primaryRomPile.name='Illustrative primary ROM stockpile';
   box(22,12,18,-104,10,-16,materials.steel,'Feed bin');
   mesh(new THREE.CylinderGeometry(12,5,12,4),materials.copper,-104,21,-16,'Receiving hopper').rotation.y=Math.PI/4;
   shed('ROM & crushing',-88,-16,72,58,30,'feed');
@@ -159,10 +219,16 @@ export function buildConcentrator() {
   }
   // Added operating areas expand the campus rather than stretching equipment.
   shed('Covered blending and feed hall',-85,-109,116,40,32,'feed');
-  for(let i=0;i<3;i++)mesh(new THREE.ConeGeometry(13,12,16),materials.rock,-122+i*36,8,-108,'Covered feed stockpile');
+  for(let i=0;i<3;i++){
+    const pile=buildStockpile(26,19,11,11+i);
+    pile.position.set(-122+i*36,1,-108);pile.name='Illustrative covered-feed stockpile';
+  }
   shed('Product storage and loadout',100,110,166,40,29,'product');
   shed('Maintenance and spares hall',-157,102,58,48,22);
-  for(const z of [-32,30])mesh(new THREE.ConeGeometry(24,18,24),materials.rock,-163,10,z,'ROM receiving yard');
+  for(const [index,z] of [-32,30].entries()){
+    const pile=buildStockpile(48,37,17,21+index);
+    pile.position.set(-163,1,z);pile.name='Illustrative ROM receiving stockpile';
+  }
   // Second flotation train and reclaim-water thickener.
   for(let i=0;i<5;i++){
     box(12,10,18,5+i*17,7,-103,materials.steel,'Secondary flotation train');
@@ -192,7 +258,6 @@ export function buildConcentrator() {
   }
   root.userData.flow=flow;
   root.userData.labels=[['ROM / feed',-106,32,20],['Crushing & milling',-50,37,-20],['Flotation',40,30,-24],['Dewatering & product',95,35,45]];
-  addPlantDetail(root, materials);
   // Supporting facilities occupy the southern service yard, clear of the process.
   shed('Administration and laboratory',-20,194,75,44,18);
   shed('Heavy vehicle workshop and spares',-155,194,115,58,24);
@@ -211,8 +276,53 @@ export function buildConcentrator() {
     for(const y of [2,4.5])for(const sign of [-1,1])box(206,.4,.4,sign*143,y,z,materials.steel,'Perimeter fence rail and gate opening');
   }
   for(let i=0;i<7;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
+  // Measure structural bases against the pad before batching removes their
+  // individual source names. The pad top intentionally overlaps each footing
+  // so buildings meet the graded platform without a visible gap.
+  const padMesh=root.getObjectByName('Plant pad') as THREE.Mesh<THREE.BufferGeometry>|undefined;
+  padMesh?.geometry.computeBoundingBox();
+  const footingBases:number[]=[],columnBases:number[]=[];
+  for(const child of root.children){
+    if(!(child instanceof THREE.Mesh))continue;
+    if(!child.geometry.boundingBox)child.geometry.computeBoundingBox();
+    const baseY=child.position.y+(child.geometry.boundingBox?.min.y??0);
+    if(child.name.endsWith('concrete footing'))footingBases.push(baseY);
+    if(child.name.endsWith('portal column'))columnBases.push(baseY);
+  }
+  root.userData.plantStructuralBaseAudit={
+    footingCount:footingBases.length,
+    columnCount:columnBases.length,
+    padTopLocalY:padMesh?padMesh.position.y+(padMesh.geometry.boundingBox?.max.y??0):null,
+    footingBottomLocalMinY:footingBases.length?Math.min(...footingBases):null,
+    footingBottomLocalMaxY:footingBases.length?Math.max(...footingBases):null,
+    columnBottomLocalMinY:columnBases.length?Math.min(...columnBases):null,
+    columnBottomLocalMaxY:columnBases.length?Math.max(...columnBases):null,
+  };
+  const serviceDecks=root.children.filter((child):child is THREE.Mesh<THREE.BufferGeometry,THREE.Material>=>child instanceof THREE.Mesh&&child.name.includes('Conceptual')&&child.name.includes('service lane'));
+  const serviceMarkings=root.children.filter((child):child is THREE.Mesh<THREE.BufferGeometry,THREE.Material>=>child instanceof THREE.Mesh&&child.name==='Illustrative service-lane marking');
+  const localBounds=(object:THREE.Mesh<THREE.BufferGeometry,THREE.Material>)=>{if(!object.geometry.boundingBox)object.geometry.computeBoundingBox();const bounds=object.geometry.boundingBox!;return {bottom:object.position.y+bounds.min.y,top:object.position.y+bounds.max.y};};
+  const deckBounds=serviceDecks.map(localBounds),markingBounds=serviceMarkings.map(localBounds);
+  const padTopLocalY=padMesh?padMesh.position.y+(padMesh.geometry.boundingBox?.max.y??0):null;
+  root.userData.plantServiceRoadContactAudit={
+    deckCount:serviceDecks.length,markingCount:serviceMarkings.length,padTopLocalY,
+    deckBottomLocalMinY:deckBounds.length?Math.min(...deckBounds.map(item=>item.bottom)):null,
+    deckBottomLocalMaxY:deckBounds.length?Math.max(...deckBounds.map(item=>item.bottom)):null,
+    deckTopLocalMinY:deckBounds.length?Math.min(...deckBounds.map(item=>item.top)):null,
+    deckTopLocalMaxY:deckBounds.length?Math.max(...deckBounds.map(item=>item.top)):null,
+    markingBottomLocalMinY:markingBounds.length?Math.min(...markingBounds.map(item=>item.bottom)):null,
+    markingBottomLocalMaxY:markingBounds.length?Math.max(...markingBounds.map(item=>item.bottom)):null,
+  };
   root.userData.siteServices=[-20,25,194];
   batchPlantMeshes(root);
+  root.userData.ensurePlantDetail=()=>{
+    if(root.userData.plantDetailLoaded)return false;
+    const firstDetailIndex=root.children.length;
+    addPlantDetail(root,materials);
+    batchPlantMeshes(root,firstDetailIndex);
+    root.userData.plantDetailLoaded=true;
+    return true;
+  };
+  if(!options.deferPlantDetail)(root.userData.ensurePlantDetail as ()=>boolean)();
   root.scale.set(CONCEPT.plantWidth/400,CONCEPT.plantWidth/400,CONCEPT.plantDepth/280);
   return root;
 }
@@ -220,7 +330,11 @@ export function buildConcentrator() {
 export type ConceptPad={x:number;z:number;width:number;depth:number;level:number;transition:number};
 
 function padBlend(pad:ConceptPad,x:number,z:number){
-  const distance=Math.max(0,Math.abs(x-pad.x)-pad.width/2,Math.abs(z-pad.z)-pad.depth/2);
+  // Measure the transition from the rectangular pad edge with a rounded
+  // Euclidean corner. A max-axis distance produced a square, orthogonal berm
+  // around the whole facility that looked like a second platform in overview.
+  const dx=Math.max(0,Math.abs(x-pad.x)-pad.width/2),dz=Math.max(0,Math.abs(z-pad.z)-pad.depth/2);
+  const distance=Math.hypot(dx,dz);
   const t=Math.min(1,distance/pad.transition);return 1-t*t*(3-2*t);
 }
 
@@ -243,28 +357,76 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
   const pad=createConceptPad(x,z,width,depth,height);
   const {level}=pad;
   root.userData.conceptPad=pad;
+  const baseAudit=root.userData.plantStructuralBaseAudit as {footingCount:number;columnCount:number;padTopLocalY:number|null;footingBottomLocalMinY:number|null;footingBottomLocalMaxY:number|null;columnBottomLocalMinY:number|null;columnBottomLocalMaxY:number|null}|undefined;
+  if(baseAudit&&baseAudit.padTopLocalY!==null&&baseAudit.footingBottomLocalMinY!==null&&baseAudit.footingBottomLocalMaxY!==null&&baseAudit.columnBottomLocalMinY!==null&&baseAudit.columnBottomLocalMaxY!==null){
+    const scaleY=root.scale.y,padTopAboveDatumM=baseAudit.padTopLocalY*scaleY;
+    const footingBottomMinM=(baseAudit.footingBottomLocalMinY??0)*scaleY,footingBottomMaxM=(baseAudit.footingBottomLocalMaxY??0)*scaleY;
+    const columnBottomMinM=(baseAudit.columnBottomLocalMinY??0)*scaleY,columnBottomMaxM=(baseAudit.columnBottomLocalMaxY??0)*scaleY;
+    root.userData.plantFoundationContactAudit={
+      footingCount:baseAudit.footingCount,columnCount:baseAudit.columnCount,
+      padTopAboveGradedDatumM:Number(padTopAboveDatumM.toFixed(3)),
+      footingBottomRangeAboveGradedDatumM:[Number(footingBottomMinM.toFixed(3)),Number(footingBottomMaxM.toFixed(3))],
+      columnBottomRangeAboveGradedDatumM:[Number(columnBottomMinM.toFixed(3)),Number(columnBottomMaxM.toFixed(3))],
+      maximumFootingGapM:Number(Math.max(0,footingBottomMaxM-padTopAboveDatumM).toFixed(3)),
+      minimumFootingOverlapM:Number(Math.max(0,padTopAboveDatumM-footingBottomMaxM).toFixed(3)),
+      maximumColumnGapM:Number(Math.max(0,columnBottomMaxM-padTopAboveDatumM).toFixed(3)),
+      minimumColumnOverlapM:Number(Math.max(0,padTopAboveDatumM-columnBottomMaxM).toFixed(3)),
+      source:'modeled building footings and portal columns against illustrative graded pad; not a foundation design',
+    };
+  }
+  const roadAudit=root.userData.plantServiceRoadContactAudit as {deckCount:number;markingCount:number;padTopLocalY:number|null;deckBottomLocalMinY:number|null;deckBottomLocalMaxY:number|null;deckTopLocalMinY:number|null;deckTopLocalMaxY:number|null;markingBottomLocalMinY:number|null;markingBottomLocalMaxY:number|null}|undefined;
+  if(roadAudit&&roadAudit.padTopLocalY!==null&&roadAudit.deckBottomLocalMaxY!==null&&roadAudit.deckTopLocalMaxY!==null&&roadAudit.markingBottomLocalMinY!==null){
+    const scaleY=root.scale.y,padTop=roadAudit.padTopLocalY,deckBottom=roadAudit.deckBottomLocalMaxY,deckTop=roadAudit.deckTopLocalMaxY,markingBottom=roadAudit.markingBottomLocalMinY;
+    root.userData.plantServiceRoadContactRuntimeAudit={
+      deckCount:roadAudit.deckCount,markingCount:roadAudit.markingCount,
+      maximumRoadToPadGapM:Number(Math.max(0,(deckBottom-padTop)*scaleY).toFixed(4)),
+      minimumRoadToPadOverlapM:Number(Math.max(0,(padTop-deckBottom)*scaleY).toFixed(4)),
+      minimumMarkingClearanceM:Number(Math.max(0,(markingBottom-deckTop)*scaleY).toFixed(4)),
+      maximumMarkingClearanceM:Number(Math.max(0,((roadAudit.markingBottomLocalMaxY??markingBottom)-(roadAudit.deckTopLocalMinY??deckTop))*scaleY).toFixed(4)),
+      source:'conceptual internal lane and paint bands against display pad; not a civil road design',
+    };
+  }
   const vertices:number[]=[];
-  const ring=(distance:number)=>[[-width/2-distance,-depth/2-distance],[width/2+distance,-depth/2-distance],[width/2+distance,depth/2+distance],[-width/2-distance,depth/2+distance]];
+  // Parallel rounded-rectangle contours keep the engineering pad square while
+  // allowing its unsourced cut/fill transition to blend into the natural
+  // terrain instead of ending in a second hard-edged rectangle.
+  const ring=(distance:number)=>{
+    const halfWidth=width/2,halfDepth=depth/2,segmentsPerCorner=12,segmentsPerSide=Math.ceil(Math.max(width,depth)/5),points:number[][]=[];
+    const arc=(cx:number,cz:number,start:number)=>{
+      for(let i=0;i<segmentsPerCorner;i++){
+        const angle=start+i/segmentsPerCorner*Math.PI/2;
+        points.push([cx+Math.cos(angle)*distance,cz+Math.sin(angle)*distance]);
+      }
+    };
+    const line=(from:number[],to:number[])=>{
+      for(let i=0;i<segmentsPerSide;i++){
+        const t=i/segmentsPerSide;points.push([THREE.MathUtils.lerp(from[0],to[0],t),THREE.MathUtils.lerp(from[1],to[1],t)]);
+      }
+    };
+    const topRight:[number,number]=[halfWidth,halfDepth],topLeft:[number,number]=[-halfWidth,halfDepth],bottomLeft:[number,number]=[-halfWidth,-halfDepth],bottomRight:[number,number]=[halfWidth,-halfDepth];
+    arc(...topRight,0);line([halfWidth,halfDepth+distance],[-halfWidth,halfDepth+distance]);
+    arc(...topLeft,Math.PI/2);line([-halfWidth-distance,halfDepth],[-halfWidth-distance,-halfDepth]);
+    arc(...bottomLeft,Math.PI);line([-halfWidth,-halfDepth-distance],[halfWidth,-halfDepth-distance]);
+    arc(...bottomRight,Math.PI*1.5);line([halfWidth+distance,-halfDepth],[halfWidth+distance,halfDepth]);
+    return points;
+  };
   const vertex=(p:number[])=>[p[0]/root.scale.x,((height(x+p[0],z+p[1])*(1-padBlend(pad,x+p[0],z+p[1]))+level*padBlend(pad,x+p[0],z+p[1]))-level+.3)/root.scale.y,p[1]/root.scale.z];
   for(let strip=0;strip<6;strip++){
     const inner=ring(strip*5),outer=ring((strip+1)*5);
-    for(let edge=0;edge<4;edge++){
-      const next=(edge+1)%4,n=Math.ceil(Math.hypot(outer[next][0]-outer[edge][0],outer[next][1]-outer[edge][1])/5);
-      const point=(r:number[][],t:number)=>[r[edge][0]+(r[next][0]-r[edge][0])*t,r[edge][1]+(r[next][1]-r[edge][1])*t];
-      for(let i=0;i<n;i++){
-        const innerA=point(inner,i/n),innerB=point(inner,(i+1)/n),outerA=point(outer,i/n),outerB=point(outer,(i+1)/n);
-        const a=vertex(innerA),b=vertex(innerB),c=vertex(outerA),d=vertex(outerB);
-        vertices.push(...a,...c,...b,...b,...c,...d);
-      }
+    for(let i=0;i<inner.length;i++){
+      const next=(i+1)%inner.length,a=vertex(inner[i]),b=vertex(inner[next]),c=vertex(outer[i]),d=vertex(outer[next]);
+      vertices.push(...a,...c,...b,...b,...c,...d);
     }
   }
-  // Keep this shared plant apron at one fixed palette color. Procedural
-  // per-vertex mottling, even at low amplitude, shimmered as its triangles
-  // crossed screen pixels during orbit and made the resource/pad colors seem
-  // to change with the camera. Shape and relief carry the visual texture.
+  // Keep the plant apron on one fixed earth palette, but let the registered
+  // terrain imagery show through its conceptual grading tint. Fixed site-light
+  // shading restores relief/contact shadows; no camera-driven color variation
+  // is introduced.
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();
-  const earthworks=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x766d5e,toneMapped:false,side:THREE.DoubleSide}));
+  const earthworkMaterial=new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.36,depthWrite:false,side:THREE.DoubleSide});
+  const earthworks=new THREE.Mesh(geometry,earthworkMaterial);
   earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
+  earthworks.userData.surfaceLighting='fixed site lighting; rough earth material; camera independent';
   root.position.set(x,level,z);return level;
 }
 
@@ -350,8 +512,13 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
     const a=sample(outer,count),b=inner.length?sample(inner,count):[],base=positions.length/3,color=new THREE.Color(tone),lift=1.2;
     for(const [ring,level] of [[a,upper],[b,lower]] as const){
       for(const [x,z] of ring){
-        positions.push(x,Math.min(height(x,z),level)+lift,z);
-        colors.push(color.r,color.g,color.b);
+        const y=Math.min(height(x,z),level)+lift;
+        positions.push(x,y,z);
+        // Fixed, low-amplitude tonal variation adds rough-rock material depth
+        // without inventing mapped geology or changing with the camera.
+        const striation=Math.sin(x*.031+z*.017+y*.23)*Math.sin(z*.026-x*.012);
+        const value=.98+striation*.035;
+        colors.push(color.r*value,color.g*value,color.b*value);
       }
     }
     if(b.length){
@@ -383,14 +550,14 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();
   // The mine-plan sun is fixed in site coordinates, so diffuse shading adds
   // readable bench walls and contact shadows without changing with the camera.
-  const mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0xffffff,vertexColors:true,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
+  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.94,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
 }
 
 /**
  * A display-only access ribbon inside a candidate pit envelope. This is not a
  * sourced alignment, engineered haul road, or geotechnically checked grade.
  */
-export function buildConceptualPitRamp(pit:CandidatePit) {
+export function buildConceptualPitRamp(pit:CandidatePit,exitBearing=-Math.PI/2) {
   const centre=pit.centre;
   const radiusAt=(angle:number)=>{
     const direction:Point2=[Math.cos(angle),Math.sin(angle)];
@@ -416,7 +583,7 @@ export function buildConceptualPitRamp(pit:CandidatePit) {
   const steps=Math.max(160,Math.ceil(turns*128)),halfWidth=Math.max(5,Math.min(7,CONCEPT.berm*1.05));
   const path:THREE.Vector3[]=[];
   for(let i=0;i<=steps;i++){
-    const t=i/steps,angle=-Math.PI/2+t*turns*Math.PI*2,outerRadius=radiusAt(angle);
+    const t=i/steps,angle=exitBearing+t*turns*Math.PI*2,outerRadius=radiusAt(angle);
     if(!Number.isFinite(outerRadius))continue;
     const radial=outerRadius*(.92-.58*t),x=centre[0]+Math.cos(angle)*radial,z=centre[1]+Math.sin(angle)*radial;
     const ground=pitHeight([x,z],pit)??pit.floor,designY=pit.surface-t*pit.depth*.96;

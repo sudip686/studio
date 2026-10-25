@@ -5039,6 +5039,13 @@ body {
   transform: scale(1.03);
 }
 
+/* Keep the 2D transition visible, then release its hidden map/DeckGL canvas
+   from layout while the full-screen Three.js scene is active. The workbench's
+   ResizeObserver restores the map's viewport when this chapter exits. */
+.tanga-deck--three-active:not(.tanga-deck--transitioning) .tanga-deck__deck-stage {
+  display: none;
+}
+
 .tanga-deck--transitioning .tanga-deck__deck-stage,
 .tanga-deck--transitioning .tanga-three__canvas {
   filter: blur(6px) saturate(0.86);
@@ -13765,8 +13772,8 @@ button.tanga-deck__pager-count {
 .tanga-mine-story__steps button { margin:0; padding:7px 4px; font-size:10px; text-align:left; }
 .tanga-mine-story__steps button[aria-pressed="true"] { background:#925025; color:#fff4df; border-color:#efb980; }
 .tanga-mine-story details { margin:10px 0; }.tanga-mine-story summary { cursor:pointer; }
-.tanga-deck .tanga-mine-story { max-height:calc(100svh - 390px); scrollbar-width:thin; scrollbar-color:#87603c #10171d; }
-.tanga-mine-story__key { display:grid; gap:5px; color:#67b8ba; }.tanga-mine-story__key span+span{color:#ffad52;}
+.tanga-deck .tanga-mine-story { width:288px; max-height:calc(100svh - 390px); scrollbar-width:thin; scrollbar-color:#87603c #10171d; }
+.tanga-mine-story__key { display:flex; flex-wrap:wrap; gap:7px 12px; color:#dce2e2; }.tanga-mine-story__key span{display:inline-flex;align-items:center;gap:5px;font-size:9px;white-space:nowrap}.tanga-mine-story__key i{display:block;width:9px;height:9px;border-radius:2px}
 .tanga-mine-story__pit-block-action{margin:10px 0;padding:9px;border:1px solid #dda36c66;border-radius:8px;background:linear-gradient(135deg,#33291fbb,#17262dcc)}
 .tanga-deck .tanga-mine-story .tanga-mine-story__pit-block-action button{margin:0;padding:9px 10px;border-color:#d69b61;background:#51391f;color:#fff2df;font-size:11px;font-weight:700;letter-spacing:.02em;text-align:center}
 .tanga-deck .tanga-mine-story .tanga-mine-story__pit-block-action button:hover:not(:disabled){background:#694a29;border-color:#f0bf81}

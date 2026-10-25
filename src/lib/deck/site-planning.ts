@@ -21,6 +21,27 @@ export function contained(footprint: Point2[], boundary: Point2[]) {
     return inside(p,boundary) && inside([(p[0]+q[0])/2,(p[1]+q[1])/2],boundary) && !boundary.some((a,j)=>crosses(p,q,a,boundary[(j+1)%boundary.length]));
   });
 }
+/** Exact axis-aligned cell containment with a boundary-edge broad phase.
+ * The generic check is useful for arbitrary footprints; block-model cutaways
+ * contain tens of thousands of rectangles, so testing every pit edge against
+ * every rectangle edge is unnecessarily expensive. Point and midpoint tests
+ * preserve the same acceptance rule while disjoint edge bounds skip most
+ * segment intersections for interior cells. */
+export function rectangleContained(center:Point2,width:number,depth:number,boundary:Point2[]) {
+  if(boundary.length<3||!Number.isFinite(width)||!Number.isFinite(depth)||width<=0||depth<=0)return false;
+  const footprint=rectangle(center,width,depth);
+  if(!footprint.every((point,index)=>{
+    const next=footprint[(index+1)%footprint.length];
+    return inside(point,boundary)&&inside([(point[0]+next[0])/2,(point[1]+next[1])/2],boundary);
+  }))return false;
+  const minX=center[0]-width/2,maxX=center[0]+width/2,minZ=center[1]-depth/2,maxZ=center[1]+depth/2;
+  for(let index=0;index<boundary.length;index++){
+    const a=boundary[index],b=boundary[(index+1)%boundary.length];
+    if(Math.max(a[0],b[0])<minX||Math.min(a[0],b[0])>maxX||Math.max(a[1],b[1])<minZ||Math.min(a[1],b[1])>maxZ)continue;
+    for(let edge=0;edge<footprint.length;edge++)if(crosses(footprint[edge],footprint[(edge+1)%footprint.length],a,b))return false;
+  }
+  return true;
+}
 export function overlaps(a: Point2[], b: Point2[]) {
   return a.some(p=>inside(p,b)) || b.some(p=>inside(p,a)) || a.some((p,i)=>b.some((q,j)=>crosses(p,a[(i+1)%a.length],q,b[(j+1)%b.length])));
 }

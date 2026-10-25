@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {contained, overlaps, rectangle, type CandidatePit, type Point2} from './site-planning';
+import {contained, inside, overlaps, rectangle, type CandidatePit, type Point2} from './site-planning';
 import {batchPlantMeshes} from './mine-plant-detail';
 import {buildHaulTruck} from './mine-haulage';
 
@@ -18,22 +18,34 @@ export function buildMineSiteCampus(options:Options) {
   const {plant,feed,pits,boundary,bounds,height,surveyed}=options;
   const root=new THREE.Group();root.name='Illustrative waste and water facilities';
   const facilities:CampusFacility[]=[],omissions:string[]=[];
+  const facilityToeGroundContactAudit:{facilityId:CampusFacility['id'];sampleCount:number;expectedClearanceM:number;maximumAbsoluteErrorM:number}[]=[];
+  const facilityApronDrapeAudit:{facilityId:CampusFacility['id'];nx:number;nz:number;triangleCount:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[]=[];
+  let maximumContourSegmentM=0;
+  let fixedTerrainColorVertices=0,fixedTerrainColorMin=Infinity,fixedTerrainColorMax=-Infinity;
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
   const materials={
-    // Earthworks and pad surfaces use an unlit fixed palette: their mapped
-    // colors must not shift with camera angle as the viewer rotates the site.
-    // These hues identify conceptual pads and facilities in the mine-plan
-    // legend. Render them without view-dependent lighting/specular response;
-    // their relief comes from geometry and the fixed earthwork materials.
-    earth:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false}),
+    // Plant grading is a lightly tinted, rough overlay on the registered
+    // terrain. Fixed site lighting gives the transition relief while keeping
+    // its color camera independent; low opacity avoids a broad opaque plate.
+    earth:new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.36,depthWrite:false,side:THREE.DoubleSide}),
     bench:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false}),
     rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
     beach:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false}),
     liner:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false}),
+    earthSurface:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    benchSurface:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    rockSurface:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    beachSurface:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
+    linerSurface:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
     water:new THREE.MeshBasicMaterial({color:0x4a8b8b,side:THREE.DoubleSide,toneMapped:false}),
     fresh:new THREE.MeshBasicMaterial({color:0x579aa4,side:THREE.DoubleSide,toneMapped:false}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
     concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
+    access:new THREE.MeshBasicMaterial({color:0x535853,side:THREE.DoubleSide,toneMapped:false}),
+    shoulder:new THREE.MeshBasicMaterial({color:0x887f6c,side:THREE.DoubleSide,toneMapped:false}),
+    swaleBank:new THREE.MeshBasicMaterial({color:0x756f60,side:THREE.DoubleSide,toneMapped:false}),
+    swaleBed:new THREE.MeshBasicMaterial({color:0x4d554c,side:THREE.DoubleSide,toneMapped:false}),
+    centreline:new THREE.LineBasicMaterial({color:0xc5b99b,toneMapped:false}),
   };
   // Keep earthwork palettes spatially fixed. Procedural sub-metre noise here
   // produced screen-space aliasing on wide pads as the camera orbited, which
@@ -51,20 +63,70 @@ export function buildMineSiteCampus(options:Options) {
     batchPlantMeshes(group);
   }
   function mesh(group:THREE.Group,geometry:THREE.BufferGeometry,material:THREE.Material,name:string){
+    // Bake low-contrast variation from fixed site coordinates, never screen
+    // pixels or camera vectors, so broad earthworks stay stable while orbiting.
+    if(material instanceof THREE.MeshBasicMaterial&&material.vertexColors){
+      const positions=geometry.getAttribute('position'),colors=new Float32Array(positions.count*3);
+      for(let i=0;i<positions.count;i++){
+        const x=positions.getX(i),z=positions.getZ(i);
+        const shade=1+.052*Math.sin(x*.011+z*.019)+.026*Math.sin(x*.027-z*.013+1.3);
+        colors[i*3]=shade;colors[i*3+1]=shade;colors[i*3+2]=shade;
+        fixedTerrainColorVertices++;fixedTerrainColorMin=Math.min(fixedTerrainColorMin,shade);fixedTerrainColorMax=Math.max(fixedTerrainColorMax,shade);
+      }
+      geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+    }
     const object=new THREE.Mesh(geometry,material);object.name=name;object.castShadow=true;object.receiveShadow=true;group.add(object);return object;
   }
   function box(group:THREE.Group,w:number,h:number,d:number,x:number,y:number,z:number,material:THREE.Material,name:string){
     const object=mesh(group,new THREE.BoxGeometry(w,h,d),material,name);object.position.set(x,y,z);return object;
   }
   function ring(point:Point2,w:number,d:number,level:number|Height,chamfer=.12){
-    const cut=Math.min(w,d)*chamfer;
-    const local:Point2[]=[[-w/2+cut,-d/2],[w/2-cut,-d/2],[w/2,-d/2+cut],[w/2,d/2-cut],[w/2-cut,d/2],[-w/2+cut,d/2],[-w/2,d/2-cut],[-w/2,-d/2+cut]];
-    return local.map(([x,z])=>new THREE.Vector3(point[0]+x,typeof level==='number'?level:level(point[0]+x,point[1]+z),point[1]+z));
+    // Sample smooth rounded-rectangle contours at a fixed point count so
+    // adjacent berm, bench and water rings pair cleanly across sizes. The
+    // former eight-point chamfer made every facility read as a low-poly box.
+    const radius=Math.min(w,d)*chamfer,cornerSegments=12,sideSegments=64,local:Point2[]=[];
+    const arc=(cx:number,cz:number,start:number)=>{
+      for(let i=0;i<cornerSegments;i++){
+        const angle=start+i/cornerSegments*Math.PI/2;
+        local.push([cx+Math.cos(angle)*radius,cz+Math.sin(angle)*radius]);
+      }
+    };
+    const line=(a:Point2,b:Point2)=>{
+      for(let i=0;i<sideSegments;i++){const t=i/sideSegments;local.push([THREE.MathUtils.lerp(a[0],b[0],t),THREE.MathUtils.lerp(a[1],b[1],t)]);}
+    };
+    arc(w/2-radius,d/2-radius,0);line([w/2-radius,d/2],[-w/2+radius,d/2]);
+    arc(-w/2+radius,d/2-radius,Math.PI/2);line([-w/2,d/2-radius],[-w/2,-d/2+radius]);
+    arc(-w/2+radius,-d/2+radius,Math.PI);line([-w/2+radius,-d/2],[w/2-radius,-d/2]);
+    arc(w/2-radius,-d/2+radius,Math.PI*1.5);line([w/2,-d/2+radius],[w/2,d/2-radius]);
+    const points=local.map(([x,z])=>new THREE.Vector3(point[0]+x,typeof level==='number'?level:level(point[0]+x,point[1]+z),point[1]+z));
+    for(let i=0;i<points.length;i++)maximumContourSegmentM=Math.max(maximumContourSegmentM,points[i].distanceTo(points[(i+1)%points.length]));
+    return points;
+  }
+  function containmentRing(point:Point2,w:number,d:number,level:number|Height){
+    // Lowland water and tailings concepts read more like shallow containment
+    // basins than large rectangular pads. Keep a smooth, slightly asymmetric
+    // superellipse inside the same screened footprint; the fixed, modest
+    // contour variation is presentation geometry and is not an engineered
+    // embankment alignment.
+    const count=304,raw:Array<[number,number]>=[];
+    for(let i=0;i<count;i++){
+      const angle=i/count*Math.PI*2,c=Math.cos(angle),s=Math.sin(angle);
+      const radius=1+.022*Math.sin(3*angle+.6)+.012*Math.cos(5*angle-1.1);
+      raw.push([Math.sign(c)*Math.pow(Math.abs(c),.87)*radius,Math.sign(s)*Math.pow(Math.abs(s),.87)*radius]);
+    }
+    const maxX=Math.max(...raw.map(([x])=>Math.abs(x))),maxZ=Math.max(...raw.map(([,z])=>Math.abs(z)));
+    const points=raw.map(([x,z])=>{
+      const px=point[0]+x/maxX*w/2,pz=point[1]+z/maxZ*d/2;
+      return new THREE.Vector3(px,typeof level==='number'?level:level(px,pz),pz);
+    });
+    for(let i=0;i<points.length;i++)maximumContourSegmentM=Math.max(maximumContourSegmentM,points[i].distanceTo(points[(i+1)%points.length]));
+    return points;
   }
   function join(group:THREE.Group,a:THREE.Vector3[],b:THREE.Vector3[],material:THREE.Material,name:string){
-    const positions:number[]=[];
-    for(let i=0;i<a.length;i++){const j=(i+1)%a.length;for(const p of [a[i],b[i],a[j],a[j],b[i],b[j]])positions.push(p.x,p.y,p.z);}
-    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();return mesh(group,geometry,material,name);
+    const positions:number[]=[],indices:number[]=[],count=Math.min(a.length,b.length);
+    for(const point of [...a.slice(0,count),...b.slice(0,count)])positions.push(point.x,point.y,point.z);
+    for(let i=0;i<count;i++){const j=(i+1)%count;indices.push(i,count+i,j,j,count+i,count+j);}
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setIndex(indices);geometry.computeVertexNormals();return mesh(group,geometry,material,name);
   }
   function poolRadius(angle:number){return 1+.08*Math.sin(angle*3)+.04*Math.cos(angle*5);}
   function poolOutline(pool:{x:number;z:number;rx:number;rz:number},y:number){return Array.from({length:64},(_,i)=>{const a=i*Math.PI/32,r=poolRadius(a);return new THREE.Vector3(pool.x+pool.rx*r*Math.cos(a),y,pool.z+pool.rz*r*Math.sin(a));});}
@@ -75,11 +137,31 @@ export function buildMineSiteCampus(options:Options) {
     if(pool){const p=geometry.getAttribute('position');for(let i=0;i<p.count;i++){const dx=(p.getX(i)-pool.x)/pool.rx,dz=(p.getZ(i)-pool.z)/pool.rz,signed=Math.hypot(dx,dz)-poolRadius(Math.atan2(dz,dx));p.setY(i,points[0].y-.4*(1-THREE.MathUtils.clamp(signed*2,0,1)));}geometry.computeVertexNormals();}
     return mesh(group,geometry,material,name);
   }
+  function auditGroundContact(facilityId:CampusFacility['id'],toe:THREE.Vector3[],expectedClearanceM:number){
+    let maximumAbsoluteErrorM=0;
+    for(const point of toe)maximumAbsoluteErrorM=Math.max(maximumAbsoluteErrorM,Math.abs((point.y-height(point.x,point.z))-expectedClearanceM));
+    facilityToeGroundContactAudit.push({facilityId,sampleCount:toe.length,expectedClearanceM,maximumAbsoluteErrorM:Number(maximumAbsoluteErrorM.toFixed(4))});
+  }
   function patch(group:THREE.Group,f:CampusFacility){
-    const positions:number[]=[],nx=Math.ceil((f.width+30)/12),nz=Math.ceil((f.depth+30)/12);
+    const positions:number[]=[],maxSpacing=2,nx=Math.ceil((f.width+30)/maxSpacing),nz=Math.ceil((f.depth+30)/maxSpacing),apronWidth=f.width+30,apronDepth=f.depth+30;
+    let maximumTriangleCentreErrorM=0,triangleCount=0;
     const p=(i:number,j:number)=>{const x=f.point[0]-(f.width+30)/2+i*(f.width+30)/nx,z=f.point[1]-(f.depth+30)/2+j*(f.depth+30)/nz;return [x,height(x,z)+.18,z];};
-    for(let i=0;i<nx;i++)for(let j=0;j<nz;j++)positions.push(...p(i,j),...p(i,j+1),...p(i+1,j),...p(i+1,j),...p(i,j+1),...p(i+1,j+1));
-    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();mesh(group,geometry,materials.earth,'Illustrative cleared apron · terrain conforming');
+    const triangle=(a:number[],b:number[],c:number[])=>{
+      const x=(a[0]+b[0]+c[0])/3,z=(a[2]+b[2]+c[2])/3,y=(a[1]+b[1]+c[1])/3;
+      // Clip the cleared, terrain-following apron to a rounded footprint. A
+      // rectangular draped sheet around the basin read as a floating CAD pad
+      // in the oblique site view. This screen is display geometry only and
+      // does not change the report candidate or the cleared-apron dimensions.
+      const rounded=Math.pow(Math.abs((x-f.point[0])/(apronWidth/2)),2.3)+Math.pow(Math.abs((z-f.point[1])/(apronDepth/2)),2.3);
+      if(rounded>1)return;
+      positions.push(...a,...b,...c);triangleCount++;
+      maximumTriangleCentreErrorM=Math.max(maximumTriangleCentreErrorM,Math.abs(y-(height(x,z)+.18)));
+    };
+    for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){
+      const a=p(i,j),b=p(i,j+1),c=p(i+1,j),d=p(i+1,j+1);triangle(a,b,c);triangle(c,b,d);
+    }
+    facilityApronDrapeAudit.push({facilityId:f.id,nx,nz,triangleCount,maximumSampleSpacingM:Number(Math.max((f.width+30)/nx,(f.depth+30)/nz).toFixed(2)),maximumTriangleCentreErrorM:Number(maximumTriangleCentreErrorM.toFixed(4))});
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();mesh(group,geometry,materials.earthSurface,'Illustrative cleared apron · terrain conforming');
   }
   function place(id:CampusFacility['id'],title:string,preferred:Point2,w:number,d:number,limit:number,mineOnly=false){
     const candidates:{point:Point2;score:number}[]=[];
@@ -111,6 +193,124 @@ export function buildMineSiteCampus(options:Options) {
   if(mine)for(const [w,d] of [[240,180],[180,140],[140,110]]){waste=place('waste','Waste-rock landform · illustrative',[mine[0]+350,mine[1]],w,d,32,true);if(waste)break;}
   for(const [id,f] of [['tailings',tailings],['water',water],['raw-water',rawWater],['waste',waste]] as const)if(!f)omissions.push(`${id}: no display footprint passed terrain / overlap checks; facility withheld`);
 
+  // A restrained, terrain-draped access layer ties the illustrative campus
+  // together. These are display corridors only: PaulSam does not provide
+  // georeferenced service-road centerlines or a civil design. Keep them clear
+  // of conceptual pits, the feed apron and other facility footprints, and omit
+  // a spur when no screened alignment fits the current scene bounds.
+  let accessRoadCount=0;
+  const swaleDrapeAudit:{facilityId:CampusFacility['id'];sampleCount:number;maximumSegmentM:number}[]=[],swaleOmissions:string[]=[];
+  const accessRoadDrapeAudit:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]=[];
+  const roadObstacles=[
+    ...pits.map(pit=>pit.ring),
+    rectangle(feed,210,160),
+    rectangle(plant,310,310),
+  ];
+  function bezier(a:Point2,b:Point2,offset:number,t:number):Point2{
+    const dx=b[0]-a[0],dz=b[1]-a[1],length=Math.max(1,Math.hypot(dx,dz));
+    const nx=-dz/length,nz=dx/length;
+    const c1:Point2=[a[0]+dx*.34+nx*offset,a[1]+dz*.34+nz*offset];
+    const c2:Point2=[a[0]+dx*.66+nx*offset,a[1]+dz*.66+nz*offset];
+    const u=1-t;
+    return [u*u*u*a[0]+3*u*u*t*c1[0]+3*u*t*t*c2[0]+t*t*t*b[0],u*u*u*a[1]+3*u*u*t*c1[1]+3*u*t*t*c2[1]+t*t*t*b[1]];
+  }
+  const maximumRoadSampleSpacingM=6;
+  function sampleRoad(a:Point2,b:Point2,offset:number){
+    const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    let count=Math.max(24,Math.ceil(length/maximumRoadSampleSpacingM));
+    while(true){
+      const points=Array.from({length:count+1},(_,i)=>bezier(a,b,offset,i/count));
+      let longest=0;
+      for(let i=1;i<points.length;i++)longest=Math.max(longest,Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]));
+      if(longest<=maximumRoadSampleSpacingM)return points;
+      count=Math.ceil(count*longest/maximumRoadSampleSpacingM*1.01);
+    }
+  }
+  function ribbon(points:Point2[],width:number,offset:number,material:THREE.Material,name:string){
+    const positions:number[]=[];
+    for(let i=0;i<points.length-1;i++){
+      const [ax,az]=points[i],[bx,bz]=points[i+1],dx=bx-ax,dz=bz-az,length=Math.max(.001,Math.hypot(dx,dz)),nx=-dz/length*width/2,nz=dx/length*width/2;
+      const y=(x:number,z:number)=>height(x,z)+offset;
+      const a:[number,number,number]=[ax+nx,y(ax+nx,az+nz),az+nz],b:[number,number,number]=[ax-nx,y(ax-nx,az-nz),az-nz];
+      const c:[number,number,number]=[bx+nx,y(bx+nx,bz+nz),bz+nz],d:[number,number,number]=[bx-nx,y(bx-nx,bz-nz),bz-nz];
+      positions.push(...a,...c,...b,...b,...c,...d);
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();
+    const object=mesh(root,geometry,material,name);object.castShadow=false;object.receiveShadow=true;return object;
+  }
+  function swaleSections(points:Point2[],side:1|-1):number[][][]{
+    const positions:number[][][]=[];
+    for(let i=0;i<points.length;i++){
+      const previous=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next[0]-previous[0],dz=next[1]-previous[1],length=Math.max(.001,Math.hypot(dx,dz));
+      const nx=-dz/length*side,nz=dx/length*side,baseX=points[i][0]+nx*8,baseZ=points[i][1]+nz*8;
+      positions.push([-2,-.55,.55,2].map((lateral,index)=>{
+        const x=baseX+nx*lateral,z=baseZ+nz*lateral;
+        return [x,height(x,z)+(index===0||index===3?.22:.04),z];
+      }));
+    }
+    return positions;
+  }
+  function swaleGeometry(sections:number[][][],from:number,to:number){
+    const vertices:number[]=[];
+    const push=(point:number[])=>vertices.push(point[0],point[1],point[2]);
+    for(let i=0;i<sections.length-1;i++){
+      const a=sections[i][from],b=sections[i][to],c=sections[i+1][from],d=sections[i+1][to];
+      push(a);push(c);push(b);push(b);push(c);push(d);
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();return geometry;
+  }
+  function swaleClear(sections:number[][][],forbidden:Point2[][]){
+    return sections.flat().every(([x,,z])=>x>=bounds.minX&&x<=bounds.maxX&&z>=bounds.minZ&&z<=bounds.maxZ&&!forbidden.some(obstacle=>inside([x,z],obstacle)));
+  }
+  for(const facility of facilities){
+    const dx=facility.point[0]-plant[0],dz=facility.point[1]-plant[1],length=Math.max(1,Math.hypot(dx,dz)),ux=dx/length,uz=dz/length;
+    const plantEdge=155/Math.max(Math.abs(ux),Math.abs(uz),.001)+8;
+    const start:Point2=[plant[0]+ux*plantEdge,plant[1]+uz*plantEdge];
+    const halfWidth=facility.width/2,halfDepth=facility.depth/2;
+    const edgeDistance=1/Math.max(Math.abs(ux)/Math.max(1,halfWidth),Math.abs(uz)/Math.max(1,halfDepth));
+    const end:Point2=[facility.point[0]-ux*(edgeDistance+8),facility.point[1]-uz*(edgeDistance+8)];
+    const forbidden=[...roadObstacles,...facilities.filter(other=>other.id!==facility.id).map(other=>rectangle(other.point,other.width+24,other.depth+24))];
+    let chosen:Point2[]|null=null,chosenScore=Infinity;
+    for(const offset of [0,80,-80,160,-160,240,-240,320,-320]){
+      const points=sampleRoad(start,end,offset);
+      const clear=points.every(([x,z],i)=>{
+        if(x<bounds.minX||x>bounds.maxX||z<bounds.minZ||z>bounds.maxZ)return false;
+        if(forbidden.some(ringPoints=>overlaps(rectangle([x,z],12,12),ringPoints)))return false;
+        return true;
+      });
+      if(!clear)continue;
+      let pathLength=0;for(let i=1;i<points.length;i++)pathLength+=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);
+      const score=pathLength+Math.abs(offset)*.35;if(score<chosenScore){chosen=points;chosenScore=score;}
+    }
+    if(!chosen){omissions.push(`Illustrative ${facility.id} access spur withheld: no clear terrain corridor`);continue;}
+    let maximumSegmentM=0;for(let i=1;i<chosen.length;i++)maximumSegmentM=Math.max(maximumSegmentM,Math.hypot(chosen[i][0]-chosen[i-1][0],chosen[i][1]-chosen[i-1][1]));
+    accessRoadDrapeAudit.push({facilityId:facility.id,sampleCount:chosen.length,maximumSegmentM:Number(maximumSegmentM.toFixed(2))});
+    const surface=ribbon(chosen,8,1.15,materials.access,`Conceptual access surface · ${facility.id}`);
+    surface.userData.illustrative=true;surface.userData.accessFacility=facility.id;
+    // Narrow gravel shoulders make the roadway read against the natural DEM
+    // without adding a survey or engineering claim.
+    ribbon(chosen,11,1.05,materials.shoulder,`Illustrative gravel shoulders · ${facility.id}`);
+    // Add one shallow, muted display swale outside the road shoulder. This is
+    // a visual site-planning cue only: the project reports do not provide a
+    // stormwater alignment, hydraulic design or discharge point.
+    const swalePath=chosen.slice(2,-2);
+    const swaleSide:1|-1=([1,-1] as const).find(side=>swaleClear(swaleSections(swalePath,side),forbidden))??1;
+    const sections=swaleSections(swalePath,swaleSide);
+    if(swalePath.length>1&&swaleClear(sections,forbidden)){
+      const bank=mesh(root,swaleGeometry(sections,0,1),materials.swaleBank,'Illustrative roadside drainage swales · conceptual');
+      const bed=mesh(root,swaleGeometry(sections,1,2),materials.swaleBed,'Illustrative roadside drainage swales · conceptual');
+      const farBank=mesh(root,swaleGeometry(sections,2,3),materials.swaleBank,'Illustrative roadside drainage swales · conceptual');
+      for(const swale of [bank,bed,farBank]){swale.castShadow=false;swale.receiveShadow=false;}
+      let maximumSegmentM=0;for(let i=1;i<swalePath.length;i++)maximumSegmentM=Math.max(maximumSegmentM,Math.hypot(swalePath[i][0]-swalePath[i-1][0],swalePath[i][1]-swalePath[i-1][1]));
+      swaleDrapeAudit.push({facilityId:facility.id,sampleCount:swalePath.length,maximumSegmentM:Number(maximumSegmentM.toFixed(2))});
+    }else swaleOmissions.push(`${facility.id}: no obstacle-clear conceptual swale side`);
+    const centerPoints:THREE.Vector3[]=[];
+    for(let i=0;i<chosen.length;i+=Math.max(1,Math.floor(chosen.length/28))){const [x,z]=chosen[i];centerPoints.push(new THREE.Vector3(x,height(x,z)+1.35,z));}
+    if(centerPoints.length>1){const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(centerPoints),materials.centreline);line.name=`Display-only road center cue · ${facility.id}`;line.userData.accessFacility=facility.id;root.add(line);}
+    surface.userData.tooltipItems=[{title:`Illustrative access · ${facility.title}`,rows:['Display corridor only; no georeferenced road centerline or civil design supplied.','Terrain sampled from the current presentation surface; alignment is not a surveyed route.'],tone:'#c9ad7d'}];
+    accessRoadCount++;
+  }
+
   const grading=new THREE.Group();grading.name='Illustrative plant grading';
   join(grading,ring(plant,310,310,(x,z)=>height(x,z)+.2),ring(plant,250,250,options.plantLevel-.26,0),materials.earth,'Conceptual plant earthwork batters');
   batch(grading);root.add(grading);
@@ -119,14 +319,15 @@ export function buildMineSiteCampus(options:Options) {
     const [x,z]=f.point,y=f.level;
     if(f.id==='waste'){
       let outer=ring(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3),inset=0;
+      auditGroundContact(f.id,outer,.3);
       for(let lift=1;lift<=3;lift++){
         inset+=Math.min(12,f.depth/15);
         const crest=ring(f.point,f.width-2*inset,f.depth-2*inset,y+lift*5);
-        join(group,outer,crest,materials.rock,'Waste-rock batter · illustrative');
+        join(group,outer,crest,materials.rockSurface,'Waste-rock batter · illustrative');
         inset+=4;const bench=ring(f.point,f.width-2*inset,f.depth-2*inset,y+lift*5);
-        join(group,crest,bench,materials.bench,'Waste-rock bench · illustrative');outer=bench;
+        join(group,crest,bench,materials.benchSurface,'Waste-rock bench · illustrative');outer=bench;
       }
-      cap(group,outer,materials.bench,'Waste-rock upper working surface');
+      cap(group,outer,materials.benchSurface,'Waste-rock upper working surface');
       const topWidth=f.width-2*inset,topDepth=f.depth-2*inset,moundX=x-Math.min(30,topWidth*.2),moundZ=z-Math.min(15,topDepth*.2);
       const mound=mesh(group,new THREE.ConeGeometry(8,4,12),materials.rock,'Illustrative active waste-rock tip');mound.scale.set(Math.min(3.5,topWidth/40),1,Math.min(1.3,topDepth/40));mound.position.set(moundX,y+17,moundZ);f.anchor=[moundX,y+23,moundZ];
       for(let i=0;i<46;i++){
@@ -143,16 +344,26 @@ export function buildMineSiteCampus(options:Options) {
       box(group,3,2.6,3,x+16,y+18,z,materials.bench,'Parked dozer cab');
       box(group,7,2,.7,x+16,y+16,z+5,materials.steel,'Parked dozer blade');
     }else{
-      const tsf=f.id==='tailings',rise=tsf?12:4,crestInset=tsf?32:12,beachInset=tsf?68:25;
-      const toe=ring(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3);
-      const crest=ring(f.point,f.width-2*crestInset,f.depth-2*crestInset,y+rise);
-      const innerCrest=ring(f.point,f.width-2*(crestInset+6),f.depth-2*(crestInset+6),y+rise);
-      const beach=ring(f.point,f.width-2*beachInset,f.depth-2*beachInset,y+(tsf?2.4:1));
-      join(group,toe,crest,materials.earth,'Illustrative containment embankment');
-      join(group,crest,innerCrest,materials.bench,'Embankment crest access');
-      join(group,innerCrest,beach,tsf?materials.beach:materials.liner,'Contained inner slope');
+      const tsf=f.id==='tailings',basin=f.id==='tailings'||f.id==='water'||f.id==='raw-water',rise=tsf?12:4,crestInset=tsf?42:12,beachInset=tsf?68:25;
+      const contour=basin?containmentRing:ring;
+      const toe=contour(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3);
+      auditGroundContact(f.id,toe,.3);
+      const crest=contour(f.point,f.width-2*crestInset,f.depth-2*crestInset,y+rise);
+      const innerCrest=contour(f.point,f.width-2*(crestInset+6),f.depth-2*(crestInset+6),y+rise);
+      const beach=contour(f.point,f.width-2*beachInset,f.depth-2*beachInset,y+(tsf?2.4:1));
       if(tsf){
-        const pool={x:x+30,z:z-15,rx:36,rz:22};cap(group,beach,materials.beach,'Illustrative deposited-tailings beach',pool);
+        // A broad, stepped shoulder makes the conceptual containment form
+        // legible at overview scale without implying an engineered section.
+        const lowerCrest=contour(f.point,f.width-28,f.depth-28,y+5);
+        const shoulder=contour(f.point,f.width-52,f.depth-52,y+5);
+        join(group,toe,lowerCrest,materials.earthSurface,'Illustrative containment embankment');
+        join(group,lowerCrest,shoulder,materials.benchSurface,'Intermediate perimeter bench · illustrative');
+        join(group,shoulder,crest,materials.earthSurface,'Upper containment embankment · illustrative');
+      }else join(group,toe,crest,materials.earthSurface,'Illustrative containment embankment');
+      join(group,crest,innerCrest,materials.benchSurface,'Embankment crest access');
+      join(group,innerCrest,beach,tsf?materials.beachSurface:materials.linerSurface,'Contained inner slope');
+      if(tsf){
+        const pool={x:x+30,z:z-15,rx:36,rz:22};cap(group,beach,materials.beachSurface,'Illustrative deposited-tailings beach',pool);
         const ellipse=poolOutline(pool,y+2.02);
         cap(group,ellipse,materials.water,'Illustrative decant pool');
         box(group,5,.6,3,pool.x,y+2.15,pool.z,materials.steel,'Floating decant pontoon');
@@ -201,6 +412,15 @@ export function buildMineSiteCampus(options:Options) {
   }
   // Merge line detail separately, retaining each facility's picking metadata.
   batch(root);
-  root.userData.facilities=facilities;root.userData.omissions=omissions;
+  root.traverse(object=>{if(object instanceof THREE.Mesh&&object.name==='Illustrative roadside swales · no drainage design')object.userData.tooltipItems=[{title:'Illustrative roadside swales',rows:['Shallow visual site-planning cue along a screened campus access spur.','No stormwater alignment, hydraulic design, flow direction or discharge point is sourced.'],tone:'#8a8e79'}];});
+  root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;root.userData.accessRoadDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,roads:accessRoadDrapeAudit};
+  root.userData.facilityToeGroundContactAudit={expectedClearanceM:.3,facilities:facilityToeGroundContactAudit};
+  root.userData.facilityApronDrapeAudit=facilityApronDrapeAudit;
+  root.userData.swaleCount=swaleDrapeAudit.length;
+  root.userData.swaleDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,swales:swaleDrapeAudit};
+  root.userData.swaleOmissions=swaleOmissions;
+  root.userData.landformContourAudit={pointsPerRing:304,maximumSegmentM:Number(maximumContourSegmentM.toFixed(2))};
+  root.userData.tailingsProfileAudit={tierCount:tailings?2:0,intermediateBenchWidthM:12,totalRiseM:12,conceptual:true};
+  root.userData.fixedTerrainColorAudit={vertexCount:fixedTerrainColorVertices,min:Number(fixedTerrainColorMin.toFixed(4)),max:Number(fixedTerrainColorMax.toFixed(4)),source:'site-coordinate geometry; camera independent'};
   return {root,facilities,omissions};
 }

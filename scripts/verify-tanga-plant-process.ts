@@ -3,6 +3,18 @@ import * as THREE from 'three';
 import {buildConcentrator} from '../src/lib/deck/mine-scene';
 import {createPlantProcessMotion, type PlantProcessArea} from '../src/lib/deck/plant-process-motion';
 
+const deferredPlant = buildConcentrator({deferPlantDetail: true});
+assert.equal(deferredPlant.userData.plantDetailLoaded, false, 'The mine-plan overview must start with the shared plant exterior only');
+assert.equal((deferredPlant.userData.processStages as unknown[]).length, 6, 'Stage camera metadata must be ready before interior meshes load');
+const initialShellMeshes = deferredPlant.children.length;
+const ensurePlantDetail = deferredPlant.userData.ensurePlantDetail as () => boolean;
+assert.equal(ensurePlantDetail(), true, 'First plant inspection must build the process equipment');
+assert.equal(deferredPlant.userData.plantDetailLoaded, true);
+assert(deferredPlant.children.length > initialShellMeshes, 'Detailed process meshes must be attached on inspection');
+const loadedDetailMeshes = deferredPlant.children.length;
+assert.equal(ensurePlantDetail(), false, 'Repeated plant inspections must reuse the attached detail');
+assert.equal(deferredPlant.children.length, loadedDetailMeshes, 'Repeated inspection must not duplicate plant detail meshes');
+
 const plant = buildConcentrator();
 const activity = createPlantProcessMotion(plant);
 const mill = plant.userData.processMill as THREE.Mesh;

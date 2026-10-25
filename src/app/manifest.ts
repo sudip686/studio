@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Tanga Graphite · Investor Presentation',
     short_name: 'Tanga Graphite',
     description:
-      'An interactive 3D story of the Tanga Graphite Project, Tanzania — a top-5 global graphite deposit by Sakariya Mines & Minerals.',
+      'An interactive 3D story of the Tanga Graphite Project, Tanzania. Its 2025 Indicated MRE places fifth by reported contained graphite in a selected published 2023 peer set.',
     start_url: '/',
     display: 'standalone',
     orientation: 'landscape',
