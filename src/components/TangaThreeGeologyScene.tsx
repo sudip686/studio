@@ -1940,7 +1940,7 @@ function createTerrainPatchGeometry(mode: GeologyMode) {
     }
   }
 
-  const vertexIndex = (column: number, row: number) => row * (segmentsX + 1) + column;
+  const vertexIndex = (column: number, row: number) => row * rowWidth + column;
   for (let row = 0; row < segmentsY; row += 1) {
     const cy = ((row + 0.5) / segmentsY - 0.5) * depth;
     for (let column = 0; column < segmentsX; column += 1) {
@@ -1976,11 +1976,17 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
   const segmentsY = 526;
   const width = TERRAIN_PATCH_WIDTH;
   const depth = TERRAIN_PATCH_DEPTH;
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  const surveyedVertices:boolean[]=[];
+  const rowWidth = segmentsX + 1;
+  const vertexCount = rowWidth * (segmentsY + 1);
+  const positions = new Float32Array(vertexCount * 3);
+  const uvs = new Float32Array(vertexCount * 2);
+  const colors = mode === 'topography' ? new Float32Array(vertexCount * 3) : null;
+  const surveyedVertices = new Uint8Array(vertexCount);
+  const indices = new Uint32Array(segmentsX * segmentsY * 6);
+  const nearbyContextColor = new THREE.Color('#566451');
+  const regionalContextColor = new THREE.Color('#737f83');
+  let vertexCursor = 0;
+  let indexCursor = 0;
   let omittedSourceSeamTriangles=0;
 
   for (let row = 0; row <= segmentsY; row += 1) {
@@ -1989,20 +1995,26 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
       const x = (column / segmentsX - 0.5) * width;
       const verticalScale = mode === 'topography' ? 1 : VERTICAL_EXAGGERATION;
       const sample = sampleTerrainAtLocal(resources, x, planeY, 0, verticalScale);
-      positions.push(x, sample.y, -planeY);
-      surveyedVertices.push(Boolean(sample.surveyed));
-      uvs.push(sample.u, sample.v);
+      const positionOffset = vertexCursor * 3;
+      const uvOffset = vertexCursor * 2;
+      positions[positionOffset] = x;
+      positions[positionOffset + 1] = sample.y;
+      positions[positionOffset + 2] = -planeY;
+      surveyedVertices[vertexCursor] = sample.surveyed ? 1 : 0;
+      uvs[uvOffset] = sample.u;
+      uvs[uvOffset + 1] = sample.v;
       if (mode === 'topography') {
+        const colorOffset = positionOffset;
+        const colorTarget = colors!;
         if (!sample.surveyed) {
           // Three visual zones: the measured survey ramp, quiet nearby context,
           // then a cooler regional fade. These are display treatments, not
           // legal project boundaries or added geological interpretation.
-          const nearby = new THREE.Color('#566451');
-          const regional = new THREE.Color('#737f83');
           const distance = Math.hypot(x, planeY);
           const fade = clamp((distance - 1800) / 5700, 0, 1);
-          const contextColor = nearby.lerp(regional, fade);
-          colors.push(contextColor.r, contextColor.g, contextColor.b);
+          colorTarget[colorOffset] = nearbyContextColor.r + (regionalContextColor.r - nearbyContextColor.r) * fade;
+          colorTarget[colorOffset + 1] = nearbyContextColor.g + (regionalContextColor.g - nearbyContextColor.g) * fade;
+          colorTarget[colorOffset + 2] = nearbyContextColor.b + (regionalContextColor.b - nearbyContextColor.b) * fade;
         } else if (display === 'slope' && sample.slopeDegrees !== null && Number.isFinite(sample.slopeDegrees)) {
           const value = clamp(sample.slopeDegrees, 0, 55);
           let index = 0;
@@ -2010,8 +2022,9 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
           const low = TERRAIN_SLOPE_RAMP[index];
           const high = TERRAIN_SLOPE_RAMP[index + 1];
           const t = clamp((value - low.at) / (high.at - low.at), 0, 1);
-          const color = low.color.clone().lerp(high.color, t);
-          colors.push(color.r, color.g, color.b);
+          colorTarget[colorOffset] = low.color.r + (high.color.r - low.color.r) * t;
+          colorTarget[colorOffset + 1] = low.color.g + (high.color.g - low.color.g) * t;
+          colorTarget[colorOffset + 2] = low.color.b + (high.color.b - low.color.b) * t;
         } else {
           const surveyRange = resources.meta.survey_surface?.elevation_range_m;
           const elevationMin = surveyRange?.[0] ?? resources.meta.elevation_m.min;
@@ -2023,13 +2036,12 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
           const lower = TOPOGRAPHY_ELEVATION_RAMP[rampIndex];
           const upper = TOPOGRAPHY_ELEVATION_RAMP[rampIndex + 1];
           const blend = clamp((normalized - lower.at) / (upper.at - lower.at), 0, 1);
-          colors.push(
-            lower.color.r + (upper.color.r - lower.color.r) * blend,
-            lower.color.g + (upper.color.g - lower.color.g) * blend,
-            lower.color.b + (upper.color.b - lower.color.b) * blend,
-          );
+          colorTarget[colorOffset] = lower.color.r + (upper.color.r - lower.color.r) * blend;
+          colorTarget[colorOffset + 1] = lower.color.g + (upper.color.g - lower.color.g) * blend;
+          colorTarget[colorOffset + 2] = lower.color.b + (upper.color.b - lower.color.b) * blend;
         }
       }
+      vertexCursor += 1;
     }
   }
 
@@ -2044,18 +2056,24 @@ function createTexturedTerrainPatchGeometry(resources: TangaTerrainResources, mo
       const d = vertexIndex(column, row + 1);
       // Different elevation sources have no verified common vertical datum.
       // Never invent a steep wall by bridging their coverage edge.
-      if(surveyedVertices[a]===surveyedVertices[b]&&surveyedVertices[b]===surveyedVertices[d])indices.push(a,b,d);
-      else omittedSourceSeamTriangles++;
-      if(surveyedVertices[b]===surveyedVertices[c]&&surveyedVertices[c]===surveyedVertices[d])indices.push(b,c,d);
-      else omittedSourceSeamTriangles++;
+      if (surveyedVertices[a] === surveyedVertices[b] && surveyedVertices[b] === surveyedVertices[d]) {
+        indices[indexCursor++] = a;
+        indices[indexCursor++] = b;
+        indices[indexCursor++] = d;
+      } else omittedSourceSeamTriangles++;
+      if (surveyedVertices[b] === surveyedVertices[c] && surveyedVertices[c] === surveyedVertices[d]) {
+        indices[indexCursor++] = b;
+        indices[indexCursor++] = c;
+        indices[indexCursor++] = d;
+      } else omittedSourceSeamTriangles++;
     }
   }
 
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  if (mode === 'topography') geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  if (colors) geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setIndex(new THREE.BufferAttribute(indices.subarray(0, indexCursor), 1));
   geometry.userData.omittedSourceSeamTriangles=omittedSourceSeamTriangles;
   geometry.computeVertexNormals();
   return geometry;
