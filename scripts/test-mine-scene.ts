@@ -115,6 +115,10 @@ assert.equal(facilityApronAudit.length,campus.facilities.length,'Every illustrat
 assert.ok(facilityApronAudit.every(item=>item.nx>2&&item.nz>2&&item.maximumSampleSpacingM<=2.01),'Rounded facility aprons follow sampled terrain on a maximum 2 m grid');
 assert.ok(facilityApronAudit.every(item=>item.triangleCount>0&&item.triangleCount<2*item.nx*item.nz),'Facility aprons follow rounded landform footprints instead of forming full rectangular pads');
 assert.ok(facilityApronAudit.every(item=>item.maximumTriangleCentreErrorM<.02),'Facility apron triangles stay within 0.02 m of synthetic rolling terrain at their centres');
+const facilityToeGroundContactAudit=campus.root.userData.facilityToeGroundContactAudit as {expectedClearanceM:number;facilities:{facilityId:string;sampleCount:number;expectedClearanceM:number;maximumAbsoluteErrorM:number}[]};
+assert.equal(facilityToeGroundContactAudit.expectedClearanceM,.3,'Facility embankment toes use the documented 0.30 m render lift');
+assert.equal(facilityToeGroundContactAudit.facilities.length,campus.facilities.length,'Every placed facility exposes a terrain-contact audit for its actual embankment-toe vertices');
+assert.ok(facilityToeGroundContactAudit.facilities.every(item=>item.sampleCount>=64&&item.expectedClearanceM===.3&&item.maximumAbsoluteErrorM<.001),'Tailings, pond and waste-rock toes follow the supplied terrain sampler within 1 mm of their render lift');
 const landformContourAudit=campus.root.userData.landformContourAudit as {pointsPerRing:number;maximumSegmentM:number};
 assert.equal(landformContourAudit.pointsPerRing,304,'Rounded site landforms use a dense, matched perimeter for smooth berms and benches');
 assert.ok(landformContourAudit.maximumSegmentM<=6,`Rounded landform contours stay within the 6 m terrain-drape spacing (${landformContourAudit.maximumSegmentM.toFixed(2)} m)`);

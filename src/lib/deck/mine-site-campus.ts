@@ -18,6 +18,7 @@ export function buildMineSiteCampus(options:Options) {
   const {plant,feed,pits,boundary,bounds,height,surveyed}=options;
   const root=new THREE.Group();root.name='Illustrative waste and water facilities';
   const facilities:CampusFacility[]=[],omissions:string[]=[];
+  const facilityToeGroundContactAudit:{facilityId:CampusFacility['id'];sampleCount:number;expectedClearanceM:number;maximumAbsoluteErrorM:number}[]=[];
   const facilityApronDrapeAudit:{facilityId:CampusFacility['id'];nx:number;nz:number;triangleCount:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[]=[];
   let maximumContourSegmentM=0;
   let fixedTerrainColorVertices=0,fixedTerrainColorMin=Infinity,fixedTerrainColorMax=-Infinity;
@@ -135,6 +136,11 @@ export function buildMineSiteCampus(options:Options) {
     const geometry=new THREE.ShapeGeometry(shape,32);geometry.rotateX(-Math.PI/2);geometry.translate(0,points[0].y,0);
     if(pool){const p=geometry.getAttribute('position');for(let i=0;i<p.count;i++){const dx=(p.getX(i)-pool.x)/pool.rx,dz=(p.getZ(i)-pool.z)/pool.rz,signed=Math.hypot(dx,dz)-poolRadius(Math.atan2(dz,dx));p.setY(i,points[0].y-.4*(1-THREE.MathUtils.clamp(signed*2,0,1)));}geometry.computeVertexNormals();}
     return mesh(group,geometry,material,name);
+  }
+  function auditGroundContact(facilityId:CampusFacility['id'],toe:THREE.Vector3[],expectedClearanceM:number){
+    let maximumAbsoluteErrorM=0;
+    for(const point of toe)maximumAbsoluteErrorM=Math.max(maximumAbsoluteErrorM,Math.abs((point.y-height(point.x,point.z))-expectedClearanceM));
+    facilityToeGroundContactAudit.push({facilityId,sampleCount:toe.length,expectedClearanceM,maximumAbsoluteErrorM:Number(maximumAbsoluteErrorM.toFixed(4))});
   }
   function patch(group:THREE.Group,f:CampusFacility){
     const positions:number[]=[],maxSpacing=2,nx=Math.ceil((f.width+30)/maxSpacing),nz=Math.ceil((f.depth+30)/maxSpacing),apronWidth=f.width+30,apronDepth=f.depth+30;
@@ -313,6 +319,7 @@ export function buildMineSiteCampus(options:Options) {
     const [x,z]=f.point,y=f.level;
     if(f.id==='waste'){
       let outer=ring(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3),inset=0;
+      auditGroundContact(f.id,outer,.3);
       for(let lift=1;lift<=3;lift++){
         inset+=Math.min(12,f.depth/15);
         const crest=ring(f.point,f.width-2*inset,f.depth-2*inset,y+lift*5);
@@ -340,6 +347,7 @@ export function buildMineSiteCampus(options:Options) {
       const tsf=f.id==='tailings',basin=f.id==='tailings'||f.id==='water'||f.id==='raw-water',rise=tsf?12:4,crestInset=tsf?42:12,beachInset=tsf?68:25;
       const contour=basin?containmentRing:ring;
       const toe=contour(f.point,f.width,f.depth,(px,pz)=>height(px,pz)+.3);
+      auditGroundContact(f.id,toe,.3);
       const crest=contour(f.point,f.width-2*crestInset,f.depth-2*crestInset,y+rise);
       const innerCrest=contour(f.point,f.width-2*(crestInset+6),f.depth-2*(crestInset+6),y+rise);
       const beach=contour(f.point,f.width-2*beachInset,f.depth-2*beachInset,y+(tsf?2.4:1));
@@ -406,6 +414,7 @@ export function buildMineSiteCampus(options:Options) {
   batch(root);
   root.traverse(object=>{if(object instanceof THREE.Mesh&&object.name==='Illustrative roadside swales · no drainage design')object.userData.tooltipItems=[{title:'Illustrative roadside swales',rows:['Shallow visual site-planning cue along a screened campus access spur.','No stormwater alignment, hydraulic design, flow direction or discharge point is sourced.'],tone:'#8a8e79'}];});
   root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;root.userData.accessRoadDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,roads:accessRoadDrapeAudit};
+  root.userData.facilityToeGroundContactAudit={expectedClearanceM:.3,facilities:facilityToeGroundContactAudit};
   root.userData.facilityApronDrapeAudit=facilityApronDrapeAudit;
   root.userData.swaleCount=swaleDrapeAudit.length;
   root.userData.swaleDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,swales:swaleDrapeAudit};
