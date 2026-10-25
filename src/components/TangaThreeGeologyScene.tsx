@@ -2467,7 +2467,11 @@ export default function TangaThreeGeologyScene({
     // Left transparent (background = null) would show the page's black through,
     // which is what flattened the scene before.
     const subsurfaceStudio = ['drillholes','subsurface','resource'].includes(mode);
-    const sceneSky = subsurfaceStudio ? 0x3c4650 : SKY_COLOR;
+    // The mapped-geology chapter reads as a field atlas: keep a warm, bright
+    // neutral beyond the finite survey footprint so colored source units and
+    // the registered terrain edge remain easy to distinguish. Other evidence
+    // chapters retain their darker studio horizon.
+    const sceneSky = mode==='subsurface' ? 0xe8e6df : subsurfaceStudio ? 0x3c4650 : SKY_COLOR;
     scene.background = new THREE.Color(sceneSky);
     // Fog tinted to the sky so distant ground fades into the horizon instead of
     // ending on a hard cut.
