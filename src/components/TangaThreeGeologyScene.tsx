@@ -4892,6 +4892,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // Mine-plan site construction can schedule view transitions while its
           // terrain and facilities are rebuilding. Reapply the captured pose
           // once those objects are ready, so recovery wins over stale commands.
+          if(recoveryView.sitePlanView)setMineOrientation('plan');
           cameraTween=null;
           camera.position.set(...recoveryView.position);
           controls.target.set(...recoveryView.target);
