@@ -3238,8 +3238,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // earlier distant camera made the source cells read as a grade patch
         // on the hillside; this angle exposes their cube faces against the
         // stepped benches while preserving the registered source elevations.
-        const span=Math.max(size.x,size.z)*.7+90;
-        const position=centre.clone().add(new THREE.Vector3(span*.9,span*.32,span*.34));
+        const span=Math.max(size.x,size.z)*.84+110;
+        const position=centre.clone().add(new THREE.Vector3(span*.88,span*.32,span*.34));
         stage.localToWorld(centre);stage.localToWorld(position);
         scheduleCameraTween(position,centre,2,42);
         setStatus(`${command.action==='northPit'?'North':'South'} pit · source blocks within conceptual cutaway`);
