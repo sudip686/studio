@@ -153,6 +153,22 @@ campus.root.traverse(object=>{
 assert.ok(checkedRoadVertices>100,'Draped access-road vertices remain consistently above the sampled synthetic terrain');
 assert.ok(maximumTriangleDrapeError<0.02,`Road triangle interpolation follows rolling terrain (max error ${maximumTriangleDrapeError.toFixed(3)} m)`);
 const development=buildDevelopmentInfrastructure([-500,300],[200,-100],(x,z)=>x*.01+z*.005,25);
+const feedShedAudit=development.userData.fipShedAudit as {basis:string;footprintM:{width:number;length:number;area:number};conflictingTable5_1AreaM2:number;modeledTable5_9AreaM2:number;location:string;arrangement:string;baseY:number};
+assert.equal(feedShedAudit.basis,'PaulSam June 2023 · Table 5.9','The FIP building allowance retains its report basis');
+assert.deepEqual(feedShedAudit.footprintM,{width:30,length:50,area:1500},'The modeled FIP shed uses the 30 × 50 m / 1,500 m² Table 5.9 allowance');
+assert.equal(feedShedAudit.conflictingTable5_1AreaM2,1200,'The conflicting 1,200 m² Table 5.1 figure remains exposed');
+assert.equal(feedShedAudit.modeledTable5_9AreaM2,1500,'The exterior model records which table value it follows');
+assert.match(feedShedAudit.location,/approximate map registration/,'The report allowance is not presented as a surveyed building location');
+assert.match(feedShedAudit.arrangement,/no building plan or room layout/,'The exterior detail does not imply a sourced internal arrangement');
+const feedShedParts:THREE.Mesh[]=[];
+development.traverse(object=>{if(object instanceof THREE.Mesh&&object.name.includes('FIP operatives shed'))feedShedParts.push(object);});
+assert.ok(feedShedParts.length>=3,'The report-scale operations shed has separately batched structural, cladding and roof elements');
+const shedBounds=new THREE.Box3();feedShedParts.forEach(part=>shedBounds.union(new THREE.Box3().setFromObject(part)));
+const shedSize=shedBounds.getSize(new THREE.Vector3());
+assert.ok(shedSize.x>=30&&shedSize.x<31&&shedSize.z>=50&&shedSize.z<51,'The detailed shed remains within its 30 × 50 m report footprint plus minor roof thickness');
+const shedFloor=feedShedParts.find(part=>part.name.includes('report allowance / illustrative exterior'));
+assert.ok(shedFloor,'Batched shed components remain individually inspectable as one FIP building layer');
+assert.ok(shedBounds.min.y>=feedShedAudit.baseY-.001,'The detailed FIP shed sits on the report-apron datum rather than floating below the hardstand');
 const conveyorSupports=development.userData.conveyorSupports as {x:number;z:number;groundY:number;topY:number;height:number}[];
 assert.equal(conveyorSupports.length,62,'Both sides of all 31 conceptual conveyor support stations have individual footings');
 for(const support of conveyorSupports){
