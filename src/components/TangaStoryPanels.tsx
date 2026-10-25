@@ -173,6 +173,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       <details className="tanga-site-facility-register">
         <summary>Full site names &amp; location status</summary>
         <ul>
+          <li><strong>Feed-in point &amp; operatives shed</strong><span>Report allowance; approximate Figure 3.3 map registration; illustrative exterior</span></li>
           <li><strong>Processing candidate · Option 2</strong><span>Report planning assumption; approximate map registration</span></li>
           <li><strong>Tailings impoundment</strong><span>Illustrative placement; regional terrain context</span></li>
           <li><strong>Settling and reclaim-water pond</strong><span>Illustrative placement; regional terrain context</span></li>
