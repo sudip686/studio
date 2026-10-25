@@ -1138,6 +1138,18 @@ function cameraShotForMode(mode: GeologyMode, lowCamera: boolean): CameraShot {
       );
   }
 
+  if (mode === 'drillholes' && !lowCamera) {
+    // Start the drilling chapter as an aerial evidence map: keep the survey
+    // surface in frame and show the collar pattern from above instead of
+    // opening at the near-horizon angle used by the earlier low oblique shot.
+    return makeCameraShot(
+      new THREE.Vector3(-4200, 5100, 5700),
+      new THREE.Vector3(-2100, 3100, 3400),
+      new THREE.Vector3(100, -125, -90),
+      {fov: 42, lift: 240, drift: new THREE.Vector3(18, 5, 14), yawDrift: 0.005, flySeconds: 3.6}
+    );
+  }
+
   return lowCamera
     ? makeCameraShot(
       new THREE.Vector3(760, -1180, 1640),

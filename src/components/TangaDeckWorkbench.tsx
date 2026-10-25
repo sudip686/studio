@@ -2600,6 +2600,10 @@ export default function TangaDeckWorkbench() {
     if (overrides.resourceFocus) setResourceFocus(overrides.resourceFocus);
     setActiveShotIndex(0);
     setThreeCameraCommand(null);
+    if (mode === 'topography') {
+      setThreeLoadReport({...DEFAULT_THREE_LOAD_REPORT, scene: 'loading', terrain: 'loading', message: 'Loading measured terrain'});
+      setStatusText('Three.js loading measured terrain');
+    }
     if (mode === 'subsurface') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'geologyPlan'});
     else if (mode === 'mine_planning') setThreeCameraCommand({id:++threeCameraSequenceRef.current,action:'siteOblique'});
     setActiveMode(mode);
@@ -3597,8 +3601,13 @@ export default function TangaDeckWorkbench() {
         : activeMode === 'subsurface'
           ? 'resource'
           : null;
+  // Prioritize the current chapter's first useful 3D frame. Assay/lithology
+  // payloads are sizable and can compete with measured-terrain startup when
+  // a viewer opens Topography directly; they still warm during that chapter
+  // as soon as its scene has settled.
+  const nextPreloadSceneReady = activeMode !== 'topography' || threeLoadReport.scene === 'ready';
   useEffect(() => {
-    if (!nextPreloadStage) return;
+    if (!nextPreloadStage || !nextPreloadSceneReady) return;
     let idleHandle: number | null = null;
     let timerHandle: number | null = null;
     let cancelled = false;
@@ -3622,7 +3631,7 @@ export default function TangaDeckWorkbench() {
       // joins during the handoff, the controller still cancels the request.
       window.setTimeout(() => controller.abort(), 900);
     };
-  }, [nextPreloadStage]);
+  }, [nextPreloadSceneReady, nextPreloadStage]);
 
   const layers = useMemo(() => {
     const showGraphitePeers = activeMode === 'comparison' && isExploreMode;
