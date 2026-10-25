@@ -3393,6 +3393,47 @@ export default function TangaDeckWorkbench() {
     return () => window.clearInterval(timer);
   }, [mapInstance]);
 
+  // The MapLibre React `onLoad` callback can be skipped when a warm or reused
+  // map already has its style in memory. The instance-adoption path above is
+  // deliberately independent of that callback, so use the adopted map's own
+  // lifecycle as a second readiness signal instead of leaving map chapters in
+  // the indefinite “preparing” state.
+  useEffect(() => {
+    const map = mapInstance as any;
+    if (!map?.once) return;
+
+    let active = true;
+    const markReady = () => {
+      if (!active) return;
+      disableNativeTerrain({target: map});
+      setMapLoadState('ready');
+    };
+    const markFirstIdle = () => {
+      if (!active) return;
+      setMapLoadState(current => current === 'loading' ? 'ready' : current);
+      setMapFirstIdleMs(current => current ?? Math.round(performance.now() - appStartedAtRef.current));
+    };
+    const styleIsReady = () => {
+      try {
+        return typeof map.isStyleLoaded === 'function'
+          ? map.isStyleLoaded()
+          : typeof map.loaded === 'function' && map.loaded();
+      } catch {
+        return false;
+      }
+    };
+
+    if (styleIsReady()) markReady();
+    else map.once('load', markReady);
+    map.once('idle', markFirstIdle);
+
+    return () => {
+      active = false;
+      map.off?.('load', markReady);
+      map.off?.('idle', markFirstIdle);
+    };
+  }, [mapInstance, disableNativeTerrain]);
+
   // Sampled once the topography scene is reached. Without it that slide has
   // no relief at all — which is its entire subject.
   useEffect(() => {
