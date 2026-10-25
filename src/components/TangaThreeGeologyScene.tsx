@@ -2464,6 +2464,15 @@ export default function TangaThreeGeologyScene({
   const [projectedFrame, setProjectedFrame] = useState<ProjectedCalloutFrame>({width: 0, height: 0, items: []});
   const [navInstrument, setNavInstrument] = useState<ThreeNavInstrument>(DEFAULT_NAV_INSTRUMENT);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
+  const [selectedBlockTooltip, setSelectedBlockTooltip] = useState<HoverTooltip | null>(null);
+  useEffect(() => {
+    if (!selectedBlockTooltip) return;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedBlockTooltip(null);
+    };
+    window.addEventListener('keydown', dismissOnEscape);
+    return () => window.removeEventListener('keydown', dismissOnEscape);
+  }, [selectedBlockTooltip]);
   // Derived drill results, kept in state so the narration callouts and the
   // headline panel quote the same numbers the scene labels do.
   const [assayFacts, setAssayFacts] = useState<AssayFacts | null>(null);
@@ -2533,6 +2542,7 @@ export default function TangaThreeGeologyScene({
     setProjectedFrame({width: 0, height: 0, items: []});
     setNavInstrument(DEFAULT_NAV_INSTRUMENT);
     setHoverTooltip(null);
+    setSelectedBlockTooltip(null);
     const host = hostRef.current;
     // This chapter is a dedicated product/evidence composition, not a second
     // mine viewer. Avoid loading and rendering an invisible industrial campus.
@@ -5036,6 +5046,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (!hit || !tooltip) {
         renderer.domElement.classList.remove('is-picking');
         setHoverTooltip(null);
+        if (select && mode === 'mine_planning') setSelectedBlockTooltip(null);
         return;
       }
 
@@ -5053,18 +5064,26 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           window.dispatchEvent(new Event('tanga:manual-exploration'));
         }
       }
-      setHoverTooltip({
+      const nextTooltip = {
         x: clamp(event.clientX - rect.left + 16, 14, rect.width - 276),
         y: clamp(event.clientY - rect.top + 16, 76, rect.height - 156),
         title: tooltip.title,
         rows: tooltip.rows,
         tone: tooltip.tone,
-      });
+      };
+      setHoverTooltip(nextTooltip);
+      if (select && mode === 'mine_planning') {
+        const resourceBlocks=hit.object.userData?.resourceBlockSources as ResourceBlock[]|undefined;
+        setSelectedBlockTooltip(resourceBlocks?.[hit.instanceId??0] ? nextTooltip : null);
+      }
     };
 
     const onPointerMove = (event: PointerEvent) => {
       clearTimeout(pickTimer);
       if (event.buttons || interacting) {
+        if (selectionPointer && Math.hypot(event.clientX - selectionPointer.x, event.clientY - selectionPointer.y) >= 5) {
+          setSelectedBlockTooltip(null);
+        }
         setHoverTooltip(null);
         return;
       }
@@ -5073,9 +5092,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       pickTimer = setTimeout(() => pickAtPointer(event), 120);
     };
 
-    const onPointerLeave = () => {
+    const onPointerLeave = (event: PointerEvent) => {
       clearTimeout(pickTimer);
       selectionPointer = null;
+      if (event.buttons && mode === 'mine_planning') setSelectedBlockTooltip(null);
       renderer.domElement.classList.remove('is-picking', 'is-interacting');
       setHoverTooltip(null);
     };
@@ -6021,20 +6041,23 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           ))}
         </section>
       )}
-      {hoverTooltip && (
+      {(hoverTooltip ?? selectedBlockTooltip) && (
         <div
           className="tanga-three__tooltip"
           style={{
-            '--tooltip-x': `${hoverTooltip.x}px`,
-            '--tooltip-y': `${hoverTooltip.y}px`,
-            '--tooltip-tone': hoverTooltip.tone,
+            '--tooltip-x': `${(hoverTooltip ?? selectedBlockTooltip)!.x}px`,
+            '--tooltip-y': `${(hoverTooltip ?? selectedBlockTooltip)!.y}px`,
+            '--tooltip-tone': `${(hoverTooltip ?? selectedBlockTooltip)!.tone}`,
           } as any}
-          aria-label="3D data tooltip"
+          role={selectedBlockTooltip && !hoverTooltip ? 'status' : 'tooltip'}
+          aria-label={selectedBlockTooltip && !hoverTooltip ? 'Selected 3D resource block' : '3D data tooltip'}
+          data-selected={selectedBlockTooltip && !hoverTooltip ? 'true' : undefined}
         >
-          <strong>{hoverTooltip.title}</strong>
-          {hoverTooltip.rows.map((row) => (
+          <strong>{(hoverTooltip ?? selectedBlockTooltip)!.title}</strong>
+          {(hoverTooltip ?? selectedBlockTooltip)!.rows.map((row) => (
             <span key={row}>{row}</span>
           ))}
+          {selectedBlockTooltip && !hoverTooltip && <small className="tanga-three__tooltip-hint">Selected · Escape to clear</small>}
         </div>
       )}
       <section className={classNames('tanga-three__nav-cluster', legendItems.length === 0 && 'is-scale-only')} aria-label="Geology legend compass and scale">
