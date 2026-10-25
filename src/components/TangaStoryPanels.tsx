@@ -204,7 +204,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
         <p>{decision.detail}</p>
         <nav className="tanga-decision-links" aria-label={`${decision.title} supporting evidence`}>
           <a href={`/?v=1#${decision.chapter}`} target="_blank" rel="noreferrer">{decision.chapterLabel}<ArrowRight size={13}/></a>
-          <a href={decision.evidenceHref} target="_blank" rel="noreferrer">{decision.evidenceLabel}<ArrowRight size={13}/></a>
+          <details className="tanga-decision-source">
+            <summary>{decision.evidenceLabel}</summary>
+            <a href={decision.evidenceHref} target="_blank" rel="noreferrer">Open source evidence<ArrowRight size={13}/></a>
+          </details>
         </nav>
       </div>
     </li>)}</ol>
