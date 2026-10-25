@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {CONCEPT, inside, insetCrest, type CandidatePit, type Point2} from './site-planning';
 import {addPlantDetail, batchPlantMeshes, PLANT_PROCESS_STAGES} from './mine-plant-detail';
+import {SITE_EARTHWORK_OPACITY} from './stable-materials';
 
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
 export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
@@ -419,11 +420,11 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
     }
   }
   // Keep the plant apron on one fixed earth palette, but let the registered
-  // terrain imagery show through its conceptual grading tint. Fixed site-light
-  // shading restores relief/contact shadows; no camera-driven color variation
-  // is introduced.
+  // terrain imagery carry the close view beneath its conceptual grading tint.
+  // Fixed site-light shading restores relief/contact shadows; no camera-driven
+  // color variation is introduced.
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();
-  const earthworkMaterial=new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.36,depthWrite:false,side:THREE.DoubleSide});
+  const earthworkMaterial=new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:SITE_EARTHWORK_OPACITY,depthWrite:false,side:THREE.DoubleSide});
   const earthworks=new THREE.Mesh(geometry,earthworkMaterial);
   earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
   earthworks.userData.surfaceLighting='fixed site lighting; rough earth material; camera independent';

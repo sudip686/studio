@@ -1812,7 +1812,7 @@ function sceneCalloutsForMode(
   }
   if (mode === 'comparison') {
     return [
-      {id: 'comparison', label: 'Tanga · next study stage', detail: 'Reconcile evidence · validate assumptions · advance studies', boxX: 45, boxY: 38, tone: '#c7551b', anchor: {...PROJECT_CENTER}, offset: {x: 104, y: -88}},
+      {id: 'comparison', label: 'Tanga Graphite Project', detail: 'Project location · Tanzania', boxX: 45, boxY: 38, tone: '#c7551b', anchor: {...PROJECT_CENTER}, offset: {x: 104, y: -88}},
     ];
   }
   if (mode === 'resource') {
@@ -2464,6 +2464,9 @@ export default function TangaDeckWorkbench() {
   );
   const tangaRankingInserted = activeMode === 'ranking' ? peerMreRevealed || activeShotIndex > 0 : resourceHasBeenShown;
   const graphiteRows = useMemo(() => graphitePeerRows(tangaRankingInserted), [tangaRankingInserted]);
+  const selectedTangaPredecessor = selectedPeerProject?.isTanga
+    ? graphiteRows.find((project) => project.displayRank === selectedPeerProject.displayRank - 1) ?? null
+    : null;
   const maxContainedGraphite = useMemo(
     () => graphiteRows.reduce((max, p) => Math.max(max, p.containedGraphiteMt || 0), 0) || 1,
     [graphiteRows],
@@ -3389,6 +3392,47 @@ export default function TangaDeckWorkbench() {
 
     return () => window.clearInterval(timer);
   }, [mapInstance]);
+
+  // The MapLibre React `onLoad` callback can be skipped when a warm or reused
+  // map already has its style in memory. The instance-adoption path above is
+  // deliberately independent of that callback, so use the adopted map's own
+  // lifecycle as a second readiness signal instead of leaving map chapters in
+  // the indefinite “preparing” state.
+  useEffect(() => {
+    const map = mapInstance as any;
+    if (!map?.once) return;
+
+    let active = true;
+    const markReady = () => {
+      if (!active) return;
+      disableNativeTerrain({target: map});
+      setMapLoadState('ready');
+    };
+    const markFirstIdle = () => {
+      if (!active) return;
+      setMapLoadState(current => current === 'loading' ? 'ready' : current);
+      setMapFirstIdleMs(current => current ?? Math.round(performance.now() - appStartedAtRef.current));
+    };
+    const styleIsReady = () => {
+      try {
+        return typeof map.isStyleLoaded === 'function'
+          ? map.isStyleLoaded()
+          : typeof map.loaded === 'function' && map.loaded();
+      } catch {
+        return false;
+      }
+    };
+
+    if (styleIsReady()) markReady();
+    else map.once('load', markReady);
+    map.once('idle', markFirstIdle);
+
+    return () => {
+      active = false;
+      map.off?.('load', markReady);
+      map.off?.('idle', markFirstIdle);
+    };
+  }, [mapInstance, disableNativeTerrain]);
 
   // Sampled once the topography scene is reached. Without it that slide has
   // no relief at all — which is its entire subject.
@@ -5271,6 +5315,8 @@ export default function TangaDeckWorkbench() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
+  const [sceneMotionPaused, setSceneMotionPaused] = useState(false);
+  useEffect(() => { setSceneMotionPaused(false); }, [activeMode, activeShotIndex]);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);setIsHighlightsTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
@@ -5788,6 +5834,8 @@ export default function TangaDeckWorkbench() {
           onInspectEvidence={()=>{setIsAutoplay(false);setIsExecutiveTour(false);}}
           onSiteFacilities={setAvailableMineFacilities}
           onAssayFacts={setAssayFacts}
+          motionPaused={sceneMotionPaused}
+          onMotionPausedChange={setSceneMotionPaused}
         />
       )}
 
@@ -6976,6 +7024,8 @@ export default function TangaDeckWorkbench() {
         pitGradeFocus={pitGradeFocus}
         onPitGradeFocusChange={grade=>{setPitGradeFocus(grade);if(grade&&activeMode==='mine_planning'&&activeShot?.id!=='pit-blocks'){setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='pit-blocks')));issueThreeCameraCommand('revealPitBlocks');}}}
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
+        sceneMotionPaused={sceneMotionPaused}
+        onToggleSceneMotion={() => setSceneMotionPaused(value => !value)}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
@@ -7029,6 +7079,23 @@ export default function TangaDeckWorkbench() {
             <strong>{selectedPeerProject.containedGraphiteMt.toLocaleString(undefined, {maximumFractionDigits: 3})} Mt</strong>
             <small>{selectedPeerProject.status}</small>
           </div>
+          {selectedPeerProject.isTanga && selectedTangaPredecessor && (
+            <section className="tanga-deck__peer-popup-rank-context" aria-label="Adjacent selected-set ranking positions">
+              <span className="tanga-deck__peer-popup-rank-label">Adjacent position in this selected set</span>
+              <div className="tanga-deck__peer-popup-rank-values">
+                <div>
+                  <small>#{selectedTangaPredecessor.displayRank} {selectedTangaPredecessor.project} · Nov 2023 benchmark</small>
+                  <strong>{selectedTangaPredecessor.containedGraphiteMt.toFixed(1)} <em>Mt C</em></strong>
+                </div>
+                <span aria-hidden="true">→</span>
+                <div>
+                  <small>#{selectedPeerProject.displayRank} Tanga · Dec 2025 Indicated MRE</small>
+                  <strong>{selectedPeerProject.containedGraphiteMt.toFixed(2)} <em>Mt C</em></strong>
+                </div>
+              </div>
+              <p>Reported contained graphite values; benchmark categories are not itemized. Dates and bases are not harmonized. This selected historical set is not a global census.</p>
+            </section>
+          )}
           <dl className="tanga-deck__peer-popup-grid">
             {peerPopupRows(selectedPeerProject).map(([label, value]) => (
               <div key={`${selectedPeerProject.project}-${label}`}>
@@ -7051,7 +7118,7 @@ export default function TangaDeckWorkbench() {
           onPointerDown={markUiInteraction}
         >
           <div className="tanga-deck__ranking-head">
-            <span>{tangaRankingInserted ? 'Global Ranking' : 'Peer Context'}</span>
+            <span>{tangaRankingInserted ? 'Selected peer set' : 'Peer context'}</span>
             <strong>{tangaRankingInserted ? 'Tanga ranks #5 in this peer set' : 'Selected 10-project 2023 benchmark'}</strong>
             <small>{tangaRankingInserted
               ? 'By reported contained graphite. Dates and reported categories vary; this is a selected comparison set.'
@@ -7106,22 +7173,7 @@ export default function TangaDeckWorkbench() {
             ))}
           </ol>
 
-          {tangaRankingInserted ? (
-            <div className="tanga-deck__rank-vs" aria-label="Tanga versus Mahenge">
-              <div className="tanga-deck__rank-vs-head">
-                <span>#5 Tanga</span>
-                <em>vs</em>
-                <span>#4 Mahenge</span>
-              </div>
-              <ul>
-                <li><i>Scale</i><b>7.3 Mt</b><s>comparable</s><b>9.3 Mt</b></li>
-                <li className="is-win"><i>Logistics</i><b>~80 km to port</b><s>coastal edge</s><b>inland south</b></li>
-                <li className="is-win"><i>Metallurgy</i><b>&gt;97% TC</b><s>premium conc.</s><b>large-flake</b></li>
-                <li><i>Listing</i><b>Private</b><s>pre-market entry</s><b>ASX: BKT</b></li>
-              </ul>
-              <p>In this selected peer set, Tanga ranks fifth by reported contained graphite, using its Indicated MRE figure. Port distance and metallurgical testwork are context, not demonstrated cost or product advantages.</p>
-            </div>
-          ) : (
+          {!tangaRankingInserted && (
             <div className="tanga-deck__ranking-foot">
               <span>Awaiting resource reveal</span>
               <strong>Say &ldquo;show resource&rdquo; to reveal Tanga</strong>

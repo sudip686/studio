@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+/** Keep concept grading legible while letting registered terrain carry the view. */
+export const SITE_EARTHWORK_OPACITY = 0.24;
+
 /**
  * Keep fixed palette colors steady while the camera moves. Matte diffuse
  * shading retains shape; map/resource/pad colors should use unlit materials.
