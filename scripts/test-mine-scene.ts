@@ -104,6 +104,12 @@ assert.ok(campusPlantGrading?.material instanceof THREE.MeshStandardMaterial,'Th
 assert.equal((campusPlantGrading!.material as THREE.MeshStandardMaterial).opacity,.36,'The second plant grading layer does not restore an opaque terrain plate');
 assert.equal(campusPlantGrading!.receiveShadow,true,'Campus grading follows the fixed site lighting');
 assert.ok(campus.root.userData.accessRoadCount>=2,'The site campus has screened illustrative access spurs when terrain corridors are clear');
+const swaleAudit=campus.root.userData.swaleDrapeAudit as {maximumSampleSpacingM:number;swales:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]};
+assert.equal(swaleAudit.swales.length,campus.root.userData.swaleCount,'Each rendered roadside swale has an exposed drape audit');
+assert.ok(swaleAudit.swales.length>0&&swaleAudit.swales.every(item=>item.sampleCount>10&&item.maximumSegmentM<=swaleAudit.maximumSampleSpacingM),'Conceptual swale sections follow their screened road corridors at no more than 6 m spacing');
+const swaleMeshes:THREE.Mesh[]=[];campus.root.traverse(object=>{if(object instanceof THREE.Mesh&&object.name==='Illustrative roadside swales · no drainage design')swaleMeshes.push(object);});
+assert.ok(swaleMeshes.length>=2,'Conceptual swales retain separately inspectable earth banks and bed');
+assert.ok(swaleMeshes.every(mesh=>Array.isArray(mesh.userData.tooltipItems)&&JSON.stringify(mesh.userData.tooltipItems).includes('No stormwater alignment')),'Swale inspection states that no stormwater design is sourced');
 const facilityApronAudit=campus.root.userData.facilityApronDrapeAudit as {facilityId:string;nx:number;nz:number;triangleCount:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[];
 assert.equal(facilityApronAudit.length,campus.facilities.length,'Every illustrative water, tailings and waste facility exposes a cleared-apron drape audit');
 assert.ok(facilityApronAudit.every(item=>item.nx>2&&item.nz>2&&item.maximumSampleSpacingM<=2.01),'Rounded facility aprons follow sampled terrain on a maximum 2 m grid');

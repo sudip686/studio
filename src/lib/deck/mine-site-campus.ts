@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {contained, overlaps, rectangle, type CandidatePit, type Point2} from './site-planning';
+import {contained, inside, overlaps, rectangle, type CandidatePit, type Point2} from './site-planning';
 import {batchPlantMeshes} from './mine-plant-detail';
 import {buildHaulTruck} from './mine-haulage';
 
@@ -42,6 +42,8 @@ export function buildMineSiteCampus(options:Options) {
     concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
     access:new THREE.MeshBasicMaterial({color:0x535853,side:THREE.DoubleSide,toneMapped:false}),
     shoulder:new THREE.MeshBasicMaterial({color:0x887f6c,side:THREE.DoubleSide,toneMapped:false}),
+    swaleBank:new THREE.MeshBasicMaterial({color:0x756f60,side:THREE.DoubleSide,toneMapped:false}),
+    swaleBed:new THREE.MeshBasicMaterial({color:0x4d554c,side:THREE.DoubleSide,toneMapped:false}),
     centreline:new THREE.LineBasicMaterial({color:0xc5b99b,toneMapped:false}),
   };
   // Keep earthwork palettes spatially fixed. Procedural sub-metre noise here
@@ -191,6 +193,7 @@ export function buildMineSiteCampus(options:Options) {
   // of conceptual pits, the feed apron and other facility footprints, and omit
   // a spur when no screened alignment fits the current scene bounds.
   let accessRoadCount=0;
+  const swaleDrapeAudit:{facilityId:CampusFacility['id'];sampleCount:number;maximumSegmentM:number}[]=[],swaleOmissions:string[]=[];
   const accessRoadDrapeAudit:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]=[];
   const roadObstacles=[
     ...pits.map(pit=>pit.ring),
@@ -229,6 +232,30 @@ export function buildMineSiteCampus(options:Options) {
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();
     const object=mesh(root,geometry,material,name);object.castShadow=false;object.receiveShadow=true;return object;
   }
+  function swaleSections(points:Point2[],side:1|-1):number[][][]{
+    const positions:number[][][]=[];
+    for(let i=0;i<points.length;i++){
+      const previous=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next[0]-previous[0],dz=next[1]-previous[1],length=Math.max(.001,Math.hypot(dx,dz));
+      const nx=-dz/length*side,nz=dx/length*side,baseX=points[i][0]+nx*8,baseZ=points[i][1]+nz*8;
+      positions.push([-2,-.55,.55,2].map((lateral,index)=>{
+        const x=baseX+nx*lateral,z=baseZ+nz*lateral;
+        return [x,height(x,z)+(index===0||index===3?.22:.04),z];
+      }));
+    }
+    return positions;
+  }
+  function swaleGeometry(sections:number[][][],from:number,to:number){
+    const vertices:number[]=[];
+    const push=(point:number[])=>vertices.push(point[0],point[1],point[2]);
+    for(let i=0;i<sections.length-1;i++){
+      const a=sections[i][from],b=sections[i][to],c=sections[i+1][from],d=sections[i+1][to];
+      push(a);push(c);push(b);push(b);push(c);push(d);
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();return geometry;
+  }
+  function swaleClear(sections:number[][][],forbidden:Point2[][]){
+    return sections.flat().every(([x,,z])=>x>=bounds.minX&&x<=bounds.maxX&&z>=bounds.minZ&&z<=bounds.maxZ&&!forbidden.some(obstacle=>inside([x,z],obstacle)));
+  }
   for(const facility of facilities){
     const dx=facility.point[0]-plant[0],dz=facility.point[1]-plant[1],length=Math.max(1,Math.hypot(dx,dz)),ux=dx/length,uz=dz/length;
     const plantEdge=155/Math.max(Math.abs(ux),Math.abs(uz),.001)+8;
@@ -257,6 +284,20 @@ export function buildMineSiteCampus(options:Options) {
     // Narrow gravel shoulders make the roadway read against the natural DEM
     // without adding a survey or engineering claim.
     ribbon(chosen,11,1.05,materials.shoulder,`Illustrative gravel shoulders · ${facility.id}`);
+    // Add one shallow, muted display swale outside the road shoulder. This is
+    // a visual site-planning cue only: the project reports do not provide a
+    // stormwater alignment, hydraulic design or discharge point.
+    const swalePath=chosen.slice(2,-2);
+    const swaleSide:1|-1=([1,-1] as const).find(side=>swaleClear(swaleSections(swalePath,side),forbidden))??1;
+    const sections=swaleSections(swalePath,swaleSide);
+    if(swalePath.length>1&&swaleClear(sections,forbidden)){
+      const bank=mesh(root,swaleGeometry(sections,0,1),materials.swaleBank,'Illustrative roadside drainage swales · conceptual');
+      const bed=mesh(root,swaleGeometry(sections,1,2),materials.swaleBed,'Illustrative roadside drainage swales · conceptual');
+      const farBank=mesh(root,swaleGeometry(sections,2,3),materials.swaleBank,'Illustrative roadside drainage swales · conceptual');
+      for(const swale of [bank,bed,farBank]){swale.castShadow=false;swale.receiveShadow=false;}
+      let maximumSegmentM=0;for(let i=1;i<swalePath.length;i++)maximumSegmentM=Math.max(maximumSegmentM,Math.hypot(swalePath[i][0]-swalePath[i-1][0],swalePath[i][1]-swalePath[i-1][1]));
+      swaleDrapeAudit.push({facilityId:facility.id,sampleCount:swalePath.length,maximumSegmentM:Number(maximumSegmentM.toFixed(2))});
+    }else swaleOmissions.push(`${facility.id}: no obstacle-clear conceptual swale side`);
     const centerPoints:THREE.Vector3[]=[];
     for(let i=0;i<chosen.length;i+=Math.max(1,Math.floor(chosen.length/28))){const [x,z]=chosen[i];centerPoints.push(new THREE.Vector3(x,height(x,z)+1.35,z));}
     if(centerPoints.length>1){const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(centerPoints),materials.centreline);line.name=`Display-only road center cue · ${facility.id}`;line.userData.accessFacility=facility.id;root.add(line);}
@@ -363,8 +404,12 @@ export function buildMineSiteCampus(options:Options) {
   }
   // Merge line detail separately, retaining each facility's picking metadata.
   batch(root);
+  root.traverse(object=>{if(object instanceof THREE.Mesh&&object.name==='Illustrative roadside swales · no drainage design')object.userData.tooltipItems=[{title:'Illustrative roadside swales',rows:['Shallow visual site-planning cue along a screened campus access spur.','No stormwater alignment, hydraulic design, flow direction or discharge point is sourced.'],tone:'#8a8e79'}];});
   root.userData.facilities=facilities;root.userData.omissions=omissions;root.userData.accessRoadCount=accessRoadCount;root.userData.accessRoadDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,roads:accessRoadDrapeAudit};
   root.userData.facilityApronDrapeAudit=facilityApronDrapeAudit;
+  root.userData.swaleCount=swaleDrapeAudit.length;
+  root.userData.swaleDrapeAudit={maximumSampleSpacingM:maximumRoadSampleSpacingM,swales:swaleDrapeAudit};
+  root.userData.swaleOmissions=swaleOmissions;
   root.userData.landformContourAudit={pointsPerRing:304,maximumSegmentM:Number(maximumContourSegmentM.toFixed(2))};
   root.userData.tailingsProfileAudit={tierCount:tailings?2:0,intermediateBenchWidthM:12,totalRiseM:12,conceptual:true};
   root.userData.fixedTerrainColorAudit={vertexCount:fixedTerrainColorVertices,min:Number(fixedTerrainColorMin.toFixed(4)),max:Number(fixedTerrainColorMax.toFixed(4)),source:'site-coordinate geometry; camera independent'};
