@@ -1812,7 +1812,7 @@ function sceneCalloutsForMode(
   }
   if (mode === 'comparison') {
     return [
-      {id: 'comparison', label: 'Tanga · next study stage', detail: 'Reconcile evidence · validate assumptions · advance studies', boxX: 45, boxY: 38, tone: '#c7551b', anchor: {...PROJECT_CENTER}, offset: {x: 104, y: -88}},
+      {id: 'comparison', label: 'Tanga Graphite Project', detail: 'Project location · Tanzania', boxX: 45, boxY: 38, tone: '#c7551b', anchor: {...PROJECT_CENTER}, offset: {x: 104, y: -88}},
     ];
   }
   if (mode === 'resource') {

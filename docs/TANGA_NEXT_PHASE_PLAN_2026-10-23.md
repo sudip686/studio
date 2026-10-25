@@ -21,6 +21,7 @@ Observed opportunities:
 - The mine overview frames the pits prominently while the lowland plant and water facilities sit near the bottom edge and behind the lower overlays. Some facility label headings truncate.
 - The peer globe now fits between the panels. Preserve this improvement; further work should emphasize selection, hierarchy and the dated comparison basis.
 - The final chapter repeats similar wording in its callout, right panel and bottom cue. Give this chapter an explicit decision-oriented visual composition.
+- [x] Give the closing map callout a geographic locator role (“Tanga Graphite Project · Project location · Tanzania”), leaving next-study decisions to the right panel and bottom cue. Verified visually at 1707 × 842 and 1366 × 768 with no overlap, horizontal overflow or browser errors; captures: `.playwright-mcp/closing-locator-1707x842.png` and `.playwright-mcp/closing-locator-1366x768.png`.
 - Source inspection confirms existing presentation/explore modes, layer search and opacity, projected label placement, scene load states, asset caching, resolution adaptation and chapter hash links. These are foundations to consolidate, not missing features to recreate.
 - The 3D error message currently asks the viewer to switch scenes and return. An in-place retry and an intelligible fallback would be better for a live meeting.
 - Chapter hashes currently restore the chapter; the map/model substage and selected object need an explicit share-state design.
