@@ -4590,7 +4590,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               if(cancelled)return;
               if(cursor<sourceBlocks.length)await new Promise<void>(resolve=>{
                 if(document.visibilityState==='hidden')window.setTimeout(resolve,100);
-                else window.requestAnimationFrame(()=>resolve());
+                else{
+                  const schedulerApi=(window as Window&{scheduler?:{yield?:()=>Promise<void>}}).scheduler;
+                  if(schedulerApi?.yield)void schedulerApi.yield().then(resolve,resolve);
+                  else window.setTimeout(resolve,0);
+                }
               });
             }
             // Draw every selected source cell in the pit shell. A sparse display
