@@ -2279,6 +2279,8 @@ export type WebGlRecoveryView = {
   mode: GeologyMode;
   position: [number, number, number];
   target: [number, number, number];
+  up?: [number, number, number];
+  sitePlanView?: boolean;
   fov: number;
   geologyStage?: 'plan' | 'mapped-relief' | 'interpreted-depth';
 };
@@ -2766,7 +2768,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     try {
       const stored = sessionStorage.getItem(recoveryViewKey);
       if (!recoveryView && stored) {
-        const candidate = JSON.parse(stored) as {position?: number[]; target?: number[]; fov?: number; geologyStage?: string};
+        const candidate = JSON.parse(stored) as {position?: number[]; target?: number[]; up?: number[]; sitePlanView?: boolean; fov?: number; geologyStage?: string};
         const validVector = (value?: number[]): value is [number, number, number] =>
           Array.isArray(value) && value.length === 3 && value.every((coordinate) => Number.isFinite(coordinate) && Math.abs(coordinate) <= 1e7);
         const distance = validVector(candidate.position) && validVector(candidate.target)
@@ -2778,6 +2780,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             mode,
             position: candidate.position,
             target: candidate.target,
+            ...(validVector(candidate.up)?{up:candidate.up}:{}),
+            ...(typeof candidate.sitePlanView==='boolean'?{sitePlanView:candidate.sitePlanView}:{}),
             fov: candidate.fov!,
             ...(mode==='subsurface'&&['plan','mapped-relief','interpreted-depth'].includes(candidate.geologyStage??'')?{geologyStage:candidate.geologyStage as 'plan'|'mapped-relief'|'interpreted-depth'}:{}),
           };
@@ -2787,6 +2791,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     } catch { /* Session storage is optional; retain the authored camera. */ }
     const camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 0.1, mode === 'subsurface' ? 65000 : 26000);
     camera.fov = recoveryView?.fov ?? cameraShot.fov;
+    if(recoveryView?.up)camera.up.fromArray(recoveryView.up);
     camera.position.copy(recoveryView ? new THREE.Vector3(...recoveryView.position) : cameraShot.from);
     camera.updateProjectionMatrix();
 
@@ -2828,6 +2833,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         mode,
         position: camera.position.toArray() as [number, number, number],
         target: controlsRef.current?.target.toArray() as [number, number, number] ?? DEFAULT_CAMERA_TARGET.toArray() as [number, number, number],
+        up: camera.up.toArray() as [number, number, number],
+        sitePlanView,
         fov: camera.fov,
         geologyStage: mode === 'subsurface'
           ? ['plan','mapped-relief','interpreted-depth'].includes(host.dataset.geologyStage ?? '')
@@ -2890,6 +2897,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     controls.target.copy(recoveryView ? new THREE.Vector3(...recoveryView.target) : DEFAULT_CAMERA_TARGET);
     controls.maxDistance = mode === 'subsurface' ? 34000 : 16000;
     controls.minDistance = 25;
+    if(mode==='mine_planning'&&recoveryView?.sitePlanView){
+      sitePlanView=true;
+      controls.enableRotate=false;
+      controls.minPolarAngle=0.04;
+      controls.maxPolarAngle=Math.PI-0.04;
+    }
     controls.update();
     controlsRef.current = controls;
     let userTookControl = Boolean(recoveryView);
@@ -4874,7 +4887,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(mode==='mine_planning'){
         mineCampusReady=true;
         const pending=cameraCommandRef.current;
-        if(pending&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit','revealPitBlocks'].includes(pending.action))consumeCameraCommand(pending);
+        if(pending&&!recoveryView&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit','revealPitBlocks'].includes(pending.action))consumeCameraCommand(pending);
+        if(recoveryView){
+          // Mine-plan site construction can schedule view transitions while its
+          // terrain and facilities are rebuilding. Reapply the captured pose
+          // once those objects are ready, so recovery wins over stale commands.
+          cameraTween=null;
+          camera.position.set(...recoveryView.position);
+          controls.target.set(...recoveryView.target);
+          camera.fov=recoveryView.fov;
+          camera.updateProjectionMatrix();
+          controls.update();
+        }
       }
       if (mode === 'subsurface') {
         geologyModelReady = true;
