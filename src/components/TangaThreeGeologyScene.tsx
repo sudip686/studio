@@ -2860,8 +2860,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     renderer.domElement.addEventListener('webglcontextrestored', onContextRestored, false);
     // Keep a fixed draw-buffer scale through camera gestures and settled
     // views. Frame-time adaptation made colored blocks, pads, and fine details
-    // shimmer as the resolution changed while the presenter orbited.
-    const renderPixelRatio = Math.min(mode === 'topography' ? 1.25 : 1, window.devicePixelRatio || 1);
+    // shimmer as the resolution changed while the presenter orbited. A 1x cap
+    // also avoids oversampling the large terrain mesh on high-DPI displays.
+    const renderPixelRatio = Math.min(1, window.devicePixelRatio || 1);
     renderer.setPixelRatio(renderPixelRatio);
     host.dataset.renderScale = renderPixelRatio.toFixed(2);
     renderer.setSize(host.clientWidth, host.clientHeight);
