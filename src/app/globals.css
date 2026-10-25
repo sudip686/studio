@@ -5039,6 +5039,13 @@ body {
   transform: scale(1.03);
 }
 
+/* Keep the 2D transition visible, then release its hidden map/DeckGL canvas
+   from layout while the full-screen Three.js scene is active. The workbench's
+   ResizeObserver restores the map's viewport when this chapter exits. */
+.tanga-deck--three-active:not(.tanga-deck--transitioning) .tanga-deck__deck-stage {
+  display: none;
+}
+
 .tanga-deck--transitioning .tanga-deck__deck-stage,
 .tanga-deck--transitioning .tanga-three__canvas {
   filter: blur(6px) saturate(0.86);
