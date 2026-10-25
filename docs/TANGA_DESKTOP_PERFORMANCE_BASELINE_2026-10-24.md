@@ -46,3 +46,11 @@ The workbench exposes `data-map-state`, `data-map-first-idle-ms`, `data-three-st
 ## Open gates
 
 Repeat the test on physical target devices, include a 30-second orbit/drag/zoom sample for every 3D chapter, test cold and warm cache behavior on throttled networks, and measure deployed Vercel and Cloudflare builds separately. The local short-window RAF figures are not an acceptance result.
+
+## Follow-up: cold topography discrepancy on the current branch — 2026-10-25
+
+On branch `codex/tanga-investor-experience` at `6287f84`, a fresh Playwright browser context using the installed desktop Chrome opened the standard Next production build at 1366 × 768 on an isolated loopback origin (`http://localhost:3113/#topography`). The scene reached its existing `data-ready=true` marker at 41.45 s from navigation. No failed requests, HTTP errors or browser console errors were recorded. This is one unthrottled local cold-context observation, not a physical-device or deployed-host result.
+
+The browser timing entries show the registered terrain context and survey grids starting at about 25.64 s: the 5.74 MB survey-height binary completed in 3.15 s, and the 1.44 MB context and coverage binaries each completed in 2.40 s. The one-ahead drilling preload also requested `assay_data.geojson` (331,049 transferred bytes; 4.87 MB decoded) from 17.68 s and completed in 10.30 s. External imagery-tile traffic was active during the same entry. These timings do not establish that one request caused the late scene start or that the preload delayed it.
+
+This result differs sharply from the 1.83 s Topography ready time in the 24 October cache-isolated matrix. The methods are not sufficiently matched to call this a regression or a speed-up. Re-run both methods on the current branch with navigation, first useful frame, Three.js ready marker, cache state and request timings recorded together; keep the cross-chapter performance acceptance open until reconciled.
