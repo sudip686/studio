@@ -4618,6 +4618,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 mesh.name=`${pitIndex===0?'North':'South'} pit · ${band.range} model cells`;
                 mesh.userData.pitIndex=pitIndex;
                 mesh.userData.gradeBand=band.key;
+                // Keep each instanced cell tied to its own source record so
+                // hover/click inspection reports this block's grade,
+                // classification and dimensions instead of only the batch.
+                mesh.userData.resourceBlockSources=subset;
                 mesh.renderOrder=40+bandIndex*.01;
                 mesh.visible=false;
                 mesh.userData.tooltipItems=[{title:mesh.name,rows:['Source-positioned model cells inside the conceptual pit envelope.','Displayed grade threshold is not an economic cutoff or reserve.'],tone:band.color}];
