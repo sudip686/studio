@@ -156,10 +156,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       </div>
     </div>}
     {minePanelSection==='blocks'&&<div className="tanga-site-panel-content">
-      <div className="tanga-site-panel-subtitle">SOURCE BLOCK MODEL · PIT CUTAWAY</div>
+      <div className="tanga-site-panel-subtitle">SOURCE BLOCK MODEL · OPEN PIT</div>
       {pitBlocksStatus!=='ready'&&<small className="tanga-pit-grade-state tanga-pit-block-status" data-state={pitBlocksStatus} role="status">{pitBlocksStatus==='loading'?'Source cells are loading. You can still explore the pit cutaway.':'Source block data failed to load. Choose Inspect to retry.'}</small>}
       <button type="button" className="tanga-story-panel__compare tanga-story-panel__pit-block-reveal" aria-label={pitBlocksStatus==='error'?'Retry source block model and focus both conceptual pits':'Focus resource blocks inside both conceptual pits'} aria-pressed={pitBlockFocusIndex===null} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.()}>{pitBlocksStatus==='error'?'Retry blocks & inspect pits':'Inspect blocks in both pits'} <ArrowRight size={14}/></button>
-      <div className="tanga-pit-focus-actions" role="group" aria-label="Focus resource block cutaway">
+      <div className="tanga-pit-focus-actions" role="group" aria-label="Focus source blocks inside pit shells">
         <button type="button" aria-pressed={pitBlockFocusIndex===0} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(0)}>North pit · inspect blocks</button>
         <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}>South pit · inspect blocks</button>
       </div>

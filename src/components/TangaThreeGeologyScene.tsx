@@ -3195,12 +3195,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setMiningBeat(2);
         setMotionPaused(false);
         activePitBlockFocusRef.current = Number.isInteger(command.pitIndex) ? command.pitIndex! : null;
-        // Keep the grade cells integrated with the excavation: terrain and
-        // pit geometry should occlude them naturally. X-ray stays available
-        // as a separate presenter control when a through-surface inspection
-        // is useful.
+        // The terrain is already carved to the pit shell. Keep the entire
+        // source-cell population inside that open excavation; a second plane
+        // through the middle of the pit made the grade model read as a detached
+        // slab. X-ray and the staged bench reveal remain separate controls.
         setTargetXray(false);
-        revealCommand.current?.('pitcut');
+        revealCommand.current?.('none');
         pitBlockRetryRef.current?.();
         stage.updateMatrixWorld(true);
         const orderedPits=[...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]);
@@ -3215,7 +3215,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         centre.y+=(size.y*.2);
         const offset=new THREE.Vector3(span*.78,span*.78,span*.92).multiplyScalar(Math.max(1,.72/camera.aspect));
         scheduleCameraTween(centre.clone().add(offset),centre,1.8,43);
-        setStatus('Grade-selected resource blocks exposed within the conceptual pit cutaway');
+        setStatus('Grade-selected source cells shown within the full conceptual pit shells');
         return;
       }
       if(command.action==='northPit'||command.action==='southPit'){
@@ -3233,7 +3233,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // broken from the initial mine-planning view.
         activePitBlockFocusRef.current=pitIndex;
         setTargetXray(false);
-        revealCommand.current?.('pitcut');
+        revealCommand.current?.('none');
         pitBlockRetryRef.current?.();
         const bounds=new THREE.Box3();
         for(const [x,z] of pit.ring)bounds.expandByPoint(new THREE.Vector3(x,pit.surface-pit.depth*.45,z));
@@ -3246,7 +3246,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const position=centre.clone().add(new THREE.Vector3(span*.88,span*.32,span*.34));
         stage.localToWorld(centre);stage.localToWorld(position);
         scheduleCameraTween(position,centre,2,42);
-        setStatus(`${command.action==='northPit'?'North':'South'} pit · source blocks within conceptual cutaway`);
+        setStatus(`${command.action==='northPit'?'North':'South'} pit · source blocks within the open conceptual excavation`);
         return;
       }
 
@@ -6056,7 +6056,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <h2>{miningBeat>=3?'Processing & site services':miningBeat===2?'Resource blocks inside pits':'Why these pits?'}</h2>
         {miningBeat===2&&<>
           <div className="tanga-mine-story__pit-block-action">
-            <button aria-pressed={revealAction==='pitcut'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='pitcut'?'Replay pit block cutaway':'Focus resource blocks inside pits'}</button>
+            <button aria-pressed={revealAction==='benches'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='benches'?'Replay staged bench reveal':'Focus resource blocks inside pits'}</button>
             <small>{pitBlocksStatus==='loading'?'Loading source block cells; the site and pit cutaway remain interactive.':pitBlocksStatus==='error'?'Source block model unavailable. The conceptual pit remains viewable.':`${targetDisplayCount.toLocaleString()} grade-selected source blocks inside the conceptual pit shells. Source positions, dimensions and grades are retained.`}</small>
           </div>
           <div className="tanga-mine-story__key" aria-label="Resource block grade bands">{TGC_GRADE_BINS.filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high').map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.key==='medium'?'4.5–<6% TGC':bin.key==='high'?'6–<8% TGC':'≥8% TGC'}</span>)}</div>
