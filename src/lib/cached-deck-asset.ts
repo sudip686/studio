@@ -4,6 +4,7 @@ const TTL=24*60*60*1000;
 const ALLOWED=/\/(geologicalModel\.glb|height_hires\.bin|terrain_context_512\.bin|survey_(height|coverage|slope)_hires\.bin|height_preview_1024\.bin|assay_data\.geojson|lithology_data\.geojson|BlockModel\.geojson|api\/block-model|terrain_(hires|preview)_meta\.json|terrain_texture_hires\.jpg)$/;
 type PendingAsset={controller:AbortController;promise:Promise<Response>;consumers:number;settled:boolean;cancelled:boolean};
 const pending=new Map<string,PendingAsset>();
+const cacheWrites=new Map<string,Promise<void>>();
 
 function isCacheableAssetPath(pathname:string){
   // R2-backed public assets are exposed through the same-origin streaming
@@ -37,7 +38,12 @@ function subscribe(job:PendingAsset,key:string,signal?:AbortSignal):Promise<Resp
       }
     };
     signal?.addEventListener('abort',onAbort,{once:true});
-    job.promise.then(response=>{if(finish())resolve(response.clone());},error=>{if(finish())reject(error);});
+    job.promise.then(response=>{
+      // Give the original stream to the last active consumer; earlier
+      // consumers get independent tees. This avoids retaining an otherwise
+      // unread response branch for large GeoJSON payloads.
+      if(finish())resolve(job.consumers>0?response.clone():response);
+    },error=>{if(finish())reject(error);});
   });
 }
 
@@ -49,16 +55,29 @@ export async function cachedDeckAsset(url:string,init?:RequestInit):Promise<Resp
   const controller=new AbortController();
   const load=async()=>{
     let cache:Cache|undefined;
-    try{cache=await caches.open(DECK_ASSET_CACHE);const hit=await cache.match(key);if(controller.signal.aborted)throw abortError();if(hit&&Date.now()-Number(hit.headers.get('x-tanga-stored-at'))<TTL)return hit;}catch(error){if(controller.signal.aborted)throw error;/* Private browsing/quota restrictions must not block viewing. */}
+    try{
+      cache=await caches.open(DECK_ASSET_CACHE);
+      // A previous foreground load may already have returned while its
+      // persistent write is finishing. Let that write settle before deciding
+      // whether this caller needs another large transfer.
+      await cacheWrites.get(key);
+      const hit=await cache.match(key);
+      if(controller.signal.aborted)throw abortError();
+      if(hit&&Date.now()-Number(hit.headers.get('x-tanga-stored-at'))<TTL)return hit;
+    }catch(error){if(controller.signal.aborted)throw error;/* Private browsing/quota restrictions must not block viewing. */}
     const response=await fetch(url,{...init,cache:'no-cache',signal:controller.signal});
     const type=response.headers.get('content-type')||'',length=Number(response.headers.get('content-length'));
     const invalid=type.includes('text/html')||(key.endsWith('.glb')&&length>0&&length<1024);
     if(response.ok&&response.status===200&&!invalid&&cache){
       const copy=response.clone(),headers=new Headers(copy.headers);headers.set('x-tanga-stored-at',String(Date.now()));
       // Fixed deck allowlist (~119 MB from R2); never cache failed responses.
-      // Keep the shared request alive through the entire download/cache write,
-      // so entering geology mid-preload does not start a second transfer.
-      await cache.put(key,new Response(copy.body,{status:200,headers})).catch(()=>{});
+      // Return the readable response as soon as it arrives so JSON decoding
+      // and scene preparation can run while Cache Storage persists its copy.
+      // A later caller waits for this write above before checking the cache,
+      // avoiding duplicate transfers during the background write.
+      const write=cache.put(key,new Response(copy.body,{status:200,headers})).catch(()=>{});
+      cacheWrites.set(key,write);
+      void write.then(()=>{if(cacheWrites.get(key)===write)cacheWrites.delete(key);});
     }
     return response;
   };
