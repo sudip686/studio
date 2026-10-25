@@ -646,6 +646,8 @@ const DEFAULT_NAV_INSTRUMENT: ThreeNavInstrument = {
 const NICE_SCALE_METERS = [25, 50, 100, 200, 500, 1000, 2000, 5000];
 
 let blockPromise: Promise<ResourceBlock[]> | null = null;
+let blockParserBackend: 'worker' | 'main-fallback' = 'worker';
+let blockParserTiming: {parseMs: number; projectionMs: number; sourceFeatures: number} | null = null;
 let drillPromise: Promise<DrillSegment[]> | null = null;
 const terrainPromises = new Map<AssetQuality, Promise<TangaTerrainResources>>();
 let terrainTexturePromise: Promise<THREE.Texture> | null = null;
@@ -1546,11 +1548,49 @@ function loadBlocks() {
     // route streams it from R2 when it is not available in the local build,
     // avoiding browser CORS failures on preview hosts and laptops.
     blockPromise = cachedDeckAsset('/api/block-model', {cache: 'force-cache'})
-      .then(response => {if (!response.ok) throw new Error('Block model unavailable'); return response.json();})
-      .then(parseBlockGeoJson)
+      .then(response => {if (!response.ok) throw new Error('Block model unavailable'); return parseBlockGeoJsonInWorker(response);})
       .catch(error => {blockPromise = null; throw error;});
   }
   return blockPromise;
+}
+
+async function parseBlockGeoJsonInWorker(response: Response): Promise<ResourceBlock[]> {
+  if (typeof Worker === 'undefined') {
+    blockParserBackend = 'main-fallback';
+    return parseBlockGeoJson(await response.json());
+  }
+
+  const workerRef: {current: Worker | null} = {current: null};
+  try {
+    const buffer = await response.arrayBuffer();
+    const center = PROJECT_UTM_CENTER;
+    const result = await new Promise<{blocks?: ResourceBlock[]; error?: string; parseMs?: number; projectionMs?: number; featureCount?: number}>((resolve, reject) => {
+      workerRef.current = new Worker('/workers/block-model-parser.js', {name: 'tanga-block-model-parser'});
+      workerRef.current.onmessage = event => {
+        const data = event.data as {blocks?: ResourceBlock[]; error?: string; parseMs?: number; projectionMs?: number; featureCount?: number};
+        if (data.error) reject(new Error(data.error));
+        else resolve(data);
+      };
+      workerRef.current.onerror = event => reject(new Error(event.message || 'The block-model parser worker failed.'));
+      workerRef.current.postMessage({buffer, centerEasting: center.easting, centerNorthing: center.northing, localVerticalDatum: LOCAL_VERTICAL_DATUM}, [buffer]);
+    });
+    if (!result.blocks) throw new Error('The block-model parser worker returned no cells.');
+    blockParserBackend = 'worker';
+    blockParserTiming = {parseMs: result.parseMs ?? 0, projectionMs: result.projectionMs ?? 0, sourceFeatures: result.featureCount ?? 0};
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('measure-block-parse')) {
+      console.info(`[tanga-perf] block model worker parse/project: ${result.blocks.length}/${result.featureCount ?? 0} cells; JSON ${Math.round(result.parseMs ?? 0)} ms; projection ${Math.round(result.projectionMs ?? 0)} ms`);
+    }
+    return result.blocks;
+  } catch (error) {
+    workerRef.current?.terminate();
+    blockParserBackend = 'main-fallback';
+    console.warn('Block-model worker unavailable; using the main-thread parser.', error);
+    const fallbackResponse = await cachedDeckAsset('/api/block-model', {cache: 'force-cache'});
+    if (!fallbackResponse.ok) throw new Error('Block model unavailable for the main-thread fallback');
+    return parseBlockGeoJson(await fallbackResponse.json());
+  } finally {
+    workerRef.current?.terminate();
+  }
 }
 
 let licenceBoundaryPromise: Promise<Array<[number, number]> | null> | null = null;
@@ -4538,6 +4578,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             });
             if(cancelled)return;
             host.dataset.mineTargetBuildMs=String(Math.round(performance.now()-targetBuildStartedAt));
+            host.dataset.miningBlockParser=blockParserBackend;
+            if(blockParserTiming){
+              host.dataset.mineBlockJsonParseMs=String(Math.round(blockParserTiming.parseMs));
+              host.dataset.mineBlockProjectionMs=String(Math.round(blockParserTiming.projectionMs));
+              host.dataset.mineBlockFeatureCount=String(blockParserTiming.sourceFeatures);
+            }
             host.dataset.miningBlocksState='ready';
             setPitBlocksStatus('ready');
             return true;
@@ -4548,6 +4594,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             host.dataset.miningBlocksState='loading';
             const finishPitBlockLoad=async(data:ResourceBlock[])=>{
               if(cancelled)return;
+              host.dataset.miningBlockParser=blockParserBackend;
+              host.dataset.miningBlocksState='filtering';
+              if(blockParserTiming){
+                host.dataset.mineBlockJsonParseMs=String(Math.round(blockParserTiming.parseMs));
+                host.dataset.mineBlockProjectionMs=String(Math.round(blockParserTiming.projectionMs));
+                host.dataset.mineBlockFeatureCount=String(blockParserTiming.sourceFeatures);
+              }
               const built=await buildPitBlockTargets(data);
               if(!built||cancelled)return;
               // If the presenter focused or started a pit reveal while the
