@@ -23,12 +23,10 @@ export function buildMineSiteCampus(options:Options) {
   let fixedTerrainColorVertices=0,fixedTerrainColorMin=Infinity,fixedTerrainColorMax=-Infinity;
   const excluded=[rectangle(plant,310,310),rectangle(feed,210,160),...pits.map(p=>p.ring)];
   const materials={
-    // Earthworks and pad surfaces use an unlit fixed palette: their mapped
-    // colors must not shift with camera angle as the viewer rotates the site.
-    // These hues identify conceptual pads and facilities in the mine-plan
-    // legend. Render them without view-dependent lighting/specular response;
-    // their relief comes from geometry and the fixed earthwork materials.
-    earth:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false}),
+    // Plant grading is a lightly tinted, rough overlay on the registered
+    // terrain. Fixed site lighting gives the transition relief while keeping
+    // its color camera independent; low opacity avoids a broad opaque plate.
+    earth:new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.36,depthWrite:false,side:THREE.DoubleSide}),
     bench:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false}),
     rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
     beach:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false}),

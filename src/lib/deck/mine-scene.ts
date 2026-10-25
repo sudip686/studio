@@ -356,7 +356,7 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
   // shading restores relief/contact shadows; no camera-driven color variation
   // is introduced.
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();
-  const earthworkMaterial=new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.62,depthWrite:false,side:THREE.DoubleSide});
+  const earthworkMaterial=new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.36,depthWrite:false,side:THREE.DoubleSide});
   const earthworks=new THREE.Mesh(geometry,earthworkMaterial);
   earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
   earthworks.userData.surfaceLighting='fixed site lighting; rough earth material; camera independent';

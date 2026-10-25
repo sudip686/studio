@@ -63,7 +63,7 @@ assert.ok(earthworks,'The site-conforming cut/fill transition remains separately
 assert.ok(earthworks.material instanceof THREE.MeshStandardMaterial,'The plant earthwork relief uses stable site-light shading rather than a flat unlit plate');
 assert.equal(earthworks.material.roughness,.96,'The plant earthwork surface stays matte at presentation scale');
 assert.equal(earthworks.material.transparent,true,'The conceptual apron allows registered terrain imagery to remain visible beneath it');
-assert.equal(earthworks.material.opacity,.62,'The conceptual earth tint remains a restrained overlay');
+assert.equal(earthworks.material.opacity,.36,'The conceptual earth tint remains a restrained overlay');
 assert.equal(earthworks.userData.surfaceLighting,'fixed site lighting; rough earth material; camera independent','Earthwork shading is camera-independent');
 assert.equal(earthworks.receiveShadow,true,'The plant grading transition receives fixed site shadows for ground contact');
 const earthworkPositions=earthworks.geometry.getAttribute('position');
@@ -98,6 +98,11 @@ const campus=buildMineSiteCampus({
   boundary:rectangle([0,0],5200,5200),bounds:{minX:-2600,maxX:2600,minZ:-2600,maxZ:2600},
   height:(x,z)=>5*Math.sin(x/350)+4*Math.cos(z/420),surveyed:()=>true,
 });
+const campusGradingGroup=campus.root.getObjectByName('Illustrative plant grading') as THREE.Group|undefined;
+const campusPlantGrading=campusGradingGroup?.children.find(object=>object instanceof THREE.Mesh) as THREE.Mesh|undefined;
+assert.ok(campusPlantGrading?.material instanceof THREE.MeshStandardMaterial,'The campus grading band reveals the underlying registered terrain');
+assert.equal((campusPlantGrading!.material as THREE.MeshStandardMaterial).opacity,.36,'The second plant grading layer does not restore an opaque terrain plate');
+assert.equal(campusPlantGrading!.receiveShadow,true,'Campus grading follows the fixed site lighting');
 assert.ok(campus.root.userData.accessRoadCount>=2,'The site campus has screened illustrative access spurs when terrain corridors are clear');
 const facilityApronAudit=campus.root.userData.facilityApronDrapeAudit as {facilityId:string;nx:number;nz:number;triangleCount:number;maximumSampleSpacingM:number;maximumTriangleCentreErrorM:number}[];
 assert.equal(facilityApronAudit.length,campus.facilities.length,'Every illustrative water, tailings and waste facility exposes a cleared-apron drape audit');
