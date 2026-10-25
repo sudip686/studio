@@ -60,6 +60,12 @@ assert.ok(cornerBlend<sideBlend,'The earthwork transition follows a rounded dist
 assert.equal(conceptPadHeight(transitionPad,50,50,0),10,'The facility footprint remains level inside its rectangular land allowance');
 const earthworks=plant.getObjectByName('Illustrative cut and fill transition · not engineered') as THREE.Mesh|undefined;
 assert.ok(earthworks,'The site-conforming cut/fill transition remains separately identified');
+assert.ok(earthworks.material instanceof THREE.MeshStandardMaterial,'The plant earthwork relief uses stable site-light shading rather than a flat unlit plate');
+assert.equal(earthworks.material.roughness,.96,'The plant earthwork surface stays matte at presentation scale');
+assert.equal(earthworks.material.transparent,true,'The conceptual apron allows registered terrain imagery to remain visible beneath it');
+assert.equal(earthworks.material.opacity,.62,'The conceptual earth tint remains a restrained overlay');
+assert.equal(earthworks.userData.surfaceLighting,'fixed site lighting; rough earth material; camera independent','Earthwork shading is camera-independent');
+assert.equal(earthworks.receiveShadow,true,'The plant grading transition receives fixed site shadows for ground contact');
 const earthworkPositions=earthworks.geometry.getAttribute('position');
 assert.ok(Array.from(earthworkPositions.array).every(Number.isFinite),'Rounded terrain contours produce finite earthwork vertices');
 const placedBounds=new THREE.Box3();

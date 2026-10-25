@@ -351,13 +351,15 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
       vertices.push(...a,...c,...b,...b,...c,...d);
     }
   }
-  // Keep this shared plant apron at one fixed palette color. Procedural
-  // per-vertex mottling, even at low amplitude, shimmered as its triangles
-  // crossed screen pixels during orbit and made the resource/pad colors seem
-  // to change with the camera. Shape and relief carry the visual texture.
+  // Keep the plant apron on one fixed earth palette, but let the registered
+  // terrain imagery show through its conceptual grading tint. Fixed site-light
+  // shading restores relief/contact shadows; no camera-driven color variation
+  // is introduced.
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.computeVertexNormals();
-  const earthworks=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x766d5e,toneMapped:false,side:THREE.DoubleSide}));
+  const earthworkMaterial=new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.62,depthWrite:false,side:THREE.DoubleSide});
+  const earthworks=new THREE.Mesh(geometry,earthworkMaterial);
   earthworks.name='Illustrative cut and fill transition · not engineered';earthworks.receiveShadow=true;root.add(earthworks);
+  earthworks.userData.surfaceLighting='fixed site lighting; rough earth material; camera independent';
   root.position.set(x,level,z);return level;
 }
 
