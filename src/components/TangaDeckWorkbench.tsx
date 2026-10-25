@@ -35,7 +35,14 @@ import {type TangaChapterId} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {MAPPED_SURFACE_UNITS} from '@/lib/deck/geology-palette';
 import {presentationBuild} from '@/lib/presentation-build';
-import {preloadDeckAssets, type DeckPreloadStage} from '@/lib/preload-deck-assets';
+import {
+  DECK_PRELOAD_ASSETS,
+  DECK_PRELOAD_ASSET_LABELS,
+  prepareDeckAssets,
+  preloadDeckAssets,
+  type DeckAssetPreparationItem,
+  type DeckPreloadStage,
+} from '@/lib/preload-deck-assets';
 import {
   type CameraAction,
   type CommandIntent,
@@ -135,6 +142,7 @@ type FallbackPreflightResult = {
 type ReadinessAsset = {label:string;path:string;required:boolean};
 type AssetReadinessResult = {mode:WorkbenchMode;checkedAt:string;items:Array<ReadinessAsset&{status:number|null;contentType:string;bytes:number|null;ok:boolean}>};
 type AllChapterAssetReadinessResult = {checkedAt:string;chapters:Array<{mode:WorkbenchMode;items:Array<ReadinessAsset&{status:number|null;contentType:string;bytes:number|null;ok:boolean}>}>};
+type DeckPreparationState = {running:boolean;cancelling:boolean;startedAt:string;completedAt:string|null;items:Record<string,DeckAssetPreparationItem>};
 
 const TERRAIN_READINESS_ASSETS:ReadinessAsset[]=[
   {label:'Terrain metadata',path:'/terrain_hires_meta.json?v=registered-grid-v2',required:true},
@@ -171,6 +179,12 @@ function chapterReadinessText(stages?: LoadStage[]) {
 function chapterReadinessDetail(stages?: LoadStage[]) {
   if (!stages) return 'Not checked in this session';
   return stages.map(stage => `${stage.label}: ${sceneStateText(stage.state)}`).join(' · ');
+}
+
+function preparationSize(bytes:number){
+  if(bytes<=0)return '0 B';
+  if(bytes<1_000_000)return `${Math.max(1,Math.round(bytes/1000))} KB`;
+  return `${(bytes/1_000_000).toFixed(1)} MB`;
 }
 
 const CHAPTER_READINESS_STORAGE_KEY='tanga:chapter-readiness:v1';
@@ -2341,6 +2355,8 @@ export default function TangaDeckWorkbench() {
   const [assetReadinessRunning, setAssetReadinessRunning] = useState(false);
   const [allChapterAssetReadiness, setAllChapterAssetReadiness] = useState<AllChapterAssetReadinessResult | null>(null);
   const [allChapterAssetReadinessRunning, setAllChapterAssetReadinessRunning] = useState(false);
+  const [deckPreparation,setDeckPreparation]=useState<DeckPreparationState|null>(null);
+  const deckPreparationAbortRef=useRef<AbortController|null>(null);
   const [chapterReadiness, setChapterReadiness] = useState<Partial<Record<WorkbenchMode, LoadStage[]>>>({});
   const [chapterReadinessLoaded,setChapterReadinessLoaded]=useState(false);
   const chapterReadinessHydratedRef=useRef(false);
@@ -5124,6 +5140,39 @@ export default function TangaDeckWorkbench() {
     setAllChapterAssetReadinessRunning(false);
   },[allChapterAssetReadinessRunning]);
 
+  const prepareAllDeckAssets = useCallback(async () => {
+    if(deckPreparation?.running)return;
+    const controller=new AbortController();
+    deckPreparationAbortRef.current=controller;
+    const startedAt=new Date().toISOString();
+    const initialItems=Object.entries(DECK_PRELOAD_ASSETS).flatMap(([stage,stagePaths])=>
+      stagePaths.map(path=>[path,{stage:stage as DeckPreloadStage,path,status:'not-prepared',bytes:0} satisfies DeckAssetPreparationItem] as const)
+    );
+    setDeckPreparation({
+      running:true,
+      cancelling:false,
+      startedAt,
+      completedAt:null,
+      items:Object.fromEntries(initialItems),
+    });
+    try{
+      await prepareDeckAssets(item=>{
+        setDeckPreparation(current=>current?{...current,items:{...current.items,[item.path]:item}}:current);
+      },controller.signal);
+    }finally{
+      if(deckPreparationAbortRef.current===controller)deckPreparationAbortRef.current=null;
+      setDeckPreparation(current=>current?{...current,running:false,cancelling:false,completedAt:new Date().toISOString()}:current);
+    }
+  },[deckPreparation?.running]);
+
+  const cancelDeckAssetPreparation=useCallback(()=>{
+    if(!deckPreparationAbortRef.current)return;
+    setDeckPreparation(current=>current?{...current,cancelling:true}:current);
+    deckPreparationAbortRef.current.abort();
+  },[]);
+
+  useEffect(()=>()=>deckPreparationAbortRef.current?.abort(),[]);
+
   const toggleMappedGeologyUnit=useCallback((label:string)=>{
     const hiding=!hiddenGeologyUnits.includes(label);
     setHiddenGeologyUnits(current=>current.includes(label)?current.filter(unit=>unit!==label):[...current,label]);
@@ -6473,6 +6522,46 @@ export default function TangaDeckWorkbench() {
                 </>}
               </section>
             </details>
+            <section className="tanga-presentation-tools__all-asset-check" aria-label="Prepare 3D presentation data">
+              <div className="tanga-presentation-tools__asset-check-head">
+                <div><strong>Prepare 3D sequence data</strong><span>{Object.values(DECK_PRELOAD_ASSETS).flat().length} source files · four scene stages</span></div>
+                {deckPreparation?.running
+                  ? <button type="button" onClick={cancelDeckAssetPreparation}>Cancel preparation</button>
+                  : <button type="button" onClick={prepareAllDeckAssets}>
+                    <RotateCw size={13} aria-hidden="true"/>
+                    {deckPreparation?.completedAt?'Prepare again':'Prepare assets'}
+                  </button>}
+              </div>
+              <p>Fetches the registered 3D scene data into the app’s 24-hour best-effort browser cache when storage permits; this may use up to about 119 MB. Browser storage may evict files. Live map tiles, voice services and full offline use are not included.</p>
+              {deckPreparation&&(()=>{
+                const items=Object.values(deckPreparation.items);
+                const cached=items.filter(item=>item.status==='cached').length;
+                const loaded=items.filter(item=>item.status==='loaded-not-cached').length;
+                const failed=items.filter(item=>item.status==='failed'&&item.path!=='/lithology_data.geojson').length;
+                const optionalMissing=items.filter(item=>item.status==='failed'&&item.path==='/lithology_data.geojson').length;
+                const active=items.find(item=>item.status==='preparing');
+                const bytes=items.reduce((sum,item)=>sum+item.bytes,0);
+                const countLabel=deckPreparation.running
+                  ? `${items.filter(item=>['cached','loaded-not-cached','failed'].includes(item.status)).length} / ${items.length} files processed`
+                  : deckPreparation.completedAt
+                    ? `${cached} cached${loaded?` · ${loaded} fetched but not retained`:''}${failed?` · ${failed} required failed`:''}${optionalMissing?' · optional lithology unavailable':''}`
+                    : 'Not prepared in this session';
+                return <>
+                  <p className={`tanga-presentation-tools__asset-summary${failed?' is-issue':''}`} aria-live="polite">
+                    {countLabel} · {preparationSize(bytes)} read{active?` · ${DECK_PRELOAD_ASSET_LABELS[active.path]??active.path}`:''}{deckPreparation.cancelling?' · cancelling after the current request':''}
+                  </p>
+                  <ul className="tanga-presentation-tools__asset-results" aria-live="polite">
+                    {Object.entries(DECK_PRELOAD_ASSETS).flatMap(([stage,paths])=>paths.map(path=>{
+                      const item=deckPreparation.items[path];
+                      const optional=path==='/lithology_data.geojson';
+                      const state=item.status==='cached'?'available':item.status==='loaded-not-cached'?'loaded':item.status==='failed'?(optional?'optional-missing':'missing'):item.status==='preparing'?'preparing':item.status==='cancelled'?'cancelled':'not-checked';
+                      const status=item.status==='cached'?`Cached · ${preparationSize(item.bytes)}`:item.status==='loaded-not-cached'?`Fetched · ${preparationSize(item.bytes)}`:item.status==='preparing'?`Fetching · ${preparationSize(item.bytes)}`:item.status==='failed'?`Failed · ${item.error??'request error'}`:item.status==='cancelled'?'Cancelled':item.status==='not-prepared'?'Not prepared':'Not started';
+                      return <li key={`${stage}-${path}`} className={`is-${state}`}><span>{DECK_PRELOAD_ASSET_LABELS[path]??path}<small> · {MODE_LABELS[stage as WorkbenchMode]??stage}</small></span><strong>{status}</strong></li>;
+                    }))}
+                  </ul>
+                </>;
+              })()}
+            </section>
             <section className="tanga-presentation-tools__fallback-check" aria-label="Saved scene and map fallback image check">
               <div><strong>Saved scene and map fallback images</strong><span>Five 3D stills and six map references for renderer recovery.</span></div>
               <button type="button" onClick={runFallbackPreflight} disabled={fallbackPreflightRunning}>

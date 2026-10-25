@@ -1201,6 +1201,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-presentation-tools__asset-results li>span small{color:#9aadb2;font-size:8px}
 .tanga-presentation-tools__asset-results li>strong{color:#abbac0;font-size:8px;font-weight:600;text-align:right}
 .tanga-presentation-tools__asset-results li.is-available>strong{color:#8fd1ba}
+.tanga-presentation-tools__asset-results li.is-loaded>strong,.tanga-presentation-tools__asset-results li.is-preparing>strong{color:#e3ad73}
+.tanga-presentation-tools__asset-results li.is-cancelled>strong,.tanga-presentation-tools__asset-results li.is-not-checked>strong{color:#9aadb2}
 .tanga-presentation-tools__asset-results li.is-missing>strong{color:#ed998a}
 .tanga-presentation-tools__asset-results li.is-optional-missing>strong{color:#e3ad73}
 .tanga-presentation-tools__asset-check>.tanga-presentation-tools__asset-summary{margin:3px 0 5px;color:#8fd1ba;font-size:9px;font-weight:600}
