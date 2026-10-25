@@ -6,6 +6,7 @@ import {rectangle, inside} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
+import {SITE_EARTHWORK_OPACITY} from '../src/lib/deck/stable-materials';
 
 async function main(){
 const ring=rectangle([0,0],400,320);
@@ -78,7 +79,7 @@ assert.ok(earthworks,'The site-conforming cut/fill transition remains separately
 assert.ok(earthworks.material instanceof THREE.MeshStandardMaterial,'The plant earthwork relief uses stable site-light shading rather than a flat unlit plate');
 assert.equal(earthworks.material.roughness,.96,'The plant earthwork surface stays matte at presentation scale');
 assert.equal(earthworks.material.transparent,true,'The conceptual apron allows registered terrain imagery to remain visible beneath it');
-assert.equal(earthworks.material.opacity,.36,'The conceptual earth tint remains a restrained overlay');
+assert.equal(earthworks.material.opacity,SITE_EARTHWORK_OPACITY,'The conceptual earth tint uses the shared terrain-led overlay strength');
 assert.equal(earthworks.userData.surfaceLighting,'fixed site lighting; rough earth material; camera independent','Earthwork shading is camera-independent');
 assert.equal(earthworks.receiveShadow,true,'The plant grading transition receives fixed site shadows for ground contact');
 const earthworkPositions=earthworks.geometry.getAttribute('position');
@@ -116,7 +117,7 @@ const campus=buildMineSiteCampus({
 const campusGradingGroup=campus.root.getObjectByName('Illustrative plant grading') as THREE.Group|undefined;
 const campusPlantGrading=campusGradingGroup?.children.find(object=>object instanceof THREE.Mesh) as THREE.Mesh|undefined;
 assert.ok(campusPlantGrading?.material instanceof THREE.MeshStandardMaterial,'The campus grading band reveals the underlying registered terrain');
-assert.equal((campusPlantGrading!.material as THREE.MeshStandardMaterial).opacity,.36,'The second plant grading layer does not restore an opaque terrain plate');
+assert.equal((campusPlantGrading!.material as THREE.MeshStandardMaterial).opacity,SITE_EARTHWORK_OPACITY,'Plant campus grading shares the terrain-led earthwork overlay strength');
 assert.equal(campusPlantGrading!.receiveShadow,true,'Campus grading follows the fixed site lighting');
 assert.ok(campus.root.userData.accessRoadCount>=2,'The site campus has screened illustrative access spurs when terrain corridors are clear');
 const swaleAudit=campus.root.userData.swaleDrapeAudit as {maximumSampleSpacingM:number;swales:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]};

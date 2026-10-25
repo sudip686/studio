@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {contained, inside, overlaps, rectangle, type CandidatePit, type Point2} from './site-planning';
 import {batchPlantMeshes} from './mine-plant-detail';
 import {buildHaulTruck} from './mine-haulage';
+import {SITE_EARTHWORK_OPACITY} from './stable-materials';
 
 type Bounds = {minX:number;maxX:number;minZ:number;maxZ:number};
 type Height = (x:number,z:number)=>number;
@@ -27,7 +28,7 @@ export function buildMineSiteCampus(options:Options) {
     // Plant grading is a lightly tinted, rough overlay on the registered
     // terrain. Fixed site lighting gives the transition relief while keeping
     // its color camera independent; low opacity avoids a broad opaque plate.
-    earth:new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:.36,depthWrite:false,side:THREE.DoubleSide}),
+    earth:new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:SITE_EARTHWORK_OPACITY,depthWrite:false,side:THREE.DoubleSide}),
     bench:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false}),
     rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
     beach:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false}),
