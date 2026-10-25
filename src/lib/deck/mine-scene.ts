@@ -71,13 +71,15 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   // coplanar slab top caused depth-buffer z-fighting (color shimmer) while the
   // camera orbited. Footings still begin at y=0 and overlap the slab cleanly.
   box(400,3,280,0,-1.15,0,materials.concrete,'Plant pad');
-  // A conceptual perimeter service loop sits just above the shared pad slab.
-  // Previously its road deck and markings were below the slab top and hidden.
-  const serviceRoadY=.46;
+  // Set the service deck onto the shared pad datum and lift only the thin
+  // paint bands by 1 mm above the road top to keep them crisp without floating.
+  const serviceRoadY=.425;
   box(392,.15,7,0,serviceRoadY,135,materials.serviceRoad,'Conceptual perimeter service lane');
   box(392,.15,5,0,serviceRoadY,-135,materials.serviceRoad,'Conceptual service lane');
   for(const x of [-195,195])box(4,.15,268,x,serviceRoadY,0,materials.serviceRoad,'Conceptual perimeter service lane');
-  for(let x=-185;x<=185;x+=14)box(5,.08,.25,x,.58,135,materials.roadMarking,'Illustrative service-lane marking');
+  const serviceRoadTopY=serviceRoadY+.075;
+  const serviceRoadMarkY=serviceRoadTopY+.011;
+  for(let x=-185;x<=185;x+=14)box(5,.02,.5,x,serviceRoadMarkY,135,materials.roadMarking,'Illustrative service-lane marking');
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
@@ -296,6 +298,20 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
     columnBottomLocalMinY:columnBases.length?Math.min(...columnBases):null,
     columnBottomLocalMaxY:columnBases.length?Math.max(...columnBases):null,
   };
+  const serviceDecks=root.children.filter((child):child is THREE.Mesh<THREE.BufferGeometry,THREE.Material>=>child instanceof THREE.Mesh&&child.name.includes('Conceptual')&&child.name.includes('service lane'));
+  const serviceMarkings=root.children.filter((child):child is THREE.Mesh<THREE.BufferGeometry,THREE.Material>=>child instanceof THREE.Mesh&&child.name==='Illustrative service-lane marking');
+  const localBounds=(object:THREE.Mesh<THREE.BufferGeometry,THREE.Material>)=>{if(!object.geometry.boundingBox)object.geometry.computeBoundingBox();const bounds=object.geometry.boundingBox!;return {bottom:object.position.y+bounds.min.y,top:object.position.y+bounds.max.y};};
+  const deckBounds=serviceDecks.map(localBounds),markingBounds=serviceMarkings.map(localBounds);
+  const padTopLocalY=padMesh?padMesh.position.y+(padMesh.geometry.boundingBox?.max.y??0):null;
+  root.userData.plantServiceRoadContactAudit={
+    deckCount:serviceDecks.length,markingCount:serviceMarkings.length,padTopLocalY,
+    deckBottomLocalMinY:deckBounds.length?Math.min(...deckBounds.map(item=>item.bottom)):null,
+    deckBottomLocalMaxY:deckBounds.length?Math.max(...deckBounds.map(item=>item.bottom)):null,
+    deckTopLocalMinY:deckBounds.length?Math.min(...deckBounds.map(item=>item.top)):null,
+    deckTopLocalMaxY:deckBounds.length?Math.max(...deckBounds.map(item=>item.top)):null,
+    markingBottomLocalMinY:markingBounds.length?Math.min(...markingBounds.map(item=>item.bottom)):null,
+    markingBottomLocalMaxY:markingBounds.length?Math.max(...markingBounds.map(item=>item.bottom)):null,
+  };
   root.userData.siteServices=[-20,25,194];
   batchPlantMeshes(root);
   root.userData.ensurePlantDetail=()=>{
@@ -356,6 +372,18 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
       maximumColumnGapM:Number(Math.max(0,columnBottomMaxM-padTopAboveDatumM).toFixed(3)),
       minimumColumnOverlapM:Number(Math.max(0,padTopAboveDatumM-columnBottomMaxM).toFixed(3)),
       source:'modeled building footings and portal columns against illustrative graded pad; not a foundation design',
+    };
+  }
+  const roadAudit=root.userData.plantServiceRoadContactAudit as {deckCount:number;markingCount:number;padTopLocalY:number|null;deckBottomLocalMinY:number|null;deckBottomLocalMaxY:number|null;deckTopLocalMinY:number|null;deckTopLocalMaxY:number|null;markingBottomLocalMinY:number|null;markingBottomLocalMaxY:number|null}|undefined;
+  if(roadAudit&&roadAudit.padTopLocalY!==null&&roadAudit.deckBottomLocalMaxY!==null&&roadAudit.deckTopLocalMaxY!==null&&roadAudit.markingBottomLocalMinY!==null){
+    const scaleY=root.scale.y,padTop=roadAudit.padTopLocalY,deckBottom=roadAudit.deckBottomLocalMaxY,deckTop=roadAudit.deckTopLocalMaxY,markingBottom=roadAudit.markingBottomLocalMinY;
+    root.userData.plantServiceRoadContactRuntimeAudit={
+      deckCount:roadAudit.deckCount,markingCount:roadAudit.markingCount,
+      maximumRoadToPadGapM:Number(Math.max(0,(deckBottom-padTop)*scaleY).toFixed(4)),
+      minimumRoadToPadOverlapM:Number(Math.max(0,(padTop-deckBottom)*scaleY).toFixed(4)),
+      minimumMarkingClearanceM:Number(Math.max(0,(markingBottom-deckTop)*scaleY).toFixed(4)),
+      maximumMarkingClearanceM:Number(Math.max(0,((roadAudit.markingBottomLocalMaxY??markingBottom)-(roadAudit.deckTopLocalMinY??deckTop))*scaleY).toFixed(4)),
+      source:'conceptual internal lane and paint bands against display pad; not a civil road design',
     };
   }
   const vertices:number[]=[];

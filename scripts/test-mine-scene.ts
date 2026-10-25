@@ -62,6 +62,13 @@ assert.equal(plantFoundationAudit.maximumFootingGapM,0,'No building footing floa
 assert.equal(plantFoundationAudit.maximumColumnGapM,0,'No portal column floats above the plant pad');
 assert.ok(plantFoundationAudit.minimumFootingOverlapM>0.15&&plantFoundationAudit.minimumColumnOverlapM>0.15,'Footings and portal columns physically overlap the pad surface');
 assert.match(plantFoundationAudit.source,/not a foundation design/,'The plant foundation contact audit preserves its conceptual status');
+const serviceRoadAudit=plant.userData.plantServiceRoadContactRuntimeAudit as {deckCount:number;markingCount:number;maximumRoadToPadGapM:number;minimumRoadToPadOverlapM:number;minimumMarkingClearanceM:number;maximumMarkingClearanceM:number;source:string};
+assert.equal(serviceRoadAudit.deckCount,4,'All four internal service-lane decks are included in the contact audit');
+assert.equal(serviceRoadAudit.markingCount,27,'Every dashed lane-marking segment is included in the contact audit');
+assert.equal(serviceRoadAudit.maximumRoadToPadGapM,0,'Internal service lanes have no gap above the pad');
+assert.equal(serviceRoadAudit.minimumRoadToPadOverlapM,0,'Internal service lanes meet the pad surface without excessive overlap');
+assert.ok(serviceRoadAudit.minimumMarkingClearanceM>0&&serviceRoadAudit.maximumMarkingClearanceM<.002,'Paint bands sit clear of the deck by less than 2 mm in project scale');
+assert.match(serviceRoadAudit.source,/not a civil road design/,'The internal service-lane audit preserves its conceptual status');
 const transitionPad:ConceptPad={x:0,z:0,width:100,depth:100,level:10,transition:20};
 const sideBlend=conceptPadHeight(transitionPad,55,50,0),cornerBlend=conceptPadHeight(transitionPad,55,55,0);
 assert.ok(cornerBlend<sideBlend,'The earthwork transition follows a rounded distance around pad corners instead of square-axis blending');
