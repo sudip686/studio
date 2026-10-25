@@ -20,6 +20,8 @@ export type GraphitePeerProject = {
 };
 
 export type GraphitePeerEvidence = {
+  benchmarkDateLabel: string;
+  benchmarkCategoryLabel: string;
   dateLabel: string;
   href: string;
   sourceLabel: string;
@@ -30,8 +32,12 @@ export type GraphitePeerEvidence = {
 const PUBLISHED_BENCHMARK_HREF = 'https://www.costmine.com/2023/11/07/ranked-worlds-top-10-graphite-projects/';
 const EPANKO_MRE_HREF = 'https://www.ecograf.com.au/wp-content/uploads/2024/03/06_EGR_ASX_127-Increase-in-MRE_11-March-2024.pdf';
 const TANGA_MRE_HREF = '/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf';
+const BENCHMARK_ROW_CONTEXT = {
+  benchmarkDateLabel: 'Published ranking · 7 Nov 2023',
+  benchmarkCategoryLabel: 'Not itemized by benchmark source',
+} as const;
 
-const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmarkHref'>> = {
+const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmarkHref' | 'benchmarkDateLabel' | 'benchmarkCategoryLabel'>> = {
   'Balama North / Nicanda Hill': {
     dateLabel: 'Primary MRE · September 2016 · 41.5 Mt Indicated',
     href: 'https://announcements.asx.com.au/asxpdf/20160916/pdf/43b7x1brbmy40z.pdf',
@@ -90,13 +96,13 @@ const PEER_PRIMARY_EVIDENCE: Record<string, Omit<GraphitePeerEvidence, 'benchmar
 /** Trace the estimate used in the selected row without implying a current global census. */
 export function graphitePeerEvidence(project: Pick<GraphitePeerProject, 'project' | 'isTanga'>): GraphitePeerEvidence {
   if (project.isTanga) {
-    return {dateLabel: 'Final MRE · 19 Dec 2025', href: TANGA_MRE_HREF, sourceLabel: 'AMC Tanga MRE'};
+    return {benchmarkDateLabel: 'Tanga estimate · 19 Dec 2025', benchmarkCategoryLabel: 'Indicated', dateLabel: 'Final MRE · 19 Dec 2025 · 148 Mt Indicated', href: TANGA_MRE_HREF, sourceLabel: 'AMC Tanga MRE'};
   }
   const primarySource = PEER_PRIMARY_EVIDENCE[project.project];
   if (primarySource) {
-    return {...primarySource, benchmarkHref: PUBLISHED_BENCHMARK_HREF};
+    return {...BENCHMARK_ROW_CONTEXT, ...primarySource, benchmarkHref: PUBLISHED_BENCHMARK_HREF};
   }
-  return {dateLabel: 'Published benchmark · 7 Nov 2023', href: PUBLISHED_BENCHMARK_HREF, sourceLabel: 'Mining Intelligence / Costmine'};
+  return {...BENCHMARK_ROW_CONTEXT, dateLabel: 'No row-level primary estimate has been verified', href: PUBLISHED_BENCHMARK_HREF, sourceLabel: 'Mining Intelligence / Costmine'};
 }
 
 export const GRAPHITE_PEER_PROJECTS: GraphitePeerProject[] = [
