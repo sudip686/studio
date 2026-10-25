@@ -787,21 +787,63 @@ function addStableResourceCellEdges(material: THREE.MeshBasicMaterial) {
 }
 
 type PitFootprintBounds = {minX:number;maxX:number;minZ:number;maxZ:number};
+type PitCutawayEdge = {x:number;z:number;dx:number;dz:number;inverseLengthSquared:number};
+type PitCutawayShape = {pit:SitePlan['pits'][number];bounds:PitFootprintBounds;edges:PitCutawayEdge[];winding:1|-1};
+
+function preparePitCutawayShape(pit:SitePlan['pits'][number]):PitCutawayShape{
+  const ring=pit.ring;
+  let twiceArea=0;
+  const edges=ring.map(([x,z],index)=>{
+    const next=ring[(index+1)%ring.length],dx=next[0]-x,dz=next[1]-z;
+    twiceArea+=x*next[1]-next[0]*z;
+    return {x,z,dx,dz,inverseLengthSquared:1/(dx*dx+dz*dz||1)};
+  });
+  return {pit,edges,winding:twiceArea>=0?1:-1,bounds:{minX:Math.min(...ring.map(([x])=>x)),maxX:Math.max(...ring.map(([x])=>x)),minZ:Math.min(...ring.map(([,z])=>z)),maxZ:Math.max(...ring.map(([,z])=>z))}};
+}
+
+/** Exact distance to a convex pit perimeter with one pass over its edges. */
+function preparedPitHeight(x:number,z:number,shape:PitCutawayShape){
+  let nearestDistanceSquared=Infinity;
+  for(const edge of shape.edges){
+    const rx=x-edge.x,rz=z-edge.z;
+    if(shape.winding*(edge.dx*rz-edge.dz*rx)<-1e-6)return null;
+    const t=Math.max(0,Math.min(1,(rx*edge.dx+rz*edge.dz)*edge.inverseLengthSquared));
+    const dx=rx-t*edge.dx,dz=rz-t*edge.dz,distanceSquared=dx*dx+dz*dz;
+    if(distanceSquared<nearestDistanceSquared)nearestDistanceSquared=distanceSquared;
+  }
+  const distance=Math.sqrt(nearestDistanceSquared);
+  const run=CONCEPT.bench/Math.tan(CONCEPT.batterDegrees*Math.PI/180)+CONCEPT.berm;
+  const level=Math.floor(distance/run),within=distance-level*run;
+  return Math.max(shape.pit.floor,shape.pit.surface-level*CONCEPT.bench-Math.min(CONCEPT.bench,within*Math.tan(CONCEPT.batterDegrees*Math.PI/180)));
+}
 
 /** Keep pit cutaway cells wholly inside the conceptual excavation envelope. */
-function resourceBlockFitsPitCutaway(block: ResourceBlock, pit: SitePlan['pits'][number], resources: TangaTerrainResources | null, bounds: PitFootprintBounds) {
+function resourceBlockFitsPitCutaway(block: ResourceBlock, shape:PitCutawayShape, resources: TangaTerrainResources | null, pitHeightCache:Map<string,number|null>, terrainHeightCache:Map<string,number>) {
   const halfX=block.dx/2,halfZ=block.dy/2;
   // Reject almost all of the full-site block model before polygon containment
   // and pit-height checks. The broad-phase envelope cannot accept a cell that
   // fails the exact footprint test below.
+  const {pit,bounds}=shape;
   if(block.x-halfX<bounds.minX||block.x+halfX>bounds.maxX||block.z-halfZ<bounds.minZ||block.z+halfZ>bounds.maxZ)return false;
-  if (!rectangleContained([block.x, block.z], block.dx, block.dy, pit.ring)) return false;
-  const footprint=rectangle([block.x,block.z],block.dx,block.dy);
   let cutFloor=-Infinity;
-  for(const point of footprint){const height=pitHeight(point,pit);if(height===null)return false;cutFloor=Math.max(cutFloor,height);}
+  // The site planner forms candidate pit rings from a convex hull. Its four
+  // rectangle corners therefore prove full-cell containment. Cache each
+  // corner's exact bench height because vertically stacked cells reuse the
+  // same horizontal positions.
+  const acceptCorner=(x:number,z:number)=>{
+    const key=`${Math.round(x*1000)}:${Math.round(z*1000)}`;
+    let height=pitHeightCache.get(key);
+    if(height===undefined&&!pitHeightCache.has(key)){height=preparedPitHeight(x,z,shape);pitHeightCache.set(key,height);}
+    if(height===null||height===undefined)return false;
+    cutFloor=Math.max(cutFloor,height);
+    return true;
+  };
+  if(!acceptCorner(block.x-halfX,block.z-halfZ)||!acceptCorner(block.x+halfX,block.z-halfZ)||!acceptCorner(block.x+halfX,block.z+halfZ)||!acceptCorner(block.x-halfX,block.z+halfZ))return false;
   const blockBottom = block.y - block.dz / 2;
   const blockTop = block.y + block.dz / 2;
-  const groundTop=terrainSurfaceY(resources,block.x,-block.z);
+  const terrainKey=`${Math.round(block.x*1000)}:${Math.round(block.z*1000)}`;
+  let groundTop=terrainHeightCache.get(terrainKey);
+  if(groundTop===undefined){groundTop=terrainSurfaceY(resources,block.x,-block.z);terrainHeightCache.set(terrainKey,groundTop);}
   // Keep cells wholly within the excavation envelope and below the local
   // registered ground surface. The second test prevents cells near a high
   // crest from reading as a floating overlay when the terrain varies across
@@ -4415,25 +4457,54 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           }
           tagDeckLayer(evidenceGroup,'context');stage.add(evidenceGroup);
           storyMotionStart=motionTime;
-          const buildPitBlockTargets=(sourceBlocks:ResourceBlock[])=>{
+          const buildPitBlockTargets=async(sourceBlocks:ResourceBlock[])=>{
             const targetBuildStartedAt=performance.now();
             const orderedPits=[...minePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]);
-            const pitBounds=orderedPits.map(pit=>({minX:Math.min(...pit.ring.map(([x])=>x)),maxX:Math.max(...pit.ring.map(([x])=>x)),minZ:Math.min(...pit.ring.map(([,z])=>z)),maxZ:Math.max(...pit.ring.map(([,z])=>z))}));
-            const targetsByPit=orderedPits.map((pit,index)=>sourceBlocks.filter(b=>b.carbon>=4.5&&resourceBlockFitsPitCutaway(b,pit,terrainResources,pitBounds[index])));
-            const targets=targetsByPit.flat();
+            const pitShapes=orderedPits.map(preparePitCutawayShape);
+            const pitHeightCaches=orderedPits.map(()=>new Map<string,number|null>());
+            const terrainHeightCache=new Map<string,number>();
+            const gradeCounts:Record<string,number>={medium:0,high:0,'very-high':0};
+            const gradeTargets=orderedPits.map(()=>new Map<string,ResourceBlock[]>([['medium',[]],['high',[]],['very-high',[]]]));
+            let targetsCount=0;
+            // The source block model can contain more than 150,000 cells. Keep
+            // the exact footprint, bench-height and terrain checks, but yield
+            // between short slices so orbit, zoom and retry controls keep
+            // responding while the pit cutaway is prepared.
+            let cursor=0;
+            while(cursor<sourceBlocks.length){
+              const sliceStartedAt=performance.now();
+              while(cursor<sourceBlocks.length&&performance.now()-sliceStartedAt<8){
+                const block=sourceBlocks[cursor++];
+                if(block.carbon<4.5)continue;
+                for(let pitIndex=0;pitIndex<orderedPits.length;pitIndex++){
+                  if(!resourceBlockFitsPitCutaway(block,pitShapes[pitIndex],terrainResources,pitHeightCaches[pitIndex],terrainHeightCache))continue;
+                  const gradeKey=tgcGradeBin(block.carbon).key;
+                  if(gradeKey==='medium'||gradeKey==='high'||gradeKey==='very-high'){
+                    gradeCounts[gradeKey]=(gradeCounts[gradeKey]??0)+1;
+                    gradeTargets[pitIndex].get(gradeKey)!.push(block);
+                  }
+                  targetsCount++;
+                  break;
+                }
+              }
+              if(cancelled)return;
+              if(cursor<sourceBlocks.length)await new Promise<void>(resolve=>{
+                if(document.visibilityState==='hidden')window.setTimeout(resolve,100);
+                else window.requestAnimationFrame(()=>resolve());
+              });
+            }
             // Draw every selected source cell in the pit shell. A sparse display
             // sample left visible gaps and read as a grade carpet over the terrain.
-            const displayedByPit=targetsByPit;
-            const displayedTargets=targets;
-            setTargetCount(targets.length);
-            setTargetDisplayCount(displayedTargets.length);
-            host.dataset.miningTargets=String(targets.length);
-            host.dataset.miningTargetsDisplayed=String(displayedTargets.length);
+            const displayedByPit=gradeTargets;
+            setTargetCount(targetsCount);
+            setTargetDisplayCount(targetsCount);
+            host.dataset.miningTargets=String(targetsCount);
+            host.dataset.miningTargetsDisplayed=String(targetsCount);
             const pitGradeBands=TGC_GRADE_BINS.filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high');
-            host.dataset.miningGradeCounts=JSON.stringify(Object.fromEntries(pitGradeBands.map(bin=>[bin.key,targets.filter(block=>tgcGradeBin(block.carbon).key===bin.key).length])));
+            host.dataset.miningGradeCounts=JSON.stringify(gradeCounts);
             displayedByPit.forEach((pitBlocks,pitIndex)=>{
               for(const [bandIndex,band] of pitGradeBands.entries()){
-                const subset=pitBlocks.filter(block=>tgcGradeBin(block.carbon).key===band.key);
+                const subset=pitBlocks.get(band.key)??[];
                 if(!subset.length)continue;
                 // Match the resource chapter's fixed grade palette. Flat face
                 // tones show cube depth without camera-dependent color changes.
@@ -4460,17 +4531,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 mesh.instanceMatrix.needsUpdate=true;tagDeckLayer(mesh,'blocks');stage.add(mesh);targetMeshes.push(mesh);revealBlocks.push(mesh);pickables.push(mesh);
               }
             });
+            if(cancelled)return;
             host.dataset.mineTargetBuildMs=String(Math.round(performance.now()-targetBuildStartedAt));
             host.dataset.miningBlocksState='ready';
             setPitBlocksStatus('ready');
+            return true;
           };
           if(blocks.length){
             buildPitBlockTargets(blocks);
           }else if(minePlanBlocksPromise){
             host.dataset.miningBlocksState='loading';
-            const finishPitBlockLoad=(data:ResourceBlock[])=>{
+            const finishPitBlockLoad=async(data:ResourceBlock[])=>{
               if(cancelled)return;
-              buildPitBlockTargets(data);
+              const built=await buildPitBlockTargets(data);
+              if(!built||cancelled)return;
               // If the presenter focused or started a pit reveal while the
               // remote model was in flight, reapply it now that the instanced
               // cells belong to the reveal controller's shared target list.
@@ -4498,7 +4572,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             minePlanBlocksPromise.then(({data,error})=>{
               if(cancelled)return;
               if(error||!data){failPitBlockLoad(error);return;}
-              finishPitBlockLoad(data);
+              return finishPitBlockLoad(data);
             }).catch(failPitBlockLoad);
           }
           for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePit(mesh.geometry, sitePlan.pits);
