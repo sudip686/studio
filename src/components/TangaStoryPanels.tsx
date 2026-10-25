@@ -149,7 +149,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       {onShowSiteContext&&<button type="button" onClick={onShowSiteContext}>Show site concept <ArrowRight size={14}/></button>}
     </div>}
     <div className="tanga-site-panel-switcher" role="group" aria-label="Mine plan information">
-      {([['site','Site'],['blocks','Pit blocks'],['sources','Sources']] as const).map(([section,label])=><button key={section} type="button" aria-pressed={minePanelSection===section} onClick={()=>setMinePanelSection(section)}>{label}</button>)}
+      {([['site','Site'],['blocks','Pit blocks'],['sources','Sources']] as const).map(([section,label])=><button key={section} type="button" aria-pressed={minePanelSection===section} onClick={()=>{setMinePanelSection(section);if(section==='blocks'&&!['pit-blocks','north-pit','south-pit'].includes(developmentViewId??''))onRevealPitBlocks?.();}}>{label}</button>)}
     </div>
     {minePanelSection==='site'&&<div className="tanga-site-panel-content">
       <div className="tanga-site-status-key" role="group" aria-label="Site feature evidence status">
