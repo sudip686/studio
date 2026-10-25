@@ -48,23 +48,34 @@ function subscribe(job:PendingAsset,key:string,signal?:AbortSignal):Promise<Resp
 }
 
 export async function cachedDeckAsset(url:string,init?:RequestInit):Promise<Response>{
-  if(typeof window==='undefined'||!('caches' in window)||!isCacheableAssetPath(new URL(url,window.location.href).pathname))return fetch(url,init);
+  if(typeof window==='undefined')return fetch(url,init);
+  const pathname=new URL(url,window.location.href).pathname;
+  const cacheable=isCacheableAssetPath(pathname);
+  const cloudflareWorkerBuild=process.env.NEXT_PUBLIC_PRESENTATION_BUILD_TARGET?.startsWith('Cloudflare Workers');
+  // The full block-model GeoJSON is ~76 MB. On Cloudflare, keep that response
+  // single-consumer instead of teeing it into Cache Storage while the parser
+  // reads it; the in-flight map below still deduplicates concurrent requests.
+  // Vercel and local builds retain persistent caching for repeat visits.
+  const persistable=cacheable&&!(cloudflareWorkerBuild&&pathname.endsWith('/api/block-model'));
+  if(!('caches' in window)||!cacheable)return fetch(url,init);
   if(init?.signal?.aborted)throw abortError();
   const key=new URL(url,window.location.href).href;
   const active=pending.get(key);if(active&&!active.cancelled)return subscribe(active,key,init?.signal??undefined);
   const controller=new AbortController();
   const load=async()=>{
     let cache:Cache|undefined;
-    try{
-      cache=await caches.open(DECK_ASSET_CACHE);
-      // A previous foreground load may already have returned while its
-      // persistent write is finishing. Let that write settle before deciding
-      // whether this caller needs another large transfer.
-      await cacheWrites.get(key);
-      const hit=await cache.match(key);
-      if(controller.signal.aborted)throw abortError();
-      if(hit&&Date.now()-Number(hit.headers.get('x-tanga-stored-at'))<TTL)return hit;
-    }catch(error){if(controller.signal.aborted)throw error;/* Private browsing/quota restrictions must not block viewing. */}
+    if(persistable){
+      try{
+        cache=await caches.open(DECK_ASSET_CACHE);
+        // A previous foreground load may already have returned while its
+        // persistent write is finishing. Let that write settle before deciding
+        // whether this caller needs another large transfer.
+        await cacheWrites.get(key);
+        const hit=await cache.match(key);
+        if(controller.signal.aborted)throw abortError();
+        if(hit&&Date.now()-Number(hit.headers.get('x-tanga-stored-at'))<TTL)return hit;
+      }catch(error){if(controller.signal.aborted)throw error;/* Private browsing/quota restrictions must not block viewing. */}
+    }
     const response=await fetch(url,{...init,cache:'no-cache',signal:controller.signal});
     const type=response.headers.get('content-type')||'',length=Number(response.headers.get('content-length'));
     const invalid=type.includes('text/html')||(key.endsWith('.glb')&&length>0&&length<1024);
