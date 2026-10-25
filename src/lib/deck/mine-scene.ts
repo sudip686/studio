@@ -274,6 +274,28 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
     for(const y of [2,4.5])for(const sign of [-1,1])box(206,.4,.4,sign*143,y,z,materials.steel,'Perimeter fence rail and gate opening');
   }
   for(let i=0;i<7;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
+  // Measure structural bases against the pad before batching removes their
+  // individual source names. The pad top intentionally overlaps each footing
+  // so buildings meet the graded platform without a visible gap.
+  const padMesh=root.getObjectByName('Plant pad') as THREE.Mesh<THREE.BufferGeometry>|undefined;
+  padMesh?.geometry.computeBoundingBox();
+  const footingBases:number[]=[],columnBases:number[]=[];
+  for(const child of root.children){
+    if(!(child instanceof THREE.Mesh))continue;
+    if(!child.geometry.boundingBox)child.geometry.computeBoundingBox();
+    const baseY=child.position.y+(child.geometry.boundingBox?.min.y??0);
+    if(child.name.endsWith('concrete footing'))footingBases.push(baseY);
+    if(child.name.endsWith('portal column'))columnBases.push(baseY);
+  }
+  root.userData.plantStructuralBaseAudit={
+    footingCount:footingBases.length,
+    columnCount:columnBases.length,
+    padTopLocalY:padMesh?padMesh.position.y+(padMesh.geometry.boundingBox?.max.y??0):null,
+    footingBottomLocalMinY:footingBases.length?Math.min(...footingBases):null,
+    footingBottomLocalMaxY:footingBases.length?Math.max(...footingBases):null,
+    columnBottomLocalMinY:columnBases.length?Math.min(...columnBases):null,
+    columnBottomLocalMaxY:columnBases.length?Math.max(...columnBases):null,
+  };
   root.userData.siteServices=[-20,25,194];
   batchPlantMeshes(root);
   root.userData.ensurePlantDetail=()=>{
@@ -319,6 +341,23 @@ export function placeConcentrator(root:THREE.Group,x:number,z:number,height:(x:n
   const pad=createConceptPad(x,z,width,depth,height);
   const {level}=pad;
   root.userData.conceptPad=pad;
+  const baseAudit=root.userData.plantStructuralBaseAudit as {footingCount:number;columnCount:number;padTopLocalY:number|null;footingBottomLocalMinY:number|null;footingBottomLocalMaxY:number|null;columnBottomLocalMinY:number|null;columnBottomLocalMaxY:number|null}|undefined;
+  if(baseAudit&&baseAudit.padTopLocalY!==null&&baseAudit.footingBottomLocalMinY!==null&&baseAudit.footingBottomLocalMaxY!==null&&baseAudit.columnBottomLocalMinY!==null&&baseAudit.columnBottomLocalMaxY!==null){
+    const scaleY=root.scale.y,padTopAboveDatumM=baseAudit.padTopLocalY*scaleY;
+    const footingBottomMinM=(baseAudit.footingBottomLocalMinY??0)*scaleY,footingBottomMaxM=(baseAudit.footingBottomLocalMaxY??0)*scaleY;
+    const columnBottomMinM=(baseAudit.columnBottomLocalMinY??0)*scaleY,columnBottomMaxM=(baseAudit.columnBottomLocalMaxY??0)*scaleY;
+    root.userData.plantFoundationContactAudit={
+      footingCount:baseAudit.footingCount,columnCount:baseAudit.columnCount,
+      padTopAboveGradedDatumM:Number(padTopAboveDatumM.toFixed(3)),
+      footingBottomRangeAboveGradedDatumM:[Number(footingBottomMinM.toFixed(3)),Number(footingBottomMaxM.toFixed(3))],
+      columnBottomRangeAboveGradedDatumM:[Number(columnBottomMinM.toFixed(3)),Number(columnBottomMaxM.toFixed(3))],
+      maximumFootingGapM:Number(Math.max(0,footingBottomMaxM-padTopAboveDatumM).toFixed(3)),
+      minimumFootingOverlapM:Number(Math.max(0,padTopAboveDatumM-footingBottomMaxM).toFixed(3)),
+      maximumColumnGapM:Number(Math.max(0,columnBottomMaxM-padTopAboveDatumM).toFixed(3)),
+      minimumColumnOverlapM:Number(Math.max(0,padTopAboveDatumM-columnBottomMaxM).toFixed(3)),
+      source:'modeled building footings and portal columns against illustrative graded pad; not a foundation design',
+    };
+  }
   const vertices:number[]=[];
   // Parallel rounded-rectangle contours keep the engineering pad square while
   // allowing its unsourced cut/fill transition to blend into the natural

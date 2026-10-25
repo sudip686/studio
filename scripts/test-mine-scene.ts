@@ -54,6 +54,14 @@ for(const name of ['Flotation banks and walkways','Crushing and milling equipmen
 assert.ok(plant.children.filter(object=>object.userData.plantRoof).length>=12,'Roof cutaway tags cover the industrial halls');
 const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05,admittedPad);
 assert.ok(Math.abs(level-1.5)<1e-6,'Platform datum is 1.5 m above the median of the symmetric sampled ground');
+const plantFoundationAudit=plant.userData.plantFoundationContactAudit as {footingCount:number;columnCount:number;padTopAboveGradedDatumM:number;footingBottomRangeAboveGradedDatumM:number[];columnBottomRangeAboveGradedDatumM:number[];maximumFootingGapM:number;minimumFootingOverlapM:number;maximumColumnGapM:number;minimumColumnOverlapM:number;source:string};
+assert.ok(plantFoundationAudit.footingCount>=8&&plantFoundationAudit.columnCount>=40,'Every plant hall contributes footing and portal-column bases to the contact audit');
+assert.ok(plantFoundationAudit.footingBottomRangeAboveGradedDatumM.every(y=>Math.abs(y)<1e-6)&&plantFoundationAudit.columnBottomRangeAboveGradedDatumM.every(y=>Math.abs(y)<1e-6),'Building footings and portal columns start at the shared plant-pad datum');
+assert.ok(Math.abs(plantFoundationAudit.padTopAboveGradedDatumM-.35*plant.scale.y)<1e-6,'The pad top uses the scaled slab geometry above the graded datum');
+assert.equal(plantFoundationAudit.maximumFootingGapM,0,'No building footing floats above the plant pad');
+assert.equal(plantFoundationAudit.maximumColumnGapM,0,'No portal column floats above the plant pad');
+assert.ok(plantFoundationAudit.minimumFootingOverlapM>0.15&&plantFoundationAudit.minimumColumnOverlapM>0.15,'Footings and portal columns physically overlap the pad surface');
+assert.match(plantFoundationAudit.source,/not a foundation design/,'The plant foundation contact audit preserves its conceptual status');
 const transitionPad:ConceptPad={x:0,z:0,width:100,depth:100,level:10,transition:20};
 const sideBlend=conceptPadHeight(transitionPad,55,50,0),cornerBlend=conceptPadHeight(transitionPad,55,55,0);
 assert.ok(cornerBlend<sideBlend,'The earthwork transition follows a rounded distance around pad corners instead of square-axis blending');
@@ -181,6 +189,6 @@ for(const support of conveyorSupports){
   assert.ok(Math.abs(support.height-(support.topY-support.groundY))<1e-9,'Support height joins its own terrain footing to the conveyor crossbeam');
   assert.ok(support.height>=9.29,'Intermediate support maintains at least 9.3 m of conceptual conveyor clearance across the sampled cross-section');
 }
-console.log(`PASS: contour coverage, elevation, crest containment, plant bounds, ${roadDrapeAudit.roads.length} access spurs draped at ≤6 m with ${maximumTriangleDrapeError.toFixed(3)} m synthetic-terrain error and ${conveyorSupports.length} individually sampled conveyor footings`);
+console.log(`PASS: contour coverage, elevation, crest containment, plant bounds, ${plantFoundationAudit.footingCount} plant footings and ${plantFoundationAudit.columnCount} portal columns overlap the pad with zero gaps, ${roadDrapeAudit.roads.length} access spurs draped at ≤6 m with ${maximumTriangleDrapeError.toFixed(3)} m synthetic-terrain error and ${conveyorSupports.length} individually sampled conveyor footings`);
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

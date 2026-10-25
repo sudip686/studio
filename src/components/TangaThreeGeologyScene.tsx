@@ -4684,6 +4684,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const plant = buildConcentrator({deferPlantDetail:true});
             const [x, z] = sitePlan.plant;
             const level=placeConcentrator(plant,x,z,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz),{width:250,depth:250});
+            host.dataset.sitePlantFoundationContactAudit=JSON.stringify(plant.userData.plantFoundationContactAudit??null);
             for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,plant.userData.conceptPad as ConceptPad);
             tagDeckLayer(plant, 'context');
             stage.add(plant);
