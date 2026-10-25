@@ -1921,6 +1921,7 @@ function createTerrainEdgeAlphaTexture() {
 function createTerrainPatchGeometry(mode: GeologyMode) {
   const segmentsX = 176;
   const segmentsY = 140;
+  const rowWidth = segmentsX + 1;
   const width = TERRAIN_PATCH_WIDTH;
   const depth = TERRAIN_PATCH_DEPTH;
   const positions: number[] = [];
@@ -1945,7 +1946,7 @@ function createTerrainPatchGeometry(mode: GeologyMode) {
     const cy = ((row + 0.5) / segmentsY - 0.5) * depth;
     for (let column = 0; column < segmentsX; column += 1) {
       const cx = ((column + 0.5) / segmentsX - 0.5) * width;
-            const a = vertexIndex(column, row);
+      const a = vertexIndex(column, row);
       const b = vertexIndex(column + 1, row);
       const c = vertexIndex(column + 1, row + 1);
       const d = vertexIndex(column, row + 1);

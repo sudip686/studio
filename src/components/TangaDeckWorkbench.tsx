@@ -4841,16 +4841,17 @@ export default function TangaDeckWorkbench() {
   const isFirstStory = activeStoryIndex <= 0 && activeShotIndex <= 0;
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1 && activeShotIndex >= activeShots.length - 1;
 
-  // Prefetch the Three.js scene chunk once the user is a few scenes in (but
-  // before the first 3D scene), so arriving at it is instant. Idle-scheduled so
-  // it never competes with the current scene's work.
+  // Prefetch the Three.js scene chunk before the first 3D scene. An unbounded
+  // idle callback can starve while the map is streaming tiles, leaving a large
+  // scene import to start at the same time as the first 3D chapter. The timeout
+  // preserves idle-first scheduling but guarantees the download gets underway.
   useEffect(() => {
-    if (threeSceneRequested || activeStoryIndex < 3) return;
-    const w = window as unknown as {requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void};
+    if (threeSceneRequested || activeStoryIndex < 2) return;
+    const w = window as unknown as {requestIdleCallback?: (cb: () => void, options?: {timeout: number}) => number; cancelIdleCallback?: (id: number) => void};
     let idle: number | undefined;
     let timer: number | undefined;
     const warm = () => { void loadThreeSceneModule(); };
-    if (w.requestIdleCallback) idle = w.requestIdleCallback(warm);
+    if (w.requestIdleCallback) idle = w.requestIdleCallback(warm, {timeout: 1200});
     else timer = window.setTimeout(warm, 500);
     return () => {
       if (idle !== undefined && w.cancelIdleCallback) w.cancelIdleCallback(idle);
