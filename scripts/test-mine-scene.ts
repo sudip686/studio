@@ -157,9 +157,9 @@ const fixedTerrainColorAudit=campus.root.userData.fixedTerrainColorAudit as {ver
 assert.ok(fixedTerrainColorAudit.vertexCount>0&&fixedTerrainColorAudit.min<1&&fixedTerrainColorAudit.max>1,'Facility earthworks have restrained fixed-coordinate surface variation');
 assert.ok(fixedTerrainColorAudit.min>=.91&&fixedTerrainColorAudit.max<=1.09,'Fixed-coordinate earthwork variation remains within an 18% total luminance range');
 assert.equal(fixedTerrainColorAudit.source,'site-coordinate geometry; camera independent','Landform colors are baked from site geometry, not recalculated from the camera');
-const variedSurfaces:THREE.Mesh[]=[];
-campus.root.traverse(object=>{if(object instanceof THREE.Mesh&&object.material instanceof THREE.MeshBasicMaterial&&object.material.vertexColors)variedSurfaces.push(object);});
-assert.ok(variedSurfaces.length>0&&variedSurfaces.every(object=>object.geometry.getAttribute('color')?.count===object.geometry.getAttribute('position').count),'Every vertex-colored landform retains a complete per-vertex color attribute after batching');
+const variedSurfaces:THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>[]=[];
+campus.root.traverse(object=>{if(object instanceof THREE.Mesh&&object.material instanceof THREE.MeshStandardMaterial&&object.material.vertexColors)variedSurfaces.push(object as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>);});
+assert.ok(variedSurfaces.length>0&&variedSurfaces.every(object=>object.geometry.getAttribute('color')?.count===object.geometry.getAttribute('position').count&&object.material.roughness>=.9&&object.material.metalness===0&&object.receiveShadow),'Earthwork vertex colors stay complete while rough standard landforms receive stable site shadows');
 for(const object of variedSurfaces){const colors=object.geometry.getAttribute('color');assert.ok(Array.from(colors.array).every(Number.isFinite),'Batched landform color factors remain finite');}
 const roadDrapeAudit=campus.root.userData.accessRoadDrapeAudit as {maximumSampleSpacingM:number;roads:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]};
 assert.equal(roadDrapeAudit.maximumSampleSpacingM,6,'Campus access roads use a dense terrain drape interval');
