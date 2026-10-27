@@ -388,8 +388,8 @@ type ThreeCallout = {
   compact?: boolean;
   /** Compact, detail-free marker for the three-step whole-campus process sequence. */
   plantTag?: boolean;
-  /** Hide this label when opaque, visible scene geometry blocks its world anchor. */
-  occlusion?: 'scene' | 'none';
+  /** Test solid-scene visibility, intentionally show through geometry, or skip the test. */
+  occlusion?: 'scene' | 'xray' | 'none';
 };
 
 type ThreeLegendItem = {
@@ -3310,7 +3310,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStoryPlaying(false);setMiningBeat(3);
         const centre=stage.localToWorld(feedAnchor.clone());
         scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,1.5,42);
-        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed');
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed').map(item=>({...item,occlusion:'xray' as const}));
         setStatus('Uphill feed station · conceptual route into processing');return;
       }
       if(command.action==='tailingsView'||command.action==='wasteView'||command.action==='campusView'){
@@ -3326,7 +3326,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if(command.action==='tailingsView'||command.action==='wasteView')offset.multiplyScalar(1.35);
         offset.multiplyScalar(Math.max(1,.65/camera.aspect));
         scheduleCameraTween(centre.clone().add(offset),centre,1.8,42);
-        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id.startsWith('facility-')&&(command.action==='wasteView'?item.id==='facility-waste':command.action==='tailingsView'?item.id==='facility-tailings':item.id!=='facility-waste')||(command.action==='campusView'&&item.id==='development-plant'));
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id.startsWith('facility-')&&(command.action==='wasteView'?item.id==='facility-waste':command.action==='tailingsView'?item.id==='facility-tailings':item.id!=='facility-waste')||(command.action==='campusView'&&item.id==='development-plant')).map(item=>({...item,occlusion:'xray' as const}));
         setStatus(command.action==='tailingsView'?'Tailings and water concept detail':command.action==='wasteView'?'Waste-rock landform concept detail':'Lowland campus concept detail');
         return;
       }
@@ -3336,7 +3336,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStoryPlaying(false);setMiningBeat(3);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(processPlant.userData.siteServices as [number,number,number])));
         scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,1.5,42);
-        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant');
+        calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant').map(item=>({...item,occlusion:'xray' as const}));
         setStatus('Site services · workshop, laboratory and water provision');return;
       }
       if(command.action==='plantDetail'&&processPlant){
@@ -3360,7 +3360,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStoryPlaying(false); setMiningBeat(3);
         const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
         const selected=stages?.find(item=>item.id===command.stage);
-        calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:({feed:'01 · Feed & crushing',milling:'02 · Milling',flotation:'03 · Flotation',thickening:'04 · Thickening',dewatering:'05 · Dewatering',product:'06 · Product handling'} as Record<string,string>)[item.id]??item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:threeOwnerLocalAnchor(item.point,'process-plant'),kind:'story' as const}));
+        calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:({feed:'01 · Feed & crushing',milling:'02 · Milling',flotation:'03 · Flotation',thickening:'04 · Thickening',dewatering:'05 · Dewatering',product:'06 · Product handling'} as Record<string,string>)[item.id]??item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:threeOwnerLocalAnchor(item.point,'process-plant'),kind:'story' as const,occlusion:'xray' as const}));
         for(const callout of calloutsForProjection)calloutObjects.set(callout.id,processPlant);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
         const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
@@ -5332,10 +5332,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         ) {
           return;
         }
-        // A selected facility detail is an intentional x-ray annotation view:
-        // keep the selected feature named even when its own roof/embankment
-        // covers the anchor. Whole-site labels still use solid/terrain tests.
-        if(callout.occlusion==='scene'&&!(mode==='mine_planning'&&facilityFocused)&&activeOccluders.length){
+        // Ordinary scene labels stay tied to visible geometry. Detail views
+        // that deliberately name equipment through a roof mark those labels
+        // `xray`; focus state alone does not disable occlusion for every label.
+        if(callout.occlusion==='scene'&&activeOccluders.length){
           // Cast only to a point just short of the feature. The small tolerance
           // keeps a label attached to its own surface while hiding it behind a
           // nearer ridge, pit wall, or building during orbit and zoom.
@@ -5349,7 +5349,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if(calloutRaycaster.intersectObjects(activeOccluders,false).length)return;
           }
         }
-        if(callout.occlusion==='scene'&&!(mode==='mine_planning'&&facilityFocused)&&terrainResources&&layerSettingsRef.current.terrain.visible&&terrainSurfaceMaterials.some(material=>material.visible&&material.opacity>.65)){
+        if(callout.occlusion==='scene'&&terrainResources&&layerSettingsRef.current.terrain.visible&&terrainSurfaceMaterials.some(material=>material.visible&&material.opacity>.65)){
           // Terrain is checked against the same registered elevation samples
           // used to build the visible surface. This avoids triangle-scanning a
           // 512² mesh on every camera update while keeping ridge occlusion live.
