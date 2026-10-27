@@ -15,6 +15,10 @@ if (workbox) {
 
   // __WB_MANIFEST is replaced at build time (InjectManifest)
   precaching.precacheAndRoute(self.__WB_MANIFEST || []);
+  // Remove obsolete Workbox precache versions on activation. The custom
+  // activate handler below keeps the current precache but only cleans the
+  // runtime cache groups it owns.
+  precaching.cleanupOutdatedCaches();
 
 
 
