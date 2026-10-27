@@ -163,8 +163,8 @@ const CHAPTER_READINESS_ASSETS:Partial<Record<WorkbenchMode,ReadinessAsset[]>>={
   topography:[...TERRAIN_READINESS_ASSETS],
   drillholes:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
   subsurface:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Interpreted geology model',path:'/geologicalModel.glb',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
-  resource:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true}],
-  mine_planning:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  resource:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET,{label:'Reported resource block model',path:'/resource_blocks_v1.bin',required:true}],
+  mine_planning:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Reported resource block model',path:'/resource_blocks_v1.bin',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
   metallurgy:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
 };
 
@@ -303,6 +303,8 @@ type SceneCallout = {
   boxY: number;
   tone: string;
   anchor?: {
+    /** Geographic source coordinates projected by the active MapLibre view. */
+    space: 'EPSG:4326';
     lon: number;
     lat: number;
     elevationOffset?: number;
@@ -310,6 +312,10 @@ type SceneCallout = {
   side?: 'left' | 'right' | 'top' | 'bottom';
   offset?: {x: number; y: number};
 };
+
+function wgs84Anchor(point: {lon: number; lat: number}, elevationOffset?: number): NonNullable<SceneCallout['anchor']> {
+  return {space: 'EPSG:4326', ...point, ...(elevationOffset === undefined ? {} : {elevationOffset})};
+}
 
 type ProjectedSceneCallout = SceneCallout & {
   boxPixelX: number;
@@ -1772,15 +1778,15 @@ function sceneCalloutsForMode(
       // stage direction — it described where the deck was in its own sequence
       // rather than telling the viewer anything about the country. Both now
       // answer the question this scene exists to answer: why Tanzania.
-      {id: 'country', label: 'A graphite country', detail: 'Four ranked graphite projects sit in Tanzania, including Tanga', boxX: 42, boxY: 40, tone: '#a89c94', anchor: {lon: 35.2, lat: -6.2, elevationOffset: 160000}, offset: {x: -260, y: -120}},
-      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 80 km from deep-water port at Tanga', boxX: 55, boxY: 56, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 90000}, offset: {x: 88, y: -96}},
+      {id: 'country', label: 'A graphite country', detail: 'Four ranked graphite projects sit in Tanzania, including Tanga', boxX: 42, boxY: 40, tone: '#a89c94', anchor: wgs84Anchor({lon: 35.2, lat: -6.2}, 160000), offset: {x: -260, y: -120}},
+      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 80 km from deep-water port at Tanga', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
     ];
   }
   if (mode === 'project') {
     // One bold callout only — the licence. (Was 2; the village-context box added
     // noise and repeated what the map already shows.)
     return [
-      {id: 'aoi', label: 'Provisional boundary', detail: 'Legal licence geometry unconfirmed; drilling evidence follows in Chapter 05', boxX: 46, boxY: 37, tone: '#c7551b', anchor: {...PROJECT_CENTER, elevationOffset: 180}, offset: {x: 92, y: -116}},
+      {id: 'aoi', label: 'Provisional boundary', detail: 'Legal licence geometry unconfirmed; drilling evidence follows in Chapter 05', boxX: 46, boxY: 37, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 180), offset: {x: 92, y: -116}},
     ];
   }
   if (mode === 'topography') {
@@ -1790,7 +1796,7 @@ function sceneCalloutsForMode(
     // `reliefHeightAt`, which synthesises relief from noise for the 2D map and
     // then clamps it to 0..420, so its "range" was the clamp, not the ground.
     return [
-      {id: 'relief', label: 'Survey elevation range', detail: `${formatReliefWindow(relief)} across valid survey coverage`, boxX: 50, boxY: 33, tone: '#a89c94', anchor: {...PROJECT_CENTER, elevationOffset: 130}},
+      {id: 'relief', label: 'Survey elevation range', detail: `${formatReliefWindow(relief)} across valid survey coverage`, boxX: 50, boxY: 33, tone: '#a89c94', anchor: wgs84Anchor(PROJECT_CENTER, 130)},
     ];
   }
   if (mode === 'accessibility') {
@@ -1801,8 +1807,8 @@ function sceneCalloutsForMode(
       // Anchored on the middle of the corridor rather than its destination.
       // The destination is where the port and rail pins already sit, so a
       // callout anchored there landed on top of both of them.
-      {id: 'route', label: `${routeProfile.distanceLabel} / ${routeProfile.durationLabel}`, detail: `${routeProfile.source === 'osrm' ? 'Road geometry' : 'Indicative route'} to ${routeProfile.targetLabel}`, boxX: 38, boxY: 43, tone: targetTone, anchor: {...routeCorridorMidpoint(routeTarget), elevationOffset: 420}},
-      ...POWER_GRID_NODES.map((node, index) => ({id: `power-${node.id}`, label: node.shortName, detail: `${node.distanceKm.toFixed(1)} km direct · hydro / grid node`, boxX: 66, boxY: 38 + index * 22, tone: '#a89c94', anchor: {lon: node.lon, lat: node.lat}})),
+      {id: 'route', label: `${routeProfile.distanceLabel} / ${routeProfile.durationLabel}`, detail: `${routeProfile.source === 'osrm' ? 'Road geometry' : 'Indicative route'} to ${routeProfile.targetLabel}`, boxX: 38, boxY: 43, tone: targetTone, anchor: wgs84Anchor(routeCorridorMidpoint(routeTarget), 420)},
+      ...POWER_GRID_NODES.map((node, index) => ({id: `power-${node.id}`, label: node.shortName, detail: `${node.distanceKm.toFixed(1)} km direct · hydro / grid node`, boxX: 66, boxY: 38 + index * 22, tone: '#a89c94', anchor: wgs84Anchor(node)})),
     ];
   }
   if (mode === 'ranking') {
@@ -1812,7 +1818,7 @@ function sceneCalloutsForMode(
   }
   if (mode === 'comparison') {
     return [
-      {id: 'comparison', label: 'Tanga Graphite Project', detail: 'Project location · Tanzania', boxX: 45, boxY: 38, tone: '#c7551b', anchor: {...PROJECT_CENTER}, offset: {x: 104, y: -88}},
+      {id: 'comparison', label: 'Tanga Graphite Project', detail: 'Project location · Tanzania', boxX: 45, boxY: 38, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER), offset: {x: 104, y: -88}},
     ];
   }
   if (mode === 'resource') {
@@ -4517,7 +4523,7 @@ export default function TangaDeckWorkbench() {
   const sceneCallouts = threeVisible || (activeMode === 'ranking' && !isExploreMode)
     ? []
     : sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile, relief).flatMap(callout => {
-      if (callout.id === 'aoi') return boundaryAnchor ? [{...callout, anchor: boundaryAnchor}] : [];
+      if (callout.id === 'aoi') return boundaryAnchor ? [{...callout, anchor: wgs84Anchor(boundaryAnchor)}] : [];
       if (callout.id === 'route' && activeRoutePath.length) {
         const half = pathDistanceMeters(activeRoutePath) / 2;
         let distance = 0, point = activeRoutePath[0];
@@ -4526,7 +4532,7 @@ export default function TangaDeckWorkbench() {
           point = activeRoutePath[index];
           if (distance >= half) break;
         }
-        return [{...callout, anchor: {lon: point[0], lat: point[1]}}];
+        return [{...callout, anchor: wgs84Anchor({lon: point[0], lat: point[1]})}];
       }
       return [callout];
     });
@@ -5934,7 +5940,7 @@ export default function TangaDeckWorkbench() {
         <section className="tanga-deck__callout-layer" aria-label="Scene callouts">
           <svg className="tanga-deck__leader-svg" viewBox={`0 0 ${stageSize.width} ${stageSize.height}`} aria-hidden="true">
             {projectedSceneCallouts.map((callout) => callout.anchorPixelX !== null && callout.anchorPixelY !== null && (
-              <g key={`leader-${callout.id}`}>
+              <g key={`leader-${callout.id}`} data-callout-id={callout.id} data-anchor-space={callout.anchor?.space ?? 'screen'}>
                 <line
                   data-callout-leader={callout.id}
                   x1={callout.anchorPixelX}
@@ -5957,7 +5963,7 @@ export default function TangaDeckWorkbench() {
             <div
               key={callout.id}
               data-callout-id={callout.id}
-              data-anchor-space={callout.anchor ? 'EPSG:4326' : 'screen'}
+              data-anchor-space={callout.anchor?.space ?? 'screen'}
               className={classNames('tanga-deck__callout', `is-${callout.side ?? 'right'}`)}
               style={{
                 '--callout-x': `${callout.boxPixelX}px`,

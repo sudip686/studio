@@ -26,7 +26,7 @@ export const DECK_PRELOAD_ASSETS: Record<DeckPreloadStage, readonly string[]> = 
   ],
   drillholes: ['/assay_data.geojson', '/lithology_data.geojson'],
   subsurface: ['/geologicalModel.glb', '/terrain_texture_hires.jpg?v=survey-2026-10-21'],
-  resource: ['/api/block-model'],
+  resource: ['/resource_blocks_v1.bin'],
 };
 
 export const DECK_PRELOAD_ASSET_LABELS: Record<string, string> = {
@@ -38,7 +38,7 @@ export const DECK_PRELOAD_ASSET_LABELS: Record<string, string> = {
   '/lithology_data.geojson': 'Lithology intervals',
   '/geologicalModel.glb': 'Interpreted geology model',
   '/terrain_texture_hires.jpg?v=survey-2026-10-21': 'Survey terrain imagery',
-  '/api/block-model': 'Reported resource block model',
+  '/resource_blocks_v1.bin': 'Compact reported resource block model',
 };
 
 export async function isDeckAssetCached(path: string) {

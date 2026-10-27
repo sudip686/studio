@@ -68,6 +68,11 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 const assetsDirectory = path.resolve(root, '.open-next', 'assets');
 const insideRoot = path.relative(root, assetsDirectory);
 if (insideRoot.startsWith('..') || path.isAbsolute(insideRoot)) throw new Error('Unsafe Cloudflare assets directory');
+await writeFile(
+  path.join(assetsDirectory, '_headers'),
+  '/resource_blocks_v1.bin\n  Cache-Control: public, max-age=31536000, immutable\n',
+  'utf8',
+);
 let omittedBytes = 0;
 let requiredCount = 0;
 let unresolved = [];

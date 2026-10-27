@@ -351,6 +351,21 @@ type DrillSegment = {
   lithology: string;
 };
 
+type ThreeOwnerLocalAnchor = {
+  /** Coordinates belong to the callout owner's local Three.js coordinate frame. */
+  space: 'three-owner-local';
+  owner: 'scene-stage' | 'process-plant' | 'interpreted-unit';
+  coordinates: readonly [number, number, number];
+};
+
+function threeOwnerLocalAnchor(
+  point: readonly [number, number, number] | THREE.Vector3,
+  owner: ThreeOwnerLocalAnchor['owner'] = 'scene-stage'
+): ThreeOwnerLocalAnchor {
+  const coordinates = point instanceof THREE.Vector3 ? point.toArray() : point;
+  return {space: 'three-owner-local', owner, coordinates: [coordinates[0], coordinates[1], coordinates[2]]};
+}
+
 type ThreeCallout = {
   id: string;
   label: string;
@@ -358,8 +373,8 @@ type ThreeCallout = {
   x: number;
   y: number;
   tone: string;
-  /** Coordinates in the callout owner's local space (the scene stage when no owner is assigned). */
-  anchor: [number, number, number];
+  /** Explicit owner-local anchor; never a screen pixel, geographic pair, or world coordinate. */
+  anchor: ThreeOwnerLocalAnchor;
   side?: 'left' | 'right' | 'top' | 'bottom';
   /**
    * `story` callouts are the hand-authored scene narration and always place
@@ -397,6 +412,12 @@ const MINE_SITE_CALLOUT_INDEX: Readonly<Record<string, string>> = {
   'facility-water': '06',
   'facility-raw-water': '07',
   'facility-waste': '08',
+};
+const MINE_SITE_CALLOUT_SHORT_LABEL: Readonly<Record<string, string>> = {
+  'pit-0': 'North pit',
+  'pit-1': 'South pit',
+  'development-feed': 'Feed point',
+  'development-plant': 'Plant',
 };
 
 type ProjectedThreeCallout = ThreeCallout & {
@@ -1268,7 +1289,7 @@ function interceptCallouts(
           x: 50,
           y: 50,
           tone: interceptTone(intercept.gradePct),
-          anchor: [0, 0, 0] as [number, number, number],
+          anchor: threeOwnerLocalAnchor([0, 0, 0]),
           kind: 'intercept' as const,
           // Rank order becomes priority, so the strongest survive crowding.
           priority: facts.ranked.length - index,
@@ -1392,13 +1413,13 @@ function threeCallouts(
         id: 'terrain-ridges',
         label: 'Ridge relief',
         detail: 'Measured project DEM · 1× vertical scale',
-        x: 37, y: 32, tone: '#e4a85d', anchor: [-1650, 180, -940], side: 'right', kind: 'story', occlusion: 'scene',
+        x: 37, y: 32, tone: '#e4a85d', anchor: threeOwnerLocalAnchor([-1650, 180, -940]), side: 'right', kind: 'story', occlusion: 'scene',
       },
       {
         id: 'terrain-drainage',
         label: 'Slope & elevation',
         detail: 'Relief follows the measured project DEM',
-        x: 62, y: 58, tone: '#84c7d5', anchor: [1260, -20, 980], side: 'left', kind: 'story', occlusion: 'scene',
+        x: 62, y: 58, tone: '#84c7d5', anchor: threeOwnerLocalAnchor([1260, -20, 980]), side: 'left', kind: 'story', occlusion: 'scene',
       },
     ];
   }
@@ -1409,13 +1430,13 @@ function threeCallouts(
         id: 'collars',
         label: assayFacts ? `${assayFacts.holeCount} holes with intercepts` : 'Drillhole collars',
         detail: coverage ?? 'Surface control points feeding the 3D assay trace',
-        x: 47, y: 28, tone: '#facc15', anchor: [-820, 30, 540], side: 'right', kind: 'story',
+        x: 47, y: 28, tone: '#facc15', anchor: threeOwnerLocalAnchor([-820, 30, 540]), side: 'right', kind: 'story',
       },
       {
         id: 'assays',
         label: best ? 'Best intercept' : 'Carbon intervals',
         detail: bestQuote ?? 'Red-yellow traces mark the stronger TGC intervals',
-        x: 61, y: 52, tone: '#ef4444', anchor: [280, -230, -120], side: 'left', kind: 'story',
+        x: 61, y: 52, tone: '#ef4444', anchor: threeOwnerLocalAnchor([280, -230, -120]), side: 'left', kind: 'story',
       },
     ];
   }
@@ -1425,13 +1446,13 @@ function threeCallouts(
         id: 'cutaway',
         label: 'Interpreted geology',
         detail: 'Seven supplied units · colours correspond to source map',
-        x: 40, y: 31, tone: '#7dd3fc', anchor: [-780, 36, -650], side: 'right', kind: 'story',
+        x: 40, y: 31, tone: '#7dd3fc', anchor: threeOwnerLocalAnchor([-780, 36, -650]), side: 'right', kind: 'story',
       },
       {
         id: 'volume',
         label: 'Evidence and interpretation',
         detail: 'Registered to drill coordinates; contacts need geological approval',
-        x: 64, y: 58, tone: '#2dd4bf', anchor: [360, -300, 190], side: 'left', kind: 'story',
+        x: 64, y: 58, tone: '#2dd4bf', anchor: threeOwnerLocalAnchor([360, -300, 190]), side: 'left', kind: 'story',
       },
     ];
   }
@@ -1441,7 +1462,7 @@ function threeCallouts(
         id: 'blocks',
         label: `${resourceFocusLabel(focus)} blocks`,
         detail: 'Selected model population',
-        x: 57, y: 35, tone: '#ef4444', anchor: [420, -165, 420], side: 'left', kind: 'story',
+        x: 57, y: 35, tone: '#ef4444', anchor: threeOwnerLocalAnchor([420, -165, 420]), side: 'left', kind: 'story',
       },
       {
         id: 'grade',
@@ -1449,7 +1470,7 @@ function threeCallouts(
           ? `${assayFacts.cutoffLabel} to ${assayFacts.bestGradePct.toFixed(1)}% TGC`
           : 'TGC color ramp',
         detail: coverage ?? 'Every block is shaded by graphite grade',
-        x: 36, y: 62, tone: '#facc15', anchor: [-520, -140, 700], side: 'right', kind: 'story',
+        x: 36, y: 62, tone: '#facc15', anchor: threeOwnerLocalAnchor([-520, -140, 700]), side: 'right', kind: 'story',
       },
     ];
   }
@@ -1458,15 +1479,15 @@ function threeCallouts(
     // upper-left over the terrain — clear of both the right-docked Pit &
     // Financial panel and the bottom-left drillhole legend.
     return [
-      {id: 'pit', label: 'Conceptual excavations', detail: 'Block-informed footprints · provisional boundary · not an economic design', x: 33, y: 34, tone: '#f59e0b', anchor: [-620, -60, 300], side: 'right', kind: 'story'},
+      {id: 'pit', label: 'Conceptual excavations', detail: 'Block-informed footprints · provisional boundary · not an economic design', x: 33, y: 34, tone: '#f59e0b', anchor: threeOwnerLocalAnchor([-620, -60, 300]), side: 'right', kind: 'story'},
     ];
   }
   // metallurgy (default)
   return [
     // Anchored at the two ends of the story the scene now tells: material
     // leaving identified holes, and the lab it arrives at.
-    {id: 'samples', label: '8 variability composites', detail: 'Oxide, transition and fresh material leaving the drilled holes', x: 30, y: 40, tone: '#d96b2b', anchor: [-360, 120, 220], side: 'right', kind: 'story'},
-    {id: 'recoveries', label: 'Flotation testwork', detail: 'TDM006 oxide: 93.0%; TDM001 fresh: 94.4%. TDM004 recovery: 75.8%.', x: 62, y: 52, tone: '#b9954b', anchor: [METALLURGY_LAB_POSITION.x, METALLURGY_LAB_POSITION.y, METALLURGY_LAB_POSITION.z], side: 'left', kind: 'story'},
+    {id: 'samples', label: '8 variability composites', detail: 'Oxide, transition and fresh material leaving the drilled holes', x: 30, y: 40, tone: '#d96b2b', anchor: threeOwnerLocalAnchor([-360, 120, 220]), side: 'right', kind: 'story'},
+    {id: 'recoveries', label: 'Flotation testwork', detail: 'TDM006 oxide: 93.0%; TDM001 fresh: 94.4%. TDM004 recovery: 75.8%.', x: 62, y: 52, tone: '#b9954b', anchor: threeOwnerLocalAnchor([METALLURGY_LAB_POSITION.x, METALLURGY_LAB_POSITION.y, METALLURGY_LAB_POSITION.z]), side: 'left', kind: 'story'},
   ];
 }
 
@@ -1556,12 +1577,49 @@ function parseBlockGeoJson(payload: any) {
   return blocks;
 }
 
+function parseBlockModelBuffer(buffer: ArrayBuffer): ResourceBlock[] {
+  const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, Math.min(8, buffer.byteLength)));
+  if (magic !== 'TGRBIN01') return parseBlockGeoJson(JSON.parse(new TextDecoder().decode(buffer)));
+  if (buffer.byteLength < 20) throw new Error('Compact resource model header is incomplete.');
+
+  const view = new DataView(buffer);
+  const count = view.getUint32(8, true);
+  const stride = view.getUint32(12, true);
+  const metadataLength = view.getUint32(16, true);
+  const dataOffset = 20 + metadataLength;
+  if (stride !== 44 || dataOffset > buffer.byteLength || count > Math.floor((buffer.byteLength - dataOffset) / stride)) {
+    throw new Error('Compact resource model has an invalid size or record layout.');
+  }
+  const metadata = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, metadataLength)));
+  const classes: string[] = Array.isArray(metadata.classes) ? metadata.classes : [];
+  const blocks: ResourceBlock[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const offset = dataOffset + index * stride;
+    const longitude = view.getFloat64(offset, true);
+    const latitude = view.getFloat64(offset + 8, true);
+    const elevation = view.getFloat64(offset + 16, true);
+    const dx = view.getFloat32(offset + 24, true);
+    const dy = view.getFloat32(offset + 28, true);
+    const dz = view.getFloat32(offset + 32, true);
+    const carbon = view.getFloat32(offset + 36, true);
+    const classificationIndex = view.getUint32(offset + 40, true);
+    if (!(carbon > 0) || !Number.isFinite(longitude) || !Number.isFinite(latitude) || !Number.isFinite(elevation) || !(dx > 0) || !(dy > 0) || !(dz > 0)) continue;
+    const [easting, northing] = proj4('WGS84', 'EPSG:32737', [longitude, latitude]) as [number, number];
+    const x = easting - PROJECT_UTM_CENTER.easting;
+    const y = (elevation - LOCAL_VERTICAL_DATUM) * VERTICAL_EXAGGERATION;
+    const z = -(northing - PROJECT_UTM_CENTER.northing);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+    blocks.push({x, y, z, dx, dy, dz, carbon, classification: String(classes[classificationIndex] ?? 'Unknown')});
+  }
+  return blocks;
+}
+
 function loadBlocks() {
   if (!blockPromise) {
-    // Keep the large resource model on the app's same-origin server route. The
-    // route streams it from R2 when it is not available in the local build,
-    // avoiding browser CORS failures on preview hosts and laptops.
-    blockPromise = cachedDeckAsset('/api/block-model', {cache: 'force-cache'})
+    // Use the versioned compact form derived from the reported block model.
+    // It preserves every source cell while avoiding a large streamed GeoJSON
+    // response, which could be truncated by the public R2 development host.
+    blockPromise = cachedDeckAsset('/resource_blocks_v1.bin', {cache: 'force-cache'})
       .then(response => {if (!response.ok) throw new Error('Block model unavailable'); return parseBlockGeoJsonInWorker(response);})
       .catch(error => {blockPromise = null; throw error;});
   }
@@ -1569,14 +1627,15 @@ function loadBlocks() {
 }
 
 async function parseBlockGeoJsonInWorker(response: Response): Promise<ResourceBlock[]> {
+  const workerRef: {current: Worker | null} = {current: null};
+  const buffer = await response.arrayBuffer();
+  const fallbackBuffer = buffer.slice(0);
   if (typeof Worker === 'undefined') {
     blockParserBackend = 'main-fallback';
-    return parseBlockGeoJson(await response.json());
+    return parseBlockModelBuffer(buffer);
   }
 
-  const workerRef: {current: Worker | null} = {current: null};
   try {
-    const buffer = await response.arrayBuffer();
     const center = PROJECT_UTM_CENTER;
     const result = await new Promise<{blocks?: ResourceBlock[]; error?: string; parseMs?: number; projectionMs?: number; featureCount?: number}>((resolve, reject) => {
       workerRef.current = new Worker('/workers/block-model-parser.js', {name: 'tanga-block-model-parser'});
@@ -1599,9 +1658,7 @@ async function parseBlockGeoJsonInWorker(response: Response): Promise<ResourceBl
     workerRef.current?.terminate();
     blockParserBackend = 'main-fallback';
     console.warn('Block-model worker unavailable; using the main-thread parser.', error);
-    const fallbackResponse = await cachedDeckAsset('/api/block-model', {cache: 'force-cache'});
-    if (!fallbackResponse.ok) throw new Error('Block model unavailable for the main-thread fallback');
-    return parseBlockGeoJson(await fallbackResponse.json());
+    return parseBlockModelBuffer(fallbackBuffer);
   } finally {
     workerRef.current?.terminate();
   }
@@ -2464,6 +2521,15 @@ export default function TangaThreeGeologyScene({
   const [projectedFrame, setProjectedFrame] = useState<ProjectedCalloutFrame>({width: 0, height: 0, items: []});
   const [navInstrument, setNavInstrument] = useState<ThreeNavInstrument>(DEFAULT_NAV_INSTRUMENT);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
+  const [selectedBlockTooltip, setSelectedBlockTooltip] = useState<HoverTooltip | null>(null);
+  useEffect(() => {
+    if (!selectedBlockTooltip) return;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedBlockTooltip(null);
+    };
+    window.addEventListener('keydown', dismissOnEscape);
+    return () => window.removeEventListener('keydown', dismissOnEscape);
+  }, [selectedBlockTooltip]);
   // Derived drill results, kept in state so the narration callouts and the
   // headline panel quote the same numbers the scene labels do.
   const [assayFacts, setAssayFacts] = useState<AssayFacts | null>(null);
@@ -2533,6 +2599,7 @@ export default function TangaThreeGeologyScene({
     setProjectedFrame({width: 0, height: 0, items: []});
     setNavInstrument(DEFAULT_NAV_INSTRUMENT);
     setHoverTooltip(null);
+    setSelectedBlockTooltip(null);
     const host = hostRef.current;
     // This chapter is a dedicated product/evidence composition, not a second
     // mine viewer. Avoid loading and rendering an invisible industrial campus.
@@ -2731,7 +2798,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let storyMotionStart=0,consumedReplay=0,lastStoryBeat=-1;
     let calloutsForProjection = threeCallouts(mode, resourceFocus, null);
     let siteOverviewCallouts: ThreeCallout[] = [];
-    const calloutAnchors = new Map<string, THREE.Vector3>();
+    const calloutAnchorOverrides = new Map<string, ThreeOwnerLocalAnchor>();
     const calloutObjects = new Map<string, THREE.Object3D>();
     const calloutOccluders: THREE.Object3D[] = [];
     const terrainSurfaceMaterials: THREE.Material[] = [];
@@ -3274,8 +3341,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStoryPlaying(false); setMiningBeat(3);
         const stages=processPlant.userData.processStages as Array<{id:string;label:string;detail:string;point:[number,number,number]}>;
         const selected=stages?.find(item=>item.id===command.stage);
-        calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:({feed:'01 · Feed & crushing',milling:'02 · Milling',flotation:'03 · Flotation',thickening:'04 · Thickening',dewatering:'05 · Dewatering',product:'06 · Product handling'} as Record<string,string>)[item.id]??item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:item.point,kind:'story' as const}));
-        for(const callout of calloutsForProjection){calloutAnchors.set(callout.id,new THREE.Vector3(...callout.anchor));calloutObjects.set(callout.id,processPlant);}
+        calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:({feed:'01 · Feed & crushing',milling:'02 · Milling',flotation:'03 · Flotation',thickening:'04 · Thickening',dewatering:'05 · Dewatering',product:'06 · Product handling'} as Record<string,string>)[item.id]??item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:threeOwnerLocalAnchor(item.point,'process-plant'),kind:'story' as const}));
+        for(const callout of calloutsForProjection)calloutObjects.set(callout.id,processPlant);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
         const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
         scheduleCameraTween(position,centre,1.3,42);
@@ -3876,7 +3943,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const {bounds_utm: bounds, width, height} = resources.meta;
             const x = bounds.minX + ((index % width) + .5) / width * (bounds.maxX - bounds.minX) - PROJECT_UTM_CENTER.easting;
             const north = bounds.maxY - (Math.floor(index / width) + .5) / height * (bounds.maxY - bounds.minY) - PROJECT_UTM_CENTER.northing;
-            calloutAnchors.set(id, new THREE.Vector3(x, terrainSurfaceY(resources, x, north), -north));
+            calloutAnchorOverrides.set(id, threeOwnerLocalAnchor([x, terrainSurfaceY(resources, x, north), -north]));
           }
         }
         stabilizeSceneMaterialAppearance(scene);
@@ -3968,8 +4035,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           tagDeckLayer(mesh, 'blocks'); stage.add(mesh); unitCount++;
           if (isHost) {
             const vertex = geometry.index?.getX(Math.floor(geometry.index.count / 2)) ?? Math.floor(positions.count / 2);
-            calloutAnchors.set('cutaway', new THREE.Vector3().fromBufferAttribute(positions, vertex));
+            const cutawayAnchor = new THREE.Vector3().fromBufferAttribute(positions, vertex);
             calloutObjects.set('cutaway', mesh);
+            calloutsForProjection = calloutsForProjection.map(callout => callout.id === 'cutaway'
+              ? {...callout, anchor: threeOwnerLocalAnchor(cutawayAnchor, 'interpreted-unit')}
+              : callout);
           }
         });
         host.dataset.geologyUnits = String(unitCount);
@@ -4027,8 +4097,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const planeMesh=new THREE.Mesh(curtain,new THREE.MeshBasicMaterial({color:0x65e8df,transparent:true,opacity:.12,side:THREE.DoubleSide,depthWrite:false}));locator.add(planeMesh);
           const endpointGeometry=new THREE.SphereGeometry(9,12,8),endpointMaterial=new THREE.MeshBasicMaterial({color:0xf5e2b9,depthTest:false});
           for(const point of [points[0],points[points.length-1]]){const marker=new THREE.Mesh(endpointGeometry,endpointMaterial);marker.position.copy(point);marker.renderOrder=71;locator.add(marker);}
-          calloutsForProjection=definition.ends.map((end,i)=>({id:`section-end-${i}`,label:end,detail:'Section endpoint',x:28,y:30,tone:'#65e8df',anchor:(i?points[points.length-1]:points[0]).toArray() as [number,number,number],side:i?'left' as const:'right' as const,kind:'story' as const}));
-          for(const label of calloutsForProjection)calloutAnchors.set(label.id,new THREE.Vector3(...label.anchor));
+          calloutsForProjection=definition.ends.map((end,i)=>({id:`section-end-${i}`,label:end,detail:'Section endpoint',x:28,y:30,tone:'#65e8df',anchor:threeOwnerLocalAnchor(i?points[points.length-1]:points[0]),side:i?'left' as const:'right' as const,kind:'story' as const}));
           const [x,z]=sectionWorld(definition,(definition.min+definition.max)/2);
           stage.updateMatrixWorld(true);
           const target=stage.localToWorld(new THREE.Vector3(x,flat?centre.y:crossHeight(x,z),z));
@@ -4109,7 +4178,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const start = registeredDrillPoint(host, 'from', terrainResources, drillSurfaceOffsets);
           const end = registeredDrillPoint(host, 'to', terrainResources, drillSurfaceOffsets);
           const fraction = clamp((midDepth - host.depthFrom) / Math.max(.001, host.depthTo - host.depthFrom), 0, 1);
-          calloutAnchors.set(callout.id, start.clone().lerp(end, fraction));
+          calloutAnchorOverrides.set(callout.id, threeOwnerLocalAnchor(start.clone().lerp(end, fraction)));
           return true;
         })
         .map(({callout}) => callout);
@@ -4126,8 +4195,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const highEnd = registeredDrillPoint(highCarbonSegment, 'to', terrainResources, drillSurfaceOffsets);
         const fraction = matchingBest && midDepth !== null ? clamp((midDepth - matchingBest.depthFrom) / Math.max(.001, matchingBest.depthTo - matchingBest.depthFrom), 0, 1) : .5;
         const assayAnchor = highStart.clone().lerp(highEnd, fraction);
-        if (!bestIntercept || matchingBest) calloutAnchors.set('assays', assayAnchor);
-        calloutAnchors.set('volume', assayAnchor.clone());
+        if (!bestIntercept || matchingBest) calloutAnchorOverrides.set('assays', threeOwnerLocalAnchor(assayAnchor));
+        calloutAnchorOverrides.set('volume', threeOwnerLocalAnchor(assayAnchor.clone()));
       }
       const tubeGeometry = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
       const traceMaterial = new THREE.MeshBasicMaterial({
@@ -4246,7 +4315,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       host.dataset.drillSurfaceResidual = JSON.stringify({count: residuals.length, min: Math.min(...residuals), max: Math.max(...residuals)});
       const collarAnchorSegment = collarSegments[Math.floor(collarSegments.length * 0.46)] ?? collarSegments[0];
       if (collarAnchorSegment) {
-        calloutAnchors.set('collars', collarSurfacePoint(collarAnchorSegment, terrainResources, 18));
+        calloutAnchorOverrides.set('collars', threeOwnerLocalAnchor(collarSurfacePoint(collarAnchorSegment, terrainResources, 18)));
       }
       // Collars are reference points, not the subject. At r=7.8 with a bright
       // emissive they bloomed into blobs that covered the drill traces and the
@@ -4379,10 +4448,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         processMarker = new THREE.Mesh(new THREE.SphereGeometry(2.5, 12, 8), new THREE.MeshBasicMaterial({color: 0xefb980}));
         labPlant.add(processMarker);
         calloutsForProjection = [
-          {id: 'feed', label: '01 · Feed preparation', detail: 'ROM → crushing → milling', x: 25, y: 30, tone: '#c7551b', anchor: [plantX-80, labGround+30, plantZ-16], side: 'left', kind: 'story'},
-          {id: 'product', label: '02 · Concentration', detail: 'Flotation → thickening → dewatering', x: 70, y: 40, tone: '#7ca6ad', anchor: [plantX+70, labGround+30, plantZ+10], side: 'right', kind: 'story'},
+          {id: 'feed', label: '01 · Feed preparation', detail: 'ROM → crushing → milling', x: 25, y: 30, tone: '#c7551b', anchor: threeOwnerLocalAnchor([plantX-80, labGround+30, plantZ-16]), side: 'left', kind: 'story'},
+          {id: 'product', label: '02 · Concentration', detail: 'Flotation → thickening → dewatering', x: 70, y: 40, tone: '#7ca6ad', anchor: threeOwnerLocalAnchor([plantX+70, labGround+30, plantZ+10]), side: 'right', kind: 'story'},
         ];
-        for (const label of calloutsForProjection) calloutAnchors.set(label.id, new THREE.Vector3(...label.anchor));
         setStatus('Illustrative concentrator flow ready');
       }
 
@@ -4416,12 +4484,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if (mode === 'resource') calloutsForProjection = calloutsForProjection.map(callout => callout.id === 'grade'
             ? {...callout, label: `${gradeAnchorBlock.carbon.toFixed(2)}% TGC model cell`, detail: 'Highest displayed block grade · model estimate'}
             : callout.id === 'blocks' ? {...callout, detail: `${sampled.length.toLocaleString()} displayed source cells`} : callout);
-          calloutAnchors.set('blocks', blockAnchor);
-          calloutAnchors.set('grade', new THREE.Vector3(
+          calloutAnchorOverrides.set('blocks', threeOwnerLocalAnchor(blockAnchor));
+          calloutAnchorOverrides.set('grade', threeOwnerLocalAnchor(new THREE.Vector3(
             gradeAnchorBlock.x,
             resourceBlockCenterY(gradeAnchorBlock, voxelScale, terrainResources),
             gradeAnchorBlock.z
-          ));
+          )));
         }
 
         const blockGeometry = createResourceCellGeometry();
@@ -4618,6 +4686,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 mesh.name=`${pitIndex===0?'North':'South'} pit · ${band.range} model cells`;
                 mesh.userData.pitIndex=pitIndex;
                 mesh.userData.gradeBand=band.key;
+                // Keep each instanced cell tied to its own source record so
+                // hover/click inspection reports this block's grade,
+                // classification and dimensions instead of only the batch.
+                mesh.userData.resourceBlockSources=subset;
                 mesh.renderOrder=40+bandIndex*.01;
                 mesh.visible=false;
                 mesh.userData.tooltipItems=[{title:mesh.name,rows:['Source-positioned model cells inside the conceptual pit envelope.','Displayed grade threshold is not an economic cutoff or reserve.'],tone:band.color}];
@@ -4842,16 +4914,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             cameraShot.mid.copy(cameraShot.from).lerp(cameraShot.to, .5);
             cameraShot.targetMid.copy(cameraShot.target);
             cameraShot.drift.set(8, 3, 8);
-            calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:[p.centre[0],p.surface,p.centre[1]] as [number,number,number],side:'right' as const,kind:'story' as const,occlusion:'scene' as const}));
+            calloutsForProjection = [...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]).map((p,i)=>({id:`pit-${i}`,label:i===0?'North pit · concept':'South pit · concept',detail:'Presentation envelope · not full extraction',x:28,y:30,tone:'#c7551b',anchor:threeOwnerLocalAnchor([p.centre[0],p.surface,p.centre[1]]),side:'right' as const,kind:'story' as const,occlusion:'scene' as const}));
             if(feedAnchor&&sitePlan.plant&&processPlant){
-              calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:feedAnchor.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
+              calloutsForProjection.push({id:'development-feed',label:'Proposed feed apron',detail:'Near PaulSam candidate 2 · offset clear of concept pits',x:28,y:30,tone:'#a4c6ce',anchor:threeOwnerLocalAnchor(feedAnchor),kind:'story',occlusion:'scene'});
               const plantBounds=new THREE.Box3().setFromObject(processPlant);
               const plantTop=stage.worldToLocal(new THREE.Vector3((plantBounds.min.x+plantBounds.max.x)/2,plantBounds.max.y+12,(plantBounds.min.z+plantBounds.max.z)/2));
-              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'Option 2 · 250 × 250 m land allowance',x:28,y:30,tone:'#dca06b',anchor:plantTop.toArray() as [number,number,number],kind:'story',occlusion:'scene'});
+              calloutsForProjection.push({id:'development-plant',label:'Processing candidate',detail:'Option 2 · 250 × 250 m land allowance',x:28,y:30,tone:'#dca06b',anchor:threeOwnerLocalAnchor(plantTop),kind:'story',occlusion:'scene'});
             }
-            for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell',water:'Reclaim pond','raw-water':'Raw-water pond',waste:'Waste rock'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:f.anchor,kind:'story',occlusion:'scene'});
+            for(const f of campusFacilities)calloutsForProjection.push({id:`facility-${f.id}`,label:({tailings:'Tailings cell',water:'Reclaim pond','raw-water':'Raw-water pond',waste:'Waste rock'}[f.id]),detail:'Illustrative placement',x:28,y:30,tone:f.id==='waste'?'#c4ad86':'#8eb9bd',anchor:threeOwnerLocalAnchor(f.anchor),kind:'story',occlusion:'scene'});
             siteOverviewCallouts = calloutsForProjection;
-            for(const label of calloutsForProjection)calloutAnchors.set(label.id,new THREE.Vector3(...label.anchor));
             // Site labels disappear when a nearer solid feature blocks the
             // world anchor. Exclude instanced grade blocks: they are not
             // architectural occluders and are costly to ray-test individually.
@@ -5032,6 +5103,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (!hit || !tooltip) {
         renderer.domElement.classList.remove('is-picking');
         setHoverTooltip(null);
+        if (select && mode === 'mine_planning') setSelectedBlockTooltip(null);
         return;
       }
 
@@ -5049,18 +5121,26 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           window.dispatchEvent(new Event('tanga:manual-exploration'));
         }
       }
-      setHoverTooltip({
+      const nextTooltip = {
         x: clamp(event.clientX - rect.left + 16, 14, rect.width - 276),
         y: clamp(event.clientY - rect.top + 16, 76, rect.height - 156),
         title: tooltip.title,
         rows: tooltip.rows,
         tone: tooltip.tone,
-      });
+      };
+      setHoverTooltip(nextTooltip);
+      if (select && mode === 'mine_planning') {
+        const resourceBlocks=hit.object.userData?.resourceBlockSources as ResourceBlock[]|undefined;
+        setSelectedBlockTooltip(resourceBlocks?.[hit.instanceId??0] ? nextTooltip : null);
+      }
     };
 
     const onPointerMove = (event: PointerEvent) => {
       clearTimeout(pickTimer);
       if (event.buttons || interacting) {
+        if (selectionPointer && Math.hypot(event.clientX - selectionPointer.x, event.clientY - selectionPointer.y) >= 5) {
+          setSelectedBlockTooltip(null);
+        }
         setHoverTooltip(null);
         return;
       }
@@ -5069,9 +5149,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       pickTimer = setTimeout(() => pickAtPointer(event), 120);
     };
 
-    const onPointerLeave = () => {
+    const onPointerLeave = (event: PointerEvent) => {
       clearTimeout(pickTimer);
       selectionPointer = null;
+      if (event.buttons && mode === 'mine_planning') setSelectedBlockTooltip(null);
       renderer.domElement.classList.remove('is-picking', 'is-interacting');
       setHoverTooltip(null);
     };
@@ -5181,12 +5262,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const cameraForward=camera.getWorldDirection(new THREE.Vector3());
 
       visible.forEach((callout) => {
-        const anchor = calloutAnchors.get(callout.id);
+        const anchor = calloutAnchorOverrides.get(callout.id) ?? callout.anchor;
         if (!anchor) return;
-        let owner:THREE.Object3D|null=calloutObjects.get(callout.id)??stage;
+        let owner:THREE.Object3D|null=anchor.owner==='scene-stage'?stage:calloutObjects.get(callout.id)??null;
+        if (!owner) return;
         while(owner){if(!owner.visible)return;owner=owner.parent;}
-        const anchorWorld = anchor.clone();
-        (calloutObjects.get(callout.id) ?? stage).localToWorld(anchorWorld);
+        const anchorOwner=anchor.owner==='scene-stage'?stage:calloutObjects.get(callout.id);
+        if(!anchorOwner)return;
+        const anchorWorld = new THREE.Vector3(...anchor.coordinates);
+        anchorOwner.localToWorld(anchorWorld);
         // A point behind a perspective camera can still project to an in-range
         // depth value with inverted screen coordinates. Reject it in world
         // space before NDC clipping so labels never jump across the canvas.
@@ -5244,8 +5328,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const anchorPixelY = rawAnchorY;
         const isIntercept = callout.kind === 'intercept';
         const compactMineTag = mode === 'mine_planning' && density === 'key';
+        const indexedMineTag = compactMineTag && MINE_SITE_CALLOUT_INDEX[callout.id] !== undefined;
         const projectedCallout = compactMineTag ? {...callout, compact: true} : callout;
-        const size = isIntercept ? INTERCEPT_LABEL_SIZE : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
+        const size = isIntercept ? INTERCEPT_LABEL_SIZE : indexedMineTag ? {width: 144, height: 40} : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
 
         byId.set(callout.id, {callout: projectedCallout, anchorPixelX, anchorPixelY});
         candidates.push({
@@ -5978,7 +6063,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           {hasProjectedCallouts && (
             <svg className="tanga-three__leader-svg" viewBox={`0 0 ${projectedFrame.width} ${projectedFrame.height}`} aria-hidden="true">
               {projectedCallouts.map((callout) => (
-                <g key={`leader-${callout.id}`}>
+                <g key={`leader-${callout.id}`} data-callout-id={callout.id} data-anchor-space={callout.anchor.space} data-anchor-owner={callout.anchor.owner}>
                   <line
                     x1={callout.anchorPixelX}
                     y1={callout.anchorPixelY}
@@ -5999,38 +6084,47 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           {(hasProjectedCallouts ? projectedCallouts : callouts).map((callout) => (
             <div
               key={callout.id}
+              data-callout-id={callout.id}
+              data-anchor-space={callout.anchor.space}
+              data-anchor-owner={callout.anchor.owner}
               className={classNames(
                 'tanga-three__callout',
                 `is-${callout.side ?? 'right'}`,
                 callout.kind === 'intercept' && 'tanga-three__callout--intercept',
-                callout.compact && 'tanga-three__callout--compact'
+                callout.compact && 'tanga-three__callout--compact',
+                mode === 'mine_planning' && callout.compact && MINE_SITE_CALLOUT_INDEX[callout.id] && 'tanga-three__callout--site-tag'
               )}
+              role="note"
+              aria-label={`${callout.label}. ${callout.detail}`}
               style={{
                 '--callout-x': hasProjectedCallouts ? `${(callout as ProjectedThreeCallout).boxPixelX}px` : `${callout.x}%`,
                 '--callout-y': hasProjectedCallouts ? `${(callout as ProjectedThreeCallout).boxPixelY}px` : `${callout.y}%`,
                 '--callout-tone': callout.tone,
               } as any}
             >
-              <span data-site-index={mode === 'mine_planning' ? MINE_SITE_CALLOUT_INDEX[callout.id] : undefined}>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
+              <span data-site-index={mode === 'mine_planning' ? MINE_SITE_CALLOUT_INDEX[callout.id] : undefined}>{mode==='mine_planning'&&callout.compact&&MINE_SITE_CALLOUT_SHORT_LABEL[callout.id] ? MINE_SITE_CALLOUT_SHORT_LABEL[callout.id] : mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
               {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
             </div>
           ))}
         </section>
       )}
-      {hoverTooltip && (
+      {(hoverTooltip ?? selectedBlockTooltip) && (
         <div
           className="tanga-three__tooltip"
           style={{
-            '--tooltip-x': `${hoverTooltip.x}px`,
-            '--tooltip-y': `${hoverTooltip.y}px`,
-            '--tooltip-tone': hoverTooltip.tone,
+            '--tooltip-x': `${(hoverTooltip ?? selectedBlockTooltip)!.x}px`,
+            '--tooltip-y': `${(hoverTooltip ?? selectedBlockTooltip)!.y}px`,
+            '--tooltip-tone': `${(hoverTooltip ?? selectedBlockTooltip)!.tone}`,
           } as any}
-          aria-label="3D data tooltip"
+          role={selectedBlockTooltip && !hoverTooltip ? 'status' : 'tooltip'}
+          aria-label={selectedBlockTooltip && !hoverTooltip ? 'Selected 3D resource block' : '3D data tooltip'}
+          data-selected={selectedBlockTooltip && !hoverTooltip ? 'true' : undefined}
         >
-          <strong>{hoverTooltip.title}</strong>
-          {hoverTooltip.rows.map((row) => (
+          <strong>{(hoverTooltip ?? selectedBlockTooltip)!.title}</strong>
+          {(hoverTooltip ?? selectedBlockTooltip)!.rows.map((row) => (
             <span key={row}>{row}</span>
           ))}
+          {selectedBlockTooltip && !hoverTooltip && <small className="tanga-three__tooltip-hint">Selected · Escape to clear</small>}
         </div>
       )}
       <section className={classNames('tanga-three__nav-cluster', legendItems.length === 0 && 'is-scale-only')} aria-label="Geology legend compass and scale">
