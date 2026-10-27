@@ -2022,29 +2022,44 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
    other right-hand information panels. Keep its compact treatment only on
    shorter screens, where the scene needs to retain its vertical space. */
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector {
-  padding: 12px;
+  padding: var(--tanga-panel-pad, 15px);
+  align-self: start;
+  height: max-content;
+  max-height: 100%;
+  border-color: var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
   border-radius: var(--tanga-panel-radius, 14px);
   box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
-  margin: 4px 0 6px;
-  font-size: 19px;
-  line-height: 1.22;
+  margin: 4px 0 7px;
+  font-size: 18px;
+  line-height: 1.2;
   letter-spacing: -.025em;
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation {
-  margin-bottom: 7px;
-  font-size: 12px;
-  line-height: 1.6;
+  margin-bottom: 9px;
+  font-size: 11px;
+  line-height: 1.55;
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-disclosure {
   font-size: 10px;
   line-height: 1.5;
-  padding-top: 7px;
+  padding-top: 9px;
 }
-.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { gap: 5px; margin-bottom: 7px; }
-.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result { margin: 2px 0 7px; padding: 8px 9px; }
-.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta { margin-top: 2px; padding: 6px 8px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { gap: 7px; margin-bottom: 9px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
+  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .035);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result { margin: 2px 0 8px; padding: 9px 10px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta {
+  margin-top: 3px;
+  padding: 7px 9px;
+  border-left-width: 1px !important;
+}
 .tanga-deck .tanga-process-exhibit--factory .tanga-enduse-boundary {
   margin-bottom: 5px;
   padding: 6px 8px;
@@ -2055,7 +2070,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   font-size: 10px;
 }
 @media (min-width: 761px) and (max-height: 800px) {
-  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector { padding: 9px 9px 8px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector { padding: 12px; }
   .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 { font-size: 17px; }
   .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 { margin: 2px 0 4px; }
   .tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation { margin-bottom: 4px; font-size: 11px; line-height: 1.4; }
