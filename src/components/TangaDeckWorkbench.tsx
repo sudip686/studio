@@ -163,8 +163,8 @@ const CHAPTER_READINESS_ASSETS:Partial<Record<WorkbenchMode,ReadinessAsset[]>>={
   topography:[...TERRAIN_READINESS_ASSETS],
   drillholes:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
   subsurface:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Interpreted geology model',path:'/geologicalModel.glb',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
-  resource:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true}],
-  mine_planning:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Reported resource block model',path:'/api/block-model',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
+  resource:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET,{label:'Reported resource block model',path:'/resource_blocks_v1.bin',required:true}],
+  mine_planning:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,{label:'Reported resource block model',path:'/resource_blocks_v1.bin',required:true},ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
   metallurgy:[...TERRAIN_READINESS_ASSETS,TERRAIN_TEXTURE_READINESS_ASSET,ASSAY_READINESS_ASSET,LITHOLOGY_READINESS_ASSET],
 };
 

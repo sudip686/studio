@@ -44,37 +44,68 @@ self.addEventListener('message', (event) => {
   try {
     const {buffer, centerEasting, centerNorthing, localVerticalDatum} = event.data;
     const parseStarted = performance.now();
-    const payload = JSON.parse(new TextDecoder().decode(buffer));
-    const parseMs = performance.now() - parseStarted;
-    const features = Array.isArray(payload.features) ? payload.features : [];
     const blocks = [];
     const projectionStarted = performance.now();
 
-    for (const feature of features) {
-      const coordinates = feature.geometry && feature.geometry.coordinates;
-      if (!Array.isArray(coordinates) || coordinates.length < 3) continue;
-      const longitude = Number(coordinates[0]);
-      const latitude = Number(coordinates[1]);
-      const elevation = Number(coordinates[2] ?? 0);
-      const properties = feature.properties ?? {};
-      const carbon = Number(properties['Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'] ?? 0);
-      const dx = Number(properties.dX ?? 25);
-      const dy = Number(properties.dY ?? 25);
-      const dz = Number(properties.dZ ?? 10);
-      if (!(carbon > 0) || !Number.isFinite(longitude) || !Number.isFinite(latitude) || !Number.isFinite(elevation) || !(dx > 0) || !(dy > 0) || !(dz > 0)) continue;
-
-      const [easting, northing] = projectToUtm37South(longitude, latitude);
-      const x = easting - centerEasting;
-      const y = elevation - localVerticalDatum;
-      const z = -(northing - centerNorthing);
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
-      blocks.push({
-        x, y, z, dx, dy, dz, carbon,
-        classification: String(properties.RescCalc ?? properties.classification ?? 'Unknown'),
-      });
+    const isCompact = new TextDecoder().decode(new Uint8Array(buffer, 0, Math.min(8, buffer.byteLength))) === 'TGRBIN01';
+    let featureCount = 0;
+    if (isCompact) {
+      const view = new DataView(buffer);
+      if (buffer.byteLength < 20) throw new Error('Compact resource model header is incomplete.');
+      const count = view.getUint32(8, true);
+      const stride = view.getUint32(12, true);
+      const metadataLength = view.getUint32(16, true);
+      const dataOffset = 20 + metadataLength;
+      if (stride !== 44 || dataOffset > buffer.byteLength || count > Math.floor((buffer.byteLength - dataOffset) / stride)) {
+        throw new Error('Compact resource model has an invalid size or record layout.');
+      }
+      const metadata = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, metadataLength)));
+      const classes = Array.isArray(metadata.classes) ? metadata.classes : [];
+      featureCount = count;
+      for (let index = 0; index < count; index += 1) {
+        const offset = dataOffset + index * stride;
+        const longitude = view.getFloat64(offset, true);
+        const latitude = view.getFloat64(offset + 8, true);
+        const elevation = view.getFloat64(offset + 16, true);
+        const dx = view.getFloat32(offset + 24, true);
+        const dy = view.getFloat32(offset + 28, true);
+        const dz = view.getFloat32(offset + 32, true);
+        const carbon = view.getFloat32(offset + 36, true);
+        const classificationIndex = view.getUint32(offset + 40, true);
+        if (!(carbon > 0) || !Number.isFinite(longitude) || !Number.isFinite(latitude) || !Number.isFinite(elevation) || !(dx > 0) || !(dy > 0) || !(dz > 0)) continue;
+        const [easting, northing] = projectToUtm37South(longitude, latitude);
+        const x = easting - centerEasting;
+        const y = elevation - localVerticalDatum;
+        const z = -(northing - centerNorthing);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+        blocks.push({x, y, z, dx, dy, dz, carbon, classification: String(classes[classificationIndex] ?? 'Unknown')});
+      }
+    } else {
+      const payload = JSON.parse(new TextDecoder().decode(buffer));
+      const features = Array.isArray(payload.features) ? payload.features : [];
+      featureCount = features.length;
+      for (const feature of features) {
+        const coordinates = feature.geometry && feature.geometry.coordinates;
+        if (!Array.isArray(coordinates) || coordinates.length < 3) continue;
+        const longitude = Number(coordinates[0]);
+        const latitude = Number(coordinates[1]);
+        const elevation = Number(coordinates[2] ?? 0);
+        const properties = feature.properties ?? {};
+        const carbon = Number(properties['Kr, GRAPHITIC_CARBON in GM_Litho: GRSC'] ?? 0);
+        const dx = Number(properties.dX ?? 25);
+        const dy = Number(properties.dY ?? 25);
+        const dz = Number(properties.dZ ?? 10);
+        if (!(carbon > 0) || !Number.isFinite(longitude) || !Number.isFinite(latitude) || !Number.isFinite(elevation) || !(dx > 0) || !(dy > 0) || !(dz > 0)) continue;
+        const [easting, northing] = projectToUtm37South(longitude, latitude);
+        const x = easting - centerEasting;
+        const y = elevation - localVerticalDatum;
+        const z = -(northing - centerNorthing);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+        blocks.push({x, y, z, dx, dy, dz, carbon, classification: String(properties.RescCalc ?? properties.classification ?? 'Unknown')});
+      }
     }
 
-    self.postMessage({blocks, featureCount: features.length, parseMs, projectionMs: performance.now() - projectionStarted});
+    self.postMessage({blocks, featureCount, parseMs: performance.now() - parseStarted, projectionMs: performance.now() - projectionStarted});
   } catch (error) {
     self.postMessage({error: error instanceof Error ? error.message : 'Unable to parse the resource block model.'});
   }

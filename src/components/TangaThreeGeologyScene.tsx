@@ -1562,12 +1562,49 @@ function parseBlockGeoJson(payload: any) {
   return blocks;
 }
 
+function parseBlockModelBuffer(buffer: ArrayBuffer): ResourceBlock[] {
+  const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, Math.min(8, buffer.byteLength)));
+  if (magic !== 'TGRBIN01') return parseBlockGeoJson(JSON.parse(new TextDecoder().decode(buffer)));
+  if (buffer.byteLength < 20) throw new Error('Compact resource model header is incomplete.');
+
+  const view = new DataView(buffer);
+  const count = view.getUint32(8, true);
+  const stride = view.getUint32(12, true);
+  const metadataLength = view.getUint32(16, true);
+  const dataOffset = 20 + metadataLength;
+  if (stride !== 44 || dataOffset > buffer.byteLength || count > Math.floor((buffer.byteLength - dataOffset) / stride)) {
+    throw new Error('Compact resource model has an invalid size or record layout.');
+  }
+  const metadata = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, metadataLength)));
+  const classes: string[] = Array.isArray(metadata.classes) ? metadata.classes : [];
+  const blocks: ResourceBlock[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const offset = dataOffset + index * stride;
+    const longitude = view.getFloat64(offset, true);
+    const latitude = view.getFloat64(offset + 8, true);
+    const elevation = view.getFloat64(offset + 16, true);
+    const dx = view.getFloat32(offset + 24, true);
+    const dy = view.getFloat32(offset + 28, true);
+    const dz = view.getFloat32(offset + 32, true);
+    const carbon = view.getFloat32(offset + 36, true);
+    const classificationIndex = view.getUint32(offset + 40, true);
+    if (!(carbon > 0) || !Number.isFinite(longitude) || !Number.isFinite(latitude) || !Number.isFinite(elevation) || !(dx > 0) || !(dy > 0) || !(dz > 0)) continue;
+    const [easting, northing] = proj4('WGS84', 'EPSG:32737', [longitude, latitude]) as [number, number];
+    const x = easting - PROJECT_UTM_CENTER.easting;
+    const y = (elevation - LOCAL_VERTICAL_DATUM) * VERTICAL_EXAGGERATION;
+    const z = -(northing - PROJECT_UTM_CENTER.northing);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+    blocks.push({x, y, z, dx, dy, dz, carbon, classification: String(classes[classificationIndex] ?? 'Unknown')});
+  }
+  return blocks;
+}
+
 function loadBlocks() {
   if (!blockPromise) {
-    // Keep the large resource model on the app's same-origin server route. The
-    // route streams it from R2 when it is not available in the local build,
-    // avoiding browser CORS failures on preview hosts and laptops.
-    blockPromise = cachedDeckAsset('/api/block-model', {cache: 'force-cache'})
+    // Use the versioned compact form derived from the reported block model.
+    // It preserves every source cell while avoiding a large streamed GeoJSON
+    // response, which could be truncated by the public R2 development host.
+    blockPromise = cachedDeckAsset('/resource_blocks_v1.bin', {cache: 'force-cache'})
       .then(response => {if (!response.ok) throw new Error('Block model unavailable'); return parseBlockGeoJsonInWorker(response);})
       .catch(error => {blockPromise = null; throw error;});
   }
@@ -1575,14 +1612,15 @@ function loadBlocks() {
 }
 
 async function parseBlockGeoJsonInWorker(response: Response): Promise<ResourceBlock[]> {
+  const workerRef: {current: Worker | null} = {current: null};
+  const buffer = await response.arrayBuffer();
+  const fallbackBuffer = buffer.slice(0);
   if (typeof Worker === 'undefined') {
     blockParserBackend = 'main-fallback';
-    return parseBlockGeoJson(await response.json());
+    return parseBlockModelBuffer(buffer);
   }
 
-  const workerRef: {current: Worker | null} = {current: null};
   try {
-    const buffer = await response.arrayBuffer();
     const center = PROJECT_UTM_CENTER;
     const result = await new Promise<{blocks?: ResourceBlock[]; error?: string; parseMs?: number; projectionMs?: number; featureCount?: number}>((resolve, reject) => {
       workerRef.current = new Worker('/workers/block-model-parser.js', {name: 'tanga-block-model-parser'});
@@ -1605,9 +1643,7 @@ async function parseBlockGeoJsonInWorker(response: Response): Promise<ResourceBl
     workerRef.current?.terminate();
     blockParserBackend = 'main-fallback';
     console.warn('Block-model worker unavailable; using the main-thread parser.', error);
-    const fallbackResponse = await cachedDeckAsset('/api/block-model', {cache: 'force-cache'});
-    if (!fallbackResponse.ok) throw new Error('Block model unavailable for the main-thread fallback');
-    return parseBlockGeoJson(await fallbackResponse.json());
+    return parseBlockModelBuffer(fallbackBuffer);
   } finally {
     workerRef.current?.terminate();
   }

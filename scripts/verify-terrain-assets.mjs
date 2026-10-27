@@ -32,4 +32,16 @@ for (let i = 0; i < size; i++) {
   assert.ok(slope[i] === -32767 || (Number.isFinite(slope[i]) && slope[i] >= 0 && slope[i] <= 90), 'Invalid slope sample');
 }
 assert.ok(Math.abs(covered / size - meta.survey_surface.valid_output_fraction) < 1e-6, 'Survey coverage does not match metadata');
-console.log(`Terrain assets verified: ${meta.context_grid.width}×${meta.context_grid.height} regional grid; ${covered.toLocaleString()} valid survey samples; no LFS pointers.`);
+const resourceBlocks = read('resource_blocks_v1.bin');
+assert.ok(!resourceBlocks.subarray(0, 80).toString().startsWith('version https://git-lfs.github.com/'), 'resource_blocks_v1.bin is an LFS pointer');
+assert.equal(resourceBlocks.toString('ascii', 0, 8), 'TGRBIN01', 'Unexpected compact resource block format');
+const blockCount = resourceBlocks.readUInt32LE(8);
+const blockStride = resourceBlocks.readUInt32LE(12);
+const blockMetadataLength = resourceBlocks.readUInt32LE(16);
+assert.equal(blockStride, 44, 'Compact resource block record layout changed');
+assert.equal(20 + blockMetadataLength + blockCount * blockStride, resourceBlocks.byteLength, 'Compact resource block header and payload disagree');
+const blockMetadata = JSON.parse(resourceBlocks.toString('utf8', 20, 20 + blockMetadataLength));
+assert.equal(blockMetadata.formatVersion, 1, 'Unsupported compact resource block version');
+assert.equal(blockMetadata.sourceFeatureCount, blockCount, 'Compact block model does not retain every source feature');
+assert.ok(Array.isArray(blockMetadata.classes) && blockMetadata.classes.length > 0, 'Compact resource block classifications are missing');
+console.log(`Terrain and presentation assets verified: ${meta.context_grid.width}×${meta.context_grid.height} regional grid; ${covered.toLocaleString()} valid survey samples; ${blockCount.toLocaleString()} source resource cells; no LFS pointers.`);

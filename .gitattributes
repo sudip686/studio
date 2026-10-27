@@ -16,3 +16,4 @@ public/BlockModel.geojson filter=lfs diff=lfs merge=lfs -text
 # integration does not hydrate LFS pointers; each is smaller than 6 MB.
 public/survey_*_hires.bin -filter -diff -merge -text
 public/terrain_context_512.bin -filter -diff -merge -text
+public/resource_blocks_v1.bin -filter -diff -merge -text
