@@ -3614,10 +3614,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const applyTexturedTerrain = async (quality: AssetQuality) => {
       try {
         reportLoadState('loading', 'loading', quality, `Loading ${quality} terrain`);
-        const [resources, sourceTexture] = await Promise.all([
-          loadTangaTerrainResources(),
-          mode === 'topography' ? Promise.resolve(null) : loadTerrainTexture(),
-        ]);
+        // Elevation is the scene's spatial source of truth; aerial imagery is
+        // a visual refinement. Do not make a slow 6 MB imagery transfer hold
+        // the measured terrain mesh, pits, or plant behind a loading screen.
+        // Resolve the raster first, draw a neutral terrain surface, and drape
+        // the imagery onto that same mesh when it arrives.
+        host.dataset.terrainTextureState = mode === 'topography' ? 'not-used' : 'loading';
+        const texturePromise: Promise<THREE.Texture | null> = mode === 'topography'
+          ? Promise.resolve(null)
+          : loadTerrainTexture().then(texture => texture, () => {
+            if (!cancelled) host.dataset.terrainTextureState = 'unavailable';
+            return null;
+          });
+        const resources = await loadTangaTerrainResources();
         if (cancelled) return null;
         terrainResources = resources;
         if (mode === 'topography' && (!resources.surveyHeightData || !resources.surveyCoverageData)) {
@@ -3665,18 +3674,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         terrainMeshes.length = 0;
         terrainOccluders.length = 0;
         terrainSurfaceMaterials.length = 0;
-        const terrainTexture = sourceTexture?.clone() ?? null;
-        if (terrainTexture) {
-        terrainTexture.colorSpace = THREE.SRGBColorSpace;
-        terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
-        terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
-        terrainTexture.generateMipmaps = true;
-        terrainTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        terrainTexture.magFilter = THREE.LinearFilter;
-        terrainTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy?.() ?? 8, 16);
-        terrainTexture.needsUpdate = true;
-        }
-
         const geometryStartedAt = performance.now();
         const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terrainDisplayRef.current);
         host.dataset.terrainBuildMs = String(Math.round(performance.now() - geometryStartedAt));
@@ -3687,11 +3684,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           carvePit(terrainGeometry, sitePlan.pits);
           const pad=processPlant?.userData.conceptPad as ConceptPad|undefined;if(pad)gradeConceptPad(terrainGeometry,pad);
         }
-        const hasSatelliteTexture = mode !== 'topography' && Boolean(terrainTexture);
-        const satelliteTerrainMaterial = hasSatelliteTexture
+        const isSatelliteTerrain = mode !== 'topography';
+        const satelliteTerrainMaterial = isSatelliteTerrain
           ? new THREE.MeshBasicMaterial({
-            map: terrainTexture,
-            color: 0xffffff,
+            // This is the immediate, textured-terrain fallback. Its palette
+            // remains subdued while preserving the relief until imagery lands.
+            map: null,
+            color: mode === 'subsurface' ? 0x52616a : 0x9a8267,
             colorWrite: true,
             toneMapped: false,
             transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
@@ -3720,7 +3719,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const texturedTerrain = new THREE.Mesh(
           terrainGeometry,
           satelliteTerrainMaterial ?? new THREE.MeshLambertMaterial({
-            map: mode === 'topography' ? null : terrainTexture,
+            map: null,
             color: 0xffffff,
             transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
             opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
@@ -3741,6 +3740,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         texturedTerrain.receiveShadow = true;
         texturedTerrain.renderOrder = 20;
         terrainLayer.add(texturedTerrain);
+        if (satelliteTerrainMaterial) {
+          void texturePromise.then(sourceTexture => {
+            if (cancelled || !sourceTexture) return;
+            const terrainTexture = sourceTexture.clone();
+            terrainTexture.colorSpace = THREE.SRGBColorSpace;
+            terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
+            terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
+            terrainTexture.generateMipmaps = true;
+            terrainTexture.minFilter = THREE.LinearMipmapLinearFilter;
+            terrainTexture.magFilter = THREE.LinearFilter;
+            terrainTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy?.() ?? 8, 16);
+            terrainTexture.needsUpdate = true;
+            satelliteTerrainMaterial.map = terrainTexture;
+            satelliteTerrainMaterial.color.set(0xffffff);
+            satelliteTerrainMaterial.needsUpdate = true;
+            host.dataset.terrainTextureState = 'ready';
+            host.dataset.terrainTextureReadyAt = String(Math.round(performance.now()));
+          });
+        }
         if (mode === 'topography') {
           const updateDisplay = async (display: TerrainDisplay) => {
             if (display === 'slope' && !resources.surveySlopeData) {
