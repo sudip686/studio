@@ -24,4 +24,9 @@ Resource disclosure-state captures:
 - 1366 × 768: [grade legend open, Resource reveal closed](../.playwright-mcp/resource-grade-legend-exclusive-1366x768.png)
 - 1707 × 842: [grade legend open, Resource reveal closed](../.playwright-mcp/resource-grade-legend-exclusive-1707x842.png)
 
+Metallurgy inspector follow-up captures after matching the shared deck-panel typography and card styling:
+
+- 1366 × 768: [whole-plant overview](../.playwright-mcp/metallurgy-panel-polished-20261028.png) and [Flotation detail with lab-result card](../.playwright-mcp/metallurgy-panel-stage-20261028.png)
+- 1707 × 842: [Flotation detail with lab-result card](../.playwright-mcp/metallurgy-inspector-flotation-1707x842-20261028.png)
+
 Audit runner: `scripts/verify-presentation.ps1`. It supports a chapter range with `-First` and `-Last`, custom viewport dimensions, and a custom local server through `-BaseUrl`.
