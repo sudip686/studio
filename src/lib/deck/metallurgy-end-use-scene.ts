@@ -82,6 +82,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
 
   const path = [-128, -48, 38, 132];
   const rings = path.map((x, index) => addStageRing(group, x, materials.teal, index));
+  let updateMotion = (_seconds: number, _step: number) => {};
   for (let i = 0; i < path.length - 1; i++) {
     const rail = new THREE.Mesh(new THREE.BoxGeometry(path[i + 1] - path[i] - 24, .28, .75), materials.steel);
     rail.name = `Downstream material route ${i + 1}`;
@@ -98,29 +99,38 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     const mixer = new THREE.Group(); mixer.name = 'Illustrative particle shaping and purification equipment'; mixer.position.set(-48, 0, 0); group.add(mixer);
     const drum = addCylinder(mixer, 'Particle-shaping drum', 11, 11, 28, [0, 11, 0], materials.steel, 32);
     drum.rotation.z = Math.PI / 2;
+    const drumMount = drum.quaternion.clone();
     addCylinder(mixer, 'Drum feed collar', 7, 7, 2, [-15, 11, 0], materials.copper, 24).rotation.z = Math.PI / 2;
     addCylinder(mixer, 'Drum discharge collar', 7, 7, 2, [15, 11, 0], materials.copper, 24).rotation.z = Math.PI / 2;
     for (const x of [-9, 9]) addBox(mixer, 'Mixer bearing support', [3, 10, 22], [x, 5, 0], materials.steel);
     addBox(mixer, 'Purification vessel', [24, 24, 22], [-5, 22, -24], materials.pale);
-    addBox(mixer, 'Purification vessel dark glass', [17, 13, .5], [-5, 22, -12.65], materials.teal);
+    const washWindow = addBox(mixer, 'Purification vessel dark glass', [17, 13, .5], [-5, 22, -12.65], materials.teal);
+    const washWindowMaterial = materials.teal.clone();
+    washWindow.material = washWindowMaterial;
     addCylinder(mixer, 'Wash and filtration tank', 8, 9, 20, [17, 11, -20], materials.steel, 24);
     addBox(mixer, 'Filter press frame', [4, 24, 20], [31, 12, -22], materials.copper);
-    for (let i = 0; i < 5; i++) addBox(mixer, 'Filter press plate', [1, 16, 15], [23 + i * 4, 12, -22], materials.pale);
+    const filterPlates: THREE.Mesh[] = [];
+    for (let i = 0; i < 5; i++) filterPlates.push(addBox(mixer, 'Filter press plate', [1, 16, 15], [23 + i * 4, 12, -22], materials.pale));
+    const filterPlateBaseX = filterPlates.map(plate => plate.position.x);
 
     const coat = new THREE.Group(); coat.name = 'Illustrative coating and carbonization'; coat.position.set(38, 0, 0); group.add(coat);
     addBox(coat, 'Coating enclosure', [42, 29, 35], [0, 16, -2], materials.steel);
     addBox(coat, 'Coating enclosure window', [22, 13, 1], [0, 17, 16], materials.teal);
     const furnace = addBox(coat, 'Carbonization furnace', [30, 35, 28], [31, 19, -2], materials.steel);
-    addBox(coat, 'Carbonization glow window', [17, 18, 1], [31, 18, 12.5], materials.glow);
+    const carbonWindow = addBox(coat, 'Carbonization glow window', [17, 18, 1], [31, 18, 12.5], materials.glow);
+    const carbonWindowMaterial = materials.glow.clone();
+    carbonWindow.material = carbonWindowMaterial;
     addBox(coat, 'Furnace belt', [70, 2, 9], [17, 3.5, 18], materials.copper);
     furnace.castShadow = true;
 
     const cell = new THREE.Group(); cell.name = 'Illustrative battery anode cutaway'; cell.position.set(132, 0, 0); group.add(cell);
     const cellShell = new THREE.Mesh(new THREE.BoxGeometry(48, 36, 34), new THREE.MeshPhysicalMaterial({color: '#9ab1b7', roughness: .23, metalness: .28, transparent: true, opacity: .23, side: THREE.DoubleSide}));
     cellShell.name = 'Transparent battery-cell enclosure'; cellShell.position.set(0, 22, 0); cell.add(cellShell);
+    const activeMaterialLayers: THREE.Mesh[] = [];
     for (let i = 0; i < 7; i++) {
       const y = 8 + i * 4.2;
-      addBox(cell, i % 2 === 0 ? 'Graphite anode active-material layer' : 'Copper current-collector layer', [40, 2.2, 26], [0, y, 0], i % 2 === 0 ? materials.graphite : materials.copper);
+      const layer = addBox(cell, i % 2 === 0 ? 'Graphite anode active-material layer' : 'Copper current-collector layer', [40, 2.2, 26], [0, y, 0], (i % 2 === 0 ? materials.graphite : materials.copper).clone());
+      activeMaterialLayers.push(layer);
     }
     for (const x of [-21, 21]) addBox(cell, 'Battery-cell terminal', [5, 5, 5], [x, 42, 0], materials.copper);
     const car = new THREE.Group(); car.name = 'EV downstream-use context illustration'; car.position.set(215, 0, 0); group.add(car);
@@ -131,7 +141,27 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
       const wheel = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 3.5, 24), materials.graphite);
       wheel.name = 'EV wheel'; wheel.rotation.x = Math.PI / 2; wheel.position.set(x, 5, 8); car.add(wheel);
     }
-    addBox(car, 'Illustrative battery pack under EV platform', [34, 3, 12], [0, 3.5, 0], materials.teal);
+    const batteryPack = addBox(car, 'Illustrative battery pack under EV platform', [34, 3, 12], [0, 3.5, 0], materials.teal.clone());
+    const layerBaseX = activeMaterialLayers.map(layer => layer.position.x);
+    updateMotion = (seconds, step) => {
+      const drumTime = Math.min(seconds, 6);
+      drum.quaternion.copy(drumMount).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), drumTime * .72));
+      const purificationCycle = step === 1 ? .5 + .5 * Math.sin((seconds - 6) * 1.8) : 0;
+      filterPlates.forEach((plate, index) => {
+        const direction = index % 2 === 0 ? -1 : 1;
+        plate.position.x = filterPlateBaseX[index] + direction * purificationCycle * 1.15;
+      });
+      washWindowMaterial.emissiveIntensity = step === 1 ? .2 + .16 * (.5 + .5 * Math.sin((seconds - 6) * 2.4)) : .08;
+      const coatingPulse = .5 + .5 * Math.sin((seconds - 12) * 2.2);
+      carbonWindowMaterial.emissiveIntensity = step === 2 ? .48 + coatingPulse * .52 : .24;
+      const stackReveal = step === 3 ? THREE.MathUtils.clamp((seconds - 18) * 1.2, 0, 1) : 0;
+      activeMaterialLayers.forEach((layer, index) => {
+        const side = index % 2 === 0 ? -1 : 1;
+        layer.position.x = layerBaseX[index] + side * stackReveal * 1.25;
+      });
+      const packMaterial = batteryPack.material as THREE.MeshStandardMaterial;
+      packMaterial.emissiveIntensity = step === 3 ? .28 + .22 * (.5 + .5 * Math.sin(seconds * 2.1)) : .08;
+    };
   } else {
     addFlakeCluster(group, [-128, 8, 0], 13, 5.2, materials.graphite);
 
@@ -139,16 +169,19 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     addCylinder(mixer, 'Refractory batch mixer', 15, 18, 27, [0, 15, 0], materials.steel, 32);
     addCylinder(mixer, 'Mixer upper rim', 18, 18, 2.5, [0, 28.5, 0], materials.copper, 32);
     addBox(mixer, 'Mixer drive housing', [12, 8, 14], [16, 8, 0], materials.steel);
+    const grainBed = new THREE.Group(); grainBed.name = 'Magnesia and graphite batch'; mixer.add(grainBed);
     for (let i = 0; i < 8; i++) {
       const grain = new THREE.Mesh(new THREE.IcosahedronGeometry(2.3 + (i % 3) * .7, 1), materials.pale);
-      grain.name = 'Magnesia grain in refractory mix'; grain.position.set(-5 + (i % 4) * 3.2, 24 + (i % 2) * 2.4, -4 + Math.floor(i / 4) * 4.5); mixer.add(grain);
+      grain.name = 'Magnesia grain in refractory mix'; grain.position.set(-5 + (i % 4) * 3.2, 24 + (i % 2) * 2.4, -4 + Math.floor(i / 4) * 4.5); grainBed.add(grain);
     }
 
     const press = new THREE.Group(); press.name = 'Illustrative refractory brick press'; press.position.set(38, 0, 0); group.add(press);
     addBox(press, 'Refractory press bed', [48, 6, 34], [0, 4, 0], materials.steel);
-    addBox(press, 'Refractory press ram', [34, 8, 28], [0, 31, 0], materials.copper);
+    const ram = addBox(press, 'Refractory press ram', [34, 8, 28], [0, 31, 0], materials.copper);
+    const ramBaseY = ram.position.y;
     for (const x of [-18, 18]) addBox(press, 'Press guide column', [3, 37, 3], [x, 18, -14], materials.steel);
-    addBox(press, 'Unfired magnesia-carbon brick', [31, 15, 22], [0, 14, 0], materials.pale);
+    const pressedBrick = addBox(press, 'Unfired magnesia-carbon brick', [31, 15, 22], [0, 14, 0], materials.pale.clone());
+    const pressedBrickBaseY = pressedBrick.position.y;
     addFlakeCluster(press, [0, 11, 12], 5, 2.1, materials.graphite);
 
     const furnace = new THREE.Group(); furnace.name = 'Illustrative electric-arc furnace cutaway'; furnace.position.set(145, 0, 0); group.add(furnace);
@@ -158,17 +191,35 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     lining.name = 'Magnesia-carbon refractory lining'; lining.position.y = 35; furnace.add(lining);
     const pool = new THREE.Mesh(new THREE.CircleGeometry(28, 40), new THREE.MeshStandardMaterial({color: '#ff8750', emissive: '#ff4419', emissiveIntensity: 1.25, roughness: .34}));
     pool.name = 'Illustrative hot furnace interior'; pool.rotation.x = -Math.PI / 2; pool.position.set(0, 7, 0); furnace.add(pool);
+    const electrodeBases: number[] = [];
     for (const x of [-16, 0, 16]) {
       const electrode = addCylinder(furnace, 'Graphite electrode in EAF context', 3.4, 3.1, 42, [x, 64, 0], materials.graphite, 12);
       electrode.rotation.z = (x / 16) * .035;
+      electrodeBases.push(electrode.position.y);
     }
+    const poolMaterial = pool.material as THREE.MeshStandardMaterial;
     const refractoryBrick = new THREE.Group(); refractoryBrick.name = 'Magnesia-carbon refractory brick cutaway'; refractoryBrick.position.set(224, 4, 0); group.add(refractoryBrick);
     addBox(refractoryBrick, 'Magnesia-carbon refractory brick body', [37, 25, 27], [0, 12, 0], materials.pale);
     addBox(refractoryBrick, 'Graphite-bearing working face', [37, 3, 27], [0, 25, 0], materials.graphite);
     addFlakeCluster(refractoryBrick, [0, 15, 14], 7, 2.1, materials.graphite);
+    updateMotion = (seconds, step) => {
+      const blendTime = Math.min(seconds, 6);
+      mixer.rotation.y = blendTime * .34;
+      grainBed.rotation.y = blendTime * .62;
+      const pressCycle = step === 1 ? Math.max(0, Math.sin((seconds - 6) * 1.8)) : 0;
+      ram.position.y = ramBaseY - pressCycle * 4.2;
+      const extraction = step === 2 ? THREE.MathUtils.clamp((seconds - 12) * .8, 0, 1) : 0;
+      pressedBrick.position.y = pressedBrickBaseY + extraction * 3.2;
+      (pressedBrick.material as THREE.MeshStandardMaterial).emissiveIntensity = step === 2 ? .16 : 0;
+      poolMaterial.emissiveIntensity = step === 3 ? 1.05 + .3 * (.5 + .5 * Math.sin(seconds * 2.1)) : .72;
+      const electrodePulse = step === 3 ? Math.sin(seconds * 2.6) * .55 : 0;
+      furnace.children.filter(child => child.name === 'Graphite electrode in EAF context').forEach((electrode, index) => {
+        electrode.position.y = electrodeBases[index] + electrodePulse * (index === 1 ? 1 : .65);
+      });
+    };
   }
 
-  return {group, path, rings};
+  return {group, path, rings, updateMotion};
 }
 
 /** Build a separate product vignette so illustrative downstream scenes never
@@ -207,6 +258,7 @@ export function createMetallurgyEndUseScene() {
     const step = Math.min(3, Math.floor(safeSeconds / 6));
     const progress = safeSeconds / JOURNEY_SECONDS;
     const deck = selected === 'anode' ? anode : refractory;
+    deck.updateMotion(safeSeconds, step);
     deck.rings.forEach((ring, index) => {
       const material = ring.material as THREE.MeshStandardMaterial;
       const active = index === step;

@@ -184,9 +184,17 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     }
     function focusEndUseStep(route: MetallurgyEndUseRoute, step: number, animate: boolean) {
       const routeTargets = route === 'anode' ? [-128, -34, 44, 176] : [-128, -48, 38, 178];
-      target.set(routeTargets[Math.max(0, Math.min(3, step))], 20, 0);
+      const selectedStep = Math.max(0, Math.min(3, step));
+      const targetHeight = route === 'refractory' && selectedStep === 3 ? 42 : 20;
+      target.set(routeTargets[selectedStep], targetHeight, 0);
       direction.set(.64, .58, 1.2).normalize();
-      destination.copy(target).addScaledVector(direction, 174);
+      const widths = route === 'anode' ? [86, 116, 142, 188] : [86, 108, 142, 174];
+      const heights = route === 'anode' ? [56, 60, 68, 76] : [56, 60, 72, 108];
+      const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const horizontalFit = widths[selectedStep] / (2 * tanHalfFov * Math.max(.7, camera.aspect));
+      const verticalFit = heights[selectedStep] / (2 * tanHalfFov);
+      const distance = Math.max(72, horizontalFit, verticalFit) * 1.12;
+      destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
       dirty = true;
     }
