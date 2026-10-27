@@ -1869,10 +1869,18 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-process-exhibit--factory .tanga-factory-stages button[aria-pressed="true"] b { color: #ffd2a9; }
 .tanga-process-exhibit--factory .tanga-factory-inspector {
   border: 1px solid var(--factory-line);
-  border-radius: 12px;
-  background: linear-gradient(155deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025));
+  border-radius: var(--tanga-panel-radius, 14px);
+  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
   color: var(--factory-text);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+}
+@media (min-width: 761px) {
+  .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: -.025em;
+  }
+  .tanga-process-exhibit--factory .tanga-process-explanation { font-size: 11px; line-height: 1.55; }
 }
 .tanga-process-exhibit--factory .tanga-process-explanation,
 .tanga-process-exhibit--factory .tanga-factory-disclosure,
@@ -1896,6 +1904,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-process-exhibit--factory .tanga-factory-operation-basis summary,
 .tanga-process-exhibit--factory .tanga-factory-operation-basis a { color: #f1b17b; }
 .tanga-process-exhibit--factory .tanga-factory-result:hover { border-color: rgba(227, 154, 94, .42); background: rgba(227, 154, 94, .09); }
+.tanga-process-exhibit--factory .tanga-factory-result { border-radius: 8px; }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
   border-color: var(--factory-line) !important;
   border-left-color: rgba(227, 154, 94, .72) !important;
