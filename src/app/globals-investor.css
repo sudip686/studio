@@ -1482,6 +1482,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck--present .tanga-story-panel--concept :is(.tanga-story-panel__link,.tanga-story-panel__compare){min-height:40px;margin-top:7px;padding:9px 10px}
 .tanga-site-orientation button{min-width:0;min-height:30px;padding:6px 8px;border:1px solid var(--story-line);border-radius:5px;background:#1c2b34;color:var(--story-muted);font:inherit;font-size:10px;font-weight:620;cursor:pointer;transition:border-color .16s ease,background .16s ease,color .16s ease}
 .tanga-site-orientation button:hover:not(:disabled){border-color:color-mix(in srgb,var(--story-accent) 55%,transparent);background:color-mix(in srgb,var(--story-accent) 14%,#111b23);color:var(--story-text)}
+.tanga-site-orientation button[aria-pressed="true"]{border-color:color-mix(in srgb,var(--story-accent) 62%,transparent);background:color-mix(in srgb,var(--story-accent) 18%,#111b23);color:var(--story-text)}
 .tanga-site-orientation button:focus-visible{outline:2px solid var(--story-accent);outline-offset:2px}
 .tanga-site-orientation button:disabled{cursor:wait;opacity:.55}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:8px 0 10px;padding:3px;border:1px solid #c9d8de26;border-radius:7px;background:#111b21}

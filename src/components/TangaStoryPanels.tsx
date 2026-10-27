@@ -53,6 +53,18 @@ function SceneMotionControl({paused,onToggle}:{paused:boolean;onToggle:()=>void}
 
 export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void}) {
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
+  const [siteOrientation,setSiteOrientation]=useState<'plan'|'oblique'>('oblique');
+
+  useEffect(()=>{
+    if(chapter!=='mine_planning')return;
+    const onOrientationChange=(event:Event)=>{
+      const orientation=(event as CustomEvent<'plan'|'oblique'>).detail;
+      if(orientation==='plan'||orientation==='oblique')setSiteOrientation(orientation);
+    };
+    window.addEventListener('tanga:mine-orientation-change',onOrientationChange);
+    setSiteOrientation('oblique');
+    return()=>window.removeEventListener('tanga:mine-orientation-change',onOrientationChange);
+  },[chapter]);
 
   useEffect(()=>{
     if(chapter!=='mine_planning')return;
@@ -160,8 +172,8 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       </div>
       <select className="tanga-development-select" aria-label="Mine site view" value={developmentViewId ?? 'overview'} onChange={event=>onInspectDevelopment?.(event.target.value as DevelopmentView)}>{developmentViewId==='pit-blocks'&&<option value="pit-blocks" disabled>Both pit cutaways</option>}{(developmentViewId==='north-pit'||developmentViewId==='south-pit')&&<option value={developmentViewId} disabled>{developmentViewId==='north-pit'?'North pit':'South pit'}</option>}{DEVELOPMENT_FACILITIES.map(view=><option key={view.id} value={view.id} disabled={!developmentAvailable(view.id)}>{view.label}</option>)}</select>
       <div className="tanga-site-orientation" role="group" aria-label="Site camera view">
-        <button type="button" disabled={!onSiteOrientation} onClick={()=>onSiteOrientation?.('plan')}>North-up plan</button>
-        <button type="button" disabled={!onSiteOrientation} onClick={()=>onSiteOrientation?.('oblique')}>Oblique view</button>
+        <button type="button" aria-pressed={siteOrientation==='plan'} disabled={!onSiteOrientation} onClick={()=>{setSiteOrientation('plan');onSiteOrientation?.('plan');}}>North-up plan</button>
+        <button type="button" aria-pressed={siteOrientation==='oblique'} disabled={!onSiteOrientation} onClick={()=>{setSiteOrientation('oblique');onSiteOrientation?.('oblique');}}>Oblique view</button>
       </div>
       <div className="tanga-site-panel-actions">
         <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Processing plant <ArrowRight size={14}/></button>

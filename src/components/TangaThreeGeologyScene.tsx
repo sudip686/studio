@@ -2466,7 +2466,11 @@ export default function TangaThreeGeologyScene({
   const [pitBlocksStatus, setPitBlocksStatus] = useState<'loading' | 'ready' | 'error'>('ready');
   const pitBlockRetryRef = useRef<(() => void) | null>(null);
   const [mineOrientation,setMineOrientation]=useState<'oblique'|'plan'>('oblique');
-  useEffect(()=>{setMineOrientation('oblique');},[mode]);
+  const updateMineOrientation=(orientation:'oblique'|'plan')=>{
+    setMineOrientation(orientation);
+    window.dispatchEvent(new CustomEvent('tanga:mine-orientation-change',{detail:orientation}));
+  };
+  useEffect(()=>{updateMineOrientation('oblique');},[mode]);
   const [evidenceHoleIds,setEvidenceHoleIds]=useState<string[]>([]);
   const [focusedSource,setFocusedSource]=useState<string|null>(null);
   const evidenceFocusRef=useRef<((holeId:string)=>void)|null>(null);
@@ -3069,7 +3073,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const leaveMinePlanView = () => {
       if (mode !== 'mine_planning' || !sitePlanView) return;
       sitePlanView = false;
-      setMineOrientation('oblique');
+      updateMineOrientation('oblique');
       camera.up.set(0, 1, 0);
       controls.enableRotate = true;
       controls.minPolarAngle = 0;
@@ -3205,7 +3209,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (command.action === 'sitePlan' && mode === 'mine_planning' && sitePlan?.pits.length) {
         facilityFocused=false;setStoryPlaying(false);calloutsForProjection=siteOverviewCallouts;
         sitePlanView=true;
-        setMineOrientation('plan');
+        updateMineOrientation('plan');
         const bounds=new THREE.Box3();
         for(const pit of sitePlan.pits) for(const [x,z] of pit.ring) bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,pit.surface,z)));
         const includeLocal=(x:number,z:number,y=0)=>bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,y,z)));
@@ -3236,7 +3240,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'siteOblique' && mode === 'mine_planning') {
         sitePlanView=false;
-        setMineOrientation('oblique');
+        updateMineOrientation('oblique');
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI-0.04;
         facilityFocused=false;calloutsForProjection=siteOverviewCallouts;
         setMiningBeat(3);
@@ -3247,7 +3251,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'resetView') {
         if(mode==='mine_planning')sitePlanView=false;
-        if(mode==='mine_planning')setMineOrientation('oblique');
+        if(mode==='mine_planning')updateMineOrientation('oblique');
         facilityFocused=false;
         if (mode === 'mine_planning') calloutsForProjection = siteOverviewCallouts;
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle = Math.PI - 0.04;
@@ -4998,7 +5002,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // Mine-plan site construction can schedule view transitions while its
           // terrain and facilities are rebuilding. Reapply the captured pose
           // once those objects are ready, so recovery wins over stale commands.
-          if(recoveryView.sitePlanView)setMineOrientation('plan');
+          if(recoveryView.sitePlanView)updateMineOrientation('plan');
           cameraTween=null;
           camera.position.set(...recoveryView.position);
           controls.target.set(...recoveryView.target);
