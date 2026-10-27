@@ -73,6 +73,21 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   // coplanar slab top caused depth-buffer z-fighting (color shimmer) while the
   // camera orbited. Footings still begin at y=0 and overlap the slab cleanly.
   box(400,3,280,0,-1.15,0,materials.concrete,'Plant pad');
+  // Break up the broad hardstand with a subtle, site-fixed aggregate finish.
+  // The low-amplitude vertex pattern is anchored in plant-local coordinates
+  // (never screen space), so camera orbit cannot make the pad shimmer.
+  const hardstandGeometry=new THREE.PlaneGeometry(400,280,80,56);
+  const hardstandColor=hardstandGeometry.getAttribute('position');
+  const hardstandTones=new Float32Array(hardstandColor.count*3);
+  for(let vertex=0;vertex<hardstandColor.count;vertex++){
+    const x=hardstandColor.getX(vertex),z=-hardstandColor.getY(vertex);
+    const tone=.972+.012*Math.sin(x*.17+Math.sin(z*.09))*Math.sin(z*.13)+.009*Math.sin((x+z)*.37)+.006*Math.cos(z*.31-x*.23);
+    hardstandTones[vertex*3]=tone;hardstandTones[vertex*3+1]=tone;hardstandTones[vertex*3+2]=tone;
+  }
+  hardstandGeometry.setAttribute('color',new THREE.BufferAttribute(hardstandTones,3));
+  const hardstand=new THREE.Mesh(hardstandGeometry,new THREE.MeshStandardMaterial({color:0x757c77,vertexColors:true,roughness:.96,metalness:0}));
+  hardstand.name='Plant yard hardstand finish';hardstand.rotation.x=-Math.PI/2;hardstand.position.y=.357;hardstand.receiveShadow=true;
+  hardstand.userData.surfaceLighting='fixed plant-local aggregate pattern and site shadows; camera independent';root.add(hardstand);
   // Set the service deck onto the shared pad datum and lift only the thin
   // paint bands by 1 mm above the road top to keep them crisp without floating.
   const serviceRoadY=.425;

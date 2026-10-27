@@ -56,6 +56,15 @@ const wallRibs=plant.getObjectByName('Steel-clad exterior wall ribs') as THREE.M
 assert.ok(wallRibs&&wallRibs.geometry.getAttribute('position').count>10_000,'Process-hall corrugated sheet ribs retain detailed geometry after batching');
 assert.ok(wallRibs!.material instanceof THREE.MeshStandardMaterial&&wallRibs!.material.roughness>=.8,'Exterior ribs use a muted matte industrial finish');
 assert.ok(wallRibs!.castShadow&&wallRibs!.receiveShadow,'Exterior ribs contribute to fixed-site contact shading');
+const hardstand=plant.getObjectByName('Plant yard hardstand finish') as THREE.Mesh|undefined;
+assert.ok(hardstand&&hardstand.geometry.getAttribute('position').count>4_000,'The plant yard keeps a detailed fixed-coordinate surface finish after batching');
+assert.ok(hardstand!.material instanceof THREE.MeshStandardMaterial&&hardstand!.material.roughness>=.95,'The hardstand uses a restrained matte aggregate material');
+const hardstandTones=hardstand!.geometry.getAttribute('color');
+const hardstandToneValues=Array.from(hardstandTones.array);
+assert.equal(hardstandTones.count,hardstand!.geometry.getAttribute('position').count,'Every hardstand vertex has a stable color sample');
+assert.ok(Math.max(...hardstandToneValues)-Math.min(...hardstandToneValues)<.06,'The hardstand pattern stays low contrast at investor-view scale');
+assert.equal(hardstand!.userData.surfaceLighting,'fixed plant-local aggregate pattern and site shadows; camera independent','The hardstand finish is anchored in fixed plant coordinates');
+assert.ok(!hardstand!.castShadow&&hardstand!.receiveShadow,'The broad surface receives site shadows without casting an extra full-pad shadow');
 assert.ok(plant.children.filter(object=>object.userData.plantRoof).length>=12,'Roof cutaway tags cover the industrial halls');
 const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05,admittedPad);
 assert.ok(Math.abs(level-1.5)<1e-6,'Platform datum is 1.5 m above the median of the symmetric sampled ground');
