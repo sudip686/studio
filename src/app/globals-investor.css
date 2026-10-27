@@ -1905,6 +1905,52 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-process-exhibit--factory .tanga-factory-operation-basis a { color: #f1b17b; }
 .tanga-process-exhibit--factory .tanga-factory-result:hover { border-color: rgba(227, 154, 94, .42); background: rgba(227, 154, 94, .09); }
 .tanga-process-exhibit--factory .tanga-factory-result { border-radius: 8px; }
+.tanga-process-exhibit--factory .tanga-factory-pathway-cta {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(227, 154, 94, .34);
+  border-radius: 8px;
+  background: linear-gradient(120deg, rgba(227, 154, 94, .105), rgba(255, 255, 255, .025));
+  color: var(--factory-text);
+  text-align: left;
+  cursor: pointer;
+}
+.tanga-process-exhibit--factory .tanga-factory-pathway-cta:hover { border-color: rgba(227, 154, 94, .62); background: rgba(227, 154, 94, .15); }
+.tanga-factory-pathway-cta span { color: var(--factory-muted); font-size: 8px; font-weight: 700; letter-spacing: .13em; }
+.tanga-factory-pathway-cta strong { color: #f1b17b; font-size: 12px; font-weight: 650; }
+.tanga-factory-pathway-cta small { color: var(--factory-muted); font-size: 9px; line-height: 1.35; }
+.tanga-process-exhibit--factory .tanga-enduse-routes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.tanga-process-exhibit--factory .tanga-enduse-routes button {
+  display: grid; grid-template-columns: 28px minmax(0,1fr); align-items: center; gap: 2px 9px; min-width: 0; min-height: 42px;
+  padding: 6px 10px; border: 1px solid var(--factory-line); border-radius: 8px; background: rgba(255,255,255,.035); color: var(--factory-text); text-align: left; cursor: pointer;
+}
+.tanga-process-exhibit--factory .tanga-enduse-routes button[aria-pressed="true"] { border-color: rgba(227,154,94,.58); background: linear-gradient(105deg,rgba(227,154,94,.14),rgba(255,255,255,.035)); }
+.tanga-enduse-routes button>span { grid-row: span 2; color: #f1b17b; font-size: 10px; font-weight: 750; }
+.tanga-enduse-routes button>strong { font-size: 11px; font-weight: 650; }
+.tanga-enduse-routes button>small { color: var(--factory-muted); font-size: 9px; }
+.tanga-process-exhibit--factory .tanga-enduse-steps { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin: 3px 0 7px; padding: 0; list-style: none; }
+.tanga-process-exhibit--factory .tanga-enduse-steps li { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid var(--factory-line); border-radius: 7px; background: rgba(255,255,255,.028); color: var(--factory-muted); }
+.tanga-process-exhibit--factory .tanga-enduse-steps li[aria-current="step"] { border-color: rgba(227,154,94,.55); background: rgba(227,154,94,.12); color: var(--factory-text); }
+.tanga-enduse-steps li[data-complete="true"]>span { color: #8fd1c4; }
+.tanga-enduse-steps li>span { flex: 0 0 auto; color: var(--factory-accent); font-size: 9px; font-weight: 750; }
+.tanga-enduse-steps li>strong { overflow: hidden; font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tanga-process-exhibit--factory .tanga-enduse-boundary { margin: 0 0 8px; padding: 8px 9px; border-left: 2px solid var(--factory-accent); border-radius: 0 6px 6px 0; background: rgba(227,154,94,.075); color: var(--factory-muted); font-size: 9px; line-height: 1.45; }
+.tanga-process-exhibit--factory[data-inspection="anode"] .tanga-factory-scene,
+.tanga-process-exhibit--factory[data-inspection="refractory"] .tanga-factory-scene { background: #071117; }
+.tanga-process-exhibit--factory[data-inspection="anode"] .tanga-process-caption,
+.tanga-process-exhibit--factory[data-inspection="refractory"] .tanga-process-caption { background: rgba(9,15,22,.94); }
+.tanga-process-exhibit--factory[data-inspection="anode"] .tanga-factory-inspector,
+.tanga-process-exhibit--factory[data-inspection="refractory"] .tanga-factory-inspector { padding: 10px; }
+@media (min-width: 761px) and (max-height: 800px) {
+  .tanga-process-exhibit--factory .tanga-factory-pathway-cta { margin-top: 4px; padding: 7px 8px; }
+  .tanga-process-exhibit--factory .tanga-enduse-routes button { min-height: 36px; padding-block: 5px; }
+  .tanga-process-exhibit--factory .tanga-enduse-steps { gap: 5px; margin: 0 0 4px; }
+  .tanga-process-exhibit--factory .tanga-enduse-steps li { min-height: 30px; padding: 4px 7px; }
+  .tanga-process-exhibit--factory .tanga-enduse-boundary { margin-bottom: 5px; padding: 6px 8px; }
+}
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
   border-color: var(--factory-line) !important;
   border-left-color: rgba(227, 154, 94, .72) !important;
@@ -1925,6 +1971,51 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-process-exhibit--factory .tanga-factory-error { border: 1px solid var(--factory-line); border-radius: 12px; background: rgba(9, 15, 22, .96); color: var(--factory-text); }
 .tanga-process-exhibit--factory .tanga-factory-error span { color: var(--factory-muted); }
 .tanga-process-exhibit--factory :is(button, summary, a):focus-visible { outline: 2px solid #f2b47f; outline-offset: 3px; }
+
+/* Use the same compact glass-card rhythm as the rest of the presentation HUD.
+   Selected-area content used to overflow by a few lines and expose a full-height
+   scrollbar; the downstream action also inherited the blue story-button skin. */
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector {
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(157, 198, 209, .28) transparent;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector::-webkit-scrollbar { width: 5px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector::-webkit-scrollbar-thumb { border-radius: 6px; background: rgba(157, 198, 209, .28); }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 { margin: 4px 0 5px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation { margin-bottom: 5px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { margin-bottom: 4px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-motion-note { margin-bottom: 4px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-operation-basis { margin-bottom: 4px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 7px 9px;
+  border: 1px solid var(--factory-line) !important;
+  border-left: 2px solid rgba(227, 154, 94, .72) !important;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .045) !important;
+  color: var(--factory-text) !important;
+  text-align: left;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta:hover {
+  border-color: rgba(227, 154, 94, .46) !important;
+  background: rgba(227, 154, 94, .09) !important;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta span {
+  flex: 0 0 auto;
+  color: var(--factory-muted);
+  font-size: 8px;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta strong {
+  color: #f1b17b;
+  font-size: 10px;
+  text-align: right;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta small { display: none; }
 
 /* Keep the full selected-set ranking visible; the Tanga detail card carries the
    only adjacent-value comparison and its source-category qualification. */
