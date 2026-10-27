@@ -24,6 +24,11 @@ Resource disclosure-state captures:
 - 1366 × 768: [grade legend open, Resource reveal closed](../.playwright-mcp/resource-grade-legend-exclusive-1366x768.png)
 - 1707 × 842: [grade legend open, Resource reveal closed](../.playwright-mcp/resource-grade-legend-exclusive-1707x842.png)
 
+Live public Cloudflare Worker sweep (`ad2cc7be-0ed5-41a7-b075-308ce6efb62d`) at **1366 × 768**:
+
+- All 12 chapters reached their expected readiness marker; the automated panel audit reported zero overlap and out-of-viewport panels in every capture. This was a warm production layout/readiness pass, not a cold-cache timing or performance benchmark.
+- Captures: [01 Project](../.playwright-mcp/verify-20261028-041128-1366x768-01-project.png), [02 Tanzania](../.playwright-mcp/verify-20261028-041128-1366x768-02-tanzania.png), [03 Work completed](../.playwright-mcp/verify-20261028-041128-1366x768-03-work_completed.png), [04 Topography](../.playwright-mcp/verify-20261028-041128-1366x768-04-topography.png), [05 Drillholes](../.playwright-mcp/verify-20261028-041128-1366x768-05-drillholes.png), [06 Subsurface](../.playwright-mcp/verify-20261028-041128-1366x768-06-subsurface.png), [07 Resource](../.playwright-mcp/verify-20261028-041128-1366x768-07-resource.png), [08 Ranking](../.playwright-mcp/verify-20261028-041128-1366x768-08-ranking.png), [09 Mine Planning](../.playwright-mcp/verify-20261028-041128-1366x768-09-mine_planning.png), [10 Metallurgy](../.playwright-mcp/verify-20261028-041128-1366x768-10-metallurgy.png), [11 Accessibility](../.playwright-mcp/verify-20261028-041128-1366x768-11-accessibility.png), [12 Comparison](../.playwright-mcp/verify-20261028-041128-1366x768-12-comparison.png).
+
 Metallurgy inspector follow-up captures after matching the shared deck-panel typography and card styling:
 
 - 1366 × 768: [whole-plant overview](../.playwright-mcp/metallurgy-panel-polished-20261028.png) and [Flotation detail with lab-result card](../.playwright-mcp/metallurgy-panel-stage-20261028.png)
