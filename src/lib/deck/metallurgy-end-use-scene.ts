@@ -2,9 +2,9 @@ import * as THREE from 'three';
 
 export type MetallurgyEndUseRoute = 'anode' | 'refractory';
 
-const JOURNEY_SECONDS = 24;
+const ROUTE_STEP_SECONDS = 6;
 const ROUTE_STEPS: Record<MetallurgyEndUseRoute, readonly string[]> = {
-  anode: ['Shape', 'Purify', 'Coat & heat', 'Battery cell'],
+  anode: ['Shape', 'Purify', 'Coat & heat', 'Electrode coating', 'Cell + EV'],
   refractory: ['Blend', 'Press', 'MgO–C brick', 'Furnace lining'],
 };
 
@@ -22,7 +22,7 @@ function makeFlakeGeometry(radius: number, seed: number) {
   return new THREE.ExtrudeGeometry(shape, {depth: 1.35, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: .35, bevelThickness: .25});
 }
 
-function addBox(parent: THREE.Group, name: string, size: [number, number, number], position: [number, number, number], material: THREE.Material) {
+function addBox(parent: THREE.Object3D, name: string, size: [number, number, number], position: [number, number, number], material: THREE.Material) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
   mesh.name = name;
   mesh.position.set(...position);
@@ -123,6 +123,22 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     addBox(coat, 'Furnace belt', [70, 2, 9], [17, 3.5, 18], materials.copper);
     furnace.castShadow = true;
 
+    const electrodeLine = new THREE.Group(); electrodeLine.name = 'Illustrative anode electrode coating and calendering line'; electrodeLine.position.set(82, 0, 24); electrodeLine.scale.setScalar(1.28); group.add(electrodeLine);
+    addBox(electrodeLine, 'Electrode line foundation', [54, 3, 28], [0, 1.5, 0], materials.steel);
+    addBox(electrodeLine, 'Copper anode current-collector foil', [45, .35, 12], [0, 5.2, 0], materials.copper);
+    addBox(electrodeLine, 'Graphite active-material coating on copper foil', [30, .38, 9], [0, 5.55, 0], materials.graphite);
+    const calenderRollers: THREE.Mesh[] = [];
+    const calenderRollerBases: THREE.Quaternion[] = [];
+    for (const x of [-13, 13]) {
+      const roller = addCylinder(electrodeLine, 'Electrode calender roller', 4.2, 4.2, 17, [x, 10, 0], materials.steel, 32);
+      roller.rotation.z = Math.PI / 2;
+      addBox(roller, 'Calender roller motion marker', [.8, 11, 1.2], [3.8, 0, 0], materials.copper);
+      calenderRollers.push(roller);
+      calenderRollerBases.push(roller.quaternion.clone());
+      for (const z of [-8, 8]) addBox(electrodeLine, 'Electrode-line roller support', [2.2, 12, 2.2], [x, 6, z], materials.copper);
+    }
+    const coatingHead = addBox(electrodeLine, 'Illustrative electrode coating head', [7, 8, 15], [-9, 18, 0], materials.pale);
+
     const cell = new THREE.Group(); cell.name = 'Illustrative battery anode cutaway'; cell.position.set(132, 0, 0); group.add(cell);
     const cellShell = new THREE.Mesh(new THREE.BoxGeometry(48, 36, 34), new THREE.MeshPhysicalMaterial({color: '#9ab1b7', roughness: .23, metalness: .28, transparent: true, opacity: .23, side: THREE.DoubleSide}));
     cellShell.name = 'Transparent battery-cell enclosure'; cellShell.position.set(0, 22, 0); cell.add(cellShell);
@@ -131,6 +147,18 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
       const y = 8 + i * 4.2;
       const layer = addBox(cell, i % 2 === 0 ? 'Graphite anode active-material layer' : 'Copper current-collector layer', [40, 2.2, 26], [0, y, 0], (i % 2 === 0 ? materials.graphite : materials.copper).clone());
       activeMaterialLayers.push(layer);
+    }
+    const separator = new THREE.Mesh(new THREE.BoxGeometry(39, .65, 24), new THREE.MeshPhysicalMaterial({color: '#8ed7d2', roughness: .55, transparent: true, opacity: .4, side: THREE.DoubleSide}));
+    separator.name = 'Illustrative porous separator between electrodes'; separator.position.set(0, 22.7, 0); cell.add(separator);
+    const cathode = addBox(cell, 'Illustrative cathode active-material layer', [38, 2.2, 24], [0, 34.2, 0], materials.glow.clone());
+    const cathodeCurrentCollector = addBox(cell, 'Illustrative cathode current collector', [38, 1, 24], [0, 37.2, 0], materials.steel.clone());
+    const lithiumIons: THREE.Mesh[] = [];
+    const lithiumIonMaterial = new THREE.MeshStandardMaterial({color: '#a9f1ed', emissive: '#32c7bf', emissiveIntensity: .85, roughness: .3, metalness: .04});
+    for (let i = 0; i < 9; i++) {
+      const ion = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), lithiumIonMaterial);
+      ion.name = 'Illustrative lithium ion moving toward graphite anode during charge';
+      ion.position.set(-12 + (i % 3) * 12, 31, -8 + Math.floor(i / 3) * 8);
+      ion.visible = false; cell.add(ion); lithiumIons.push(ion);
     }
     for (const x of [-21, 21]) addBox(cell, 'Battery-cell terminal', [5, 5, 5], [x, 42, 0], materials.copper);
     const car = new THREE.Group(); car.name = 'EV downstream-use context illustration'; car.position.set(215, 0, 0); group.add(car);
@@ -143,6 +171,9 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     }
     const batteryPack = addBox(car, 'Illustrative battery pack under EV platform', [34, 3, 12], [0, 3.5, 0], materials.teal.clone());
     const layerBaseX = activeMaterialLayers.map(layer => layer.position.x);
+    const coatingHeadBaseX = coatingHead.position.x;
+    const carBaseX = car.position.x;
+    const carWheelMeshes = car.children.filter((child): child is THREE.Mesh => child instanceof THREE.Mesh && child.name === 'EV wheel');
     updateMotion = (seconds, step) => {
       const drumTime = Math.min(seconds, 6);
       drum.quaternion.copy(drumMount).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), drumTime * .72));
@@ -154,13 +185,33 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
       washWindowMaterial.emissiveIntensity = step === 1 ? .2 + .16 * (.5 + .5 * Math.sin((seconds - 6) * 2.4)) : .08;
       const coatingPulse = .5 + .5 * Math.sin((seconds - 12) * 2.2);
       carbonWindowMaterial.emissiveIntensity = step === 2 ? .48 + coatingPulse * .52 : .24;
-      const stackReveal = step === 3 ? THREE.MathUtils.clamp((seconds - 18) * 1.2, 0, 1) : 0;
+      const electrodeProgress = step === 3 ? THREE.MathUtils.clamp((seconds - 18) / ROUTE_STEP_SECONDS, 0, 1) : 0;
+      calenderRollers.forEach((roller, index) => {
+        const spin = step === 3 ? (index === 0 ? 1 : -1) * (seconds - 18) * 2.2 : 0;
+        roller.quaternion.copy(calenderRollerBases[index]).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin));
+      });
+      coatingHead.position.x = coatingHeadBaseX + (step === 3 ? Math.sin(electrodeProgress * Math.PI * 2) * 8 : 0);
+      const stackReveal = step === 4 ? THREE.MathUtils.clamp((seconds - 24) * .8, 0, 1) : 0;
       activeMaterialLayers.forEach((layer, index) => {
         const side = index % 2 === 0 ? -1 : 1;
         layer.position.x = layerBaseX[index] + side * stackReveal * 1.25;
       });
+      separator.material.opacity = step === 4 ? .3 + .1 * (.5 + .5 * Math.sin(seconds * 2.2)) : .4;
+      const chargeProgress = step === 4 ? THREE.MathUtils.clamp((seconds - 24) / 5.5, 0, 1) : 0;
+      lithiumIons.forEach((ion, index) => {
+        const stagger = index / lithiumIons.length;
+        const localProgress = THREE.MathUtils.clamp(chargeProgress * 1.35 - stagger * .35, 0, 1);
+        ion.visible = step === 4 && localProgress > 0;
+        ion.position.y = THREE.MathUtils.lerp(31, 13.5, localProgress);
+        ion.position.x = -12 + (index % 3) * 12 + Math.sin(seconds * 3 + index) * .5;
+        ion.position.z = -8 + Math.floor(index / 3) * 8;
+      });
+      (cathode.material as THREE.MeshStandardMaterial).emissiveIntensity = step === 4 ? .14 + .1 * (.5 + .5 * Math.sin(seconds * 2)) : 0;
+      (cathodeCurrentCollector.material as THREE.MeshStandardMaterial).emissiveIntensity = step === 4 ? .1 : 0;
+      carWheelMeshes.forEach(wheel => { wheel.rotation.z = step === 4 ? (seconds - 24) * 1.8 : 0; });
+      car.position.x = step === 4 ? carBaseX + Math.sin((seconds - 24) * .72) * 1.2 : carBaseX;
       const packMaterial = batteryPack.material as THREE.MeshStandardMaterial;
-      packMaterial.emissiveIntensity = step === 3 ? .28 + .22 * (.5 + .5 * Math.sin(seconds * 2.1)) : .08;
+      packMaterial.emissiveIntensity = step === 4 ? .28 + .22 * (.5 + .5 * Math.sin(seconds * 2.1)) : .08;
     };
   } else {
     addFlakeCluster(group, [-128, 8, 0], 13, 5.2, materials.graphite);
@@ -254,9 +305,10 @@ export function createMetallurgyEndUseScene() {
   }
 
   function update(seconds: number, animate: boolean) {
-    const safeSeconds = THREE.MathUtils.clamp(Number.isFinite(seconds) ? seconds : 0, 0, JOURNEY_SECONDS);
-    const step = Math.min(3, Math.floor(safeSeconds / 6));
-    const progress = safeSeconds / JOURNEY_SECONDS;
+    const duration = ROUTE_STEPS[selected].length * ROUTE_STEP_SECONDS;
+    const safeSeconds = THREE.MathUtils.clamp(Number.isFinite(seconds) ? seconds : 0, 0, duration);
+    const step = Math.min(ROUTE_STEPS[selected].length - 1, Math.floor(safeSeconds / ROUTE_STEP_SECONDS));
+    const progress = safeSeconds / duration;
     const deck = selected === 'anode' ? anode : refractory;
     deck.updateMotion(safeSeconds, step);
     deck.rings.forEach((ring, index) => {
@@ -279,10 +331,10 @@ export function createMetallurgyEndUseScene() {
       flow.setMatrixAt(i, matrix);
     }
     flow.instanceMatrix.needsUpdate = true;
-    return {route: selected, step, stepLabel: ROUTE_STEPS[selected][step], progress, complete: safeSeconds >= JOURNEY_SECONDS};
+    return {route: selected, step, stepLabel: ROUTE_STEPS[selected][step], progress, complete: safeSeconds >= duration};
   }
 
   setRoute('anode');
   update(0, false);
-  return {root, setRoute, update, steps: ROUTE_STEPS, duration: JOURNEY_SECONDS};
+  return {root, setRoute, update, steps: ROUTE_STEPS, get duration() { return ROUTE_STEPS[selected].length * ROUTE_STEP_SECONDS; }};
 }

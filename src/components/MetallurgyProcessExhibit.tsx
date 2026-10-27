@@ -183,16 +183,16 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       dirty = true;
     }
     function focusEndUseStep(route: MetallurgyEndUseRoute, step: number, animate: boolean) {
-      const routeTargets = route === 'anode' ? [-128, -34, 44, 176] : [-128, -48, 38, 178];
-      const selectedStep = Math.max(0, Math.min(3, step));
-      const targetHeight = route === 'refractory' && selectedStep === 3 ? 42 : 20;
-      target.set(routeTargets[selectedStep], targetHeight, 0);
+      const routeTargets = route === 'anode' ? [-128, -34, 44, 82, 176] : [-128, -48, 38, 178];
+      const boundedStep = Math.min(routeTargets.length - 1, Math.max(0, step));
+      const targetHeight = route === 'refractory' && boundedStep === 3 ? 42 : route === 'anode' && boundedStep === 3 ? 13 : route === 'anode' && boundedStep === 4 ? 24 : 20;
+      target.set(routeTargets[boundedStep], targetHeight, route === 'anode' && boundedStep === 3 ? 17 : 0);
       direction.set(.64, .58, 1.2).normalize();
-      const widths = route === 'anode' ? [86, 116, 142, 188] : [86, 108, 142, 174];
-      const heights = route === 'anode' ? [56, 60, 68, 76] : [56, 60, 72, 108];
+      const widths = route === 'anode' ? [86, 116, 142, 146, 196] : [86, 108, 142, 174];
+      const heights = route === 'anode' ? [56, 60, 68, 74, 82] : [56, 60, 72, 108];
       const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-      const horizontalFit = widths[selectedStep] / (2 * tanHalfFov * Math.max(.7, camera.aspect));
-      const verticalFit = heights[selectedStep] / (2 * tanHalfFov);
+      const horizontalFit = widths[boundedStep] / (2 * tanHalfFov * Math.max(.7, camera.aspect));
+      const verticalFit = heights[boundedStep] / (2 * tanHalfFov);
       const distance = Math.max(72, horizontalFit, verticalFit) * 1.12;
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
@@ -294,11 +294,11 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         if (journeyRunning) {
           journeyElapsed = Math.min(endUseScene.duration, journeyElapsed + dt);
           journeyElapsedRef.current = journeyElapsed;
-          const currentJourneyStep = Math.min(3, Math.floor(journeyElapsed / 6));
+          const route = endUseRouteRef.current;
+          const currentJourneyStep = route ? Math.min(endUseScene.steps[route].length - 1, Math.floor(journeyElapsed / 6)) : 0;
           if (currentJourneyStep !== journeyStepRef.current) {
             journeyStepRef.current = currentJourneyStep;
             setJourneyStep(currentJourneyStep);
-            const route = endUseRouteRef.current;
             if (route) focusEndUseStep(route, currentJourneyStep, true);
           }
           if (journeyElapsed >= endUseScene.duration) {
@@ -400,11 +400,22 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
   const selected = PROCESS.find(item => item.id === stage) ?? PROCESS[0];
   const result = MET_GROUPS[sample];
-  const routeSteps = endUseRoute ? (endUseRoute === 'anode' ? ['Shape', 'Purify', 'Coat & heat', 'Battery cell'] : ['Blend', 'Press', 'MgO–C brick', 'Furnace lining']) : [];
+  const routeSteps = endUseRoute ? (endUseRoute === 'anode' ? ['Shape', 'Purify', 'Coat & heat', 'Electrode line', 'Cell + EV'] : ['Blend', 'Press', 'MgO–C brick', 'Furnace lining']) : [];
   const routeTitle = endUseRoute === 'anode' ? 'EV battery anode pathway' : 'Steelmaking refractory pathway';
   const routeDescription = endUseRoute === 'anode'
-    ? 'An illustrative downstream sequence from flake concentrate through shaping, purification and coating to an anode inside a battery cell.'
-    : 'An illustrative material route showing graphite as a carbon ingredient in magnesia-carbon refractory brick and a furnace lining.';
+    ? [
+      'Illustrative flake shaping and size classification begin a possible downstream anode-material route.',
+      'Purification, washing and filtration are shown as illustrative downstream steps.',
+      'A conceptual coating and heat-treatment line prepares material for later electrode production.',
+      'Graphite active material is shown coating copper foil before passing through calender rollers.',
+      'Cell cutaway: Li⁺ moves toward graphite during charging; the EV is illustrative end-use context.',
+    ][journeyStep] ?? 'An illustrative downstream route from concentrate to anode material and an EV context.'
+    : [
+      'Illustrative blending combines graphite with a magnesia refractory batch.',
+      'A conceptual press forms a magnesia-carbon refractory brick.',
+      'The cutaway highlights a graphite-bearing working face in the brick.',
+      'A steelmaking-furnace lining illustrates one refractory application for graphite.',
+    ][journeyStep] ?? 'An illustrative graphite pathway into a magnesia-carbon refractory application.';
   function openEndUse() {
     endUseRouteRef.current = 'anode';
     journeyElapsedRef.current = 0;
@@ -427,14 +438,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     if (!endUseRoute) return;
     journeyElapsedRef.current = 0;
     if (reduceMotion) {
-      journeyElapsedRef.current = 24;
+      const finalStep = endUseRoute === 'anode' ? 4 : 3;
+      journeyElapsedRef.current = (finalStep + 1) * 6;
       journeyActiveRef.current = false;
-      journeyStepRef.current = 3; setJourneyActive(false); setJourneyComplete(true); setJourneyStep(3);
-      viewCommand.current?.focusEndUseStep(endUseRoute, 3, false);
+      journeyStepRef.current = finalStep; setJourneyActive(false); setJourneyComplete(true); setJourneyStep(finalStep);
+      viewCommand.current?.focusEndUseStep(endUseRoute, finalStep, false);
       const element = host.current;
       if (element) {
         element.dataset.endUseRoute = endUseRoute;
-        element.dataset.endUseStep = '3';
+        element.dataset.endUseStep = String(finalStep);
         element.dataset.endUseProgress = '1.000';
         element.dataset.endUseComplete = 'true';
       }
@@ -480,7 +492,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     <div className="tanga-factory-body">
       <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage} />
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
-        <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / 04 · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
+        <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
       </div>
       <aside className="tanga-factory-inspector" aria-live="polite">
         {endUseRoute ? <>
