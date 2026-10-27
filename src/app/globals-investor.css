@@ -918,8 +918,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-peer-benchmark button:focus-visible,.tanga-peer-benchmark a:focus-visible { outline:2px solid #efb980; outline-offset:3px; }
 @media(max-width:900px) { .tanga-peer-benchmark { gap:18px; grid-template-columns:230px minmax(0,1fr); } .tanga-peer-benchmark__chart { padding:12px; } .tanga-peer-benchmark li { gap:6px; grid-template-columns:20px minmax(110px,1fr) 40px; } .tanga-peer-benchmark__bar { display:none; } }
 @media(max-width:600px) { .tanga-peer-benchmark { inset:150px 16px 120px; display:flex; flex-direction:column; gap:12px; overflow:auto; pointer-events:auto; } .tanga-peer-benchmark__narrative { max-width:none; align-self:stretch; } .tanga-peer-benchmark h2 { font-size:28px; margin:5px 0 8px; } .tanga-peer-benchmark h2 br { display:none; } .tanga-peer-benchmark__narrative>p { font-size:11px; } .tanga-peer-benchmark__mre { display:none; } .tanga-peer-benchmark__narrative>small { font-size:9px; margin-top:8px; } .tanga-peer-benchmark__chart { flex:none; min-height:520px; } .tanga-peer-benchmark__chart h3 { font-size:17px; } }
-.tanga-deck .tanga-three.is-resource .tanga-three__grade-legend { top:350px!important; max-height:calc(100svh - 462px)!important; }
-.tanga-deck .tanga-three.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:550px!important; max-height:calc(100svh - 662px)!important; }
+.tanga-deck .tanga-three.is-resource .tanga-three__grade-legend { top:400px!important; max-height:calc(100svh - 506px)!important; }
+.tanga-deck .tanga-three.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:540px!important; max-height:calc(100svh - 646px)!important; }
 @media(max-width:600px) {
   .tanga-deck .tanga-deck__pager { z-index:60; flex-wrap:nowrap!important; }
   .tanga-deck__pager .tanga-deck__executive-tour,
@@ -940,7 +940,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 .tanga-intro.is-checking { visibility:hidden; }
 .tanga-deck .tanga-three.is-inspecting :is(.tanga-geology-section,.tanga-mine-story) { top:348px; max-height:calc(100svh - 460px); }
-.tanga-deck .tanga-three.is-visible.is-resource .tanga-three__grade-legend { display:block!important; top:350px!important; max-height:calc(100svh - 462px)!important; padding:12px; }
+.tanga-deck .tanga-three.is-visible.is-resource .tanga-three__grade-legend { display:block!important; top:400px!important; max-height:calc(100svh - 506px)!important; padding:12px; }
 .tanga-three__grade-legend>summary { color:#e3bb98; font-size:11px; cursor:pointer; }
 .tanga-three__grade-legend[open]>.tanga-three__grade-head { margin-top:14px; }
 .tanga-evidence-sequence { position:absolute; z-index:31; top:164px; left:300px; display:flex; gap:3px; padding:4px; border:1px solid #d1d9df24; border-radius:7px; background:#101a20da; backdrop-filter:blur(12px); }
@@ -988,7 +988,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media(max-width:1050px) { .tanga-evidence-sequence { top:150px; left:300px; } .tanga-evidence-sequence button { padding:7px; font-size:9px; } }
 @media(max-width:760px) { .tanga-evidence-sequence { display:none; } .tanga-material-entry { flex-wrap:wrap; } .tanga-material-counts { gap:7px; font-size:9px; } .tanga-material-counts strong { display:block; font-size:23px; } .tanga-material-evidence { padding:16px; } .tanga-material-evidence h2 { font-size:23px; } }
 @media(max-width:760px) { .tanga-material-evidence figure img { display:block; height:auto; max-height:42svh; } }
-.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:590px!important; max-height:calc(100svh - 702px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:540px!important; max-height:calc(100svh - 646px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-three__grade-legend { top:400px!important; bottom:auto!important; max-height:calc(100svh - 588px)!important; }
 /* Geological documents -> registered plan -> depth, sharing the chapter HUD. */
 .tanga-geology-map-sheet{position:absolute;z-index:24;left:300px;right:440px;top:215px;bottom:185px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #ffffff24;border-radius:14px;background:#252a2f;box-shadow:0 20px 70px #0004}
 .tanga-geology-map-sheet__toolbar{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#171e23}

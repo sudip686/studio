@@ -1,38 +1,103 @@
-param([int]$Width=1366,[int]$Height=768,[int]$First=1,[int]$Last=11)
-$ErrorActionPreference='Stop'
-$browserCli=Join-Path $PSScriptRoot '../node_modules/.bin/agent-browser.cmd'
-$auditSource=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'audit-presentation-layout.js') -Raw
-$auditEncoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($auditSource))
-$titles=@('The opportunity','A place in Tanzania','The project footprint','Read the ground','Inside the geology','Test the interpretation','Build the model','Shape a mining concept','From rock to concentrate','Connect to market','The case and next steps')
-$modes=@('ranking','tanzania','project','topography','subsurface','drillholes','resource','mine_planning','metallurgy','accessibility','comparison')
-& $browserCli --session final-pass set viewport $Width $Height
-for($slideIndex=$First;$slideIndex -le $Last;$slideIndex++){
-  if($slideIndex -eq 1){
-    & $browserCli --session final-pass open http://localhost:9004/#ranking
-    & $browserCli --session final-pass eval 'location.reload()'
-    & $browserCli --session final-pass wait --text 'Begin the story'
-  }else{
-    & $browserCli --session final-pass find role tab click --name "Scene ${slideIndex}: $($titles[$slideIndex-1])"
-  }
-  if($LASTEXITCODE -ne 0){throw "Navigation failed for chapter $slideIndex"}
-  & $browserCli --session final-pass wait --fn "document.querySelector('.tanga-deck[data-mode]')?.dataset.mode === '$($modes[$slideIndex-1])'"
-  if($LASTEXITCODE -ne 0){throw "Wrong mode for chapter $slideIndex"}
-  $waitSource="!document.querySelector('.tanga-deck--transitioning') && (!document.querySelector('.tanga-deck--three-active') || document.querySelector('[data-ready]')?.dataset.ready === 'true' || document.querySelector('[data-mode]')?.dataset.mode === 'metallurgy' || !!document.querySelector('.tanga-deck--cover'))"
-  & $browserCli --session final-pass wait --fn $waitSource
-  if($LASTEXITCODE -ne 0){throw "Readiness failed for chapter $slideIndex"}
-  if($slideIndex -ge 5 -and $slideIndex -le 8){
-    & $browserCli --session final-pass wait --fn "document.querySelector('[data-camera-moving]')?.dataset.cameraMoving === 'false'"
-    if($LASTEXITCODE -ne 0){throw "Camera did not settle for chapter $slideIndex"}
-  }
-  $auditResult=(& $browserCli --session final-pass eval -b $auditEncoded) -join "`n"
-  if($LASTEXITCODE -ne 0){throw "Layout audit failed for chapter $slideIndex"}
-  $auditResult
-  & $browserCli --session final-pass screenshot
-  $auditObject=$auditResult|ConvertFrom-Json
-  if($auditObject.overlaps.Count -or $auditObject.outside.Count){throw "Layout conflict detected for chapter $slideIndex"}
-  if($slideIndex -eq 1){
-    & $browserCli --session final-pass find role button click --name 'Begin the story'
-    if($LASTEXITCODE -ne 0){throw 'Could not dismiss opening cover'}
-  }
+param(
+  [int]$Width = 1366,
+  [int]$Height = 768,
+  [int]$First = 1,
+  [int]$Last = 12,
+  [string]$BaseUrl = 'http://localhost:3016'
+)
+
+$ErrorActionPreference = 'Stop'
+$browserCli = Join-Path $PSScriptRoot '../node_modules/.bin/agent-browser.cmd'
+$auditSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'audit-presentation-layout.js') -Raw
+$auditEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($auditSource))
+$titles = @(
+  'Meet Tanga',
+  'Place it on the map',
+  'Work completed',
+  'Read the landscape',
+  'Follow a recorded hole',
+  'Reveal the host rock',
+  'Understand the model',
+  'The global peer field',
+  'Fit a concept to ground',
+  'Examine the testwork',
+  'Connect to the port',
+  'Evidence to decisions'
+)
+$modes = @(
+  'project',
+  'tanzania',
+  'work_completed',
+  'topography',
+  'drillholes',
+  'subsurface',
+  'resource',
+  'ranking',
+  'mine_planning',
+  'metallurgy',
+  'accessibility',
+  'comparison'
+)
+$mapModes = @('project', 'tanzania', 'work_completed', 'ranking', 'accessibility', 'comparison')
+
+if ($First -lt 1 -or $Last -gt $modes.Count -or $First -gt $Last) {
+  throw "Choose a valid chapter range between 1 and $($modes.Count)."
 }
+if (-not (Test-Path -LiteralPath $browserCli)) {
+  throw "agent-browser CLI was not found at $browserCli."
+}
+
+$captureRoot = Join-Path $PSScriptRoot '../.playwright-mcp'
+$captureRoot = [IO.Path]::GetFullPath($captureRoot)
+New-Item -ItemType Directory -Path $captureRoot -Force | Out-Null
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+
+& $browserCli --session final-pass set viewport $Width $Height
+if ($LASTEXITCODE -ne 0) { throw 'Could not set the browser viewport.' }
+& $browserCli --session final-pass open "$BaseUrl/#project"
+if ($LASTEXITCODE -ne 0) { throw "Could not open $BaseUrl/#project" }
+
+for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
+  $title = $titles[$slideIndex - 1]
+  $mode = $modes[$slideIndex - 1]
+  & $browserCli --session final-pass find role tab click --name "Scene ${slideIndex}: $title"
+  if ($LASTEXITCODE -ne 0) { throw "Navigation failed for chapter $slideIndex ($title)." }
+
+  & $browserCli --session final-pass wait --fn "document.querySelector('.tanga-deck')?.dataset.mode === '$mode'"
+  if ($LASTEXITCODE -ne 0) { throw "Wrong mode for chapter $slideIndex ($mode)." }
+
+  if ($mapModes -contains $mode) {
+    $readySource = "(()=>{const d=document.querySelector('.tanga-deck');return !!d&&d.dataset.mode==='$mode'&&!d.classList.contains('tanga-deck--transitioning')&&d.dataset.mapState==='ready'})()"
+  } else {
+    $readySource = "(()=>{const d=document.querySelector('.tanga-deck');return !!d&&d.dataset.mode==='$mode'&&!d.classList.contains('tanga-deck--transitioning')&&d.dataset.threeState==='ready'})()"
+  }
+  & $browserCli --session final-pass wait --fn $readySource
+  if ($LASTEXITCODE -ne 0) { throw "Scene readiness failed for chapter $slideIndex ($mode)." }
+
+  if ($mode -eq 'metallurgy') {
+    & $browserCli --session final-pass wait --fn "(()=>{const e=document.querySelector('.tanga-process-canvas');return !!e&&e.dataset.ready==='true'&&e.dataset.cameraSettled==='true'&&e.dataset.roofSettled==='true'})()"
+    if ($LASTEXITCODE -ne 0) { throw 'Metallurgy factory camera or roof did not settle.' }
+  }
+
+  $auditResult = (& $browserCli --session final-pass eval -b $auditEncoded) -join "`n"
+  if ($LASTEXITCODE -ne 0) { throw "Layout audit failed for chapter $slideIndex." }
+  $auditObject = $auditResult | ConvertFrom-Json
+  $capturePath = Join-Path $captureRoot "verify-$stamp-$($Width)x$($Height)-$($slideIndex.ToString('00'))-$mode.png"
+  & $browserCli --session final-pass screenshot $capturePath
+  if ($LASTEXITCODE -ne 0) { throw "Screenshot failed for chapter $slideIndex." }
+
+  [pscustomobject]@{
+    chapter = $slideIndex
+    title = $title
+    mode = $mode
+    viewport = "$Width x $Height"
+    ready = $true
+    overlapCount = $auditObject.overlaps.Count
+    outsideCount = $auditObject.outside.Count
+    screenshot = $capturePath
+    overlaps = $auditObject.overlaps
+    outside = $auditObject.outside
+  } | ConvertTo-Json -Depth 8 -Compress
+}
+
 & $browserCli --session final-pass errors

@@ -1,6 +1,6 @@
 // Read-only DOM audit, evaluated inside agent-browser. Screenshot review is still required.
 (()=>{
-  const selectors=['.tanga-deck__pager','.tanga-deck__chapter-title','.tanga-three__nav-cluster','.tanga-deck__layers','.tanga-deck__notes','.tanga-deck__insight-panel','.tanga-deck__data-panel','.tanga-three__grade-legend','.tanga-three__drill-legend','.tanga-mine-story','.tanga-geology-section','.tanga-met-report','.tanga-met-visual','.tanga-deck__closing','.tanga-process-exhibit','.tanga-cross-section','.tanga-cross-launch','.tanga-evidence-replay'];
+  const selectors=['.tanga-deck__pager','.tanga-deck__chapter-title','.tanga-three__nav-cluster','.tanga-three-animation-tools','.tanga-surface-control','.tanga-story-cue','.tanga-deck__layers','.tanga-deck__notes','.tanga-deck__insight-panel','.tanga-deck__data-panel','.tanga-three__grade-legend','.tanga-three__drill-legend','.tanga-mine-story','.tanga-geology-section','.tanga-met-report','.tanga-met-visual','.tanga-deck__closing','.tanga-process-exhibit','.tanga-cross-section','.tanga-cross-launch','.tanga-evidence-replay'];
   const visible=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)>0;};
   const panels=selectors.flatMap(selector=>[...document.querySelectorAll(selector)].filter(visible).map(el=>({el,selector,rect:el.getBoundingClientRect().toJSON(),scrollable:el.scrollHeight>el.clientHeight+2})));
   const overlaps=[];
