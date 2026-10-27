@@ -60,7 +60,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     try { renderer = new THREE.WebGLRenderer({antialias: true, alpha: false, powerPreference: 'high-performance'}); }
     catch { setError('3D factory unavailable. Open the laboratory evidence board to review the reported results.'); return; }
 
-    let disposed = false, contextLost = false, userOrbit = false, tween = false, dirty = true;
+    let disposed = false, contextLost = false, contextWasLost = false, userOrbit = false, tween = false, dirty = true;
     let frame = 0, last = performance.now(), elapsed = recoveryView?.processTime ?? 0, journeyElapsed = recoveryView?.journeyTime ?? journeyElapsedRef.current, cameraStart = 0, cameraTour = false;
     let selected: ProcessId = stageRef.current;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -246,7 +246,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const onStart = () => { tween = false; userOrbit = true; window.dispatchEvent(new Event('tanga:manual-exploration')); };
     controls.addEventListener('change', onChange); controls.addEventListener('start', onStart);
     const onContextLost = (event: Event) => {
-      event.preventDefault(); contextLost = true; element.dataset.ready = 'false';
+      event.preventDefault(); contextLost = true; contextWasLost = true; element.dataset.ready = 'false';
       recoveryViewRef.current = {position: camera.position.toArray() as [number, number, number], target: controls.target.toArray() as [number, number, number], fov: camera.fov, processTime: elapsed, endUseRoute: endUseRouteRef.current, journeyTime: journeyElapsed};
       setError('Graphics context lost. The 3D factory will rebuild when graphics recover.');
     };
@@ -365,10 +365,18 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       reducedMotion.removeEventListener('change', onMotionPreference);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
-      const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
-      scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(entry => materials.add(entry)); } });
-      geometries.forEach(geometry => geometry.dispose()); materials.forEach(entry => entry.dispose());
-      sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      // A lost WebGL context already released its GPU objects. Three.js keeps
+      // VAO/program handles from before the loss, so disposing those resources
+      // after the browser restores the context sends invalid deletes into the
+      // new context and floods the console. Let the detached renderer/scene be
+      // collected in that case; keep normal disposal for ordinary unmounts.
+      if (!contextWasLost) {
+        const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+        scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(entry => materials.add(entry)); } });
+        geometries.forEach(geometry => geometry.dispose()); materials.forEach(entry => entry.dispose());
+        sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss();
+      }
+      renderer.domElement.remove();
     };
   }, [rendererAttempt]);
 
