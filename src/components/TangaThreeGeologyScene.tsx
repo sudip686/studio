@@ -3157,9 +3157,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const reliefPitch = THREE.MathUtils.degToRad(camera.aspect < .85 ? 25 : 50);
         const reliefFov = THREE.MathUtils.degToRad(camera.fov);
         const mappedSpan = Math.max(geologyPlanExtent.z, geologyPlanExtent.x / Math.max(.5, camera.aspect));
-        // Use a modest framing margin: the previous 2.15 factor left the map
-        // as a small island in the desktop canvas, especially at 1707 px.
-        const reliefDistance = mappedSpan / (2 * Math.tan(reliefFov / 2)) * 1.45;
+        // Preserve the full map on desktop while keeping the terrain plate clear
+        // of the persistent chapter title and bottom navigation. The panels
+        // overlap less at wider screens, so retain the tighter existing frame
+        // on narrow layouts until the separate device pass.
+        const desktopReliefFrame = camera.aspect > 1.3;
+        const reliefDistance = mappedSpan / (2 * Math.tan(reliefFov / 2)) * (desktopReliefFrame ? 1.71 : 1.45);
         const reliefDirection = cameraShot.to.clone().sub(cameraShot.target);
         reliefDirection.y = 0;
         if (reliefDirection.lengthSq() < 1) reliefDirection.set(.7, 0, .85);
@@ -3167,8 +3170,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const reliefPosition = geologyPlanTarget.clone()
           .addScaledVector(reliefDirection, reliefDistance * Math.cos(reliefPitch))
           .add(new THREE.Vector3(0, reliefDistance * Math.sin(reliefPitch), 0));
-        host.dataset.geologyReliefCamera = JSON.stringify({aspect:Number(camera.aspect.toFixed(3)),pitchDeg:Number(THREE.MathUtils.radToDeg(reliefPitch).toFixed(1)),target:geologyPlanTarget.toArray().map(value=>Number(value.toFixed(1))),position:reliefPosition.toArray().map(value=>Number(value.toFixed(1)))});
-        scheduleCameraTween(reliefPosition, geologyPlanTarget.clone(), 2.8, cameraShot.fov);
+        const reliefTarget = geologyPlanTarget.clone();
+        let safeAreaShift = 0;
+        if (desktopReliefFrame) {
+          const reliefForward = reliefTarget.clone().sub(reliefPosition).normalize();
+          const reliefRight = reliefForward.clone().cross(camera.up).normalize();
+          const reliefScreenUp = reliefRight.clone().cross(reliefForward).normalize();
+          safeAreaShift = reliefDistance * .035;
+          reliefPosition.addScaledVector(reliefScreenUp, -safeAreaShift);
+          reliefTarget.addScaledVector(reliefScreenUp, -safeAreaShift);
+        }
+        host.dataset.geologyReliefCamera = JSON.stringify({aspect:Number(camera.aspect.toFixed(3)),pitchDeg:Number(THREE.MathUtils.radToDeg(reliefPitch).toFixed(1)),frameFactor:desktopReliefFrame?1.71:1.45,safeAreaShiftM:Number(safeAreaShift.toFixed(1)),target:reliefTarget.toArray().map(value=>Number(value.toFixed(1))),position:reliefPosition.toArray().map(value=>Number(value.toFixed(1)))});
+        scheduleCameraTween(reliefPosition, reliefTarget, 2.8, cameraShot.fov);
         applyTerrainSurfaceView();
         host.dataset.geologyStage = 'mapped-relief';
         setStatus('Mapped rock polygons follow the unchanged terrain · drag to inspect relief');
