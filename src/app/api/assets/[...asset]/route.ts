@@ -1,4 +1,5 @@
 import {NextResponse} from 'next/server';
+import {getCloudflareContext} from '@opennextjs/cloudflare';
 import path from 'node:path';
 import {createReadStream, promises as fs} from 'node:fs';
 import {Readable} from 'node:stream';
@@ -32,6 +33,70 @@ function contentTypeFor(key: string) {
 
 type RouteContext = {params: Promise<{asset: string[]}>};
 
+type R2AssetObject = {
+  body?: ReadableStream<Uint8Array>;
+  httpEtag: string;
+  range?: {offset?: number; length?: number; suffix?: number};
+  size: number;
+  writeHttpMetadata(headers: Headers): void;
+};
+
+type R2AssetBucket = {
+  get(key: string, options?: {range?: Headers}): Promise<R2AssetObject | null>;
+  head(key: string): Promise<R2AssetObject | null>;
+};
+
+function contentRangeFor(range: NonNullable<R2AssetObject['range']>, size: number) {
+  const start = range.offset ?? (range.suffix ? Math.max(0, size - range.suffix) : 0);
+  const length = range.length ?? (range.suffix ? Math.min(size, range.suffix) : size - start);
+  const end = Math.min(size - 1, start + length - 1);
+  return length > 0 && end >= start ? {value: `bytes ${start}-${end}/${size}`, length: end - start + 1} : null;
+}
+
+async function cloudflareR2Response(request: Request, key: string) {
+  if (!process.env.NEXT_PUBLIC_PRESENTATION_BUILD_TARGET?.startsWith('Cloudflare Workers')) return null;
+
+  try {
+    const {env} = await getCloudflareContext({async: true});
+    const bucket = (env as unknown as {TANGA_R2?: R2AssetBucket}).TANGA_R2;
+    if (!bucket) return null;
+
+    const object = request.method === 'HEAD'
+      ? await bucket.head(key)
+      : await bucket.get(key, {range: request.headers});
+    // Wrangler's local R2 simulator is empty unless explicitly seeded. Let
+    // development and an unavailable binding retain the public R2 fallback.
+    if (!object || (request.method === 'GET' && !object.body)) return null;
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    headers.set('accept-ranges', 'bytes');
+    headers.set('x-content-type-options', 'nosniff');
+    if (!headers.has('content-type')) headers.set('content-type', contentTypeFor(key));
+    if (!headers.has('cache-control')) headers.set('cache-control', 'public, max-age=300');
+
+    const contentRange = request.method === 'GET' && request.headers.has('range') && object.range
+      ? contentRangeFor(object.range, object.size)
+      : null;
+    if (contentRange) {
+      headers.set('content-range', contentRange.value);
+      headers.set('content-length', String(contentRange.length));
+    } else if (!headers.has('content-length')) {
+      headers.set('content-length', String(object.size));
+    }
+    if (key.endsWith('.geojson') && request.method === 'GET' && !contentRange && object.body) {
+      return maybeGzipStreamResponse(object.body, request, {headers});
+    }
+    return new Response(request.method === 'HEAD' ? null : object.body, {
+      status: contentRange ? 206 : 200,
+      headers,
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function assetResponse(request: Request, context: RouteContext) {
   const {asset} = await context.params;
   const key = asset.join('/');
@@ -39,6 +104,9 @@ async function assetResponse(request: Request, context: RouteContext) {
     return NextResponse.json({error: 'Asset not found.'}, {status: 404});
   }
   const isGeoJson = key.endsWith('.geojson');
+
+  const cloudflareResponse = await cloudflareR2Response(request, key);
+  if (cloudflareResponse) return cloudflareResponse;
 
   const headers = new Headers();
   const range = request.headers.get('range');

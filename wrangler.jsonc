@@ -11,6 +11,12 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "r2_buckets": [
+    {
+      "binding": "TANGA_R2",
+      "bucket_name": "my-geo-assets"
+    }
+  ],
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
