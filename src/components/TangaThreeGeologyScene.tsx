@@ -386,6 +386,8 @@ type ThreeCallout = {
   priority?: number;
   /** Small surface tags keep the mine overview readable while the site stays in view. */
   compact?: boolean;
+  /** Compact, detail-free marker for the three-step whole-campus process sequence. */
+  plantTag?: boolean;
   /** Hide this label when opaque, visible scene geometry blocks its world anchor. */
   occlusion?: 'scene' | 'none';
 };
@@ -2464,7 +2466,11 @@ export default function TangaThreeGeologyScene({
   const [pitBlocksStatus, setPitBlocksStatus] = useState<'loading' | 'ready' | 'error'>('ready');
   const pitBlockRetryRef = useRef<(() => void) | null>(null);
   const [mineOrientation,setMineOrientation]=useState<'oblique'|'plan'>('oblique');
-  useEffect(()=>{setMineOrientation('oblique');},[mode]);
+  const updateMineOrientation=(orientation:'oblique'|'plan')=>{
+    setMineOrientation(orientation);
+    window.dispatchEvent(new CustomEvent('tanga:mine-orientation-change',{detail:orientation}));
+  };
+  useEffect(()=>{updateMineOrientation('oblique');},[mode]);
   const [evidenceHoleIds,setEvidenceHoleIds]=useState<string[]>([]);
   const [focusedSource,setFocusedSource]=useState<string|null>(null);
   const evidenceFocusRef=useRef<((holeId:string)=>void)|null>(null);
@@ -3067,7 +3073,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const leaveMinePlanView = () => {
       if (mode !== 'mine_planning' || !sitePlanView) return;
       sitePlanView = false;
-      setMineOrientation('oblique');
+      updateMineOrientation('oblique');
       camera.up.set(0, 1, 0);
       controls.enableRotate = true;
       controls.minPolarAngle = 0;
@@ -3151,9 +3157,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const reliefPitch = THREE.MathUtils.degToRad(camera.aspect < .85 ? 25 : 50);
         const reliefFov = THREE.MathUtils.degToRad(camera.fov);
         const mappedSpan = Math.max(geologyPlanExtent.z, geologyPlanExtent.x / Math.max(.5, camera.aspect));
-        // Use a modest framing margin: the previous 2.15 factor left the map
-        // as a small island in the desktop canvas, especially at 1707 px.
-        const reliefDistance = mappedSpan / (2 * Math.tan(reliefFov / 2)) * 1.45;
+        // Preserve the full map on desktop while keeping the terrain plate clear
+        // of the persistent chapter title and bottom navigation. The panels
+        // overlap less at wider screens, so retain the tighter existing frame
+        // on narrow layouts until the separate device pass.
+        const desktopReliefFrame = camera.aspect > 1.3;
+        const reliefDistance = mappedSpan / (2 * Math.tan(reliefFov / 2)) * (desktopReliefFrame ? 1.71 : 1.45);
         const reliefDirection = cameraShot.to.clone().sub(cameraShot.target);
         reliefDirection.y = 0;
         if (reliefDirection.lengthSq() < 1) reliefDirection.set(.7, 0, .85);
@@ -3161,8 +3170,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const reliefPosition = geologyPlanTarget.clone()
           .addScaledVector(reliefDirection, reliefDistance * Math.cos(reliefPitch))
           .add(new THREE.Vector3(0, reliefDistance * Math.sin(reliefPitch), 0));
-        host.dataset.geologyReliefCamera = JSON.stringify({aspect:Number(camera.aspect.toFixed(3)),pitchDeg:Number(THREE.MathUtils.radToDeg(reliefPitch).toFixed(1)),target:geologyPlanTarget.toArray().map(value=>Number(value.toFixed(1))),position:reliefPosition.toArray().map(value=>Number(value.toFixed(1)))});
-        scheduleCameraTween(reliefPosition, geologyPlanTarget.clone(), 2.8, cameraShot.fov);
+        const reliefTarget = geologyPlanTarget.clone();
+        let safeAreaShift = 0;
+        if (desktopReliefFrame) {
+          const reliefForward = reliefTarget.clone().sub(reliefPosition).normalize();
+          const reliefRight = reliefForward.clone().cross(camera.up).normalize();
+          const reliefScreenUp = reliefRight.clone().cross(reliefForward).normalize();
+          safeAreaShift = reliefDistance * .035;
+          reliefPosition.addScaledVector(reliefScreenUp, -safeAreaShift);
+          reliefTarget.addScaledVector(reliefScreenUp, -safeAreaShift);
+        }
+        host.dataset.geologyReliefCamera = JSON.stringify({aspect:Number(camera.aspect.toFixed(3)),pitchDeg:Number(THREE.MathUtils.radToDeg(reliefPitch).toFixed(1)),frameFactor:desktopReliefFrame?1.71:1.45,safeAreaShiftM:Number(safeAreaShift.toFixed(1)),target:reliefTarget.toArray().map(value=>Number(value.toFixed(1))),position:reliefPosition.toArray().map(value=>Number(value.toFixed(1)))});
+        scheduleCameraTween(reliefPosition, reliefTarget, 2.8, cameraShot.fov);
         applyTerrainSurfaceView();
         host.dataset.geologyStage = 'mapped-relief';
         setStatus('Mapped rock polygons follow the unchanged terrain · drag to inspect relief');
@@ -3203,7 +3222,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (command.action === 'sitePlan' && mode === 'mine_planning' && sitePlan?.pits.length) {
         facilityFocused=false;setStoryPlaying(false);calloutsForProjection=siteOverviewCallouts;
         sitePlanView=true;
-        setMineOrientation('plan');
+        updateMineOrientation('plan');
         const bounds=new THREE.Box3();
         for(const pit of sitePlan.pits) for(const [x,z] of pit.ring) bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,pit.surface,z)));
         const includeLocal=(x:number,z:number,y=0)=>bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,y,z)));
@@ -3234,7 +3253,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'siteOblique' && mode === 'mine_planning') {
         sitePlanView=false;
-        setMineOrientation('oblique');
+        updateMineOrientation('oblique');
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI-0.04;
         facilityFocused=false;calloutsForProjection=siteOverviewCallouts;
         setMiningBeat(3);
@@ -3245,7 +3264,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (command.action === 'resetView') {
         if(mode==='mine_planning')sitePlanView=false;
-        if(mode==='mine_planning')setMineOrientation('oblique');
+        if(mode==='mine_planning')updateMineOrientation('oblique');
         facilityFocused=false;
         if (mode === 'mine_planning') calloutsForProjection = siteOverviewCallouts;
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle = Math.PI - 0.04;
@@ -3614,10 +3633,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const applyTexturedTerrain = async (quality: AssetQuality) => {
       try {
         reportLoadState('loading', 'loading', quality, `Loading ${quality} terrain`);
-        const [resources, sourceTexture] = await Promise.all([
-          loadTangaTerrainResources(),
-          mode === 'topography' ? Promise.resolve(null) : loadTerrainTexture(),
-        ]);
+        // Elevation is the scene's spatial source of truth; aerial imagery is
+        // a visual refinement. Do not make a slow 6 MB imagery transfer hold
+        // the measured terrain mesh, pits, or plant behind a loading screen.
+        // Resolve the raster first, draw a neutral terrain surface, and drape
+        // the imagery onto that same mesh when it arrives.
+        host.dataset.terrainTextureState = mode === 'topography' ? 'not-used' : 'loading';
+        const texturePromise: Promise<THREE.Texture | null> = mode === 'topography'
+          ? Promise.resolve(null)
+          : loadTerrainTexture().then(texture => texture, () => {
+            if (!cancelled) host.dataset.terrainTextureState = 'unavailable';
+            return null;
+          });
+        const resources = await loadTangaTerrainResources();
         if (cancelled) return null;
         terrainResources = resources;
         if (mode === 'topography' && (!resources.surveyHeightData || !resources.surveyCoverageData)) {
@@ -3665,18 +3693,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         terrainMeshes.length = 0;
         terrainOccluders.length = 0;
         terrainSurfaceMaterials.length = 0;
-        const terrainTexture = sourceTexture?.clone() ?? null;
-        if (terrainTexture) {
-        terrainTexture.colorSpace = THREE.SRGBColorSpace;
-        terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
-        terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
-        terrainTexture.generateMipmaps = true;
-        terrainTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        terrainTexture.magFilter = THREE.LinearFilter;
-        terrainTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy?.() ?? 8, 16);
-        terrainTexture.needsUpdate = true;
-        }
-
         const geometryStartedAt = performance.now();
         const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terrainDisplayRef.current);
         host.dataset.terrainBuildMs = String(Math.round(performance.now() - geometryStartedAt));
@@ -3687,11 +3703,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           carvePit(terrainGeometry, sitePlan.pits);
           const pad=processPlant?.userData.conceptPad as ConceptPad|undefined;if(pad)gradeConceptPad(terrainGeometry,pad);
         }
-        const hasSatelliteTexture = mode !== 'topography' && Boolean(terrainTexture);
-        const satelliteTerrainMaterial = hasSatelliteTexture
+        const isSatelliteTerrain = mode !== 'topography';
+        const satelliteTerrainMaterial = isSatelliteTerrain
           ? new THREE.MeshBasicMaterial({
-            map: terrainTexture,
-            color: 0xffffff,
+            // This is the immediate, textured-terrain fallback. Its palette
+            // remains subdued while preserving the relief until imagery lands.
+            map: null,
+            color: mode === 'subsurface' ? 0x52616a : 0x9a8267,
             colorWrite: true,
             toneMapped: false,
             transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
@@ -3720,7 +3738,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const texturedTerrain = new THREE.Mesh(
           terrainGeometry,
           satelliteTerrainMaterial ?? new THREE.MeshLambertMaterial({
-            map: mode === 'topography' ? null : terrainTexture,
+            map: null,
             color: 0xffffff,
             transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
             opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
@@ -3741,6 +3759,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         texturedTerrain.receiveShadow = true;
         texturedTerrain.renderOrder = 20;
         terrainLayer.add(texturedTerrain);
+        if (satelliteTerrainMaterial) {
+          void texturePromise.then(sourceTexture => {
+            if (cancelled || !sourceTexture) return;
+            const terrainTexture = sourceTexture.clone();
+            terrainTexture.colorSpace = THREE.SRGBColorSpace;
+            terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
+            terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
+            terrainTexture.generateMipmaps = true;
+            terrainTexture.minFilter = THREE.LinearMipmapLinearFilter;
+            terrainTexture.magFilter = THREE.LinearFilter;
+            terrainTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy?.() ?? 8, 16);
+            terrainTexture.needsUpdate = true;
+            satelliteTerrainMaterial.map = terrainTexture;
+            satelliteTerrainMaterial.color.set(0xffffff);
+            satelliteTerrainMaterial.needsUpdate = true;
+            host.dataset.terrainTextureState = 'ready';
+            host.dataset.terrainTextureReadyAt = String(Math.round(performance.now()));
+          });
+        }
         if (mode === 'topography') {
           const updateDisplay = async (display: TerrainDisplay) => {
             if (display === 'slope' && !resources.surveySlopeData) {
@@ -4978,7 +5015,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // Mine-plan site construction can schedule view transitions while its
           // terrain and facilities are rebuilding. Reapply the captured pose
           // once those objects are ready, so recovery wins over stale commands.
-          if(recoveryView.sitePlanView)setMineOrientation('plan');
+          if(recoveryView.sitePlanView)updateMineOrientation('plan');
           cameraTween=null;
           camera.position.set(...recoveryView.position);
           controls.target.set(...recoveryView.target);
@@ -5240,7 +5277,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           keyLabelsTaken++;return true;
         }
         if(density==='key'&&callout.id.startsWith('plant-')) {
-          if(calloutsForProjection.length>1&&!['plant-feed','plant-flotation','plant-product'].includes(callout.id))return false;
+          // A selected process gets its own annotation even when it is not one
+          // of the three overview waypoints. In the whole-campus view, retain
+          // only the feed / testwork / product markers as a compact sequence.
+          const selectedProcess=detailOptions.current.plantProcess;
+          if(selectedProcess!=='all')return callout.id===`plant-${selectedProcess}`;
+          if(!['plant-feed','plant-flotation','plant-product'].includes(callout.id))return false;
           if(keyLabelsTaken>=3)return false;
           keyLabelsTaken++;return true;
         }
@@ -5328,9 +5370,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const anchorPixelY = rawAnchorY;
         const isIntercept = callout.kind === 'intercept';
         const compactMineTag = mode === 'mine_planning' && density === 'key';
+        const compactPlantTag = compactMineTag && callout.id.startsWith('plant-') && detailOptions.current.plantProcess === 'all';
         const indexedMineTag = compactMineTag && MINE_SITE_CALLOUT_INDEX[callout.id] !== undefined;
-        const projectedCallout = compactMineTag ? {...callout, compact: true} : callout;
-        const size = isIntercept ? INTERCEPT_LABEL_SIZE : indexedMineTag ? {width: 144, height: 40} : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
+        const projectedCallout = compactPlantTag ? {...callout, compact: true, plantTag: true} : compactMineTag ? {...callout, compact: true} : callout;
+        const size = isIntercept ? INTERCEPT_LABEL_SIZE : compactPlantTag ? {width: 152, height: 34} : indexedMineTag ? {width: 144, height: 40} : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
 
         byId.set(callout.id, {callout: projectedCallout, anchorPixelX, anchorPixelY});
         candidates.push({
@@ -6092,6 +6135,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 `is-${callout.side ?? 'right'}`,
                 callout.kind === 'intercept' && 'tanga-three__callout--intercept',
                 callout.compact && 'tanga-three__callout--compact',
+                callout.plantTag && 'tanga-three__callout--plant-tag',
                 mode === 'mine_planning' && callout.compact && MINE_SITE_CALLOUT_INDEX[callout.id] && 'tanga-three__callout--site-tag'
               )}
               role="note"
@@ -6195,7 +6239,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
           {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-label={mode==='subsurface'?(inspectionOpen?'Close inspection tools':'Inspection tools'):undefined} title={mode==='subsurface'?'Geology inspection tools':'Inspection tools'} aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{mode==='subsurface'?(inspectionOpen?'Close tools':'Inspect'):(inspectionOpen ? 'Close inspection tools' : 'Inspection tools')}</button>}
         </div>
-        {mode==='resource'&&<details className="tanga-three-animation-tools"><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
+        {mode==='resource'&&<details className="tanga-three-animation-tools" onToggle={event=>{if(event.currentTarget.open){const legend=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three__grade-legend');if(legend?.open)legend.open=false;}}}><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
           <>
           {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>Recorded intervals only; gaps are not interpolated into new assays. Highlight is visible through the terrain.</small></details>}
@@ -6320,7 +6364,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
       {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}
       {mode === 'resource' && (
-        <details className="tanga-three__grade-legend" aria-label="TGC grade legend">
+        <details className="tanga-three__grade-legend" aria-label="TGC grade legend" onToggle={event=>{if(event.currentTarget.open){const tools=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three-animation-tools');if(tools?.open)tools.open=false;}}}>
           <summary>Read the grade colours · % TGC</summary>
           <div className="tanga-three__grade-head">
             <span>TGC Grade</span>

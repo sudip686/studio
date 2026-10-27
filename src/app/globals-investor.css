@@ -918,8 +918,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-peer-benchmark button:focus-visible,.tanga-peer-benchmark a:focus-visible { outline:2px solid #efb980; outline-offset:3px; }
 @media(max-width:900px) { .tanga-peer-benchmark { gap:18px; grid-template-columns:230px minmax(0,1fr); } .tanga-peer-benchmark__chart { padding:12px; } .tanga-peer-benchmark li { gap:6px; grid-template-columns:20px minmax(110px,1fr) 40px; } .tanga-peer-benchmark__bar { display:none; } }
 @media(max-width:600px) { .tanga-peer-benchmark { inset:150px 16px 120px; display:flex; flex-direction:column; gap:12px; overflow:auto; pointer-events:auto; } .tanga-peer-benchmark__narrative { max-width:none; align-self:stretch; } .tanga-peer-benchmark h2 { font-size:28px; margin:5px 0 8px; } .tanga-peer-benchmark h2 br { display:none; } .tanga-peer-benchmark__narrative>p { font-size:11px; } .tanga-peer-benchmark__mre { display:none; } .tanga-peer-benchmark__narrative>small { font-size:9px; margin-top:8px; } .tanga-peer-benchmark__chart { flex:none; min-height:520px; } .tanga-peer-benchmark__chart h3 { font-size:17px; } }
-.tanga-deck .tanga-three.is-resource .tanga-three__grade-legend { top:350px!important; max-height:calc(100svh - 462px)!important; }
-.tanga-deck .tanga-three.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:550px!important; max-height:calc(100svh - 662px)!important; }
+.tanga-deck .tanga-three.is-resource .tanga-three__grade-legend { top:400px!important; max-height:calc(100svh - 506px)!important; }
+.tanga-deck .tanga-three.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:540px!important; max-height:calc(100svh - 646px)!important; }
 @media(max-width:600px) {
   .tanga-deck .tanga-deck__pager { z-index:60; flex-wrap:nowrap!important; }
   .tanga-deck__pager .tanga-deck__executive-tour,
@@ -940,7 +940,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 .tanga-intro.is-checking { visibility:hidden; }
 .tanga-deck .tanga-three.is-inspecting :is(.tanga-geology-section,.tanga-mine-story) { top:348px; max-height:calc(100svh - 460px); }
-.tanga-deck .tanga-three.is-visible.is-resource .tanga-three__grade-legend { display:block!important; top:350px!important; max-height:calc(100svh - 462px)!important; padding:12px; }
+.tanga-deck .tanga-three.is-visible.is-resource .tanga-three__grade-legend { display:block!important; top:400px!important; max-height:calc(100svh - 506px)!important; padding:12px; }
 .tanga-three__grade-legend>summary { color:#e3bb98; font-size:11px; cursor:pointer; }
 .tanga-three__grade-legend[open]>.tanga-three__grade-head { margin-top:14px; }
 .tanga-evidence-sequence { position:absolute; z-index:31; top:164px; left:300px; display:flex; gap:3px; padding:4px; border:1px solid #d1d9df24; border-radius:7px; background:#101a20da; backdrop-filter:blur(12px); }
@@ -988,7 +988,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media(max-width:1050px) { .tanga-evidence-sequence { top:150px; left:300px; } .tanga-evidence-sequence button { padding:7px; font-size:9px; } }
 @media(max-width:760px) { .tanga-evidence-sequence { display:none; } .tanga-material-entry { flex-wrap:wrap; } .tanga-material-counts { gap:7px; font-size:9px; } .tanga-material-counts strong { display:block; font-size:23px; } .tanga-material-evidence { padding:16px; } .tanga-material-evidence h2 { font-size:23px; } }
 @media(max-width:760px) { .tanga-material-evidence figure img { display:block; height:auto; max-height:42svh; } }
-.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:590px!important; max-height:calc(100svh - 702px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:540px!important; max-height:calc(100svh - 646px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-three__grade-legend { top:400px!important; bottom:auto!important; max-height:calc(100svh - 588px)!important; }
 /* Geological documents -> registered plan -> depth, sharing the chapter HUD. */
 .tanga-geology-map-sheet{position:absolute;z-index:24;left:300px;right:440px;top:215px;bottom:185px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #ffffff24;border-radius:14px;background:#252a2f;box-shadow:0 20px 70px #0004}
 .tanga-geology-map-sheet__toolbar{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#171e23}
@@ -1482,6 +1483,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck--present .tanga-story-panel--concept :is(.tanga-story-panel__link,.tanga-story-panel__compare){min-height:40px;margin-top:7px;padding:9px 10px}
 .tanga-site-orientation button{min-width:0;min-height:30px;padding:6px 8px;border:1px solid var(--story-line);border-radius:5px;background:#1c2b34;color:var(--story-muted);font:inherit;font-size:10px;font-weight:620;cursor:pointer;transition:border-color .16s ease,background .16s ease,color .16s ease}
 .tanga-site-orientation button:hover:not(:disabled){border-color:color-mix(in srgb,var(--story-accent) 55%,transparent);background:color-mix(in srgb,var(--story-accent) 14%,#111b23);color:var(--story-text)}
+.tanga-site-orientation button[aria-pressed="true"]{border-color:color-mix(in srgb,var(--story-accent) 62%,transparent);background:color-mix(in srgb,var(--story-accent) 18%,#111b23);color:var(--story-text)}
 .tanga-site-orientation button:focus-visible{outline:2px solid var(--story-accent);outline-offset:2px}
 .tanga-site-orientation button:disabled{cursor:wait;opacity:.55}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:8px 0 10px;padding:3px;border:1px solid #c9d8de26;border-radius:7px;background:#111b21}
@@ -1569,6 +1571,31 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 .tanga-three.is-mine_planning .tanga-three__callout--site-tag strong{display:none!important}
 .tanga-three.is-mine_planning .tanga-three__callout--site-tag > span{font-size:9px!important;line-height:1.25!important}
+.tanga-three.is-mine_planning .tanga-three__callout--plant-tag{
+  box-sizing:border-box;
+  width:152px!important;
+  min-width:0!important;
+  max-width:152px!important;
+  height:34px!important;
+  max-height:34px!important;
+  padding:5px 9px!important;
+  gap:0!important;
+  border:1px solid color-mix(in srgb,var(--callout-tone,#dca06b) 58%,transparent)!important;
+  border-radius:999px!important;
+  background:rgba(9,16,22,.84)!important;
+  box-shadow:0 4px 14px rgba(0,0,0,.2)!important;
+  backdrop-filter:blur(6px)!important;
+}
+.tanga-three.is-mine_planning .tanga-three__callout--plant-tag strong{display:none!important}
+.tanga-three.is-mine_planning .tanga-three__callout--plant-tag > span{
+  overflow:hidden;
+  font-size:9px!important;
+  line-height:1.2!important;
+  font-weight:650!important;
+  letter-spacing:.045em!important;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
 .tanga-three.is-mine_planning .tanga-three__callout > span[data-site-index]::before{
   content:attr(data-site-index);
   display:inline-grid;
@@ -1801,6 +1828,273 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media(max-width:1120px) and (min-width:701px){.tanga-deck .tanga-process-exhibit--factory{left:14px;right:14px;padding:12px;gap:8px}.tanga-process-exhibit--factory .tanga-factory-body{grid-template-columns:minmax(0,1fr) 240px;gap:9px}.tanga-process-exhibit--factory .tanga-process-actions button{padding-inline:7px;font-size:10px}.tanga-factory-inspector{padding:11px}}
 @media(max-width:700px){.tanga-deck .tanga-process-exhibit--factory{inset:154px 10px 154px;padding:8px;gap:6px;overflow:auto}.tanga-process-exhibit--factory .tanga-factory-header{align-items:flex-start;flex-wrap:wrap;gap:6px}.tanga-process-exhibit--factory .tanga-factory-header h2{font-size:17px}.tanga-process-exhibit--factory .tanga-process-actions{flex-wrap:wrap;justify-content:flex-start}.tanga-process-exhibit--factory .tanga-process-actions button{min-height:30px;padding:5px 7px;font-size:9px}.tanga-process-exhibit--factory .tanga-factory-stages{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}.tanga-process-exhibit--factory .tanga-factory-stages button{display:grid;justify-items:center;gap:3px;min-width:0;min-height:46px;padding:4px 2px;font-size:7px;text-align:center}.tanga-process-exhibit--factory .tanga-factory-body{grid-template-columns:1fr;grid-template-rows:minmax(170px,1fr) auto;gap:6px}.tanga-process-exhibit--factory .tanga-process-canvas{min-height:170px}.tanga-factory-inspector{padding:8px;max-height:150px}.tanga-factory-inspector h3{margin:4px 0;font-size:16px}.tanga-process-exhibit--factory .tanga-process-explanation{margin-bottom:5px;font-size:10px}.tanga-factory-flow{display:none}.tanga-process-exhibit--factory .tanga-factory-result{margin:2px 0 5px;padding:6px}.tanga-factory-result strong{font-size:16px}.tanga-factory-disclosure{padding-top:5px;font-size:8px}.tanga-process-exhibit--factory .tanga-factory-footer{gap:5px;flex-wrap:wrap;font-size:8px}.tanga-process-exhibit--factory .tanga-process-caption small{display:none}}
 
+/* Keep the Metallurgy walkthrough inside the same presentation panel system as
+   the other chapters. The model viewport stays light so the plant remains clear. */
+.tanga-deck .tanga-process-exhibit--factory {
+  --factory-text: #e8eef1;
+  --factory-muted: rgba(223, 231, 237, .72);
+  --factory-line: rgba(218, 229, 239, .14);
+  --factory-accent: var(--tanga-accent, #e39a5e);
+  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: var(--tanga-panel-radius, 14px);
+  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
+  color: var(--factory-text);
+  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+.tanga-process-exhibit--factory .tanga-factory-header small,
+.tanga-process-exhibit--factory .tanga-process-kicker { color: var(--tanga-label, #9dc6d1); }
+.tanga-process-exhibit--factory h2,
+.tanga-process-exhibit--factory .tanga-factory-inspector h3 { color: var(--factory-text); font-family: 'Space Grotesk', Inter, ui-sans-serif, system-ui, sans-serif; }
+.tanga-process-exhibit--factory .tanga-process-actions button,
+.tanga-process-exhibit--factory .tanga-factory-stages button,
+.tanga-process-exhibit--factory .tanga-factory-footer button {
+  border: 1px solid var(--factory-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .045);
+  color: var(--factory-text);
+  font: inherit;
+  font-size: 11px;
+  transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+}
+.tanga-process-exhibit--factory .tanga-process-actions button:hover,
+.tanga-process-exhibit--factory .tanga-factory-stages button:hover,
+.tanga-process-exhibit--factory .tanga-factory-footer button:hover { border-color: rgba(227, 154, 94, .48); background: rgba(255, 255, 255, .085); }
+.tanga-process-exhibit--factory .tanga-process-actions button[aria-pressed="true"],
+.tanga-process-exhibit--factory .tanga-factory-stages button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--factory-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--factory-accent) 17%, #121b23);
+  color: #fff3e8;
+}
+.tanga-process-exhibit--factory .tanga-factory-stages button b { color: var(--factory-accent); }
+.tanga-process-exhibit--factory .tanga-factory-stages button[aria-pressed="true"] b { color: #ffd2a9; }
+.tanga-process-exhibit--factory .tanga-factory-inspector {
+  border: 1px solid var(--factory-line);
+  border-radius: var(--tanga-panel-radius, 14px);
+  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
+  color: var(--factory-text);
+  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+}
+@media (min-width: 761px) {
+  .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: -.025em;
+  }
+  .tanga-process-exhibit--factory .tanga-process-explanation { font-size: 11px; line-height: 1.55; }
+}
+.tanga-process-exhibit--factory .tanga-process-explanation,
+.tanga-process-exhibit--factory .tanga-factory-disclosure,
+.tanga-process-exhibit--factory .tanga-factory-operation-basis { color: var(--factory-muted); }
+.tanga-process-exhibit--factory .tanga-factory-flow div,
+.tanga-process-exhibit--factory .tanga-factory-result {
+  border: 1px solid rgba(218, 229, 239, .1);
+  border-left: 2px solid rgba(227, 154, 94, .72);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .045);
+  color: var(--factory-text);
+}
+.tanga-process-exhibit--factory .tanga-factory-flow dt,
+.tanga-process-exhibit--factory .tanga-factory-result span,
+.tanga-process-exhibit--factory .tanga-factory-result small,
+.tanga-process-exhibit--factory .tanga-process-caption small { color: var(--factory-muted); }
+.tanga-process-exhibit--factory .tanga-factory-flow dd,
+.tanga-process-exhibit--factory .tanga-factory-motion-note { color: #d4dee3; }
+.tanga-process-exhibit--factory .tanga-factory-result strong,
+.tanga-process-exhibit--factory .tanga-factory-result i,
+.tanga-process-exhibit--factory .tanga-factory-operation-basis summary,
+.tanga-process-exhibit--factory .tanga-factory-operation-basis a { color: #f1b17b; }
+.tanga-process-exhibit--factory .tanga-factory-result:hover { border-color: rgba(227, 154, 94, .42); background: rgba(227, 154, 94, .09); }
+.tanga-process-exhibit--factory .tanga-factory-result { border-radius: 8px; }
+.tanga-process-exhibit--factory .tanga-factory-pathway-cta {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(227, 154, 94, .34);
+  border-radius: 8px;
+  background: linear-gradient(120deg, rgba(227, 154, 94, .105), rgba(255, 255, 255, .025));
+  color: var(--factory-text);
+  text-align: left;
+  cursor: pointer;
+}
+.tanga-process-exhibit--factory .tanga-factory-pathway-cta:hover { border-color: rgba(227, 154, 94, .62); background: rgba(227, 154, 94, .15); }
+.tanga-factory-pathway-cta span { color: var(--factory-muted); font-size: 8px; font-weight: 700; letter-spacing: .13em; }
+.tanga-factory-pathway-cta strong { color: #f1b17b; font-size: 12px; font-weight: 650; }
+.tanga-factory-pathway-cta small { color: var(--factory-muted); font-size: 9px; line-height: 1.35; }
+.tanga-process-exhibit--factory .tanga-enduse-routes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.tanga-process-exhibit--factory .tanga-enduse-routes button {
+  display: grid; grid-template-columns: 28px minmax(0,1fr); align-items: center; gap: 2px 9px; min-width: 0; min-height: 42px;
+  padding: 6px 10px; border: 1px solid var(--factory-line); border-radius: 8px; background: rgba(255,255,255,.035); color: var(--factory-text); text-align: left; cursor: pointer;
+}
+.tanga-process-exhibit--factory .tanga-enduse-routes button[aria-pressed="true"] { border-color: rgba(227,154,94,.58); background: linear-gradient(105deg,rgba(227,154,94,.14),rgba(255,255,255,.035)); }
+.tanga-enduse-routes button>span { grid-row: span 2; color: #f1b17b; font-size: 10px; font-weight: 750; }
+.tanga-enduse-routes button>strong { font-size: 11px; font-weight: 650; }
+.tanga-enduse-routes button>small { color: var(--factory-muted); font-size: 9px; }
+.tanga-process-exhibit--factory .tanga-enduse-steps { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin: 3px 0 7px; padding: 0; list-style: none; }
+.tanga-process-exhibit--factory .tanga-enduse-steps li { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid var(--factory-line); border-radius: 7px; background: rgba(255,255,255,.028); color: var(--factory-muted); }
+.tanga-process-exhibit--factory .tanga-enduse-steps li[aria-current="step"] { border-color: rgba(227,154,94,.55); background: rgba(227,154,94,.12); color: var(--factory-text); }
+.tanga-enduse-steps li[data-complete="true"]>span { color: #8fd1c4; }
+.tanga-enduse-steps li>span { flex: 0 0 auto; color: var(--factory-accent); font-size: 9px; font-weight: 750; }
+.tanga-enduse-steps li>strong { overflow: hidden; font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tanga-process-exhibit--factory .tanga-enduse-boundary { margin: 0 0 8px; padding: 8px 9px; border-left: 2px solid var(--factory-accent); border-radius: 0 6px 6px 0; background: rgba(227,154,94,.075); color: var(--factory-muted); font-size: 9px; line-height: 1.45; }
+.tanga-process-exhibit--factory[data-inspection="anode"] .tanga-factory-scene,
+.tanga-process-exhibit--factory[data-inspection="refractory"] .tanga-factory-scene { background: #071117; }
+.tanga-process-exhibit--factory[data-inspection="anode"] .tanga-process-caption,
+.tanga-process-exhibit--factory[data-inspection="refractory"] .tanga-process-caption { background: rgba(9,15,22,.94); }
+.tanga-process-exhibit--factory[data-inspection="anode"] .tanga-factory-inspector,
+.tanga-process-exhibit--factory[data-inspection="refractory"] .tanga-factory-inspector { padding: 10px; }
+@media (min-width: 761px) and (max-height: 800px) {
+  .tanga-process-exhibit--factory .tanga-factory-pathway-cta { margin-top: 4px; padding: 7px 8px; }
+  .tanga-process-exhibit--factory .tanga-enduse-routes button { min-height: 36px; padding-block: 5px; }
+  .tanga-process-exhibit--factory .tanga-enduse-steps { gap: 5px; margin: 0 0 4px; }
+  .tanga-process-exhibit--factory .tanga-enduse-steps li { min-height: 30px; padding: 4px 7px; }
+  .tanga-process-exhibit--factory .tanga-enduse-boundary { margin-bottom: 5px; padding: 6px 8px; }
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
+  border-color: var(--factory-line) !important;
+  border-left-color: rgba(227, 154, 94, .72) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, .045) !important;
+  color: var(--factory-text) !important;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result:hover { background: rgba(227, 154, 94, .09) !important; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result :is(span, small) { color: var(--factory-muted) !important; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result strong,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result i { color: #f1b17b !important; }
+.tanga-process-exhibit--factory .tanga-factory-disclosure,
+.tanga-process-exhibit--factory .tanga-factory-footer,
+.tanga-process-exhibit--factory .tanga-process-caption { border-color: var(--factory-line); color: var(--factory-muted); }
+.tanga-process-exhibit--factory .tanga-factory-footer>span:first-child { color: #eab184; }
+.tanga-process-exhibit--factory .tanga-factory-footer>span:first-child i { background: var(--factory-accent); }
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-caption { width: 100% !important; max-width: none !important; box-sizing: border-box; align-self: stretch; justify-self: stretch; background: rgba(9, 15, 22, .84) !important; }
+.tanga-process-exhibit--factory .tanga-factory-error { border: 1px solid var(--factory-line); border-radius: 12px; background: rgba(9, 15, 22, .96); color: var(--factory-text); }
+.tanga-process-exhibit--factory .tanga-factory-error span { color: var(--factory-muted); }
+.tanga-process-exhibit--factory :is(button, summary, a):focus-visible { outline: 2px solid #f2b47f; outline-offset: 3px; }
+
+/* Use the same compact glass-card rhythm as the rest of the presentation HUD.
+   Selected-area content used to overflow by a few lines and expose a full-height
+   scrollbar; the downstream action also inherited the blue story-button skin. */
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector {
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(157, 198, 209, .28) transparent;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector::-webkit-scrollbar { width: 5px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector::-webkit-scrollbar-thumb { border-radius: 6px; background: rgba(157, 198, 209, .28); }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 { margin: 4px 0 5px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation { margin-bottom: 5px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { margin-bottom: 4px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-motion-note { margin-bottom: 4px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-operation-basis { margin-bottom: 4px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 7px 9px;
+  border: 1px solid var(--factory-line) !important;
+  border-left: 2px solid rgba(227, 154, 94, .72) !important;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .045) !important;
+  color: var(--factory-text) !important;
+  text-align: left;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta:hover {
+  border-color: rgba(227, 154, 94, .46) !important;
+  background: rgba(227, 154, 94, .09) !important;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta span {
+  flex: 0 0 auto;
+  color: var(--factory-muted);
+  font-size: 8px;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta strong {
+  color: #f1b17b;
+  font-size: 10px;
+  text-align: right;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta small { display: none; }
+.tanga-process-exhibit--factory .tanga-factory-tour-button[aria-pressed="true"] {
+  border-color: rgba(227, 154, 94, .58);
+  background: linear-gradient(105deg, rgba(227, 154, 94, .16), rgba(255, 255, 255, .045));
+  color: #fff3e8;
+}
+.tanga-process-exhibit--factory .tanga-factory-tour-button:disabled { cursor: not-allowed; opacity: .58; }
+.tanga-process-exhibit--factory .tanga-factory-stages button[data-tour-step="active"] {
+  box-shadow: inset 0 -2px 0 var(--factory-accent);
+}
+
+/* Bring the metallurgy inspector's reading scale into line with the deck's
+   other right-hand information panels. Keep its compact treatment only on
+   shorter screens, where the scene needs to retain its vertical space. */
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector {
+  padding: var(--tanga-panel-pad, 15px);
+  align-self: start;
+  height: max-content;
+  max-height: 100%;
+  border-color: var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
+  border-radius: var(--tanga-panel-radius, 14px);
+  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
+  margin: 4px 0 7px;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation {
+  margin-bottom: 9px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-disclosure {
+  font-size: 10px;
+  line-height: 1.5;
+  padding-top: 9px;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { gap: 7px; margin-bottom: 9px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
+  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .035);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result { margin: 2px 0 8px; padding: 9px 10px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta {
+  margin-top: 3px;
+  padding: 7px 9px;
+  border-left-width: 1px !important;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-boundary {
+  margin-bottom: 5px;
+  padding: 6px 8px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-footer {
+  font-size: 10px;
+}
+@media (min-width: 761px) and (max-height: 800px) {
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector { padding: 12px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 { font-size: 17px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 { margin: 2px 0 4px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation { margin-bottom: 4px; font-size: 11px; line-height: 1.4; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { gap: 3px; margin-bottom: 4px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div { padding: 5px 7px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-motion-note { margin-bottom: 2px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-operation-basis { margin-bottom: 2px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result { gap: 2px; margin: 1px 0 4px; padding: 6px 8px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result strong { font-size: 18px; line-height: 1.1; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta { padding-block: 5px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-disclosure { padding-top: 5px; font-size: 8.5px; line-height: 1.3; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-enduse-boundary { padding-block: 5px; font-size: 9px; line-height: 1.35; }
+}
+
 /* Keep the full selected-set ranking visible; the Tanga detail card carries the
    only adjacent-value comparison and its source-category qualification. */
 @media (min-width: 761px) {
@@ -1859,6 +2153,77 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck__peer-popup-rank-values em { color: #d4b28e; font-size: 10px; font-style: normal; font-weight: 600; }
 .tanga-deck__peer-popup-rank-values > span { color: #edb388; font-size: 13px; }
 .tanga-deck .tanga-deck__peer-popup-rank-context p { margin: 0; color: rgba(245, 241, 235, .68); font-size: 10px; line-height: 1.4; }
+
+/* Metallurgy's right-hand inspector follows the same reading rhythm as the
+   shared evidence panels: compact eyebrow, divider, title, body and evidence
+   cards. Keep it fitted to the scene column instead of floating as a second,
+   unrelated overlay. */
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector {
+  align-self: start;
+  height: max-content;
+  max-height: 100%;
+  padding: var(--tanga-panel-pad, 15px);
+  gap: 8px;
+  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: var(--tanga-panel-radius, 14px);
+  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
+  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector .tanga-process-kicker {
+  display: block;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(218, 229, 239, .12);
+  color: var(--tanga-label, #9dc6d1);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .17em;
+  line-height: 1.4;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { gap: 8px; margin: 0; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
+  border-radius: 9px;
+  border-color: var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  background: rgba(255, 255, 255, .045);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div { padding: 8px 9px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result { margin: 0; padding: 10px 11px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  border: 1px solid rgba(227, 154, 94, .3);
+  border-radius: 9px;
+  background: rgba(227, 154, 94, .075);
+  color: #f1b17b;
+  text-align: left;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta:hover {
+  border-color: rgba(227, 154, 94, .55);
+  background: rgba(227, 154, 94, .12);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-disclosure { margin-top: auto; }
+@media (min-width: 761px) and (max-height: 800px) {
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector { padding: 12px; gap: 6px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector .tanga-process-kicker { padding-bottom: 5px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 { font-size: 18px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation { font-size: 11px; line-height: 1.45; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div { padding: 6px 8px; }
+  .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result { padding: 7px 8px; }
+}
 
 /* Short desktop screens need room for the site qualification and both camera
    presets without pushing the concept actions into a nested scroll area. */

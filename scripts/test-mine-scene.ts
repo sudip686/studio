@@ -52,6 +52,19 @@ const processStages=plant.userData.processStages as {id:string;label:string;poin
 assert.deepEqual(processStages.map(stage=>stage.id),['feed','milling','flotation','thickening','dewatering','product'],'The process plant exposes each current inspection stage');
 for(const name of ['Flotation banks and walkways','Crushing and milling equipment','Dewatering and product handling','Thickener, water and reagent circuits'])
   assert.ok(plant.getObjectByName(name),`Batched plant detail retains its ${name} group`);
+const wallRibs=plant.getObjectByName('Steel-clad exterior wall ribs') as THREE.Mesh|undefined;
+assert.ok(wallRibs&&wallRibs.geometry.getAttribute('position').count>10_000,'Process-hall corrugated sheet ribs retain detailed geometry after batching');
+assert.ok(wallRibs!.material instanceof THREE.MeshStandardMaterial&&wallRibs!.material.roughness>=.8,'Exterior ribs use a muted matte industrial finish');
+assert.ok(wallRibs!.castShadow&&wallRibs!.receiveShadow,'Exterior ribs contribute to fixed-site contact shading');
+const hardstand=plant.getObjectByName('Plant yard hardstand finish') as THREE.Mesh|undefined;
+assert.ok(hardstand&&hardstand.geometry.getAttribute('position').count>4_000,'The plant yard keeps a detailed fixed-coordinate surface finish after batching');
+assert.ok(hardstand!.material instanceof THREE.MeshStandardMaterial&&hardstand!.material.roughness>=.95,'The hardstand uses a restrained matte aggregate material');
+const hardstandTones=hardstand!.geometry.getAttribute('color');
+const hardstandToneValues=Array.from(hardstandTones.array);
+assert.equal(hardstandTones.count,hardstand!.geometry.getAttribute('position').count,'Every hardstand vertex has a stable color sample');
+assert.ok(Math.max(...hardstandToneValues)-Math.min(...hardstandToneValues)<.06,'The hardstand pattern stays low contrast at investor-view scale');
+assert.equal(hardstand!.userData.surfaceLighting,'fixed plant-local aggregate pattern and site shadows; camera independent','The hardstand finish is anchored in fixed plant coordinates');
+assert.ok(!hardstand!.castShadow&&hardstand!.receiveShadow,'The broad surface receives site shadows without casting an extra full-pad shadow');
 assert.ok(plant.children.filter(object=>object.userData.plantRoof).length>=12,'Roof cutaway tags cover the industrial halls');
 const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05,admittedPad);
 assert.ok(Math.abs(level-1.5)<1e-6,'Platform datum is 1.5 m above the median of the symmetric sampled ground');
@@ -144,9 +157,9 @@ const fixedTerrainColorAudit=campus.root.userData.fixedTerrainColorAudit as {ver
 assert.ok(fixedTerrainColorAudit.vertexCount>0&&fixedTerrainColorAudit.min<1&&fixedTerrainColorAudit.max>1,'Facility earthworks have restrained fixed-coordinate surface variation');
 assert.ok(fixedTerrainColorAudit.min>=.91&&fixedTerrainColorAudit.max<=1.09,'Fixed-coordinate earthwork variation remains within an 18% total luminance range');
 assert.equal(fixedTerrainColorAudit.source,'site-coordinate geometry; camera independent','Landform colors are baked from site geometry, not recalculated from the camera');
-const variedSurfaces:THREE.Mesh[]=[];
-campus.root.traverse(object=>{if(object instanceof THREE.Mesh&&object.material instanceof THREE.MeshBasicMaterial&&object.material.vertexColors)variedSurfaces.push(object);});
-assert.ok(variedSurfaces.length>0&&variedSurfaces.every(object=>object.geometry.getAttribute('color')?.count===object.geometry.getAttribute('position').count),'Every vertex-colored landform retains a complete per-vertex color attribute after batching');
+const variedSurfaces:THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>[]=[];
+campus.root.traverse(object=>{if(object instanceof THREE.Mesh&&object.material instanceof THREE.MeshStandardMaterial&&object.material.vertexColors)variedSurfaces.push(object as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>);});
+assert.ok(variedSurfaces.length>0&&variedSurfaces.every(object=>object.geometry.getAttribute('color')?.count===object.geometry.getAttribute('position').count&&object.material.roughness>=.9&&object.material.metalness===0&&object.receiveShadow),'Earthwork vertex colors stay complete while rough standard landforms receive stable site shadows');
 for(const object of variedSurfaces){const colors=object.geometry.getAttribute('color');assert.ok(Array.from(colors.array).every(Number.isFinite),'Batched landform color factors remain finite');}
 const roadDrapeAudit=campus.root.userData.accessRoadDrapeAudit as {maximumSampleSpacingM:number;roads:{facilityId:string;sampleCount:number;maximumSegmentM:number}[]};
 assert.equal(roadDrapeAudit.maximumSampleSpacingM,6,'Campus access roads use a dense terrain drape interval');

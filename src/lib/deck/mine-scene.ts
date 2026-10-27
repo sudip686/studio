@@ -22,6 +22,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   };
   cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
   const wallCladding=new THREE.MeshStandardMaterial({color:0xa2aca5,roughness:.92,metalness:.01});
+  const wallRib=new THREE.MeshStandardMaterial({color:0x818d86,roughness:.82,metalness:.05});
   const roofSeam=new THREE.MeshStandardMaterial({color:0x929d96,roughness:.86,metalness:.03});
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
@@ -72,6 +73,21 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   // coplanar slab top caused depth-buffer z-fighting (color shimmer) while the
   // camera orbited. Footings still begin at y=0 and overlap the slab cleanly.
   box(400,3,280,0,-1.15,0,materials.concrete,'Plant pad');
+  // Break up the broad hardstand with a subtle, site-fixed aggregate finish.
+  // The low-amplitude vertex pattern is anchored in plant-local coordinates
+  // (never screen space), so camera orbit cannot make the pad shimmer.
+  const hardstandGeometry=new THREE.PlaneGeometry(400,280,80,56);
+  const hardstandColor=hardstandGeometry.getAttribute('position');
+  const hardstandTones=new Float32Array(hardstandColor.count*3);
+  for(let vertex=0;vertex<hardstandColor.count;vertex++){
+    const x=hardstandColor.getX(vertex),z=-hardstandColor.getY(vertex);
+    const tone=.972+.012*Math.sin(x*.17+Math.sin(z*.09))*Math.sin(z*.13)+.009*Math.sin((x+z)*.37)+.006*Math.cos(z*.31-x*.23);
+    hardstandTones[vertex*3]=tone;hardstandTones[vertex*3+1]=tone;hardstandTones[vertex*3+2]=tone;
+  }
+  hardstandGeometry.setAttribute('color',new THREE.BufferAttribute(hardstandTones,3));
+  const hardstand=new THREE.Mesh(hardstandGeometry,new THREE.MeshStandardMaterial({color:0x757c77,vertexColors:true,roughness:.96,metalness:0}));
+  hardstand.name='Plant yard hardstand finish';hardstand.rotation.x=-Math.PI/2;hardstand.position.y=.357;hardstand.receiveShadow=true;
+  hardstand.userData.surfaceLighting='fixed plant-local aggregate pattern and site shadows; camera independent';root.add(hardstand);
   // Set the service deck onto the shared pad datum and lift only the thin
   // paint bands by 1 mm above the road top to keep them crisp without floating.
   const serviceRoadY=.425;
@@ -124,7 +140,16 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
       // frame and roof cutaway still expose the equipment during inspection.
       for(let bay=0;bay<bayCount;bay++){
         const bayX=x-w/2+(bay+.5)*bayWidth;
-        box(bayWidth-.8,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),wallCladding,`${name} corrugated wall panel`);
+        const panelWidth=bayWidth-.8;
+        box(panelWidth,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),wallCladding,`${name} corrugated wall panel`);
+        // Add shallow, repeated sheet ribs to the broad lower cladding. These
+        // are real geometry, batched with the plant, so daylight gives the
+        // elevations scale without a camera-dependent shading shader.
+        const ribCount=Math.max(2,Math.floor(panelWidth/.9));
+        for(let rib=1;rib<ribCount;rib++){
+          const ribX=bayX-panelWidth/2+(rib/ribCount)*panelWidth;
+          box(.16,h*.56,.12,ribX,h*.31,z+sign*(d/2-.06),wallRib,`${name} exterior wall rib`);
+        }
         box(bayWidth-.8,h*.12,.36,bayX,h*.79,z+sign*(d/2-.18),materials.water,`${name} clerestory glazing`);
       }
     }

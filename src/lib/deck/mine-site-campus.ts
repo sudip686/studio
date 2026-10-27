@@ -29,17 +29,21 @@ export function buildMineSiteCampus(options:Options) {
     // terrain. Fixed site lighting gives the transition relief while keeping
     // its color camera independent; low opacity avoids a broad opaque plate.
     earth:new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:SITE_EARTHWORK_OPACITY,depthWrite:false,side:THREE.DoubleSide}),
-    bench:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false}),
-    rock:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false}),
-    beach:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false}),
-    liner:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false}),
-    earthSurface:new THREE.MeshBasicMaterial({color:0x8b775e,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
-    benchSurface:new THREE.MeshBasicMaterial({color:0xa28b6c,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
-    rockSurface:new THREE.MeshBasicMaterial({color:0x857e71,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
-    beachSurface:new THREE.MeshBasicMaterial({color:0xa5a397,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
-    linerSurface:new THREE.MeshBasicMaterial({color:0x3e4e50,side:THREE.DoubleSide,toneMapped:false,vertexColors:true}),
-    water:new THREE.MeshBasicMaterial({color:0x4a8b8b,side:THREE.DoubleSide,toneMapped:false}),
-    fresh:new THREE.MeshBasicMaterial({color:0x579aa4,side:THREE.DoubleSide,toneMapped:false}),
+    bench:new THREE.MeshStandardMaterial({color:0xa28b6c,roughness:.96,metalness:0,side:THREE.DoubleSide}),
+    rock:new THREE.MeshStandardMaterial({color:0x857e71,roughness:.98,metalness:0,side:THREE.DoubleSide}),
+    beach:new THREE.MeshStandardMaterial({color:0xa5a397,roughness:.94,metalness:0,side:THREE.DoubleSide}),
+    liner:new THREE.MeshStandardMaterial({color:0x3e4e50,roughness:.82,metalness:0,side:THREE.DoubleSide}),
+    // Fixed vertex color variation is multiplied by the mine-plan's fixed
+    // site lighting. Unlike the former unlit surfaces, Standard materials
+    // let benches, containment slopes and pond edges receive terrain contact
+    // shadows without introducing camera-driven material changes.
+    earthSurface:new THREE.MeshStandardMaterial({color:0x8b775e,roughness:.97,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    benchSurface:new THREE.MeshStandardMaterial({color:0xa28b6c,roughness:.96,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    rockSurface:new THREE.MeshStandardMaterial({color:0x857e71,roughness:.98,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    beachSurface:new THREE.MeshStandardMaterial({color:0xa5a397,roughness:.94,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    linerSurface:new THREE.MeshStandardMaterial({color:0x3e4e50,roughness:.92,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    water:new THREE.MeshStandardMaterial({color:0x4a8b8b,roughness:.34,metalness:.02,side:THREE.DoubleSide}),
+    fresh:new THREE.MeshStandardMaterial({color:0x579aa4,roughness:.3,metalness:.02,side:THREE.DoubleSide}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
     concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
     access:new THREE.MeshBasicMaterial({color:0x535853,side:THREE.DoubleSide,toneMapped:false}),
@@ -66,7 +70,7 @@ export function buildMineSiteCampus(options:Options) {
   function mesh(group:THREE.Group,geometry:THREE.BufferGeometry,material:THREE.Material,name:string){
     // Bake low-contrast variation from fixed site coordinates, never screen
     // pixels or camera vectors, so broad earthworks stay stable while orbiting.
-    if(material instanceof THREE.MeshBasicMaterial&&material.vertexColors){
+    if((material instanceof THREE.MeshBasicMaterial||material instanceof THREE.MeshStandardMaterial)&&material.vertexColors){
       const positions=geometry.getAttribute('position'),colors=new Float32Array(positions.count*3);
       for(let i=0;i<positions.count;i++){
         const x=positions.getX(i),z=positions.getZ(i);

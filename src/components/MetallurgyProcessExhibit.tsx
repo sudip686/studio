@@ -8,6 +8,7 @@ import {buildConcentrator} from '@/lib/deck/mine-scene';
 import MetallurgyEvidenceBoard from './MetallurgyEvidenceBoard';
 import {MET_GROUPS} from '@/lib/deck/metallurgy-plant';
 import {createPlantProcessMotion} from '@/lib/deck/plant-process-motion';
+import {createMetallurgyEndUseScene, type MetallurgyEndUseRoute} from '@/lib/deck/metallurgy-end-use-scene';
 import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
 
 const PROCESS = [
@@ -21,8 +22,8 @@ const IMO_PROCESS_REPORT='/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%2
 
 type ProcessId = typeof PROCESS[number]['id'];
 type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofBaseY?: number; roofOpacity?: number}};
-type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void};
-type FactoryRecoveryView = {position: [number, number, number]; target: [number, number, number]; fov: number; processTime: number};
+type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void; showEndUse: (route: MetallurgyEndUseRoute, animate: boolean) => void; focusEndUseStep: (route: MetallurgyEndUseRoute, step: number, animate: boolean) => void; returnToPlant: (animate: boolean) => void};
+type FactoryRecoveryView = {position: [number, number, number]; target: [number, number, number]; fov: number; processTime: number; endUseRoute?: MetallurgyEndUseRoute | null; journeyTime?: number};
 
 /** Conceptual connected plant tour. Laboratory measurements stay in the evidence board. */
 export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: boolean; onToggle: () => void}) {
@@ -36,11 +37,25 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
   const [sample, setSample] = useState(0);
   const [showEvidence, setShowEvidence] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [endUseRoute, setEndUseRoute] = useState<MetallurgyEndUseRoute | null>(null);
+  const [journeyStep, setJourneyStep] = useState(0);
+  const [journeyActive, setJourneyActive] = useState(false);
+  const [journeyComplete, setJourneyComplete] = useState(false);
+  const [plantTourActive, setPlantTourActive] = useState(false);
+  const [plantTourComplete, setPlantTourComplete] = useState(false);
+  const [plantTourStep, setPlantTourStep] = useState(0);
   const [error, setError] = useState('');
   const [rendererAttempt, setRendererAttempt] = useState(0);
   const stageRef = useRef(stage); stageRef.current = stage;
+  const journeyStepRef = useRef(journeyStep); journeyStepRef.current = journeyStep;
   const openRoofRef = useRef(openRoof); openRoofRef.current = openRoof;
   const overviewRef = useRef(overview); overviewRef.current = overview;
+  const endUseRouteRef = useRef<MetallurgyEndUseRoute | null>(endUseRoute); endUseRouteRef.current = endUseRoute;
+  const journeyActiveRef = useRef(journeyActive); journeyActiveRef.current = journeyActive;
+  const journeyElapsedRef = useRef(0);
+  const plantTourActiveRef = useRef(plantTourActive); plantTourActiveRef.current = plantTourActive;
+  const plantTourElapsedRef = useRef(0);
+  const plantTourStepRef = useRef(plantTourStep);
 
   useEffect(() => {
     const element = host.current;
@@ -51,8 +66,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     try { renderer = new THREE.WebGLRenderer({antialias: true, alpha: false, powerPreference: 'high-performance'}); }
     catch { setError('3D factory unavailable. Open the laboratory evidence board to review the reported results.'); return; }
 
-    let disposed = false, contextLost = false, userOrbit = false, tween = false, dirty = true;
-    let frame = 0, last = performance.now(), elapsed = recoveryView?.processTime ?? 0, cameraStart = 0, cameraTour = false;
+    let disposed = false, contextLost = false, contextWasLost = false, userOrbit = false, tween = false, dirty = true;
+    let frame = 0, last = performance.now(), elapsed = recoveryView?.processTime ?? 0, journeyElapsed = recoveryView?.journeyTime ?? journeyElapsedRef.current, cameraStart = 0, cameraTour = false;
     let selected: ProcessId = stageRef.current;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -79,6 +94,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const plant = buildConcentrator();
     plant.name = 'Tanga conceptual processing plant';
     scene.add(plant);
+    const endUseScene = createMetallurgyEndUseScene();
+    scene.add(endUseScene.root);
     const roofs = plant.children.filter((object): object is RoofMesh => object instanceof THREE.Mesh && Boolean(object.userData.plantRoof));
     roofs.forEach(roof => {
       roof.userData.roofBaseY = roof.position.y;
@@ -98,20 +115,20 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     // A brighter, neutral exhibit recipe keeps the architectural shells and
     // process equipment readable against the ground without washing out their
     // materials. These lights stay fixed in site space while the camera orbits.
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x879189, 1.3));
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x91958b, 1.55));
     const sun = new THREE.DirectionalLight(0xfffcf4, 1.9);
     sun.position.set(-330, 520, 360); sun.castShadow = true;
     sun.shadow.mapSize.set(1536, 1536); sun.shadow.camera.left = -400; sun.shadow.camera.right = 400;
     sun.shadow.camera.top = 400; sun.shadow.camera.bottom = -400; sun.shadow.camera.far = 1500; sun.shadow.normalBias = .08;
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xf2f7f8, .82); fill.position.set(400, 180, -350); scene.add(fill);
+    const fill = new THREE.DirectionalLight(0xf2f7f8, 1.02); fill.position.set(400, 180, -350); scene.add(fill);
 
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
     // Lower the overview orbit to show more façade and spread the campus across
     // the widescreen canvas; fitOverview still frames the complete boundary.
     const direction = new THREE.Vector3(1.1, .58, 1.25).normalize();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); dirty = true; };
+    const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); if (reducedMotion.matches) stopPlantTour(); dirty = true; };
     onMotionPreference();
     reducedMotion.addEventListener('change', onMotionPreference);
     const roofState = new Map<RoofMesh, {y: number; opacity: number}>();
@@ -155,6 +172,52 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       destination.copy(target).addScaledVector(localDirection, distance);
       moveCamera(animate, true);
     }
+    function showEndUse(route: MetallurgyEndUseRoute, animate: boolean) {
+      endUseScene.setRoute(route);
+      endUseScene.root.visible = true;
+      plant.visible = false;
+      ground.visible = false;
+      scene.background = new THREE.Color('#071117');
+      target.set(34, 17, 0);
+      direction.set(.64, .58, 1.2).normalize();
+      const horizontalFit = 450 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.max(.7, camera.aspect));
+      const verticalFit = 92 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      // The route is a long, low vignette; preserve a small edge margin while
+      // letting it occupy the same confident canvas scale as the plant tour.
+      destination.copy(target).addScaledVector(direction, Math.max(245, horizontalFit, verticalFit) * 1.28);
+      moveCamera(animate);
+      dirty = true;
+    }
+    function focusEndUseStep(route: MetallurgyEndUseRoute, step: number, animate: boolean) {
+      const routeTargets = route === 'anode' ? [-128, -34, 44, 82, 176] : [-128, -48, 38, 178];
+      const boundedStep = Math.min(routeTargets.length - 1, Math.max(0, step));
+      const targetHeight = route === 'refractory' && boundedStep === 3 ? 42 : route === 'anode' && boundedStep === 3 ? 13 : route === 'anode' && boundedStep === 4 ? 24 : 20;
+      target.set(routeTargets[boundedStep], targetHeight, route === 'anode' && boundedStep === 3 ? 17 : 0);
+      direction.set(.64, .58, 1.2).normalize();
+      const widths = route === 'anode' ? [86, 116, 142, 146, 196] : [86, 108, 142, 174];
+      const heights = route === 'anode' ? [56, 60, 68, 74, 82] : [56, 60, 72, 108];
+      const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const horizontalFit = widths[boundedStep] / (2 * tanHalfFov * Math.max(.7, camera.aspect));
+      const verticalFit = heights[boundedStep] / (2 * tanHalfFov);
+      const distance = Math.max(72, horizontalFit, verticalFit) * 1.12;
+      destination.copy(target).addScaledVector(direction, distance);
+      moveCamera(animate);
+      dirty = true;
+    }
+    function returnToPlant(animate: boolean) {
+      endUseScene.root.visible = false;
+      plant.visible = true;
+      ground.visible = true;
+      scene.background = new THREE.Color('#cbd3cf');
+      overviewRef.current = true;
+      openRoofRef.current = false;
+      roofs.forEach(roof => {
+        const state = roofState.get(roof);
+        if (state) { state.y = roof.userData.roofBaseY ?? roof.position.y; state.opacity = 1; }
+      });
+      fitOverview(animate);
+      dirty = true;
+    }
     function moveCamera(animate: boolean, throughRoof = false) {
       const damping = controls.enableDamping;
       controls.enableDamping = false; controls.update(); controls.enableDamping = damping;
@@ -168,7 +231,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     function updateRoofTargets() {
       dirty = true;
       roofs.forEach(roof => {
-        const selectedRoof = !overviewRef.current && openRoofRef.current && roof.userData.plantStage === stageRef.current;
+        const selectedRoof = !endUseRouteRef.current && !overviewRef.current && openRoofRef.current && roof.userData.plantStage === stageRef.current;
         const baseY = roof.userData.roofBaseY ?? roof.position.y;
         const targetY = baseY + (selectedRoof ? 38 : 0);
         const targetOpacity = selectedRoof ? .16 : 1;
@@ -177,7 +240,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         roof.visible = true;
       });
     }
-    viewCommand.current = {frameStage, fitOverview, updateRoofTargets};
+    viewCommand.current = {frameStage, fitOverview, updateRoofTargets, showEndUse, focusEndUseStep, returnToPlant};
     let canvasWidth = 0, canvasHeight = 0;
     const resize = () => {
       const width = element.clientWidth, height = element.clientHeight;
@@ -187,16 +250,18 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       if (width === canvasWidth && height === canvasHeight) { dirty = true; return; }
       canvasWidth = width; canvasHeight = height;
       renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix();
-      if (overviewRef.current) fitOverview(false); else frameStage(stageRef.current, false);
+      if (endUseRouteRef.current) showEndUse(endUseRouteRef.current, false);
+      else if (overviewRef.current) fitOverview(false);
+      else frameStage(stageRef.current, false);
       dirty = true;
     };
     const observer = new ResizeObserver(resize); observer.observe(element); resize();
     const onChange = () => { dirty = true; };
-    const onStart = () => { tween = false; userOrbit = true; window.dispatchEvent(new Event('tanga:manual-exploration')); };
+    const onStart = () => { tween = false; userOrbit = true; stopPlantTour(); window.dispatchEvent(new Event('tanga:manual-exploration')); };
     controls.addEventListener('change', onChange); controls.addEventListener('start', onStart);
     const onContextLost = (event: Event) => {
-      event.preventDefault(); contextLost = true; element.dataset.ready = 'false';
-      recoveryViewRef.current = {position: camera.position.toArray() as [number, number, number], target: controls.target.toArray() as [number, number, number], fov: camera.fov, processTime: elapsed};
+      event.preventDefault(); contextLost = true; contextWasLost = true; element.dataset.ready = 'false';
+      recoveryViewRef.current = {position: camera.position.toArray() as [number, number, number], target: controls.target.toArray() as [number, number, number], fov: camera.fov, processTime: elapsed, endUseRoute: endUseRouteRef.current, journeyTime: journeyElapsed};
       setError('Graphics context lost. The 3D factory will rebuild when graphics recover.');
     };
     const onContextRestored = () => { if (!contextLost) return; contextLost = false; setError('Graphics restored; rebuilding the factory…'); window.setTimeout(() => { if (!disposed) setRendererAttempt(value => value + 1); }, 0); };
@@ -207,6 +272,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     if (recoveryView) {
       // Recreate the industrial scene without discarding the presenter's
       // inspection angle, selected target or process-motion phase.
+      if (recoveryView.endUseRoute) {
+        endUseScene.setRoute(recoveryView.endUseRoute);
+        endUseScene.root.visible = true;
+        plant.visible = false;
+        ground.visible = false;
+        scene.background = new THREE.Color('#071117');
+        journeyElapsed = recoveryView.journeyTime ?? 0;
+        journeyElapsedRef.current = journeyElapsed;
+      }
       target.fromArray(recoveryView.target); destination.fromArray(recoveryView.position);
       fromTarget.copy(target); fromPosition.copy(destination); direction.copy(destination).sub(target).normalize();
       camera.position.copy(destination); camera.fov = recoveryView.fov; camera.updateProjectionMatrix();
@@ -217,9 +291,39 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       if (disposed) return;
       const dt = Math.min(.08, Math.max(0, (now - last) / 1000)); last = now;
       if (!document.hidden && element.getClientRects().length) {
-        const animateProcess = !contextLost && !pausedRef.current && !reducedMotion.matches;
+        const inEndUse = Boolean(endUseRouteRef.current);
+        const animateProcess = !inEndUse && !contextLost && !pausedRef.current && !reducedMotion.matches;
         if (animateProcess) elapsed += dt;
+        if (plantTourActiveRef.current && animateProcess) {
+          plantTourElapsedRef.current += dt;
+          const nextTourStep = Math.min(PROCESS.length - 1, Math.floor(plantTourElapsedRef.current / 6));
+          if (nextTourStep !== plantTourStepRef.current) showPlantTourStep(nextTourStep);
+          if (plantTourElapsedRef.current >= PROCESS.length * 6) {
+            plantTourActiveRef.current = false;
+            setPlantTourActive(false);
+            setPlantTourComplete(true);
+          }
+        }
         const activity=processMotion.update(dt, overviewRef.current?'overview':selected, animateProcess&&(overviewRef.current||openRoofRef.current));
+        if (inEndUse) journeyElapsed = journeyElapsedRef.current;
+        const journeyRunning = inEndUse && journeyActiveRef.current && !contextLost && !pausedRef.current && !reducedMotion.matches;
+        if (journeyRunning) {
+          journeyElapsed = Math.min(endUseScene.duration, journeyElapsed + dt);
+          journeyElapsedRef.current = journeyElapsed;
+          const route = endUseRouteRef.current;
+          const currentJourneyStep = route ? Math.min(endUseScene.steps[route].length - 1, Math.floor(journeyElapsed / 6)) : 0;
+          if (currentJourneyStep !== journeyStepRef.current) {
+            journeyStepRef.current = currentJourneyStep;
+            setJourneyStep(currentJourneyStep);
+            if (route) focusEndUseStep(route, currentJourneyStep, true);
+          }
+          if (journeyElapsed >= endUseScene.duration) {
+            journeyActiveRef.current = false;
+            setJourneyActive(false);
+            setJourneyComplete(true);
+            dirty = true;
+          }
+        }
         let roofMoving = false;
         roofs.forEach(roof => {
           const state = roofState.get(roof); if (!state) return;
@@ -253,6 +357,14 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           if (progress >= 1) { tween = false; cameraTour = false; }
           dirty = true;
         }
+        if (inEndUse && (dirty || journeyRunning || tween)) {
+          const journey = endUseScene.update(journeyElapsed, journeyRunning);
+          element.dataset.endUseRoute = journey.route;
+          element.dataset.endUseStep = String(journey.step);
+          element.dataset.endUseProgress = journey.progress.toFixed(3);
+          element.dataset.endUseComplete = String(journey.complete);
+          dirty = true;
+        }
         controls.update();
         if (!contextLost && (dirty || animateProcess || tween)) {
           renderer.render(scene, camera); dirty = false;
@@ -277,10 +389,18 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       reducedMotion.removeEventListener('change', onMotionPreference);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
-      const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
-      scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(entry => materials.add(entry)); } });
-      geometries.forEach(geometry => geometry.dispose()); materials.forEach(entry => entry.dispose());
-      sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      // A lost WebGL context already released its GPU objects. Three.js keeps
+      // VAO/program handles from before the loss, so disposing those resources
+      // after the browser restores the context sends invalid deletes into the
+      // new context and floods the console. Let the detached renderer/scene be
+      // collected in that case; keep normal disposal for ordinary unmounts.
+      if (!contextWasLost) {
+        const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+        scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(entry => materials.add(entry)); } });
+        geometries.forEach(geometry => geometry.dispose()); materials.forEach(entry => entry.dispose());
+        sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss();
+      }
+      renderer.domElement.remove();
     };
   }, [rendererAttempt]);
 
@@ -289,48 +409,166 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     else viewCommand.current?.frameStage(stage, true);
   }, [overview, stage]);
   useEffect(() => { viewCommand.current?.updateRoofTargets(); }, [overview, stage, openRoof]);
+  useEffect(() => {
+    if (endUseRoute) viewCommand.current?.showEndUse(endUseRoute, true);
+    else if (viewCommand.current) viewCommand.current.returnToPlant(true);
+  }, [endUseRoute]);
 
   const selected = PROCESS.find(item => item.id === stage) ?? PROCESS[0];
   const result = MET_GROUPS[sample];
+  const routeSteps = endUseRoute ? (endUseRoute === 'anode' ? ['Shape', 'Purify', 'Coat & heat', 'Electrode line', 'Cell + EV'] : ['Blend', 'Press', 'MgO–C brick', 'Furnace lining']) : [];
+  const routeTitle = endUseRoute === 'anode' ? 'EV battery anode pathway' : 'Steelmaking refractory pathway';
+  const routeDescription = endUseRoute === 'anode'
+    ? [
+      'Illustrative flake shaping and size classification begin a possible downstream anode-material route.',
+      'Purification, washing and filtration are shown as illustrative downstream steps.',
+      'A conceptual coating and heat-treatment line prepares material for later electrode production.',
+      'Graphite active material is shown coating copper foil before passing through calender rollers.',
+      'Cell cutaway: Li⁺ moves toward graphite during charging; the EV is illustrative end-use context.',
+    ][journeyStep] ?? 'An illustrative downstream route from concentrate to anode material and an EV context.'
+    : [
+      'Illustrative blending combines graphite with a magnesia refractory batch.',
+      'A conceptual press forms a magnesia-carbon refractory brick.',
+      'The cutaway highlights a graphite-bearing working face in the brick.',
+      'A steelmaking-furnace lining illustrates one refractory application for graphite.',
+    ][journeyStep] ?? 'An illustrative graphite pathway into a magnesia-carbon refractory application.';
+  function openEndUse() {
+    stopPlantTour();
+    endUseRouteRef.current = 'anode';
+    journeyElapsedRef.current = 0;
+    journeyActiveRef.current = false;
+    journeyStepRef.current = 0; setJourneyStep(0); setJourneyActive(false); setJourneyComplete(false);
+    setEndUseRoute('anode');
+    window.dispatchEvent(new Event('tanga:manual-exploration'));
+  }
+  function chooseEndUseRoute(route: MetallurgyEndUseRoute) {
+    const sameRoute = endUseRouteRef.current === route;
+    endUseRouteRef.current = route;
+    journeyElapsedRef.current = 0;
+    journeyActiveRef.current = false;
+    journeyStepRef.current = 0; setJourneyStep(0); setJourneyActive(false); setJourneyComplete(false);
+    setEndUseRoute(route);
+    if (sameRoute) viewCommand.current?.showEndUse(route, true);
+    window.dispatchEvent(new Event('tanga:manual-exploration'));
+  }
+  function playEndUseJourney() {
+    if (!endUseRoute) return;
+    journeyElapsedRef.current = 0;
+    if (reduceMotion) {
+      const finalStep = endUseRoute === 'anode' ? 4 : 3;
+      journeyElapsedRef.current = (finalStep + 1) * 6;
+      journeyActiveRef.current = false;
+      journeyStepRef.current = finalStep; setJourneyActive(false); setJourneyComplete(true); setJourneyStep(finalStep);
+      viewCommand.current?.focusEndUseStep(endUseRoute, finalStep, false);
+      const element = host.current;
+      if (element) {
+        element.dataset.endUseRoute = endUseRoute;
+        element.dataset.endUseStep = String(finalStep);
+        element.dataset.endUseProgress = '1.000';
+        element.dataset.endUseComplete = 'true';
+      }
+      return;
+    }
+    journeyActiveRef.current = true;
+    journeyStepRef.current = 0; setJourneyStep(0); setJourneyComplete(false); setJourneyActive(true);
+    viewCommand.current?.focusEndUseStep(endUseRoute, 0, true);
+    window.dispatchEvent(new Event('tanga:manual-exploration'));
+  }
+  function returnToFactory() {
+    stopPlantTour();
+    endUseRouteRef.current = null;
+    journeyActiveRef.current = false;
+    setJourneyActive(false); setJourneyComplete(false); setEndUseRoute(null);
+    setOverview(true); setOpenRoof(false); overviewRef.current = true; openRoofRef.current = false;
+    window.dispatchEvent(new Event('tanga:manual-exploration'));
+  }
   // Keep the scene host mounted while reading evidence. Its render loop sleeps
   // when hidden, and the same renderer/camera resumes on return.
   return <>
     {showEvidence && <MetallurgyEvidenceBoard selected={sample} onSelect={setSample} onEquipment={() => setShowEvidence(false)} onBack={() => setShowEvidence(false)} />}
-    <section className="tanga-process-exhibit tanga-process-exhibit--factory" aria-label="Conceptual graphite processing facility" data-inspection="factory" style={showEvidence ? {display: 'none'} : undefined}>
+    <section className="tanga-process-exhibit tanga-process-exhibit--factory" aria-label={endUseRoute ? 'Illustrative downstream graphite end-use pathways' : 'Conceptual graphite processing facility'} data-inspection={endUseRoute ?? 'factory'} style={showEvidence ? {display: 'none'} : undefined}>
     <header className="tanga-factory-header">
-      <div><small>PROCESSING CONCEPT · ILLUSTRATIVE 3D FACILITY</small><h2>One connected process. Five areas to inspect.</h2></div>
+      <div><small>{endUseRoute ? 'DOWNSTREAM USE · ILLUSTRATIVE PATHWAY' : 'PROCESSING CONCEPT · ILLUSTRATIVE 3D FACILITY'}</small><h2>{endUseRoute ? 'From graphite concentrate to end use.' : 'One connected process. Five areas to inspect.'}</h2></div>
       <div className="tanga-process-actions">
-        <button type="button" aria-label="Reset camera to whole-plant overview" title="Reset camera to whole-plant overview" onClick={() => { if (overviewRef.current) viewCommand.current?.fitOverview(true); setOverview(true); setOpenRoof(false); overviewRef.current = true; openRoofRef.current = false; window.dispatchEvent(new Event('tanga:manual-exploration')); }}>Whole plant</button>
-        <button type="button" onClick={() => { setOverview(false); overviewRef.current = false; frameRoofToggle(); window.dispatchEvent(new Event('tanga:manual-exploration')); }}> {openRoof ? 'Close selected roof' : 'Open selected roof'}</button>
+        {endUseRoute ? <>
+          <button type="button" aria-label="Return to processing plant" onClick={returnToFactory}>← Plant tour</button>
+          <button type="button" onClick={playEndUseJourney}>{journeyComplete ? 'Replay pathway' : journeyActive ? 'Journey playing' : 'Play pathway'}</button>
+        </> : <>
+          <button type="button" aria-label="Reset camera to whole-plant overview" title="Reset camera to whole-plant overview" onClick={() => { stopPlantTour(); if (overviewRef.current) viewCommand.current?.fitOverview(true); setOverview(true); setOpenRoof(false); overviewRef.current = true; openRoofRef.current = false; window.dispatchEvent(new Event('tanga:manual-exploration')); }}>Whole plant</button>
+          <button type="button" onClick={() => { stopPlantTour(); setOverview(false); overviewRef.current = false; frameRoofToggle(); window.dispatchEvent(new Event('tanga:manual-exploration')); }}> {openRoof ? 'Close selected roof' : 'Open selected roof'}</button>
+          <button type="button" className="tanga-factory-tour-button" disabled={reduceMotion} title={reduceMotion ? 'Use the five stage buttons to explore without camera motion.' : 'Play a 30-second guided tour through the five process areas.'} aria-pressed={plantTourActive} onClick={() => plantTourActive ? stopPlantTour() : startPlantTour()}>{plantTourActive ? 'Stop tour' : plantTourComplete ? 'Replay plant tour' : reduceMotion ? 'Tour · reduced motion' : 'Play plant tour'}</button>
+        </>}
         <button type="button" onClick={onToggle} aria-pressed={paused || reduceMotion} disabled={reduceMotion} title={reduceMotion ? 'Reduced motion is enabled in your device settings' : undefined}>{reduceMotion ? 'Motion reduced' : paused ? 'Play process motion' : 'Pause process motion'}</button>
         <button type="button" onClick={() => setShowEvidence(true)}>Lab results ↗</button>
       </div>
     </header>
-    <nav className="tanga-process-stages tanga-factory-stages" aria-label="Processing facility areas">
-      {PROCESS.map((item, index) => <button type="button" key={item.id} aria-pressed={!overview && stage === item.id} onClick={() => { setStage(item.id); setOverview(false); setOpenRoof(true); stageRef.current = item.id; overviewRef.current = false; openRoofRef.current = true; window.dispatchEvent(new Event('tanga:manual-exploration')); }}><b>0{index + 1}</b><span>{item.title}</span></button>)}
-    </nav>
+    {endUseRoute ? <nav className="tanga-enduse-routes" aria-label="Choose an illustrative graphite downstream route">
+      <button type="button" aria-pressed={endUseRoute === 'anode'} onClick={() => chooseEndUseRoute('anode')}><span>01</span><strong>EV battery anode</strong><small>Shaped · purified · coated</small></button>
+      <button type="button" aria-pressed={endUseRoute === 'refractory'} onClick={() => chooseEndUseRoute('refractory')}><span>02</span><strong>Steelmaking refractory</strong><small>Magnesia-carbon brick</small></button>
+    </nav> : <nav className="tanga-process-stages tanga-factory-stages" aria-label="Processing facility areas">
+      {PROCESS.map((item, index) => <button type="button" key={item.id} aria-pressed={!overview && stage === item.id} aria-current={plantTourActive && plantTourStep === index ? 'step' : undefined} data-tour-step={plantTourActive && plantTourStep === index ? 'active' : undefined} onClick={() => { stopPlantTour(); showPlantTourStep(index); setPlantTourComplete(false); window.dispatchEvent(new Event('tanga:manual-exploration')); }}><b>0{index + 1}</b><span>{item.title}</span></button>)}
+    </nav>}
     <div className="tanga-factory-body">
       <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage} />
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
-        <div className="tanga-process-caption"><span>{overview ? 'Facility overview · connected campus and process route' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · Whole plant restores overview</small></div>
+        <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
       </div>
       <aside className="tanga-factory-inspector" aria-live="polite">
-        <small className="tanga-process-kicker">{overview ? 'FACILITY OVERVIEW' : `AREA ${String(PROCESS.findIndex(item => item.id === stage) + 1).padStart(2, '0')} / 05`}</small>
-        <h3>{overview ? 'A single connected campus' : selected.title}</h3>
-        <p className="tanga-process-explanation">{overview ? 'Follow the conceptual route from feed receiving through preparation, flotation, dewatering and product handling. The layout and equipment are illustrative.' : selected.description}</p>
-        {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
-        {!overview&&<><p className="tanga-factory-motion-note">{selected.motion}</p><details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
-        {!overview && selected.id==='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>}
-        {!overview && selected.id!=='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
-        {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>Separate measures for TC, recovery and coarse mass fraction.</small><i>Open comparison board ↗</i></button>}
-        <small className="tanga-factory-disclosure">Concept layout only · no approved location, flowsheet or residue design.</small>
+        {endUseRoute ? <>
+          <small className="tanga-process-kicker">ILLUSTRATIVE DOWNSTREAM PATHWAY</small>
+          <h3>{routeTitle}</h3>
+          <p className="tanga-process-explanation">{routeDescription}</p>
+          <ol className="tanga-enduse-steps" aria-label="Pathway stages">{routeSteps.map((label, index) => <li key={label} aria-current={journeyStep === index ? 'step' : undefined} data-complete={journeyStep > index || journeyComplete}><span>0{index + 1}</span><strong>{label}</strong></li>)}</ol>
+          <p className="tanga-enduse-boundary">Illustrative end-use scene only. Tanga’s reported testwork does not establish this conversion route, product specification or qualification.</p>
+        </> : <>
+          <small className="tanga-process-kicker">{plantTourActive ? `GUIDED TOUR · STOP ${String(plantTourStep + 1).padStart(2, '0')} / 05` : overview ? 'FACILITY OVERVIEW' : `AREA ${String(PROCESS.findIndex(item => item.id === stage) + 1).padStart(2, '0')} / 05`}</small>
+          <h3>{overview ? 'A single connected campus' : selected.title}</h3>
+          <p className="tanga-process-explanation">{overview ? 'Follow the conceptual route from feed receiving through preparation, flotation, dewatering and product handling. The layout and equipment are illustrative.' : selected.description}</p>
+          {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
+          {!overview&&<><p className="tanga-factory-motion-note">{selected.motion}</p><details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
+          {!overview && selected.id==='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>}
+          {!overview && selected.id!=='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
+          {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>Separate measures for TC, recovery and coarse mass fraction.</small><i>Open comparison board ↗</i></button>}
+          <button className="tanga-factory-pathway-cta" type="button" onClick={openEndUse}><span>NEXT</span><strong>Explore end-use pathways ↗</strong></button>
+          <small className="tanga-factory-disclosure">Concept layout only · no approved location, flowsheet or residue design.</small>
+        </>}
       </aside>
     </div>
-    <footer className="tanga-factory-footer"><span><i aria-hidden="true"/> Illustrative process motion</span><span>Speeds and particle counts are display cues · laboratory results remain separate from plant performance</span></footer>
+    <footer className="tanga-factory-footer"><span><i aria-hidden="true"/> {endUseRoute ? 'Illustrative downstream pathway' : 'Illustrative process motion'}</span><span>{endUseRoute ? 'These downstream product scenes are separate from the reported Tanga testwork and plant concept.' : 'Speeds and particle counts are display cues · laboratory results remain separate from plant performance'}</span></footer>
   </section></>;
 
   function frameRoofToggle() {
     setOpenRoof(value => { const next = !value; openRoofRef.current = next; return next; });
     setOverview(false); overviewRef.current = false;
+  }
+
+  function showPlantTourStep(index: number) {
+    const boundedIndex = Math.max(0, Math.min(PROCESS.length - 1, index));
+    const item = PROCESS[boundedIndex];
+    plantTourStepRef.current = boundedIndex;
+    setPlantTourStep(boundedIndex);
+    stageRef.current = item.id;
+    overviewRef.current = false;
+    openRoofRef.current = true;
+    setStage(item.id);
+    setOverview(false);
+    setOpenRoof(true);
+  }
+
+  function startPlantTour() {
+    if (reduceMotion || endUseRouteRef.current) return;
+    plantTourElapsedRef.current = 0;
+    plantTourStepRef.current = 0;
+    plantTourActiveRef.current = true;
+    setPlantTourStep(0);
+    setPlantTourActive(true);
+    setPlantTourComplete(false);
+    showPlantTourStep(0);
+    window.dispatchEvent(new Event('tanga:manual-exploration'));
+  }
+
+  function stopPlantTour() {
+    plantTourActiveRef.current = false;
+    setPlantTourActive(false);
   }
 }
