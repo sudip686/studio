@@ -28,5 +28,6 @@ Metallurgy inspector follow-up captures after matching the shared deck-panel typ
 
 - 1366 × 768: [whole-plant overview](../.playwright-mcp/metallurgy-panel-polished-20261028.png) and [Flotation detail with lab-result card](../.playwright-mcp/metallurgy-panel-stage-20261028.png)
 - 1707 × 842: [Flotation detail with lab-result card](../.playwright-mcp/metallurgy-inspector-flotation-1707x842-20261028.png)
+- Live Cloudflare Worker `ad2cc7be-0ed5-41a7-b075-308ce6efb62d`, 1707 × 842: [overview](../.playwright-mcp/metallurgy-inspector-live-worker-ad2cc7be-1707x842.png) and [Flotation detail](../.playwright-mcp/metallurgy-flotation-live-worker-ad2cc7be-1707x842.png)
 
 Audit runner: `scripts/verify-presentation.ps1`. It supports a chapter range with `-First` and `-Last`, custom viewport dimensions, and a custom local server through `-BaseUrl`.
