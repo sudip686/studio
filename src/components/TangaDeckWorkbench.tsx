@@ -7,6 +7,7 @@ import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, Scatter
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, Copy, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
+import {setWorkerUrl} from 'maplibre-gl';
 import {Map, type MapRef} from 'react-map-gl/maplibre';
 import {TANGA_INSERT_PROJECT, graphitePeerRows, type GraphitePeerProject} from '@/data/graphitePeerProjects';
 import proj4 from 'proj4';
@@ -54,6 +55,11 @@ import {
   ruleIntent,
   stripWakePhrase,
 } from '@/lib/tanga-voice-command';
+
+// MapLibre GL JS v6 ships its worker as an ESM asset. Give Turbopack the
+// emitted same-origin URL explicitly so production and Worker builds do not
+// fall back to the missing implicit worker path.
+setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).toString());
 
 // Named loader so we can prefetch the (525 KB) Three.js chunk in the background
 // while the user is still on the early map scenes — the first 3D scene then
