@@ -386,6 +386,8 @@ type ThreeCallout = {
   priority?: number;
   /** Small surface tags keep the mine overview readable while the site stays in view. */
   compact?: boolean;
+  /** Compact, detail-free marker for the three-step whole-campus process sequence. */
+  plantTag?: boolean;
   /** Hide this label when opaque, visible scene geometry blocks its world anchor. */
   occlusion?: 'scene' | 'none';
 };
@@ -5258,7 +5260,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           keyLabelsTaken++;return true;
         }
         if(density==='key'&&callout.id.startsWith('plant-')) {
-          if(calloutsForProjection.length>1&&!['plant-feed','plant-flotation','plant-product'].includes(callout.id))return false;
+          // A selected process gets its own annotation even when it is not one
+          // of the three overview waypoints. In the whole-campus view, retain
+          // only the feed / testwork / product markers as a compact sequence.
+          const selectedProcess=detailOptions.current.plantProcess;
+          if(selectedProcess!=='all')return callout.id===`plant-${selectedProcess}`;
+          if(!['plant-feed','plant-flotation','plant-product'].includes(callout.id))return false;
           if(keyLabelsTaken>=3)return false;
           keyLabelsTaken++;return true;
         }
@@ -5346,9 +5353,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const anchorPixelY = rawAnchorY;
         const isIntercept = callout.kind === 'intercept';
         const compactMineTag = mode === 'mine_planning' && density === 'key';
+        const compactPlantTag = compactMineTag && callout.id.startsWith('plant-') && detailOptions.current.plantProcess === 'all';
         const indexedMineTag = compactMineTag && MINE_SITE_CALLOUT_INDEX[callout.id] !== undefined;
-        const projectedCallout = compactMineTag ? {...callout, compact: true} : callout;
-        const size = isIntercept ? INTERCEPT_LABEL_SIZE : indexedMineTag ? {width: 144, height: 40} : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
+        const projectedCallout = compactPlantTag ? {...callout, compact: true, plantTag: true} : compactMineTag ? {...callout, compact: true} : callout;
+        const size = isIntercept ? INTERCEPT_LABEL_SIZE : compactPlantTag ? {width: 152, height: 34} : indexedMineTag ? {width: 144, height: 40} : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
 
         byId.set(callout.id, {callout: projectedCallout, anchorPixelX, anchorPixelY});
         candidates.push({
@@ -6110,6 +6118,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 `is-${callout.side ?? 'right'}`,
                 callout.kind === 'intercept' && 'tanga-three__callout--intercept',
                 callout.compact && 'tanga-three__callout--compact',
+                callout.plantTag && 'tanga-three__callout--plant-tag',
                 mode === 'mine_planning' && callout.compact && MINE_SITE_CALLOUT_INDEX[callout.id] && 'tanga-three__callout--site-tag'
               )}
               role="note"
