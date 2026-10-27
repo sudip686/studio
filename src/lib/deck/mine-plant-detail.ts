@@ -138,6 +138,7 @@ export function batchPlantMeshes(root: THREE.Group, startIndex = 0) {
     const roof = Boolean(object.userData.plantRoof);
     const stage=typeof object.userData.plantStage==='string'?object.userData.plantStage:undefined;
     const name = roof ? `${object.name} roof` : /FIP operatives shed/i.test(object.name) ? 'FIP operatives shed · report allowance / illustrative exterior' : /stockpile/i.test(object.name) ? 'Illustrative ROM stockpiles · not engineered' : /roadside drainage swale/i.test(object.name) ? 'Illustrative roadside swales · no drainage design' : /Conceptual access|Illustrative gravel shoulders/i.test(object.name) ? 'Illustrative campus access roads · unsurveyed'
+      : /exterior wall rib/i.test(object.name) ? 'Steel-clad exterior wall ribs'
       : /Flotation/i.test(object.name) ? 'Flotation banks and walkways'
       : /Milling|Crushing|ROM|Feed|hopper/i.test(object.name) ? 'Crushing and milling equipment'
       : /Dewatering|Product|Filter|Packaged/i.test(object.name) ? 'Dewatering and product handling'

@@ -52,6 +52,10 @@ const processStages=plant.userData.processStages as {id:string;label:string;poin
 assert.deepEqual(processStages.map(stage=>stage.id),['feed','milling','flotation','thickening','dewatering','product'],'The process plant exposes each current inspection stage');
 for(const name of ['Flotation banks and walkways','Crushing and milling equipment','Dewatering and product handling','Thickener, water and reagent circuits'])
   assert.ok(plant.getObjectByName(name),`Batched plant detail retains its ${name} group`);
+const wallRibs=plant.getObjectByName('Steel-clad exterior wall ribs') as THREE.Mesh|undefined;
+assert.ok(wallRibs&&wallRibs.geometry.getAttribute('position').count>10_000,'Process-hall corrugated sheet ribs retain detailed geometry after batching');
+assert.ok(wallRibs!.material instanceof THREE.MeshStandardMaterial&&wallRibs!.material.roughness>=.8,'Exterior ribs use a muted matte industrial finish');
+assert.ok(wallRibs!.castShadow&&wallRibs!.receiveShadow,'Exterior ribs contribute to fixed-site contact shading');
 assert.ok(plant.children.filter(object=>object.userData.plantRoof).length>=12,'Roof cutaway tags cover the industrial halls');
 const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05,admittedPad);
 assert.ok(Math.abs(level-1.5)<1e-6,'Platform datum is 1.5 m above the median of the symmetric sampled ground');

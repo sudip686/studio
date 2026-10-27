@@ -22,6 +22,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   };
   cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
   const wallCladding=new THREE.MeshStandardMaterial({color:0xa2aca5,roughness:.92,metalness:.01});
+  const wallRib=new THREE.MeshStandardMaterial({color:0x818d86,roughness:.82,metalness:.05});
   const roofSeam=new THREE.MeshStandardMaterial({color:0x929d96,roughness:.86,metalness:.03});
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
@@ -124,7 +125,16 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
       // frame and roof cutaway still expose the equipment during inspection.
       for(let bay=0;bay<bayCount;bay++){
         const bayX=x-w/2+(bay+.5)*bayWidth;
-        box(bayWidth-.8,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),wallCladding,`${name} corrugated wall panel`);
+        const panelWidth=bayWidth-.8;
+        box(panelWidth,h*.56,.32,bayX,h*.31,z+sign*(d/2-.22),wallCladding,`${name} corrugated wall panel`);
+        // Add shallow, repeated sheet ribs to the broad lower cladding. These
+        // are real geometry, batched with the plant, so daylight gives the
+        // elevations scale without a camera-dependent shading shader.
+        const ribCount=Math.max(2,Math.floor(panelWidth/.9));
+        for(let rib=1;rib<ribCount;rib++){
+          const ribX=bayX-panelWidth/2+(rib/ribCount)*panelWidth;
+          box(.16,h*.56,.12,ribX,h*.31,z+sign*(d/2-.06),wallRib,`${name} exterior wall rib`);
+        }
         box(bayWidth-.8,h*.12,.36,bayX,h*.79,z+sign*(d/2-.18),materials.water,`${name} clerestory glazing`);
       }
     }
