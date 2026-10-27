@@ -60,6 +60,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     setMinePanelSection(['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
   },[chapter,developmentViewId]);
   const developmentView=DEVELOPMENT_FACILITIES.find(view=>view.id===developmentViewId) ?? (developmentViewId==='north-pit'?{title:'Read the northern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Benches and access path are illustrative, with no engineered road or grade.'}:developmentViewId==='south-pit'?{title:'Read the southern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Excavation limits, access and slopes remain illustrative pending engineering.'}:developmentViewId==='pit-blocks'?{title:'Resource blocks in both pits',explanation:'Compare source grade cells within the two conceptual pit cutaways. Focus one excavation or return to the whole-site view.'}:undefined);
+  const blockInspectorActive=chapter==='mine_planning'&&minePanelSection==='blocks';
   const developmentAvailable=(id:DevelopmentView)=>Boolean(onInspectDevelopment)&&!((id==='tailings'||id==='waste')&&!availableDevelopment.includes(id))&&!(id==='campus'&&!availableDevelopment.length);
   const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
   const milestone = WORK_MILESTONES[milestoneIndex];
@@ -139,10 +140,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <p className="tanga-story-panel__qualification">Indicated portion of the supplied AMC MRE. Displayed blocks and filters do not constitute a new resource estimate or an ore reserve.</p>
   </aside>;
 
-  if (chapter === 'mine_planning') return <aside className="tanga-story-panel tanga-story-panel--concept" aria-label="Concept and terrain comparison">
+  if (chapter === 'mine_planning') return <aside className="tanga-story-panel tanga-story-panel--concept" aria-label={blockInspectorActive?'Mine plan information: pit-block controls':'Concept and terrain comparison'}>
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
-    <h2>{developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
-    <p className="tanga-story-panel__intro">{developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
+    <h2>{blockInspectorActive?'Pit-block controls':developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
+    <p className="tanga-story-panel__intro">{blockInspectorActive?'Focus a pit or filter the source cells by displayed TGC band.':developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
       <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
@@ -170,13 +171,13 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     {minePanelSection==='blocks'&&<div className="tanga-site-panel-content">
       <div className="tanga-site-panel-subtitle">SOURCE BLOCK MODEL · OPEN PIT</div>
       {pitBlocksStatus!=='ready'&&<small className="tanga-pit-grade-state tanga-pit-block-status" data-state={pitBlocksStatus} role="status">{pitBlocksStatus==='loading'?'Source cells are loading. You can still explore the pit cutaway.':'Source block data failed to load. Choose Inspect to retry.'}</small>}
-      <button type="button" className="tanga-story-panel__compare tanga-story-panel__pit-block-reveal" aria-label={pitBlocksStatus==='error'?'Retry source block model and focus both conceptual pits':'Focus resource blocks inside both conceptual pits'} aria-pressed={pitBlockFocusIndex===null} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.()}>{pitBlocksStatus==='error'?'Retry blocks & inspect pits':'Inspect blocks in both pits'} <ArrowRight size={14}/></button>
+      <button type="button" className="tanga-story-panel__compare tanga-story-panel__pit-block-reveal" aria-label={pitBlocksStatus==='error'?'Retry source block model and frame both conceptual pits':'Frame source blocks in both conceptual pits'} aria-pressed={pitBlockFocusIndex===null} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.()}>{pitBlocksStatus==='error'?'Retry blocks & frame pits':'Frame both pit cutaways'} <ArrowRight size={14}/></button>
       <div className="tanga-pit-focus-actions" role="group" aria-label="Focus source blocks inside pit shells">
         <button type="button" aria-pressed={pitBlockFocusIndex===0} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(0)}>North pit · inspect blocks</button>
         <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}>South pit · inspect blocks</button>
       </div>
       <div className="tanga-compact-grade-key tanga-pit-grade-key" aria-label="Filter resource blocks by TGC grade band"><span>RESOURCE BLOCKS · TGC</span><div role="group" aria-label="Show resource blocks by grade band">{PIT_RESOURCE_GRADE_BANDS.map(bin=><button key={bin.key} type="button" className="tanga-pit-grade-filter" aria-pressed={pitGradeFocus===bin.key} disabled={!onPitGradeFocusChange} onClick={()=>onPitGradeFocusChange?.(pitGradeFocus===bin.key?null:bin.key)}><i style={{background:bin.color}}/>{bin.displayRange}</button>)}</div><small className="tanga-pit-grade-state" role="status">{pitGradeFocus ? `Showing ${PIT_RESOURCE_GRADE_BANDS.find(bin=>bin.key===pitGradeFocus)?.displayRange ?? 'selected'} TGC blocks` : 'All displayed grade bands'}</small></div>
-      <p className="tanga-story-panel__qualification">All source cells at ≥4.5% TGC within each conceptual pit. Colors match the resource model; display bands are not economic cutoffs or reserves.</p>
+      <p className="tanga-story-panel__qualification">Showing source cells at ≥4.5% TGC within the conceptual cutaways. Bands match the resource model; they are not economic cutoffs or reserves.</p>
     </div>}
     {minePanelSection==='sources'&&<div className="tanga-site-panel-content">
       <div className="tanga-site-panel-subtitle">REPORT BASIS &amp; LIMITS</div>
