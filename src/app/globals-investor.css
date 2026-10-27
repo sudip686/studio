@@ -2017,6 +2017,15 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   text-align: right;
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-pathway-cta small { display: none; }
+.tanga-process-exhibit--factory .tanga-factory-tour-button[aria-pressed="true"] {
+  border-color: rgba(227, 154, 94, .58);
+  background: linear-gradient(105deg, rgba(227, 154, 94, .16), rgba(255, 255, 255, .045));
+  color: #fff3e8;
+}
+.tanga-process-exhibit--factory .tanga-factory-tour-button:disabled { cursor: not-allowed; opacity: .58; }
+.tanga-process-exhibit--factory .tanga-factory-stages button[data-tour-step="active"] {
+  box-shadow: inset 0 -2px 0 var(--factory-accent);
+}
 
 /* Bring the metallurgy inspector's reading scale into line with the deck's
    other right-hand information panels. Keep its compact treatment only on
