@@ -59,6 +59,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        // The filename is versioned and the build verifier checks its
+        // source count and encoded length, so this payload is immutable.
+        // Long-lived browser caching avoids a repeat transfer on new visits.
+        source: '/resource_blocks_v1.bin',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
