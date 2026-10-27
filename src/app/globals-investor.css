@@ -1559,6 +1559,16 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   font-size:9px!important;
   letter-spacing:.08em!important;
 }
+.tanga-three.is-mine_planning .tanga-three__callout--site-tag{
+  width:144px!important;
+  max-width:144px!important;
+  height:40px!important;
+  max-height:40px!important;
+  padding:5px 7px!important;
+  gap:0!important;
+}
+.tanga-three.is-mine_planning .tanga-three__callout--site-tag strong{display:none!important}
+.tanga-three.is-mine_planning .tanga-three__callout--site-tag > span{font-size:9px!important;line-height:1.25!important}
 .tanga-three.is-mine_planning .tanga-three__callout > span[data-site-index]::before{
   content:attr(data-site-index);
   display:inline-grid;

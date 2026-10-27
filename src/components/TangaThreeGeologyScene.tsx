@@ -398,6 +398,12 @@ const MINE_SITE_CALLOUT_INDEX: Readonly<Record<string, string>> = {
   'facility-raw-water': '07',
   'facility-waste': '08',
 };
+const MINE_SITE_CALLOUT_SHORT_LABEL: Readonly<Record<string, string>> = {
+  'pit-0': 'North pit',
+  'pit-1': 'South pit',
+  'development-feed': 'Feed point',
+  'development-plant': 'Plant',
+};
 
 type ProjectedThreeCallout = ThreeCallout & {
   anchorPixelX: number;
@@ -5268,8 +5274,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const anchorPixelY = rawAnchorY;
         const isIntercept = callout.kind === 'intercept';
         const compactMineTag = mode === 'mine_planning' && density === 'key';
+        const indexedMineTag = compactMineTag && MINE_SITE_CALLOUT_INDEX[callout.id] !== undefined;
         const projectedCallout = compactMineTag ? {...callout, compact: true} : callout;
-        const size = isIntercept ? INTERCEPT_LABEL_SIZE : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
+        const size = isIntercept ? INTERCEPT_LABEL_SIZE : indexedMineTag ? {width: 144, height: 40} : compactMineTag ? {width: 188, height: 72} : STORY_LABEL_SIZE;
 
         byId.set(callout.id, {callout: projectedCallout, anchorPixelX, anchorPixelY});
         candidates.push({
@@ -6027,15 +6034,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                 'tanga-three__callout',
                 `is-${callout.side ?? 'right'}`,
                 callout.kind === 'intercept' && 'tanga-three__callout--intercept',
-                callout.compact && 'tanga-three__callout--compact'
+                callout.compact && 'tanga-three__callout--compact',
+                mode === 'mine_planning' && callout.compact && MINE_SITE_CALLOUT_INDEX[callout.id] && 'tanga-three__callout--site-tag'
               )}
+              role="note"
+              aria-label={`${callout.label}. ${callout.detail}`}
               style={{
                 '--callout-x': hasProjectedCallouts ? `${(callout as ProjectedThreeCallout).boxPixelX}px` : `${callout.x}%`,
                 '--callout-y': hasProjectedCallouts ? `${(callout as ProjectedThreeCallout).boxPixelY}px` : `${callout.y}%`,
                 '--callout-tone': callout.tone,
               } as any}
             >
-              <span data-site-index={mode === 'mine_planning' ? MINE_SITE_CALLOUT_INDEX[callout.id] : undefined}>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
+              <span data-site-index={mode === 'mine_planning' ? MINE_SITE_CALLOUT_INDEX[callout.id] : undefined}>{mode==='mine_planning'&&callout.compact&&MINE_SITE_CALLOUT_SHORT_LABEL[callout.id] ? MINE_SITE_CALLOUT_SHORT_LABEL[callout.id] : mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
               {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
             </div>
           ))}
