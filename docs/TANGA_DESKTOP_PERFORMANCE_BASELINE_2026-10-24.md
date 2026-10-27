@@ -102,3 +102,24 @@ A separate 12-second V8 sampling profile in the settled scene collected 1,058 sa
 On the current branch (`2204ca9` plus the uncommitted 1× draw-scale change), Chrome 155 on Windows 11 rendered the standard local Next.js production build at 1707 × 842. An extended scripted pointer orbit on the previous 1.25× Topography scale recorded 505 RAF intervals over 40.3 s (median 58.3 ms, p90 91.5 ms, p95 95.8 ms, p99 104.0 ms, max 108.2 ms; 0% at or below 33.4 ms). The same orbit on the 1× build recorded 515 intervals over 42.0 s (median 58.2 ms, p90 91.4 ms, p95 95.7 ms, p99 100.1 ms, max 128.9 ms; 0.4% at or below 33.4 ms). Both scenes remained ready. The renderer's diagnostic snapshot reported 13 draw calls and 401,998 triangles. The fixed 1× capture was visually consistent with the 1.25× capture: `.playwright-mcp/desktop-orbit-topography-1707x842.png` and `.playwright-mcp/desktop-orbit-topography-1x-1707x842.png`.
 
 This is not a matched 30-second hardware benchmark: the script's actual sample windows were about 40 seconds and other Chrome tabs were open. The 1× cap prevents unnecessary high-DPI overdraw and keeps resolution fixed while orbiting, but the paired samples show no measurable frame-time improvement. Do not claim a performance gain; the desktop p95 target and native-device GPU/CPU attribution remain open. The standard production and Cloudflare/OpenNext builds passed; the OpenNext command emitted its Windows/WSL warning. The new Topography scene reported zero browser console errors.
+
+## Follow-up: live Worker 12-chapter render probe — 28 October 2026
+
+The public Cloudflare Worker was opened at 1707 × 842 in the available Chrome/Playwright browser session. Each chapter used a forced direct document navigation with the browser HTTP cache left warm. A preload script recorded the first draw call from a visible WebGL canvas; the app's chapter-specific MapLibre-idle or Three.js-ready marker was awaited, followed by a 1.2-second requestAnimationFrame sample. This is diagnostic evidence from the current live deployment, not a cold-cache or target-device benchmark. Other tabs were open, and the short frame samples are especially sensitive to browser/GPU contention.
+
+| Chapter | FCP (ms) | First visible WebGL draw (ms) | Chapter ready, wall time (ms) | RAF median / p95 (ms) |
+|---|---:|---:|---:|---:|
+| Project | 656 | 1,707 | 4,089 | 4.2 / 58.4 |
+| Tanzania | 668 | 1,436 | 4,257 | 87.5 / 100.0 |
+| Work completed | 668 | 2,259 | 3,969 | 50.0 / 94.7 |
+| Topography | 816 | 1,746 | 5,278 | 45.8 / 83.3 |
+| Drillholes | 580 | 1,768 | 6,209 | 50.0 / 75.0 |
+| Subsurface | 420 | 5,657 | 6,929 | 58.4 / 208.5 |
+| Resource | 340 | 1,849 | 6,734 | 66.7 / 204.1 |
+| Ranking | 368 | 1,476 | 3,922 | 58.3 / 124.3 |
+| Mine planning | 648 | 1,767 | 7,747 | 50.0 / 199.9 |
+| Metallurgy | 420 | 2,043 | 5,026 | 75.0 / 92.1 |
+| Accessibility | 336 | 1,416 | 4,202 | 108.2 / 391.6 |
+| Comparison | 532 | 1,750 | 3,660 | 83.3 / 133.3 |
+
+All 12 chapters reached their route-appropriate ready marker; the script recorded no JavaScript exceptions or console errors. The hidden MapLibre stage reported `mapState=error` while the six Three.js chapters reported `threeState=ready`; this did not prevent their visible 3D render, but the map-state semantics during Three.js chapters need review. Same-origin `transferSize` summed to only 0.01–0.02 MB per document in this warm session, so it is not a useful measure of full scene transfer and is not compared with the 24 October cold-origin figures. The first-WebGL-draw hook is a render-call proxy, not a pixel-confirmed useful frame. RAF samples recorded only 7–89 intervals per chapter over 1.2 seconds, with p95 from 58 to 392 ms; they are too noisy and too short to serve as a motion acceptance result. Re-run in an isolated, cache-controlled browser and collect full 30-second interaction distributions before drawing performance conclusions.
