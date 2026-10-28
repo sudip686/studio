@@ -66,6 +66,11 @@ assert.ok(Math.max(...hardstandToneValues)-Math.min(...hardstandToneValues)<.06,
 assert.equal(hardstand!.userData.surfaceLighting,'fixed plant-local aggregate pattern and site shadows; camera independent','The hardstand finish is anchored in fixed plant coordinates');
 assert.ok(!hardstand!.castShadow&&hardstand!.receiveShadow,'The broad surface receives site shadows without casting an extra full-pad shadow');
 assert.ok(plant.children.filter(object=>object.userData.plantRoof).length>=12,'Roof cutaway tags cover the industrial halls');
+const feedRoofComponents=plant.children.filter(object=>object.userData.plantRoof&&object.userData.plantStage==='feed');
+const feedRoofSides=[...new Set(feedRoofComponents.map(object=>Number(object.userData.roofSlideSign??0)))].sort((a,b)=>a-b);
+assert.deepEqual(feedRoofSides,[-1,0,1],'The batched feed-hall roof retains two outward-sliding bays and a separate center ridge');
+assert.ok(feedRoofComponents.filter(object=>Number(object.userData.roofSlideSign)!==0).every(object=>object.userData.roofSlideSign===-1||object.userData.roofSlideSign===1),'Every movable roof component carries its eave-side direction');
+assert.ok(feedRoofComponents.some(object=>object.name.includes('ridge cap')&&object.userData.roofSlideSign===0),'The roof ridge remains a stationary reveal element instead of joining the sliding panels');
 const level=placeConcentrator(plant,0,0,(x,z)=>x*.1+z*.05,admittedPad);
 assert.ok(Math.abs(level-1.5)<1e-6,'Platform datum is 1.5 m above the median of the symmetric sampled ground');
 const plantFoundationAudit=plant.userData.plantFoundationContactAudit as {footingCount:number;columnCount:number;padTopAboveGradedDatumM:number;footingBottomRangeAboveGradedDatumM:number[];columnBottomRangeAboveGradedDatumM:number[];maximumFootingGapM:number;minimumFootingOverlapM:number;maximumColumnGapM:number;minimumColumnOverlapM:number;source:string};

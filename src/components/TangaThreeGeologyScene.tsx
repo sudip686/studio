@@ -3348,6 +3348,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           processPlant.traverse(object=>{
             if(object instanceof THREE.Mesh&&object.userData.plantRoof&&!knownRoofs.has(object)){
               object.userData.roofBaseY=object.position.y;
+              object.userData.roofBaseZ=object.position.z;
               plantRoofMeshes.push(object);
             }
           });
@@ -4828,7 +4829,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             stage.add(plant);
             processPlant=plant;
             plantRoofMeshes=[];
-            plant.traverse(object=>{if(object instanceof THREE.Mesh&&object.userData.plantRoof){object.userData.roofBaseY=object.position.y;plantRoofMeshes.push(object);}});
+            plant.traverse(object=>{if(object instanceof THREE.Mesh&&object.userData.plantRoof){object.userData.roofBaseY=object.position.y;object.userData.roofBaseZ=object.position.z;plantRoofMeshes.push(object);}});
             const mappedFeed:Point2=[DEVELOPMENT_SITE.feedUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.feedUtm[1]];
             const apron=proposeFeedApron(mappedFeed,[x,z],sitePlan.pits,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz));
             if(!apron)throw new Error('No conflict-free feed apron near the mapped candidate; do not render a facility over a pit');
@@ -5568,7 +5569,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       plantRoofMeshes.forEach(roof=>{
         const open=detail.plantCutaway&&plantRoofMatchesFocus(detail.plantProcess,roof.userData.plantStage)?plantRoofProgress:0;
-        roof.position.y=Number(roof.userData.roofBaseY??0)+38*open;
+        const slideSign=Number(roof.userData.roofSlideSign??0);
+        roof.position.y=Number(roof.userData.roofBaseY??roof.position.y);
+        roof.position.z=Number(roof.userData.roofBaseZ??roof.position.z)+slideSign*18*open;
         if(!roof.userData.roofMaterialClones){
           const materials=Array.isArray(roof.material)?roof.material:[roof.material];
           roof.userData.roofBaseOpacities=materials.map(material=>material.opacity);
@@ -5584,7 +5587,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const materials=Array.isArray(roof.material)?roof.material:[roof.material];
         const baseOpacities=roof.userData.roofBaseOpacities as number[];
         materials.forEach((material,index)=>{
-          material.opacity=THREE.MathUtils.lerp(baseOpacities[index]??1,.16,open);
+          material.opacity=THREE.MathUtils.lerp(baseOpacities[index]??1,slideSign===0?.14:1,open);
           const transparent=material.opacity<.999;
           if(material.transparent!==transparent){material.transparent=transparent;material.needsUpdate=true;}
           material.depthWrite=material.opacity>.55;

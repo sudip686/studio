@@ -21,7 +21,7 @@ const PROCESS = [
 const IMO_PROCESS_REPORT='/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf';
 
 type ProcessId = typeof PROCESS[number]['id'];
-type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofBaseY?: number; roofOpacity?: number}};
+type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofSlideSign?: number; roofBaseZ?: number}};
 type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void; showEndUse: (route: MetallurgyEndUseRoute, animate: boolean) => void; focusEndUseStep: (route: MetallurgyEndUseRoute, step: number, animate: boolean, heroDetail?: boolean) => void; returnToPlant: (animate: boolean) => void};
 type FactoryRecoveryView = {position: [number, number, number]; target: [number, number, number]; fov: number; processTime: number; endUseRoute?: MetallurgyEndUseRoute | null; journeyTime?: number};
 
@@ -101,8 +101,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     scene.add(endUseScene.root);
     const roofs = plant.children.filter((object): object is RoofMesh => object instanceof THREE.Mesh && Boolean(object.userData.plantRoof));
     roofs.forEach(roof => {
-      roof.userData.roofBaseY = roof.position.y;
-      roof.userData.roofOpacity = 1;
+      roof.userData.roofBaseZ = roof.position.z;
       const cloneRoofMaterial=(material:THREE.Material)=>{const clone=material.clone();clone.onBeforeCompile=material.onBeforeCompile;clone.customProgramCacheKey=material.customProgramCacheKey;return clone;};
       if (Array.isArray(roof.material)) roof.material = roof.material.map(cloneRoofMaterial);
       else roof.material = cloneRoofMaterial(roof.material);
@@ -134,8 +133,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); if (reducedMotion.matches) stopPlantTour(); dirty = true; };
     onMotionPreference();
     reducedMotion.addEventListener('change', onMotionPreference);
-    const roofState = new Map<RoofMesh, {y: number; opacity: number}>();
-    roofs.forEach(roof => roofState.set(roof, {y: roof.position.y, opacity: 1}));
+    const roofState = new Map<RoofMesh, {z: number; opacity: number}>();
+    roofs.forEach(roof => roofState.set(roof, {z: roof.position.z, opacity: 1}));
 
     function fitOverview(animate: boolean) {
       selected = stageRef.current;
@@ -223,7 +222,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       openRoofRef.current = false;
       roofs.forEach(roof => {
         const state = roofState.get(roof);
-        if (state) { state.y = roof.userData.roofBaseY ?? roof.position.y; state.opacity = 1; }
+        if (state) { state.z = roof.userData.roofBaseZ ?? roof.position.z; state.opacity = 1; }
       });
       fitOverview(animate);
       dirty = true;
@@ -242,11 +241,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       dirty = true;
       roofs.forEach(roof => {
         const selectedRoof = !endUseRouteRef.current && !overviewRef.current && openRoofRef.current && roof.userData.plantStage === stageRef.current;
-        const baseY = roof.userData.roofBaseY ?? roof.position.y;
-        const targetY = baseY + (selectedRoof ? 38 : 0);
-        const targetOpacity = selectedRoof ? .16 : 1;
+        const baseZ = roof.userData.roofBaseZ ?? roof.position.z;
+        const slideSign = Number(roof.userData.roofSlideSign ?? 0);
+        const targetZ = baseZ + (selectedRoof ? slideSign * 18 : 0);
+        // Move the pitched roof bays outward at their eaves. The center ridge
+        // cap eases back visually so the interior opens without loose parts
+        // hovering above the building.
+        const targetOpacity = selectedRoof && slideSign === 0 ? .14 : 1;
         const state = roofState.get(roof);
-        if (state) { state.y = targetY; state.opacity = targetOpacity; }
+        if (state) { state.z = targetZ; state.opacity = targetOpacity; }
         roof.visible = true;
       });
     }
@@ -366,12 +369,12 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         let roofMoving = false;
         roofs.forEach(roof => {
           const state = roofState.get(roof); if (!state) return;
-          const positionDelta = state.y - roof.position.y;
+          const positionDelta = state.z - roof.position.z;
           dirty ||= positionDelta !== 0;
           if (Math.abs(positionDelta) > .01) {
-            roof.position.y = reducedMotion.matches ? state.y : roof.position.y + positionDelta * Math.min(1, dt * 5);
+            roof.position.z = reducedMotion.matches ? state.z : roof.position.z + positionDelta * Math.min(1, dt * 5);
             roofMoving = true;
-          } else roof.position.y = state.y;
+          } else roof.position.z = state.z;
           (Array.isArray(roof.material) ? roof.material : [roof.material]).forEach(current => {
             const material = current as THREE.MeshStandardMaterial;
             const opacityDelta = state.opacity - material.opacity;
