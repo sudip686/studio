@@ -10,7 +10,8 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
 import {planSite, inside, rectangleContained, overlaps, rectangle, CONCEPT, type SitePlan, type Point2} from '@/lib/deck/site-planning';
 import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPitRamp, carvePit, gradeConceptPad, showConceptTerrain, conceptPadHeight, pitHeight, type ConceptPad} from '@/lib/deck/mine-scene';
-import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
+import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition, updateHaulTruckCycle} from '@/lib/deck/mine-haulage';
+import type {HaulCycleStage} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
 import {buildGeologyReferenceGrid,buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
 import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
@@ -318,6 +319,7 @@ type TangaThreeGeologySceneProps = {
   onSelectGeologyUnit?: (unit: DrillPickInfo) => void;
   onGeologyLegendMount?: (element: HTMLDivElement | null) => void;
   onSiteFacilities?: (ids:string[])=>void;
+  onHaulCycleStageChange?: (stage:HaulCycleStage|null)=>void;
   motionPaused?: boolean;
   onMotionPausedChange?: (paused:boolean)=>void;
   /** Lifts the derived headline numbers out for the deck chrome to reuse. */
@@ -2375,11 +2377,14 @@ export default function TangaThreeGeologyScene({
   onSelectGeologyUnit,
   onGeologyLegendMount,
   onSiteFacilities,
+  onHaulCycleStageChange,
   onAssayFacts,
   motionPaused: externalMotionPaused,
   onMotionPausedChange,
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const onHaulCycleStageChangeRef=useRef(onHaulCycleStageChange);
+  onHaulCycleStageChangeRef.current=onHaulCycleStageChange;
   const geologyRailBodyRef = useRef<HTMLDivElement | null>(null);
   const [inspectionOpen, setInspectionOpen] = useState(false);
   const inspectionActiveRef=useRef(false);inspectionActiveRef.current=inspectionMode||inspectionOpen;
@@ -2796,7 +2801,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     let separation=0;
     const sectionPlane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
     const sectionPlanes=[sectionPlane];
-    const haulTrucks:{mesh:THREE.Group;points:THREE.Vector3[];length:number;offset:number;legDuration:number}[]=[];
+    const haulTrucks:{mesh:THREE.Group;points:THREE.Vector3[];length:number;offset:number}[]=[];
     const haulRampPaths:(THREE.Vector3[]|null)[]=[];
     const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
     let motionTime=0,lastMotionElapsed=0;
@@ -4875,9 +4880,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               truck.scale.setScalar(1.25);truck.position.copy(haulRoute[0]);
               truck.traverse(object=>{if(object instanceof THREE.Mesh)object.castShadow=true;});stage.add(truck);
               let length=0;for(let i=1;i<haulRoute.length;i++)length+=haulRoute[i].distanceTo(haulRoute[i-1]);
-              haulTrucks.push({mesh:truck,points:haulRoute,length,offset:0,legDuration:36});
+              haulTrucks.push({mesh:truck,points:haulRoute,length,offset:0});
             }
             setHaulCount(haulTrucks.length);setHaulStatus('ready');
+            if(!haulTrucks.length)onHaulCycleStageChangeRef.current?.(null);
             host.dataset.haulTrucks=String(haulTrucks.length);
             host.dataset.haulRoutes=JSON.stringify([{kind:host.dataset.haulRouteStatus,connectsToFeed:Boolean(host.dataset.haulRouteStatus.startsWith('generated')),engineeringStatus:'illustrative generated centerline; not a surveyed report alignment, approved road design or operating speed'}]);
             host.dataset.haulRouteAttempts=JSON.stringify(haulRouteAttempts);
@@ -5625,9 +5631,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       for(const item of haulTrucks){
         item.mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;
-        const phase=(motionTime/item.legDuration+item.offset)%2,returning=phase>1;
-        const at=routePosition(item.points,(returning?2-phase:phase)*item.length);
-        item.mesh.position.copy(at.position);item.mesh.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(returning?Math.PI:0);
+        const cycle=updateHaulTruckCycle(item.mesh,item.points,item.length,motionTime,item.offset*80);
+        if(host.dataset.truckCycleStage!==cycle.stage){
+          host.dataset.truckCycleStage=cycle.stage;
+          onHaulCycleStageChangeRef.current?.(cycle.stage);
+        }
+        host.dataset.truckCycleProgress=cycle.progress.toFixed(3);
       }
       host.dataset.truckVisible=String(Boolean(haulTrucks[0]?.mesh.visible));
       // Show grade cells only during the pit-concept beat. Site overview and
@@ -6363,7 +6372,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <label>Process focus<select aria-label="Plant process focus" value={plantProcess} onChange={e=>{const focus=e.target.value;setPlantProcess(focus);setPlantCutaway(focus!=='all');setStoryPlaying(false);setMiningBeat(3);cameraCommandHandlerRef.current?.({id:Date.now(),action:'plantDetail',stage:PLANT_CAMERA_STAGE_FOR_FOCUS[focus]});}}><option value="all">Whole campus</option><option value="feed">ROM & crushing</option><option value="milling">Milling & cyclones</option><option value="flotation">Flotation cells</option><option value="thickening">Thickener & water</option><option value="dewatering">Filter press & dryer</option><option value="product">Product silos</option></select></label>
           <small>Six connected process areas in site coordinates. Illustrative equipment and cut/fill pad; earthworks, slopes and the plant arrangement require engineering.</small>
         </details>
-        <small>{haulStatus==='loading'?'Preparing a conceptual pit-to-feed vehicle cue':haulCount ? `${haulCount} illustrative truck follows a generated route from the candidate pit toward the approximate mapped feed point. PaulSam estimates about 2 km mine-to-feed; the report does not georeference the road centerline, so this displayed route is not that measured alignment.` : 'No terrain-screened pit-to-feed route is available; the conceptual pit ramp remains visible without a moving truck.'}<br/>The separate conveyor cue follows the report-traced alignment; motion is presentation pacing, not throughput, operating speed or schedule.<br/>Roadside swale cues are illustrative only; no stormwater alignment, hydraulic design, flow direction or discharge point is sourced.</small>
+        <small>{haulStatus==='loading'?'Preparing a conceptual pit-to-feed vehicle cue':haulCount ? `${haulCount} illustrative truck follows a generated route from the candidate pit toward the approximate mapped feed point. Its staged load, tip-off and empty return explain the concept only. PaulSam estimates about 2 km mine-to-feed; the report does not georeference the road centerline, so this displayed route is not that measured alignment.` : 'No terrain-screened pit-to-feed route is available; the conceptual pit ramp remains visible without a moving truck.'}<br/>The separate conveyor cue follows the report-traced alignment; motion timing is display pacing, not an operating cycle, throughput, speed or schedule.<br/>Roadside swale cues are illustrative only; no stormwater alignment, hydraulic design, flow direction or discharge point is sourced.</small>
         <details><summary>Pit inspection animations</summary><button disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(2);setMotionPaused(false);setTargetXray(false);revealCommand.current?.('benches');}}>Reveal benches in steps</button><button onClick={()=>{setTargetXray(false);revealCommand.current?.('none');}}>Restore whole pits</button><small>{revealAction==='pitcut'?'Grade-selected blocks are visible through the pit cutaway; their source positions and display thresholds are unchanged.':'Illustrative pit and block-model view; benches are not an optimised reserve shell.'}</small></details>
         <details><summary>Reserve &amp; finance basis</summary><p>No verified ore-reserve estimate or financial model is connected to these envelopes. No production rate, recovery, NPV or full-extraction claim is implied.</p></details>
       </section>}
