@@ -1507,6 +1507,13 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content{display:grid;gap:6px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content .tanga-site-status-key{margin:0;padding:4px 0;min-height:34px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content .tanga-development-select{min-height:36px;margin:0;padding-block:6px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls{display:grid;gap:4px;padding:6px 8px;border:1px solid #c9d8de24;border-radius:6px;background:#ffffff05}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls label{color:#c6d1d5;font-size:9px;font-weight:650}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls select{width:100%;min-height:36px;margin:0;padding:6px 9px;border:1px solid #86a5b166;border-radius:6px;background:#20323e;color:#edf3f3;font:inherit;font-size:10px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls__roof{min-height:36px;padding:7px 9px;border:1px solid #dca46a75;border-radius:5px;background:#493728;color:#fff0df;font:inherit;font-size:10px;font-weight:700;cursor:pointer}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls__roof:hover{background:#5b432f;border-color:#efbd86}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls :is(select,button):focus-visible{outline:2px solid #ffd0a7;outline-offset:2px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls small{color:#b5c2c8;font-size:9px;line-height:1.4}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-facility-register{border-top:1px solid #c9d8de24;border-bottom:1px solid #c9d8de24;color:#c6d1d5}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-facility-register>summary{min-height:30px;padding:7px 1px;color:#e5bf98;font-size:10px;font-weight:650;cursor:pointer}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-facility-register>summary:focus-visible{outline:2px solid #f6be91;outline-offset:2px}
@@ -1831,15 +1838,15 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 /* Keep the Metallurgy walkthrough inside the same presentation panel system as
    the other chapters. The model viewport stays light so the plant remains clear. */
 .tanga-deck .tanga-process-exhibit--factory {
-  --factory-text: #e8eef1;
-  --factory-muted: rgba(223, 231, 237, .72);
-  --factory-line: rgba(218, 229, 239, .14);
-  --factory-accent: var(--tanga-accent, #e39a5e);
-  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
-  border-radius: var(--tanga-panel-radius, 14px);
-  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
+  --factory-text: var(--story-text, #f5f1eb);
+  --factory-muted: var(--story-muted, #b6c4cc);
+  --factory-line: var(--story-line, #c9d8de26);
+  --factory-accent: var(--story-accent, #e2ad78);
+  border: 1px solid var(--story-line, #c9d8de26);
+  border-radius: 10px;
+  background: var(--story-surface, #111b23ed);
   color: var(--factory-text);
-  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+  box-shadow: 0 14px 40px #0003;
   -webkit-backdrop-filter: blur(18px) saturate(1.08);
   backdrop-filter: blur(18px) saturate(1.08);
 }
@@ -2164,10 +2171,10 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   max-height: 100%;
   padding: var(--tanga-panel-pad, 15px);
   gap: 8px;
-  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
-  border-radius: var(--tanga-panel-radius, 14px);
-  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
-  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+  border: 1px solid var(--story-line, #c9d8de26);
+  border-radius: 10px;
+  background: var(--story-surface, #111b23ed);
+  box-shadow: 0 14px 40px #0003;
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector .tanga-process-kicker {
   display: block;
@@ -2181,7 +2188,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
   margin: 0;
-  font-size: 19px;
+  font-size: 17px;
   line-height: 1.2;
   letter-spacing: -.025em;
 }
@@ -2193,8 +2200,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow { gap: 8px; margin: 0; }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div,
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
-  border-radius: 9px;
-  border-color: var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: 7px;
+  border-color: var(--story-line, #c9d8de26);
   background: rgba(255, 255, 255, .045);
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div { padding: 8px 9px; }

@@ -119,6 +119,8 @@ type ThreeCameraCommand = {
   action: ThreeCameraAction;
   degrees?: 90 | 180 | 360;
   pitIndex?: number;
+  stage?: string;
+  roofOpen?: boolean;
 };
 
 type ThreeLoadReport = {
@@ -2654,10 +2656,10 @@ export default function TangaDeckWorkbench() {
     mode === 'drillholes' || mode === 'subsurface' || mode === 'resource' || mode === 'mine_planning' || mode === 'metallurgy'
   ), [activeMode]);
 
-  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360, pitIndex?: number) => {
+  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360, pitIndex?: number, detail?: Pick<ThreeCameraCommand, 'stage' | 'roofOpen'>) => {
     setThreeSceneRequested(true);
     setPitBlockFocusIndex(action==='revealPitBlocks'?(pitIndex??null):null);
-    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees,pitIndex});
+    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees,pitIndex,...detail});
   }, []);
 
   const rotateNinety = useCallback(() => {
@@ -3301,6 +3303,9 @@ export default function TangaDeckWorkbench() {
   }, [prepareVoiceSession, releaseMicStream]);
 
   const threeVisible = activeMode === 'topography' || activeMode === 'drillholes' || activeMode === 'subsurface' || activeMode === 'resource' || activeMode === 'mine_planning' || activeMode === 'metallurgy';
+  // The MapLibre stage remains mounted for shared geospatial overlays, but it
+  // is not the active viewer while a Three.js chapter owns the canvas.
+  const mapStageState: SceneLoadState = threeVisible ? 'idle' : mapLoadState;
   const localContextMode = activeMode === 'project' || activeMode === 'topography' || activeMode === 'accessibility';
   // Native MapLibre terrain and external DEM hillshade tiles make this globe path
   // slower and have triggered terrain-depth shader errors, so relief is carried by
@@ -3490,20 +3495,23 @@ export default function TangaDeckWorkbench() {
   }, [mapInstance]);
 
   const handleMapError = useCallback((event?: any) => {
+    if (threeVisible) return;
     const message = String(event?.error?.message ?? event?.error ?? '');
     const fatal = !mapInstance || /webgl|context.{0,12}lost|failed to initialize/i.test(message);
     setMapLoadState(fatal ? 'error' : 'degraded');
     console.info(`[Tanga telemetry] map entered ${fatal ? 'fallback' : 'degraded'} state; evidence and chapter controls remain available`);
-  }, [mapInstance]);
+  }, [mapInstance, threeVisible]);
 
   useEffect(() => {
     if (!mapInstance) return;
     const map = mapInstance as any;
     const onContextLost = () => {
+      if (threeVisible) return;
       setMapLoadState('error');
       console.info('[Tanga telemetry] map WebGL context lost; showing the chapter reference still');
     };
     const onContextRestored = () => {
+      if (threeVisible) return;
       setMapLoadState('ready');
       console.info('[Tanga telemetry] map WebGL context restored; returning to the live map');
     };
@@ -3513,7 +3521,7 @@ export default function TangaDeckWorkbench() {
       map.off?.('webglcontextlost', onContextLost);
       map.off?.('webglcontextrestored', onContextRestored);
     };
-  }, [mapInstance]);
+  }, [mapInstance, threeVisible]);
   const markUiInteraction = useCallback(() => {
     uiInteractionUntilRef.current = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + 450;
   }, []);
@@ -4430,7 +4438,9 @@ export default function TangaDeckWorkbench() {
       ? (contextLoadState === 'idle' ? 'Loads with local scene' : 'DeckGL relief and context')
       : 'Globe imagery and overlays';
   const loadStages = useMemo<LoadStage[]>(() => {
-    const routeDetail = activeMode === 'accessibility'
+    const routeDetail = threeVisible
+      ? 'Map view inactive in this 3D chapter'
+      : activeMode === 'accessibility'
       ? routeLoadState === 'loading'
         ? 'Route lookup running'
         : routeInfo?.source === 'fallback'
@@ -4438,7 +4448,7 @@ export default function TangaDeckWorkbench() {
           : routeInfo?.source === 'osrm'
             ? 'Road route ready'
             : 'Route on demand'
-      : mapLoadState === 'ready'
+      : mapStageState === 'ready'
         ? terrainStatus
         : 'Starting globe';
 
@@ -4446,7 +4456,7 @@ export default function TangaDeckWorkbench() {
       {
         id: 'map',
         label: 'Map',
-        state: mapLoadState,
+        state: mapStageState,
         detail: routeDetail,
       },
       {
@@ -5765,8 +5775,8 @@ export default function TangaDeckWorkbench() {
       )}
       data-act={MODE_ACT[activeMode]}
       data-mode={activeMode}
-      data-map-state={mapLoadState}
-      data-map-first-idle-ms={mapFirstIdleMs ?? undefined}
+      data-map-state={mapStageState}
+      data-map-first-idle-ms={threeVisible ? undefined : mapFirstIdleMs ?? undefined}
       data-three-state={threeLoadReport.scene}
       data-three-load-ms={threeLoadReport.elapsedMs ?? undefined}
       onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
@@ -7035,7 +7045,8 @@ export default function TangaDeckWorkbench() {
         pitBlockFocusIndex={pitBlockFocusIndex}
         pitGradeFocus={pitGradeFocus}
         onPitGradeFocusChange={grade=>{setPitGradeFocus(grade);if(grade&&activeMode==='mine_planning'&&activeShot?.id!=='pit-blocks'){setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='pit-blocks')));issueThreeCameraCommand('revealPitBlocks');}}}
-        onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
+        onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage:'all',roofOpen:false});} : undefined}
+        onPlantProcessFocus={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? (stage,roofOpen) => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant')));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage,roofOpen});} : undefined}
         sceneMotionPaused={sceneMotionPaused}
         onToggleSceneMotion={() => setSceneMotionPaused(value => !value)}
       />}

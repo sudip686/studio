@@ -110,6 +110,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
       const roof=box(w+1,.55,roofLength+.9,x,h+rise/2,z+sign*d/4,cladding,name);
       roof.rotation.x=slope;
       roof.userData.plantRoof=true;
+      roof.userData.roofSlideSign=sign;
       if(stage)roof.userData.plantStage=stage;
       // Long standing seams give the broad roof planes a scaled industrial
       // sheet profile from the overview camera; one instanced strip per hall
@@ -122,7 +123,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
         seamDummy.position.set(seamX,h+rise/2+.36,z+sign*d/4);
         seamDummy.rotation.set(slope,0,0);seamDummy.updateMatrix();seams.setMatrixAt(seam,seamDummy.matrix);
       }
-      seams.instanceMatrix.needsUpdate=true;seams.name=`${name} standing-seam roof ribs`;seams.castShadow=true;seams.userData.plantRoof=true;
+      seams.instanceMatrix.needsUpdate=true;seams.name=`${name} standing-seam roof ribs`;seams.castShadow=true;seams.userData.plantRoof=true;seams.userData.roofSlideSign=sign;
       if(stage)seams.userData.plantStage=stage;
       root.add(seams);
       // Repeated portal rafters and eave members make the process halls read
@@ -131,10 +132,16 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
         const bayX=x-w/2+bay*bayWidth;
         const rafter=box(.75,.8,roofLength,bayX,h+rise/2-.55,z+sign*d/4,materials.steel,`${name} portal rafter`);
         rafter.rotation.x=slope;
-        if(sign===1)box(.65,.7,d-.8,bayX,h-.45,z,materials.copper,`${name} portal tie beam`);
+        rafter.userData.plantRoof=true;rafter.userData.roofSlideSign=sign;if(stage)rafter.userData.plantStage=stage;
+        if(sign===1){
+          const tie=box(.65,.7,d-.8,bayX,h-.45,z,materials.copper,`${name} portal tie beam`);
+          tie.userData.plantRoof=true;tie.userData.roofSlideSign=0;if(stage)tie.userData.plantStage=stage;
+        }
       }
-      box(w+1,.8,.8,x,h-.35,z+sign*d/2,materials.steel,`${name} eave girder`);
-      box(w+1,.4,.55,x,h+.05,z+sign*d/2,materials.roof,`${name} rain gutter`);
+      const eave=box(w+1,.8,.8,x,h-.35,z+sign*d/2,materials.steel,`${name} eave girder`);
+      eave.userData.plantRoof=true;eave.userData.roofSlideSign=sign;if(stage)eave.userData.plantStage=stage;
+      const gutter=box(w+1,.4,.55,x,h+.05,z+sign*d/2,materials.roof,`${name} rain gutter`);
+      gutter.userData.plantRoof=true;gutter.userData.roofSlideSign=sign;if(stage)gutter.userData.plantStage=stage;
       // Close the lower wall bays with restrained corrugated cladding, leaving
       // a clerestory strip and the main process portals readable. The steel
       // frame and roof cutaway still expose the equipment during inspection.
@@ -180,17 +187,17 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
     // A continuous ridge cover and inset rooflights give each otherwise plain
     // hall a factory roof silhouette at the investor-view camera distance.
     const ridge=box(w+1,.75,1.5,x,h+rise+.2,z,materials.roof,`${name} roof ridge cap`);
-    ridge.userData.plantRoof=true;if(stage)ridge.userData.plantStage=stage;
+    ridge.userData.plantRoof=true;ridge.userData.roofSlideSign=0;if(stage)ridge.userData.plantStage=stage;
     for(const sign of [-1,1]){
       const rooflight=box(w*.68,.18,d*.075,x,h+rise*.6,sign*d*.2,materials.water,`${name} rooflight`);
       rooflight.rotation.x=sign*Math.atan2(rise,d/2);
-      rooflight.userData.plantRoof=true;if(stage)rooflight.userData.plantStage=stage;
+      rooflight.userData.plantRoof=true;rooflight.userData.roofSlideSign=sign;if(stage)rooflight.userData.plantStage=stage;
     }
     if(w>=60){
       for(const sign of [-1,1]){
         const ventBase=box(5,1.2,5,x+w*.28,h+rise+1.1,sign*3,materials.roof,`${name} roof ventilator base`);
         const vent=mesh(new THREE.CylinderGeometry(1.7,2.5,3.2,12),materials.steel,x+w*.28,h+rise+3.3,sign*3,`${name} roof ventilator`);
-        for(const feature of [ventBase,vent]){feature.userData.plantRoof=true;if(stage)feature.userData.plantStage=stage;}
+        for(const feature of [ventBase,vent]){feature.userData.plantRoof=true;feature.userData.roofSlideSign=sign;if(stage)feature.userData.plantStage=stage;}
       }
     }
   }

@@ -131,11 +131,12 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
 
 /** Batch static detail by material/process; keep roof cutaways separately addressable. */
 export function batchPlantMeshes(root: THREE.Group, startIndex = 0) {
-  const buckets = new Map<string, {material: THREE.Material; name: string; roof: boolean; stage?:string; surfaceLighting?:string; geometries: THREE.BufferGeometry[]}>();
+  const buckets = new Map<string, {material: THREE.Material; name: string; roof: boolean; roofSlideSign: number; stage?:string; surfaceLighting?:string; geometries: THREE.BufferGeometry[]}>();
   const children = root.children.slice(startIndex).filter((child): child is THREE.Mesh<THREE.BufferGeometry, THREE.Material> => child instanceof THREE.Mesh && !Array.isArray(child.material) && !child.userData.preserveAnimation);
   for (const object of children) {
     object.updateMatrix();
     const roof = Boolean(object.userData.plantRoof);
+    const roofSlideSign=roof?Number(object.userData.roofSlideSign??0):0;
     const stage=typeof object.userData.plantStage==='string'?object.userData.plantStage:undefined;
     const name = roof ? `${object.name} roof` : /Plant yard hardstand finish/i.test(object.name) ? 'Plant yard hardstand finish' : /FIP operatives shed/i.test(object.name) ? 'FIP operatives shed · report allowance / illustrative exterior' : /stockpile/i.test(object.name) ? 'Illustrative ROM stockpiles · not engineered' : /roadside drainage swale/i.test(object.name) ? 'Illustrative roadside swales · no drainage design' : /Conceptual access|Illustrative gravel shoulders/i.test(object.name) ? 'Illustrative campus access roads · unsurveyed'
       : /exterior wall rib/i.test(object.name) ? 'Steel-clad exterior wall ribs'
@@ -143,9 +144,9 @@ export function batchPlantMeshes(root: THREE.Group, startIndex = 0) {
       : /Milling|Crushing|ROM|Feed|hopper/i.test(object.name) ? 'Crushing and milling equipment'
       : /Dewatering|Product|Filter|Packaged/i.test(object.name) ? 'Dewatering and product handling'
       : /Thickener|water|Reagent/i.test(object.name) ? 'Thickener, water and reagent circuits' : 'Plant structures and services';
-    const key = `${object.material.uuid}:${name}:${roof}:${stage??''}`;
+    const key = `${object.material.uuid}:${name}:${roof}:${roofSlideSign}:${stage??''}`;
     const surfaceLighting=typeof object.userData.surfaceLighting==='string'?object.userData.surfaceLighting:undefined;
-    const bucket = buckets.get(key) ?? {material: object.material, name, roof, stage, surfaceLighting, geometries: []};
+    const bucket = buckets.get(key) ?? {material: object.material, name, roof, roofSlideSign, stage, surfaceLighting, geometries: []};
     bucket.geometries.push(object.geometry.clone().applyMatrix4(object.matrix)); buckets.set(key, bucket);
     root.remove(object); object.geometry.dispose();
   }
@@ -154,7 +155,7 @@ export function batchPlantMeshes(root: THREE.Group, startIndex = 0) {
     for (const source of bucket.geometries) source.dispose();
     if (!geometry) throw new Error(`Unable to batch plant detail: ${bucket.name}`);
     const object = new THREE.Mesh(geometry, bucket.material); object.name = bucket.name;
-    object.userData.plantRoof = bucket.roof; if(bucket.stage)object.userData.plantStage=bucket.stage; object.castShadow = bucket.name!=='Plant yard hardstand finish'; object.receiveShadow = true;
+    object.userData.plantRoof = bucket.roof; if(bucket.roof)object.userData.roofSlideSign=bucket.roofSlideSign; if(bucket.stage)object.userData.plantStage=bucket.stage; object.castShadow = bucket.name!=='Plant yard hardstand finish'; object.receiveShadow = true;
     if(bucket.surfaceLighting)object.userData.surfaceLighting=bucket.surfaceLighting;
     root.add(object);
   }

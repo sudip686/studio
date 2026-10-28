@@ -123,3 +123,26 @@ The public Cloudflare Worker was opened at 1707 × 842 in the available Chrome/P
 | Comparison | 532 | 1,750 | 3,660 | 83.3 / 133.3 |
 
 All 12 chapters reached their route-appropriate ready marker; the script recorded no JavaScript exceptions or console errors. The hidden MapLibre stage reported `mapState=error` while the six Three.js chapters reported `threeState=ready`; this did not prevent their visible 3D render, but the map-state semantics during Three.js chapters need review. Same-origin `transferSize` summed to only 0.01–0.02 MB per document in this warm session, so it is not a useful measure of full scene transfer and is not compared with the 24 October cold-origin figures. The first-WebGL-draw hook is a render-call proxy, not a pixel-confirmed useful frame. RAF samples recorded only 7–89 intervals per chapter over 1.2 seconds, with p95 from 58 to 392 ms; they are too noisy and too short to serve as a motion acceptance result. Re-run in an isolated, cache-controlled browser and collect full 30-second interaction distributions before drawing performance conclusions.
+
+## Follow-up: report the hidden MapLibre stage as inactive — 28 October 2026
+
+A live 12-chapter probe had shown `mapState=error` on the six Three.js chapters even while their visible 3D scene was ready. The workbench now reports the map stage as `idle` while Three.js owns the view and ignores MapLibre errors/context notifications from that inactive stage. Active map chapters keep their own MapLibre loading, error and recovery status.
+
+Local desktop browser checks at 1366 × 768 confirmed Topography and Resource as `map=idle / three=ready`, and Metallurgy as `map=idle / three=ready / factory=ready / roofSettled=true`; no scene or map fallback appeared. Project returned `map=ready / three=idle` with no map fallback. Captures: `.playwright-mcp/map-state-idle-topography-1366x768.png` and `.playwright-mcp/map-state-ready-project-1366x768.png`. The Cloudflare build passed and live Worker version `af5e816b-dcdd-42c1-8bfa-cf51deb7db4e` repeated the Topography, Project and Metallurgy status checks. No page errors were reported. A non-fatal “There is no style added to the map” console warning still appeared during a hidden-stage startup; it did not block 3D readiness and should be investigated separately if it appears in an active map chapter.
+
+This corrects the inactive-stage status reporting; it does not establish a cold-cache timing, map-source reliability on every route, or 30-second interaction performance.
+
+## Follow-up: isolated 30-second Three.js drag sample — 28 October 2026
+
+Measured the current public Worker version `f4b4ceb9-55a7-487a-b47d-182c49852256` with a fresh Playwright context in the installed system Chrome, `serviceWorkers: block`, and a 1366 × 768 viewport. The WebGL debug renderer reported the laptop's Intel UHD Graphics on Direct3D 11. Each chapter was opened directly, awaited its Three.js/factory `ready` marker, settled for 1.5 s, then received a 30-second scripted mouse drag with pointer movement paced at 50 ms. The first Topography entry used a fresh browser cache; subsequent same-origin chapters shared that context and could reuse transferred assets. This isolates the browser context from the user's 97 open Chrome processes but still shares the machine's Intel GPU. It is a drag/orbit sample, not a physical-mouse or zoom test.
+
+| Chapter | Ready (ms) | RAF intervals | Median (ms) | P90 (ms) | P95 (ms) | P99 (ms) | Max (ms) | >33.4 ms | >100 ms | Long tasks / max (ms) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Topography | 4,811 | 987 | 33.3 | 50.0 | 54.2 | 66.7 | 104.2 | 446 | 1 | 12 / 479 |
+| Drillholes | 3,308 | 785 | 41.5 | 54.1 | 58.3 | 99.9 | 133.2 | 501 | 7 | 10 / 628 |
+| Subsurface | 2,418 | 868 | 37.5 | 50.0 | 54.1 | 83.3 | 204.1 | 494 | 5 | 19 / 628 |
+| Resource | 1,864 | 713 | 41.7 | 58.4 | 66.8 | 100.0 | 120.7 | 521 | 8 | 25 / 628 |
+| Mine planning | 3,401 | 753 | 41.6 | 54.1 | 58.4 | 87.6 | 116.7 | 506 | 4 | 35 / 849 |
+| Metallurgy | 1,497 | 1,023 | 25.1 | 50.0 | 66.6 | 83.3 | 100.0 | 301 | 0 | 62 / 849 |
+
+Every scene remained `ready=true` for the full sample; the browser recorded no page exceptions. The observed p95 intervals of 54.1–66.8 ms do not meet a 30 fps p95 target (33.4 ms). A 12-second Topography V8 profile collected 7,471 samples, of which 6,655 were idle; no single JavaScript function dominated. This does not attribute the missed frame budget to the GPU, driver, renderer or app code, and long-task attribution also varied by chapter. Collect a matched zoom sample, physical-mouse run, renderer/GPU timing and controlled background-load baseline before selecting a visual-quality trade-off. Performance acceptance remains open.

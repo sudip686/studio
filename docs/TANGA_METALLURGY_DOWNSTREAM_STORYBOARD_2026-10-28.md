@@ -1,6 +1,6 @@
 # Metallurgy downstream animation storyboard
 
-**Status:** Design proposal for review. Do not implement this extension until the presenter accepts the sequence.
+**Status:** Guided story implemented on the desktop presentation; the individual routes remain available for presenter-led exploration.
 
 ## Story purpose
 
@@ -9,6 +9,13 @@ Show how reported laboratory testwork informs a conceptual process story, then m
 The plant, downstream equipment, battery, vehicle and furnace are illustrative. The Tanga reports reviewed for this presentation do not establish an industrial flowsheet, anode or refractory product specification, customer qualification, or commercial offtake.
 
 ## Run of show
+
+### Guided presentation mode
+
+- The **Play full story** action runs the 30-second five-area facility tour, then continues into the 30-second EV-anode route and holds on the cell/EV context.
+- Pause freezes both the facility and downstream sequence. Stop returns to the processing plant. The user can switch to the refractory route during the downstream portion; manual route changes end the automatic story.
+- The EV-anode path is the default cinematic close because it gives the story a recognizable application. The refractory route remains a peer option, not a lower-status product claim.
+- The downstream handoff stays clearly labeled as illustrative and carries the product-qualification boundary throughout.
 
 ### 1. Establish the facility
 
@@ -62,3 +69,11 @@ Use two equal, clear route cards: **EV battery anode** and **Steelmaking refract
 - Pause, replay, step selection, route switching, keyboard access and reduced-motion behavior work at 1366×768 and 1707×842.
 - Captions and persistent qualification copy are readable and do not overlap the scene, inspector or presentation pager.
 - No motion encodes tonnes per hour, recovery, grade, qualification, offtake or an approved engineering layout.
+
+## Verification record
+
+- Local desktop: the connected story paused at the second downstream stage for seven seconds, resumed through the Cell + EV final pose, and had no alerts or document overflow at 1366×768. At 1707×842 the overview controls fit without colliding with the title.
+- Reduced motion: the full autoplay control is disabled; the user can still select the refractory route and jump to its furnace-lining final pose.
+- Public Cloudflare Worker version `4a98bbb1-7ebc-4290-9b4a-3b4765bda17b`: the full 60-second story reached the Cell + EV final pose at 1366×768 with the qualification boundary visible, no alerts, and no document overflow.
+- Vercel deployment `AM8864Zi51WVAfv9eV19r4VnLnhK` for `0b09b51`: the exact preview completed the story at 1707×842 with the same qualification boundary, no alerts, and no overflow. The no-cookie URL redirects to Vercel SSO, so this is authenticated preview evidence rather than public investor access.
+- Standard Next and Cloudflare/OpenNext production builds, TypeScript, and `scripts/verify-tanga-plant-process.ts` passed. Visual captures are recorded in `TANGA_NEXT_PHASE_PLAN_2026-10-23.md`.
