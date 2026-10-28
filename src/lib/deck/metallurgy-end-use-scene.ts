@@ -74,7 +74,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
 }) {
   const group = new THREE.Group();
   group.name = route === 'anode' ? 'Illustrative EV anode downstream route' : 'Illustrative graphite refractory downstream route';
-  const base = new THREE.Mesh(new THREE.BoxGeometry(460, 3, 92), new THREE.MeshStandardMaterial({color: '#334249', roughness: .78, metalness: .14}));
+  const base = new THREE.Mesh(new THREE.BoxGeometry(460, 3, 92), new THREE.MeshStandardMaterial({color: '#607277', roughness: .84, metalness: .08}));
   base.name = 'Product pathway presentation plinth';
   base.position.set(50, -1.65, 0);
   base.receiveShadow = true;
@@ -243,11 +243,52 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     addFlakeCluster(press, [0, 11, 12], 5, 2.1, materials.graphite);
 
     const furnace = new THREE.Group(); furnace.name = 'Illustrative electric-arc furnace cutaway'; furnace.position.set(145, 0, 0); group.add(furnace);
-    heroFocusHide.push(furnace);
-    const shell = new THREE.Mesh(new THREE.CylinderGeometry(36, 42, 69, 40, 1, true, .55, Math.PI * 1.82), materials.steel);
+    const shell = new THREE.Mesh(new THREE.CylinderGeometry(36, 42, 69, 40, 1, true, .55, Math.PI * 1.6), materials.steel);
     shell.name = 'Cutaway EAF steel shell'; shell.position.y = 35; shell.castShadow = true; shell.receiveShadow = true; furnace.add(shell);
-    const lining = new THREE.Mesh(new THREE.CylinderGeometry(30, 35, 63, 40, 1, true, .55, Math.PI * 1.82), new THREE.MeshStandardMaterial({color: '#d39160', roughness: .94, emissive: '#482313', emissiveIntensity: .24, side: THREE.DoubleSide}));
+    const lining = new THREE.Mesh(new THREE.CylinderGeometry(30, 35, 63, 40, 1, true, .55, Math.PI * 1.6), new THREE.MeshStandardMaterial({color: '#d39160', roughness: .94, emissive: '#482313', emissiveIntensity: .24, side: THREE.DoubleSide}));
     lining.name = 'Magnesia-carbon refractory lining'; lining.position.y = 35; furnace.add(lining);
+    // A small instanced tile field makes the cutaway read as a lined furnace
+    // wall instead of a smooth colored cylinder. It is a visual concept only;
+    // no brick dimensions or refractory specification are implied.
+    const linerTileCount = 12 * 3;
+    const linerBase = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(7, 11.6, 2.1),
+      new THREE.MeshStandardMaterial({color: '#b97850', roughness: .96, metalness: .01}),
+      linerTileCount,
+    );
+    linerBase.name = 'Illustrative MgO-C lining segment courses';
+    const linerFace = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(5.5, 9.2, .8),
+      new THREE.MeshStandardMaterial({color: '#252c2e', roughness: .94, metalness: .02}),
+      linerTileCount,
+    );
+    linerFace.name = 'Illustrative graphite-bearing refractory working faces';
+    const linerMatrix = new THREE.Matrix4();
+    const linerQuaternion = new THREE.Quaternion();
+    const linerPosition = new THREE.Vector3();
+    const linerScale = new THREE.Vector3(1, 1, 1);
+    const linerMaterial = linerFace.material as THREE.MeshStandardMaterial;
+    for (let row = 0; row < 3; row++) {
+      for (let column = 0; column < 12; column++) {
+        const angle = -1.35 + (column / 11) * 2.7;
+        const y = 18 + row * 14;
+        linerQuaternion.setFromEuler(new THREE.Euler(0, angle, 0));
+        linerPosition.set(Math.sin(angle) * 30.2, y, Math.cos(angle) * 30.2);
+        linerMatrix.compose(linerPosition, linerQuaternion, linerScale);
+        const index = row * 12 + column;
+        linerBase.setMatrixAt(index, linerMatrix);
+        linerPosition.set(Math.sin(angle) * 31.35, y, Math.cos(angle) * 31.35);
+        linerMatrix.compose(linerPosition, linerQuaternion, linerScale);
+        linerFace.setMatrixAt(index, linerMatrix);
+        linerFace.setColorAt(index, new THREE.Color(column % 4 === 0 ? '#343a3c' : '#252c2e'));
+      }
+    }
+    linerBase.instanceMatrix.needsUpdate = true;
+    linerFace.instanceMatrix.needsUpdate = true;
+    if (linerFace.instanceColor) linerFace.instanceColor.needsUpdate = true;
+    linerBase.castShadow = linerFace.castShadow = true;
+    linerBase.receiveShadow = linerFace.receiveShadow = true;
+    furnace.add(linerBase, linerFace);
     const pool = new THREE.Mesh(new THREE.CircleGeometry(28, 40), new THREE.MeshStandardMaterial({color: '#ff8750', emissive: '#ff4419', emissiveIntensity: 1.25, roughness: .34}));
     pool.name = 'Illustrative hot furnace interior'; pool.rotation.x = -Math.PI / 2; pool.position.set(0, 7, 0); furnace.add(pool);
     const electrodeBases: number[] = [];
@@ -261,6 +302,17 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     addBox(refractoryBrick, 'Magnesia-carbon refractory brick body', [37, 25, 27], [0, 12, 0], materials.pale);
     addBox(refractoryBrick, 'Graphite-bearing working face', [37, 3, 27], [0, 25, 0], materials.graphite);
     addFlakeCluster(refractoryBrick, [0, 15, 14], 7, 2.1, materials.graphite);
+    const installedBrick = new THREE.Group();
+    installedBrick.name = 'Illustrative MgO-C brick seating into furnace lining';
+    installedBrick.position.set(224, 20, 0);
+    group.add(installedBrick);
+    addBox(installedBrick, 'Installed refractory brick body', [14, 10, 7], [0, 0, 0], materials.pale);
+    const installedWorkingFace = materials.graphite.clone() as THREE.MeshStandardMaterial;
+    installedWorkingFace.emissive = new THREE.Color('#6b351d');
+    installedWorkingFace.emissiveIntensity = .04;
+    addBox(installedBrick, 'Installed graphite-bearing working face', [14, 1.5, 7], [0, 5.5, 0], installedWorkingFace);
+    const installedBrickStart = installedBrick.position.clone();
+    const installedBrickStartRotation = installedBrick.rotation.y;
     updateMotion = (seconds, step) => {
       const blendTime = Math.min(seconds, 6);
       mixer.rotation.y = blendTime * .34;
@@ -275,6 +327,15 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
       furnace.children.filter(child => child.name === 'Graphite electrode in EAF context').forEach((electrode, index) => {
         electrode.position.y = electrodeBases[index] + electrodePulse * (index === 1 ? 1 : .65);
       });
+      const installProgress = step === 3 ? THREE.MathUtils.clamp((seconds - 18) / 4.5, 0, 1) : 0;
+      const easedInstall = installProgress * installProgress * (3 - 2 * installProgress);
+      installedBrick.position.set(
+        THREE.MathUtils.lerp(installedBrickStart.x, 162, easedInstall),
+        THREE.MathUtils.lerp(installedBrickStart.y, 34, easedInstall) + Math.sin(easedInstall * Math.PI) * 10,
+        THREE.MathUtils.lerp(installedBrickStart.z, 38, easedInstall),
+      );
+      installedBrick.rotation.y = THREE.MathUtils.lerp(installedBrickStartRotation, .55, easedInstall);
+      installedWorkingFace.emissiveIntensity = step === 3 ? .08 + easedInstall * .22 : .04;
     };
   }
 

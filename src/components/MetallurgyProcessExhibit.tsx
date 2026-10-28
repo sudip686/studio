@@ -24,6 +24,7 @@ type ProcessId = typeof PROCESS[number]['id'];
 type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofSlideSign?: number; roofBaseZ?: number}};
 type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void; showEndUse: (route: MetallurgyEndUseRoute, animate: boolean) => void; focusEndUseStep: (route: MetallurgyEndUseRoute, step: number, animate: boolean, heroDetail?: boolean) => void; returnToPlant: (animate: boolean) => void};
 type FactoryRecoveryView = {position: [number, number, number]; target: [number, number, number]; fov: number; processTime: number; endUseRoute?: MetallurgyEndUseRoute | null; journeyTime?: number};
+const END_USE_BACKGROUND = '#aab9b7';
 
 /** Conceptual connected plant tour. Laboratory measurements stay in the evidence board. */
 export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: boolean; onToggle: () => void}) {
@@ -180,7 +181,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       endUseScene.root.visible = true;
       plant.visible = false;
       ground.visible = false;
-      scene.background = new THREE.Color('#071117');
+      scene.background = new THREE.Color(END_USE_BACKGROUND);
       target.set(34, 17, 0);
       direction.set(.64, .58, 1.2).normalize();
       const horizontalFit = 450 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.max(.7, camera.aspect));
@@ -196,14 +197,16 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const boundedStep = Math.min(routeTargets.length - 1, Math.max(0, step));
       const isAnodeHero = heroDetail && route === 'anode' && boundedStep === 4;
       const isRefractoryHero = heroDetail && route === 'refractory' && boundedStep === 3;
-      const targetHeight = isAnodeHero ? 22 : isRefractoryHero ? 18 : route === 'refractory' && boundedStep === 3 ? 42 : route === 'anode' && boundedStep === 3 ? 13 : route === 'anode' && boundedStep === 4 ? 24 : 20;
-      target.set(isAnodeHero ? 202 : isRefractoryHero ? 224 : routeTargets[boundedStep], targetHeight, route === 'anode' && boundedStep === 3 ? 17 : 0);
-      direction.set(.64, .58, 1.2).normalize();
-      // Frame the final product vignettes as complete compositions: the anode
-      // cell and EV context should read together, while the refractory brick
-      // needs enough margin to show its full face and cutaway edge.
-      const widths = isAnodeHero ? [160] : isRefractoryHero ? [84] : route === 'anode' ? [86, 116, 142, 146, 148] : [86, 108, 142, 174];
-      const heights = isAnodeHero ? [92] : isRefractoryHero ? [70] : route === 'anode' ? [56, 60, 68, 74, 70] : [56, 60, 72, 108];
+      const targetHeight = isAnodeHero ? 23 : isRefractoryHero ? 40 : route === 'refractory' && boundedStep === 3 ? 42 : route === 'anode' && boundedStep === 3 ? 13 : route === 'anode' && boundedStep === 4 ? 24 : 20;
+      // Keep the cell/EV and furnace/brick compositions together while
+      // moving the visual center onto the product pair.
+      target.set(isAnodeHero ? 202 : isRefractoryHero ? 181 : routeTargets[boundedStep], targetHeight, route === 'anode' && boundedStep === 3 ? 17 : 0);
+      if (isRefractoryHero) direction.set(.34, .56, 1.4).normalize();
+      else direction.set(.64, .58, 1.2).normalize();
+      // Fit the final product vignettes as complete compositions. The
+      // refractory hero includes both the furnace cutaway and a brick detail.
+      const widths = isAnodeHero ? [178] : isRefractoryHero ? [170] : route === 'anode' ? [86, 116, 142, 146, 148] : [86, 108, 142, 174];
+      const heights = isAnodeHero ? [70] : isRefractoryHero ? [102] : route === 'anode' ? [56, 60, 68, 74, 70] : [56, 60, 72, 108];
       const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       const horizontalFit = widths[heroDetail ? 0 : boundedStep] / (2 * tanHalfFov * Math.max(.7, camera.aspect));
       const verticalFit = heights[heroDetail ? 0 : boundedStep] / (2 * tanHalfFov);
@@ -290,7 +293,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         endUseScene.root.visible = true;
         plant.visible = false;
         ground.visible = false;
-        scene.background = new THREE.Color('#071117');
+        scene.background = new THREE.Color(END_USE_BACKGROUND);
         journeyElapsed = recoveryView.journeyTime ?? 0;
         journeyElapsedRef.current = journeyElapsed;
       }
@@ -472,7 +475,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       'Illustrative blending combines graphite with a magnesia refractory batch.',
       'A conceptual press forms a magnesia-carbon refractory brick.',
       'The cutaway highlights a graphite-bearing working face in the brick.',
-      'A steelmaking-furnace lining illustrates one refractory application for graphite.',
+      'A conceptual MgO–C brick seats into an exposed furnace lining to show an illustrative refractory application.',
     ][journeyStep] ?? 'An illustrative graphite pathway into a magnesia-carbon refractory application.';
   function openEndUse() {
     stopPlantTour();

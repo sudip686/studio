@@ -2232,6 +2232,107 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck .tanga-process-exhibit--factory .tanga-factory-result { padding: 7px 8px; }
 }
 
+/* Keep the metallurgy facility's chrome in the same dark instrument system as
+   the rest of the deck. The brighter neutral is intentionally retained only
+   inside the scene viewport, so the conceptual plant stays easy to read. */
+.tanga-deck .tanga-process-exhibit--factory {
+  color: #f2eee8;
+  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: 14px;
+  background: linear-gradient(155deg, rgba(20, 29, 38, .98), rgba(9, 15, 22, .97));
+  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-header small,
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-kicker {
+  color: var(--tanga-label, #9dc6d1);
+}
+.tanga-deck .tanga-process-exhibit--factory h2,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
+  color: #f5f1eb;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-actions button,
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-routes button,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-stages button {
+  border: 1px solid var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .045);
+  color: rgba(245, 241, 235, .82);
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-actions button:hover:not(:disabled),
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-routes button:hover,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-stages button:hover {
+  border-color: rgba(227, 154, 94, .48);
+  background: rgba(227, 154, 94, .10);
+  color: #fff8f1;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-actions button[aria-pressed="true"],
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-routes button[aria-pressed="true"],
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-stages button[aria-pressed="true"] {
+  border-color: rgba(227, 154, 94, .62);
+  background: linear-gradient(135deg, rgba(227, 154, 94, .20), rgba(185, 149, 75, .08));
+  color: #fff4e9;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-stages button b,
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-routes button > span {
+  color: var(--tanga-accent, #e39a5e);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-routes button strong,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-stages button span {
+  color: inherit;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-routes button small {
+  color: var(--tanga-muted, rgba(223, 231, 237, .68));
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector {
+  border-color: var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: var(--tanga-panel-radius, 14px);
+  background: linear-gradient(155deg, rgba(15, 23, 32, .97), var(--tanga-panel-bg, rgba(9, 15, 22, .94)));
+  box-shadow: var(--tanga-panel-shadow, 0 18px 48px rgba(0, 0, 0, .34));
+  color: #f5f1eb;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-explanation,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-motion-note,
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-boundary {
+  color: var(--tanga-muted, rgba(223, 231, 237, .68));
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow div,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result {
+  border-color: var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .045);
+  color: #f5f1eb;
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow dt,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result span,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result small,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-disclosure,
+.tanga-deck .tanga-process-exhibit--factory .tanga-enduse-boundary {
+  color: var(--tanga-muted, rgba(223, 231, 237, .68));
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-flow dd,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result i {
+  color: rgba(245, 241, 235, .88);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result strong {
+  color: var(--tanga-accent, #e39a5e);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-process-caption {
+  border-color: rgba(13, 23, 31, .15);
+  border-radius: 0 0 11px 11px;
+  background: rgba(236, 239, 235, .92);
+}
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-footer {
+  border-color: var(--tanga-panel-border, rgba(218, 229, 239, .14));
+  color: var(--tanga-muted, rgba(223, 231, 237, .68));
+}
+.tanga-deck .tanga-process-exhibit--factory :is(button, summary, a):focus-visible {
+  outline: 2px solid #efb980;
+  outline-offset: 3px;
+}
+
 /* Short desktop screens need room for the site qualification and both camera
    presets without pushing the concept actions into a nested scroll area. */
 @media(min-width:761px) and (max-height:800px){
