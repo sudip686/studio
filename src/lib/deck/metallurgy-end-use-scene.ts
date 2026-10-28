@@ -79,6 +79,18 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
   base.position.set(50, -1.65, 0);
   base.receiveShadow = true;
   group.add(base);
+  // Replace the long process runway with a compact product-stage when the
+  // journey reaches its finale. This gives the end product its own composed
+  // frame instead of leaving it stranded on an oversized presentation slab.
+  const heroPlinth = new THREE.Mesh(
+    new THREE.BoxGeometry(route === 'anode' ? 184 : 154, 3, route === 'anode' ? 92 : 118),
+    new THREE.MeshStandardMaterial({color: '#45565a', roughness: .88, metalness: .06}),
+  );
+  heroPlinth.name = route === 'anode' ? 'EV anode product hero plinth' : 'Refractory application hero plinth';
+  heroPlinth.position.set(route === 'anode' ? 203 : 181, -1.65, 0);
+  heroPlinth.receiveShadow = true;
+  heroPlinth.visible = false;
+  group.add(heroPlinth);
 
   const path = [-128, -48, 38, 158];
   const rings = path.map((x, index) => addStageRing(group, x, materials.teal, index));
@@ -148,10 +160,12 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     const cellShell = new THREE.Mesh(new THREE.BoxGeometry(48, 36, 34), new THREE.MeshPhysicalMaterial({color: '#9ab1b7', roughness: .23, metalness: .28, transparent: true, opacity: .23, side: THREE.DoubleSide}));
     cellShell.name = 'Transparent battery-cell enclosure'; cellShell.position.set(0, 22, 0); cell.add(cellShell);
     const activeMaterialLayers: THREE.Mesh[] = [];
+    const activeMaterialLayerBases: THREE.Vector3[] = [];
     for (let i = 0; i < 7; i++) {
       const y = 8 + i * 4.2;
       const layer = addBox(cell, i % 2 === 0 ? 'Graphite anode active-material layer' : 'Copper current-collector layer', [40, 2.2, 26], [0, y, 0], (i % 2 === 0 ? materials.graphite : materials.copper).clone());
       activeMaterialLayers.push(layer);
+      activeMaterialLayerBases.push(layer.position.clone());
     }
     const separator = new THREE.Mesh(new THREE.BoxGeometry(39, .65, 24), new THREE.MeshPhysicalMaterial({color: '#8ed7d2', roughness: .55, transparent: true, opacity: .4, side: THREE.DoubleSide}));
     separator.name = 'Illustrative porous separator between electrodes'; separator.position.set(0, 22.7, 0); cell.add(separator);
@@ -167,18 +181,37 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     }
     for (const x of [-21, 21]) addBox(cell, 'Battery-cell terminal', [5, 5, 5], [x, 42, 0], materials.copper);
     const car = new THREE.Group(); car.name = 'EV downstream-use context illustration'; car.position.set(245, 0, 0); group.add(car);
-    const bodyShape = new THREE.Shape(); bodyShape.moveTo(-28, 4); bodyShape.lineTo(-24, 14); bodyShape.lineTo(-13, 17); bodyShape.lineTo(-4, 28); bodyShape.lineTo(15, 28); bodyShape.lineTo(25, 15); bodyShape.lineTo(30, 11); bodyShape.lineTo(29, 4); bodyShape.closePath();
-    const body = new THREE.Mesh(new THREE.ExtrudeGeometry(bodyShape, {depth: 15, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 1.2, bevelThickness: 1.2}), new THREE.MeshStandardMaterial({color: '#d7e0de', roughness: .42, metalness: .38}));
-    body.name = 'EV silhouette for downstream use'; body.position.z = -7.5; body.castShadow = true; car.add(body);
-    for (const x of [-17, 17]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 3.5, 24), materials.graphite);
-      wheel.name = 'EV wheel'; wheel.rotation.x = Math.PI / 2; wheel.position.set(x, 5, 8); car.add(wheel);
+    const bodyShape = new THREE.Shape();
+    bodyShape.moveTo(-37, 5); bodyShape.lineTo(-38, 10); bodyShape.quadraticCurveTo(-36, 16, -27, 17);
+    bodyShape.lineTo(-15, 18); bodyShape.quadraticCurveTo(-8, 30, 4, 31); bodyShape.lineTo(15, 31);
+    bodyShape.quadraticCurveTo(25, 30, 31, 19); bodyShape.lineTo(39, 14); bodyShape.quadraticCurveTo(42, 12, 42, 8);
+    bodyShape.lineTo(40, 5); bodyShape.quadraticCurveTo(38, 4, 34, 4); bodyShape.lineTo(-33, 4); bodyShape.closePath();
+    const body = new THREE.Mesh(new THREE.ExtrudeGeometry(bodyShape, {depth: 22, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 1.4, bevelThickness: 1.3}), new THREE.MeshStandardMaterial({color: '#c2ceca', roughness: .34, metalness: .32}));
+    body.name = 'EV silhouette for downstream use'; body.position.z = -11; body.castShadow = true; car.add(body);
+    const glassMaterial = new THREE.MeshStandardMaterial({color: '#4e696d', roughness: .3, metalness: .26, emissive: '#142b2e', emissiveIntensity: .12, side: THREE.DoubleSide});
+    const windowShape = new THREE.Shape(); windowShape.moveTo(-12, 19); windowShape.lineTo(-5, 28); windowShape.quadraticCurveTo(-3, 29, 0, 29); windowShape.lineTo(7, 29); windowShape.quadraticCurveTo(13, 28, 17, 19); windowShape.closePath();
+    const windowMesh = new THREE.Mesh(new THREE.ShapeGeometry(windowShape), glassMaterial);
+    windowMesh.name = 'Dark glass side window on EV context model'; windowMesh.position.z = 13.5; car.add(windowMesh);
+    const rearWindowShape = new THREE.Shape(); rearWindowShape.moveTo(18, 19); rearWindowShape.lineTo(25, 18); rearWindowShape.lineTo(30, 15); rearWindowShape.lineTo(24, 19); rearWindowShape.closePath();
+    const rearWindow = new THREE.Mesh(new THREE.ShapeGeometry(rearWindowShape), glassMaterial);
+    rearWindow.name = 'EV rear quarter window'; rearWindow.position.z = 13.5; car.add(rearWindow);
+    for (const x of [-24, 25]) {
+      for (const z of [-11, 11]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 3.5, 32), materials.graphite);
+        wheel.name = 'EV wheel'; wheel.rotation.x = Math.PI / 2; wheel.position.set(x, 5.5, z); car.add(wheel);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 3.8, 24), materials.steel);
+        hub.name = 'EV wheel alloy hub'; hub.rotation.x = Math.PI / 2; hub.position.copy(wheel.position); car.add(hub);
+      }
     }
-    const batteryPack = addBox(car, 'Illustrative battery pack under EV platform', [34, 3, 12], [0, 3.5, 0], materials.teal.clone());
-    const layerBaseX = activeMaterialLayers.map(layer => layer.position.x);
+    const batteryPack = addBox(car, 'Illustrative battery pack under EV platform', [42, 2.8, 13], [0, 1.7, 0], materials.steel.clone());
+    const batteryModules: THREE.MeshStandardMaterial[] = [];
+    for (let index = 0; index < 6; index++) {
+      const moduleMaterial = materials.teal.clone();
+      moduleMaterial.emissiveIntensity = .04;
+      const module = addBox(car, 'Illustrative EV battery module', [5.5, .55, 10.5], [-17.5 + index * 7, 3.35, 0], moduleMaterial);
+      batteryModules.push(moduleMaterial);
+    }
     const coatingHeadBaseX = coatingHead.position.x;
-    const carBaseX = car.position.x;
-    const carWheelMeshes = car.children.filter((child): child is THREE.Mesh => child instanceof THREE.Mesh && child.name === 'EV wheel');
     updateMotion = (seconds, step) => {
       const drumTime = Math.min(seconds, 6);
       drum.quaternion.copy(drumMount).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), drumTime * .72));
@@ -199,7 +232,11 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
       const stackReveal = step === 4 ? THREE.MathUtils.clamp((seconds - 24) * .8, 0, 1) : 0;
       activeMaterialLayers.forEach((layer, index) => {
         const side = index % 2 === 0 ? -1 : 1;
-        layer.position.x = layerBaseX[index] + side * stackReveal * 1.25;
+        const base = activeMaterialLayerBases[index];
+        layer.position.set(base.x + side * stackReveal * 4.4, base.y + stackReveal * ((index % 3) - 1) * .28, base.z);
+        const material = layer.material as THREE.MeshStandardMaterial;
+        material.emissive.set(index % 2 === 0 ? '#9a704c' : '#000000');
+        material.emissiveIntensity = step === 4 && index % 2 === 0 ? .16 + stackReveal * .12 : 0;
       });
       separator.material.opacity = step === 4 ? .3 + .1 * (.5 + .5 * Math.sin(seconds * 2.2)) : .4;
       const chargeProgress = step === 4 ? THREE.MathUtils.clamp((seconds - 24) / 5.5, 0, 1) : 0;
@@ -213,10 +250,12 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
       });
       (cathode.material as THREE.MeshStandardMaterial).emissiveIntensity = step === 4 ? .14 + .1 * (.5 + .5 * Math.sin(seconds * 2)) : 0;
       (cathodeCurrentCollector.material as THREE.MeshStandardMaterial).emissiveIntensity = step === 4 ? .1 : 0;
-      carWheelMeshes.forEach(wheel => { wheel.rotation.z = step === 4 ? (seconds - 24) * 1.8 : 0; });
-      car.position.x = step === 4 ? carBaseX + Math.sin((seconds - 24) * .72) * 1.2 : carBaseX;
       const packMaterial = batteryPack.material as THREE.MeshStandardMaterial;
-      packMaterial.emissiveIntensity = step === 4 ? .28 + .22 * (.5 + .5 * Math.sin(seconds * 2.1)) : .08;
+      packMaterial.emissiveIntensity = step === 4 ? .12 : .02;
+      batteryModules.forEach((material, index) => {
+        const activeModule = step === 4 && Math.floor((seconds - 24) * 1.15) % batteryModules.length === index;
+        material.emissiveIntensity = activeModule ? .6 : step === 4 ? .1 : .04;
+      });
     };
   } else {
     addFlakeCluster(group, [-128, 8, 0], 13, 5.2, materials.graphite);
@@ -341,6 +380,8 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
 
   function setHeroFocus(active: boolean) {
     heroFocusHide.forEach(object => { object.visible = !active; });
+    base.visible = !active;
+    heroPlinth.visible = active;
     // Clear the process marker rings from the finished-product composition;
     // an isolated ring reads like a stray annotation after upstream stages hide.
     rings.forEach(ring => { ring.visible = !active; });

@@ -99,7 +99,9 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
       const outlineGeometry=new THREE.BufferGeometry();
       outlineGeometry.setAttribute('position',new THREE.Float32BufferAttribute(outline,3));
       // A quiet dark keyline keeps pale units readable over both bright ground
-      // and forest imagery; the fine light line preserves the map-like edge.
+      // and forest imagery; the visible edge uses the source-map unit swatch
+      // so adjoining contacts reinforce the legend instead of reading as one
+      // unrelated white boundary network.
       const shadowGeometry=outlineGeometry.clone();
       const shadowPositions=shadowGeometry.getAttribute('position');
       for(let i=0;i<shadowPositions.count;i++)shadowPositions.setY(i,shadowPositions.getY(i)-1.5);
@@ -109,7 +111,7 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
       shadow.userData.geologicUnit=feature.properties.unit;
       shadow.renderOrder=30;
       group.add(shadow);
-      const boundaries=new THREE.LineSegments(outlineGeometry,new THREE.LineBasicMaterial({color:'#f5f2e9',transparent:true,opacity:.76,depthWrite:false,toneMapped:false}));
+      const boundaries=new THREE.LineSegments(outlineGeometry,new THREE.LineBasicMaterial({color:feature.properties.color,transparent:true,opacity:.88,depthWrite:false,toneMapped:false}));
       boundaries.name=`${feature.properties.unit} · mapped boundary`;
       boundaries.userData.geologicUnit=feature.properties.unit;
       boundaries.renderOrder=31;

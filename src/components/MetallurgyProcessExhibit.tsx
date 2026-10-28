@@ -22,7 +22,7 @@ const IMO_PROCESS_REPORT='/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%2
 
 type ProcessId = typeof PROCESS[number]['id'];
 type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofSlideSign?: number; roofBaseZ?: number}};
-type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void; showEndUse: (route: MetallurgyEndUseRoute, animate: boolean) => void; focusEndUseStep: (route: MetallurgyEndUseRoute, step: number, animate: boolean, heroDetail?: boolean) => void; returnToPlant: (animate: boolean) => void};
+type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void; showEndUse: (route: MetallurgyEndUseRoute, animate: boolean) => void; focusEndUseStep: (route: MetallurgyEndUseRoute, step: number, animate: boolean, heroDetail?: boolean) => void; setEndUseHeroFocus: (route: MetallurgyEndUseRoute, active: boolean) => void; returnToPlant: (animate: boolean) => void};
 type FactoryRecoveryView = {position: [number, number, number]; target: [number, number, number]; fov: number; processTime: number; endUseRoute?: MetallurgyEndUseRoute | null; journeyTime?: number};
 const END_USE_BACKGROUND = '#aab9b7';
 
@@ -100,6 +100,10 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     scene.add(plant);
     const endUseScene = createMetallurgyEndUseScene();
     scene.add(endUseScene.root);
+    function setEndUseHeroFocus(route: MetallurgyEndUseRoute, active: boolean) {
+      endUseScene.setHeroFocus(route, active);
+      if (element) element.dataset.endUseHeroFocus = String(active);
+    }
     const roofs = plant.children.filter((object): object is RoofMesh => object instanceof THREE.Mesh && Boolean(object.userData.plantRoof));
     roofs.forEach(roof => {
       roof.userData.roofBaseZ = roof.position.z;
@@ -176,8 +180,18 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       moveCamera(animate, true);
     }
     function showEndUse(route: MetallurgyEndUseRoute, animate: boolean) {
-      endUseScene.setHeroFocus(route, false);
       endUseScene.setRoute(route);
+      const heroActive = journeyHeroRevealRef.current && endUseRouteRef.current === route;
+      setEndUseHeroFocus(route, heroActive);
+      if (heroActive) {
+        focusEndUseStep(route, endUseScene.steps[route].length - 1, false, true);
+        endUseScene.root.visible = true;
+        plant.visible = false;
+        ground.visible = false;
+        scene.background = new THREE.Color(END_USE_BACKGROUND);
+        dirty = true;
+        return;
+      }
       endUseScene.root.visible = true;
       plant.visible = false;
       ground.visible = false;
@@ -216,7 +230,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       dirty = true;
     }
     function returnToPlant(animate: boolean) {
-      if (endUseRouteRef.current) endUseScene.setHeroFocus(endUseRouteRef.current, false);
+      journeyHeroRevealRef.current = false;
+      if (endUseRouteRef.current) setEndUseHeroFocus(endUseRouteRef.current, false);
       endUseScene.root.visible = false;
       plant.visible = true;
       ground.visible = true;
@@ -256,7 +271,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         roof.visible = true;
       });
     }
-    viewCommand.current = {frameStage, fitOverview, updateRoofTargets, showEndUse, focusEndUseStep, returnToPlant};
+    viewCommand.current = {frameStage, fitOverview, updateRoofTargets, showEndUse, focusEndUseStep, setEndUseHeroFocus, returnToPlant};
     let canvasWidth = 0, canvasHeight = 0;
     const resize = () => {
       const width = element.clientWidth, height = element.clientHeight;
@@ -355,7 +370,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           const routeFinalStep = route ? endUseScene.steps[route].length - 1 : -1;
           if (route && currentJourneyStep === routeFinalStep && journeyElapsed - routeFinalStep * 6 >= 3 && !journeyHeroRevealRef.current && !userOrbit) {
             journeyHeroRevealRef.current = true;
-            endUseScene.setHeroFocus(route, true);
+            setEndUseHeroFocus(route, true);
             focusEndUseStep(route, currentJourneyStep, true, true);
           }
           if (journeyElapsed >= endUseScene.duration) {
@@ -483,6 +498,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     setFullStoryActive(false);
     endUseRouteRef.current = 'anode';
     journeyElapsedRef.current = 0;
+    journeyHeroRevealRef.current = false;
     journeyActiveRef.current = false;
     journeyStepRef.current = 0; setJourneyStep(0); setJourneyActive(false); setJourneyComplete(false);
     setEndUseRoute('anode');
@@ -494,6 +510,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const sameRoute = endUseRouteRef.current === route;
     endUseRouteRef.current = route;
     journeyElapsedRef.current = 0;
+    journeyHeroRevealRef.current = false;
     journeyActiveRef.current = false;
     journeyStepRef.current = 0; setJourneyStep(0); setJourneyActive(false); setJourneyComplete(false);
     setEndUseRoute(route);
@@ -506,12 +523,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     setFullStoryActive(false);
     journeyElapsedRef.current = 0;
     journeyHeroRevealRef.current = false;
+    viewCommand.current?.setEndUseHeroFocus(endUseRoute, false);
     if (reduceMotion) {
       const finalStep = endUseRoute === 'anode' ? 4 : 3;
       journeyElapsedRef.current = (finalStep + 1) * 6;
       journeyActiveRef.current = false;
       journeyStepRef.current = finalStep; setJourneyActive(false); setJourneyComplete(true); setJourneyStep(finalStep);
-      viewCommand.current?.focusEndUseStep(endUseRoute, finalStep, false);
+      journeyHeroRevealRef.current = true;
+      viewCommand.current?.setEndUseHeroFocus(endUseRoute, true);
+      viewCommand.current?.focusEndUseStep(endUseRoute, finalStep, false, true);
       const element = host.current;
       if (element) {
         element.dataset.endUseRoute = endUseRoute;
@@ -531,6 +551,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     fullStoryActiveRef.current = false;
     setFullStoryActive(false);
     endUseRouteRef.current = null;
+    journeyHeroRevealRef.current = false;
     journeyActiveRef.current = false;
     setJourneyActive(false); setJourneyComplete(false); setEndUseRoute(null);
     setOverview(true); setOpenRoof(false); overviewRef.current = true; openRoofRef.current = false;
