@@ -22,7 +22,7 @@ const IMO_PROCESS_REPORT='/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%2
 
 type ProcessId = typeof PROCESS[number]['id'];
 type RoofMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]> & {userData: {plantRoof?: boolean; plantStage?: string; roofBaseY?: number; roofOpacity?: number}};
-type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void; showEndUse: (route: MetallurgyEndUseRoute, animate: boolean) => void; focusEndUseStep: (route: MetallurgyEndUseRoute, step: number, animate: boolean) => void; returnToPlant: (animate: boolean) => void};
+type ViewCommand = {frameStage: (stage: ProcessId, animate: boolean) => void; fitOverview: (animate: boolean) => void; updateRoofTargets: () => void; showEndUse: (route: MetallurgyEndUseRoute, animate: boolean) => void; focusEndUseStep: (route: MetallurgyEndUseRoute, step: number, animate: boolean, heroDetail?: boolean) => void; returnToPlant: (animate: boolean) => void};
 type FactoryRecoveryView = {position: [number, number, number]; target: [number, number, number]; fov: number; processTime: number; endUseRoute?: MetallurgyEndUseRoute | null; journeyTime?: number};
 
 /** Conceptual connected plant tour. Laboratory measurements stay in the evidence board. */
@@ -54,6 +54,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
   const endUseRouteRef = useRef<MetallurgyEndUseRoute | null>(endUseRoute); endUseRouteRef.current = endUseRoute;
   const journeyActiveRef = useRef(journeyActive); journeyActiveRef.current = journeyActive;
   const journeyElapsedRef = useRef(0);
+  const journeyHeroRevealRef = useRef(false);
   const plantTourActiveRef = useRef(plantTourActive); plantTourActiveRef.current = plantTourActive;
   const plantTourElapsedRef = useRef(0);
   const plantTourStepRef = useRef(plantTourStep);
@@ -175,6 +176,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       moveCamera(animate, true);
     }
     function showEndUse(route: MetallurgyEndUseRoute, animate: boolean) {
+      endUseScene.setHeroFocus(route, false);
       endUseScene.setRoute(route);
       endUseScene.root.visible = true;
       plant.visible = false;
@@ -190,23 +192,29 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       moveCamera(animate);
       dirty = true;
     }
-    function focusEndUseStep(route: MetallurgyEndUseRoute, step: number, animate: boolean) {
-      const routeTargets = route === 'anode' ? [-128, -34, 44, 82, 176] : [-128, -48, 38, 178];
+    function focusEndUseStep(route: MetallurgyEndUseRoute, step: number, animate: boolean, heroDetail = false) {
+      const routeTargets = route === 'anode' ? [-128, -34, 44, 82, 202] : [-128, -48, 38, 178];
       const boundedStep = Math.min(routeTargets.length - 1, Math.max(0, step));
-      const targetHeight = route === 'refractory' && boundedStep === 3 ? 42 : route === 'anode' && boundedStep === 3 ? 13 : route === 'anode' && boundedStep === 4 ? 24 : 20;
-      target.set(routeTargets[boundedStep], targetHeight, route === 'anode' && boundedStep === 3 ? 17 : 0);
+      const isAnodeHero = heroDetail && route === 'anode' && boundedStep === 4;
+      const isRefractoryHero = heroDetail && route === 'refractory' && boundedStep === 3;
+      const targetHeight = isAnodeHero ? 22 : isRefractoryHero ? 18 : route === 'refractory' && boundedStep === 3 ? 42 : route === 'anode' && boundedStep === 3 ? 13 : route === 'anode' && boundedStep === 4 ? 24 : 20;
+      target.set(isAnodeHero ? 202 : isRefractoryHero ? 224 : routeTargets[boundedStep], targetHeight, route === 'anode' && boundedStep === 3 ? 17 : 0);
       direction.set(.64, .58, 1.2).normalize();
-      const widths = route === 'anode' ? [86, 116, 142, 146, 196] : [86, 108, 142, 174];
-      const heights = route === 'anode' ? [56, 60, 68, 74, 82] : [56, 60, 72, 108];
+      // Frame the final product vignettes as complete compositions: the anode
+      // cell and EV context should read together, while the refractory brick
+      // needs enough margin to show its full face and cutaway edge.
+      const widths = isAnodeHero ? [160] : isRefractoryHero ? [84] : route === 'anode' ? [86, 116, 142, 146, 148] : [86, 108, 142, 174];
+      const heights = isAnodeHero ? [92] : isRefractoryHero ? [70] : route === 'anode' ? [56, 60, 68, 74, 70] : [56, 60, 72, 108];
       const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-      const horizontalFit = widths[boundedStep] / (2 * tanHalfFov * Math.max(.7, camera.aspect));
-      const verticalFit = heights[boundedStep] / (2 * tanHalfFov);
-      const distance = Math.max(72, horizontalFit, verticalFit) * 1.12;
+      const horizontalFit = widths[heroDetail ? 0 : boundedStep] / (2 * tanHalfFov * Math.max(.7, camera.aspect));
+      const verticalFit = heights[heroDetail ? 0 : boundedStep] / (2 * tanHalfFov);
+      const distance = Math.max(heroDetail ? 40 : 72, horizontalFit, verticalFit) * 1.12;
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
       dirty = true;
     }
     function returnToPlant(animate: boolean) {
+      if (endUseRouteRef.current) endUseScene.setHeroFocus(endUseRouteRef.current, false);
       endUseScene.root.visible = false;
       plant.visible = true;
       ground.visible = true;
@@ -331,7 +339,18 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           if (currentJourneyStep !== journeyStepRef.current) {
             journeyStepRef.current = currentJourneyStep;
             setJourneyStep(currentJourneyStep);
+            if (route && currentJourneyStep === endUseScene.steps[route].length - 1) journeyHeroRevealRef.current = false;
             if (route) focusEndUseStep(route, currentJourneyStep, true);
+          }
+          // Finish each pathway with a deliberate product close-up: the EV
+          // battery-cell anode, or the graphite-bearing refractory working face.
+          // This is a camera beat only; process timing and reported evidence do
+          // not change. Reduced motion skips this secondary camera move.
+          const routeFinalStep = route ? endUseScene.steps[route].length - 1 : -1;
+          if (route && currentJourneyStep === routeFinalStep && journeyElapsed - routeFinalStep * 6 >= 3 && !journeyHeroRevealRef.current && !userOrbit) {
+            journeyHeroRevealRef.current = true;
+            endUseScene.setHeroFocus(route, true);
+            focusEndUseStep(route, currentJourneyStep, true, true);
           }
           if (journeyElapsed >= endUseScene.duration) {
             journeyActiveRef.current = false;
@@ -436,7 +455,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
   const selected = PROCESS.find(item => item.id === stage) ?? PROCESS[0];
   const result = MET_GROUPS[sample];
-  const routeSteps = endUseRoute ? (endUseRoute === 'anode' ? ['Shape', 'Purify', 'Coat & heat', 'Electrode line', 'Cell + EV'] : ['Blend', 'Press', 'MgO–C brick', 'Furnace lining']) : [];
+  const routeSteps = endUseRoute ? (endUseRoute === 'anode' ? ['Shape', 'Purify', 'Coat & heat', 'Electrode line', 'Anode cell cutaway'] : ['Blend', 'Press', 'MgO–C brick', 'Lining detail']) : [];
   const routeTitle = endUseRoute === 'anode' ? 'EV battery anode pathway' : 'Steelmaking refractory pathway';
   const routeDescription = endUseRoute === 'anode'
     ? [
@@ -480,6 +499,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     fullStoryActiveRef.current = false;
     setFullStoryActive(false);
     journeyElapsedRef.current = 0;
+    journeyHeroRevealRef.current = false;
     if (reduceMotion) {
       const finalStep = endUseRoute === 'anode' ? 4 : 3;
       journeyElapsedRef.current = (finalStep + 1) * 6;

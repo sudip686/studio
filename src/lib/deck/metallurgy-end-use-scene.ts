@@ -4,8 +4,8 @@ export type MetallurgyEndUseRoute = 'anode' | 'refractory';
 
 const ROUTE_STEP_SECONDS = 6;
 const ROUTE_STEPS: Record<MetallurgyEndUseRoute, readonly string[]> = {
-  anode: ['Shape', 'Purify', 'Coat & heat', 'Electrode coating', 'Cell + EV'],
-  refractory: ['Blend', 'Press', 'MgO–C brick', 'Furnace lining'],
+  anode: ['Shape', 'Purify', 'Coat & heat', 'Electrode coating', 'Anode cell cutaway'],
+  refractory: ['Blend', 'Press', 'MgO–C brick', 'Lining detail'],
 };
 
 function makeFlakeGeometry(radius: number, seed: number) {
@@ -74,14 +74,15 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
 }) {
   const group = new THREE.Group();
   group.name = route === 'anode' ? 'Illustrative EV anode downstream route' : 'Illustrative graphite refractory downstream route';
-  const base = new THREE.Mesh(new THREE.BoxGeometry(390, 3, 92), new THREE.MeshStandardMaterial({color: '#334249', roughness: .78, metalness: .14}));
+  const base = new THREE.Mesh(new THREE.BoxGeometry(460, 3, 92), new THREE.MeshStandardMaterial({color: '#334249', roughness: .78, metalness: .14}));
   base.name = 'Product pathway presentation plinth';
-  base.position.set(28, -1.65, 0);
+  base.position.set(50, -1.65, 0);
   base.receiveShadow = true;
   group.add(base);
 
-  const path = [-128, -48, 38, 132];
+  const path = [-128, -48, 38, 158];
   const rings = path.map((x, index) => addStageRing(group, x, materials.teal, index));
+  const heroFocusHide: THREE.Object3D[] = [];
   let updateMotion = (_seconds: number, _step: number) => {};
   for (let i = 0; i < path.length - 1; i++) {
     const rail = new THREE.Mesh(new THREE.BoxGeometry(path[i + 1] - path[i] - 24, .28, .75), materials.steel);
@@ -89,6 +90,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     rail.position.set((path[i] + path[i + 1]) / 2, 2.1, 0);
     rail.castShadow = true;
     group.add(rail);
+    heroFocusHide.push(rail);
   }
 
   if (route === 'anode') {
@@ -97,6 +99,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     // A compact shaping and purification line. The forms communicate unit
     // operations without suggesting a designed Tanga facility.
     const mixer = new THREE.Group(); mixer.name = 'Illustrative particle shaping and purification equipment'; mixer.position.set(-48, 0, 0); group.add(mixer);
+    heroFocusHide.push(mixer);
     const drum = addCylinder(mixer, 'Particle-shaping drum', 11, 11, 28, [0, 11, 0], materials.steel, 32);
     drum.rotation.z = Math.PI / 2;
     const drumMount = drum.quaternion.clone();
@@ -114,6 +117,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     const filterPlateBaseX = filterPlates.map(plate => plate.position.x);
 
     const coat = new THREE.Group(); coat.name = 'Illustrative coating and carbonization'; coat.position.set(38, 0, 0); group.add(coat);
+    heroFocusHide.push(coat);
     addBox(coat, 'Coating enclosure', [42, 29, 35], [0, 16, -2], materials.steel);
     addBox(coat, 'Coating enclosure window', [22, 13, 1], [0, 17, 16], materials.teal);
     const furnace = addBox(coat, 'Carbonization furnace', [30, 35, 28], [31, 19, -2], materials.steel);
@@ -124,6 +128,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     furnace.castShadow = true;
 
     const electrodeLine = new THREE.Group(); electrodeLine.name = 'Illustrative anode electrode coating and calendering line'; electrodeLine.position.set(82, 0, 24); electrodeLine.scale.setScalar(1.28); group.add(electrodeLine);
+    heroFocusHide.push(electrodeLine);
     addBox(electrodeLine, 'Electrode line foundation', [54, 3, 28], [0, 1.5, 0], materials.steel);
     addBox(electrodeLine, 'Copper anode current-collector foil', [45, .35, 12], [0, 5.2, 0], materials.copper);
     addBox(electrodeLine, 'Graphite active-material coating on copper foil', [30, .38, 9], [0, 5.55, 0], materials.graphite);
@@ -139,7 +144,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     }
     const coatingHead = addBox(electrodeLine, 'Illustrative electrode coating head', [7, 8, 15], [-9, 18, 0], materials.pale);
 
-    const cell = new THREE.Group(); cell.name = 'Illustrative battery anode cutaway'; cell.position.set(132, 0, 0); group.add(cell);
+    const cell = new THREE.Group(); cell.name = 'Illustrative battery anode cutaway'; cell.position.set(158, 0, 0); group.add(cell);
     const cellShell = new THREE.Mesh(new THREE.BoxGeometry(48, 36, 34), new THREE.MeshPhysicalMaterial({color: '#9ab1b7', roughness: .23, metalness: .28, transparent: true, opacity: .23, side: THREE.DoubleSide}));
     cellShell.name = 'Transparent battery-cell enclosure'; cellShell.position.set(0, 22, 0); cell.add(cellShell);
     const activeMaterialLayers: THREE.Mesh[] = [];
@@ -161,7 +166,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
       ion.visible = false; cell.add(ion); lithiumIons.push(ion);
     }
     for (const x of [-21, 21]) addBox(cell, 'Battery-cell terminal', [5, 5, 5], [x, 42, 0], materials.copper);
-    const car = new THREE.Group(); car.name = 'EV downstream-use context illustration'; car.position.set(215, 0, 0); group.add(car);
+    const car = new THREE.Group(); car.name = 'EV downstream-use context illustration'; car.position.set(245, 0, 0); group.add(car);
     const bodyShape = new THREE.Shape(); bodyShape.moveTo(-28, 4); bodyShape.lineTo(-24, 14); bodyShape.lineTo(-13, 17); bodyShape.lineTo(-4, 28); bodyShape.lineTo(15, 28); bodyShape.lineTo(25, 15); bodyShape.lineTo(30, 11); bodyShape.lineTo(29, 4); bodyShape.closePath();
     const body = new THREE.Mesh(new THREE.ExtrudeGeometry(bodyShape, {depth: 15, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 1.2, bevelThickness: 1.2}), new THREE.MeshStandardMaterial({color: '#d7e0de', roughness: .42, metalness: .38}));
     body.name = 'EV silhouette for downstream use'; body.position.z = -7.5; body.castShadow = true; car.add(body);
@@ -217,6 +222,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     addFlakeCluster(group, [-128, 8, 0], 13, 5.2, materials.graphite);
 
     const mixer = new THREE.Group(); mixer.name = 'Illustrative MgO and graphite blending'; mixer.position.set(-48, 0, 0); group.add(mixer);
+    heroFocusHide.push(mixer);
     addCylinder(mixer, 'Refractory batch mixer', 15, 18, 27, [0, 15, 0], materials.steel, 32);
     addCylinder(mixer, 'Mixer upper rim', 18, 18, 2.5, [0, 28.5, 0], materials.copper, 32);
     addBox(mixer, 'Mixer drive housing', [12, 8, 14], [16, 8, 0], materials.steel);
@@ -227,6 +233,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     }
 
     const press = new THREE.Group(); press.name = 'Illustrative refractory brick press'; press.position.set(38, 0, 0); group.add(press);
+    heroFocusHide.push(press);
     addBox(press, 'Refractory press bed', [48, 6, 34], [0, 4, 0], materials.steel);
     const ram = addBox(press, 'Refractory press ram', [34, 8, 28], [0, 31, 0], materials.copper);
     const ramBaseY = ram.position.y;
@@ -236,6 +243,7 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     addFlakeCluster(press, [0, 11, 12], 5, 2.1, materials.graphite);
 
     const furnace = new THREE.Group(); furnace.name = 'Illustrative electric-arc furnace cutaway'; furnace.position.set(145, 0, 0); group.add(furnace);
+    heroFocusHide.push(furnace);
     const shell = new THREE.Mesh(new THREE.CylinderGeometry(36, 42, 69, 40, 1, true, .55, Math.PI * 1.82), materials.steel);
     shell.name = 'Cutaway EAF steel shell'; shell.position.y = 35; shell.castShadow = true; shell.receiveShadow = true; furnace.add(shell);
     const lining = new THREE.Mesh(new THREE.CylinderGeometry(30, 35, 63, 40, 1, true, .55, Math.PI * 1.82), new THREE.MeshStandardMaterial({color: '#d39160', roughness: .94, emissive: '#482313', emissiveIntensity: .24, side: THREE.DoubleSide}));
@@ -270,7 +278,14 @@ function createRouteDeck(route: MetallurgyEndUseRoute, materials: {
     };
   }
 
-  return {group, path, rings, updateMotion};
+  function setHeroFocus(active: boolean) {
+    heroFocusHide.forEach(object => { object.visible = !active; });
+    // Clear the process marker rings from the finished-product composition;
+    // an isolated ring reads like a stray annotation after upstream stages hide.
+    rings.forEach(ring => { ring.visible = !active; });
+  }
+
+  return {group, path, rings, updateMotion, setHeroFocus};
 }
 
 /** Build a separate product vignette so illustrative downstream scenes never
@@ -297,6 +312,8 @@ export function createMetallurgyEndUseScene() {
   let lastStep = -1;
 
   function setRoute(route: MetallurgyEndUseRoute) {
+    anode.setHeroFocus(false);
+    refractory.setHeroFocus(false);
     selected = route;
     anode.group.visible = route === 'anode';
     refractory.group.visible = route === 'refractory';
@@ -336,5 +353,9 @@ export function createMetallurgyEndUseScene() {
 
   setRoute('anode');
   update(0, false);
-  return {root, setRoute, update, steps: ROUTE_STEPS, get duration() { return ROUTE_STEPS[selected].length * ROUTE_STEP_SECONDS; }};
+  function setHeroFocus(route: MetallurgyEndUseRoute, active: boolean) {
+    (route === 'anode' ? anode : refractory).setHeroFocus(active);
+    flow.visible = !active;
+  }
+  return {root, setRoute, setHeroFocus, update, steps: ROUTE_STEPS, get duration() { return ROUTE_STEPS[selected].length * ROUTE_STEP_SECONDS; }};
 }
