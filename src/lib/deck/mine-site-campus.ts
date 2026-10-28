@@ -29,21 +29,21 @@ export function buildMineSiteCampus(options:Options) {
     // terrain. Fixed site lighting gives the transition relief while keeping
     // its color camera independent; low opacity avoids a broad opaque plate.
     earth:new THREE.MeshStandardMaterial({color:0x918574,roughness:.96,metalness:0,transparent:true,opacity:SITE_EARTHWORK_OPACITY,depthWrite:false,side:THREE.DoubleSide}),
-    bench:new THREE.MeshStandardMaterial({color:0xa28b6c,roughness:.96,metalness:0,side:THREE.DoubleSide}),
-    rock:new THREE.MeshStandardMaterial({color:0x857e71,roughness:.98,metalness:0,side:THREE.DoubleSide}),
-    beach:new THREE.MeshStandardMaterial({color:0xa5a397,roughness:.94,metalness:0,side:THREE.DoubleSide}),
-    liner:new THREE.MeshStandardMaterial({color:0x3e4e50,roughness:.82,metalness:0,side:THREE.DoubleSide}),
+    bench:new THREE.MeshStandardMaterial({color:0x93836e,roughness:.97,metalness:0,side:THREE.DoubleSide}),
+    rock:new THREE.MeshStandardMaterial({color:0x7d7467,roughness:.99,metalness:0,side:THREE.DoubleSide}),
+    beach:new THREE.MeshStandardMaterial({color:0x999487,roughness:.97,metalness:0,side:THREE.DoubleSide}),
+    liner:new THREE.MeshStandardMaterial({color:0x4b5753,roughness:.94,metalness:0,side:THREE.DoubleSide}),
     // Fixed vertex color variation is multiplied by the mine-plan's fixed
     // site lighting. Unlike the former unlit surfaces, Standard materials
     // let benches, containment slopes and pond edges receive terrain contact
     // shadows without introducing camera-driven material changes.
     earthSurface:new THREE.MeshStandardMaterial({color:0x8b775e,roughness:.97,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
-    benchSurface:new THREE.MeshStandardMaterial({color:0xa28b6c,roughness:.96,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
-    rockSurface:new THREE.MeshStandardMaterial({color:0x857e71,roughness:.98,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
-    beachSurface:new THREE.MeshStandardMaterial({color:0xa5a397,roughness:.94,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
-    linerSurface:new THREE.MeshStandardMaterial({color:0x3e4e50,roughness:.92,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
-    water:new THREE.MeshStandardMaterial({color:0x4a8b8b,roughness:.34,metalness:.02,side:THREE.DoubleSide}),
-    fresh:new THREE.MeshStandardMaterial({color:0x579aa4,roughness:.3,metalness:.02,side:THREE.DoubleSide}),
+    benchSurface:new THREE.MeshStandardMaterial({color:0x93836e,roughness:.97,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    rockSurface:new THREE.MeshStandardMaterial({color:0x7d7467,roughness:.99,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    beachSurface:new THREE.MeshStandardMaterial({color:0x999487,roughness:.97,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    linerSurface:new THREE.MeshStandardMaterial({color:0x4b5753,roughness:.94,metalness:0,side:THREE.DoubleSide,vertexColors:true}),
+    water:new THREE.MeshStandardMaterial({color:0x426f70,roughness:.74,metalness:0,side:THREE.DoubleSide}),
+    fresh:new THREE.MeshStandardMaterial({color:0x548388,roughness:.72,metalness:0,side:THREE.DoubleSide}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
     concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
     access:new THREE.MeshBasicMaterial({color:0x535853,side:THREE.DoubleSide,toneMapped:false}),
@@ -114,14 +114,22 @@ export function buildMineSiteCampus(options:Options) {
     // contour variation is presentation geometry and is not an engineered
     // embankment alignment.
     const count=304,raw:Array<[number,number]>=[];
+    // Each nested contour gets a small, deterministic plan offset and its own
+    // low-frequency phase. This breaks the stacked-donut silhouette while
+    // keeping every surface inside the screened conceptual footprint.
+    const phase=Math.log(Math.max(w,d))*.075;
+    const centreX=point[0]+4*Math.sin(Math.log(Math.max(1,w))*.8+d*.0012);
+    const centreZ=point[1]+3*Math.cos(Math.log(Math.max(1,d))*.75-w*.001);
     for(let i=0;i<count;i++){
       const angle=i/count*Math.PI*2,c=Math.cos(angle),s=Math.sin(angle);
-      const radius=1+.022*Math.sin(3*angle+.6)+.012*Math.cos(5*angle-1.1);
-      raw.push([Math.sign(c)*Math.pow(Math.abs(c),.87)*radius,Math.sign(s)*Math.pow(Math.abs(s),.87)*radius]);
+      // A restrained fixed-plan shoreline variation softens the perfect CAD
+      // ellipse without implying a surveyed or engineered containment line.
+      const radius=1+.052*Math.sin(3*angle+.6+phase)+.028*Math.cos(5*angle-1.1-phase)+.012*Math.sin(7*angle+phase*.7);
+      raw.push([Math.sign(c)*Math.pow(Math.abs(c),.93)*radius,Math.sign(s)*Math.pow(Math.abs(s),.93)*radius]);
     }
     const maxX=Math.max(...raw.map(([x])=>Math.abs(x))),maxZ=Math.max(...raw.map(([,z])=>Math.abs(z)));
     const points=raw.map(([x,z])=>{
-      const px=point[0]+x/maxX*w/2,pz=point[1]+z/maxZ*d/2;
+      const px=centreX+x/maxX*w/2,pz=centreZ+z/maxZ*d/2;
       return new THREE.Vector3(px,typeof level==='number'?level:level(px,pz),pz);
     });
     for(let i=0;i<points.length;i++)maximumContourSegmentM=Math.max(maximumContourSegmentM,points[i].distanceTo(points[(i+1)%points.length]));
@@ -362,7 +370,7 @@ export function buildMineSiteCampus(options:Options) {
         const lowerCrest=contour(f.point,f.width-28,f.depth-28,y+5);
         const shoulder=contour(f.point,f.width-52,f.depth-52,y+5);
         join(group,toe,lowerCrest,materials.earthSurface,'Illustrative containment embankment');
-        join(group,lowerCrest,shoulder,materials.benchSurface,'Intermediate perimeter bench · illustrative');
+        join(group,lowerCrest,shoulder,materials.earthSurface,'Intermediate perimeter bench · illustrative');
         join(group,shoulder,crest,materials.earthSurface,'Upper containment embankment · illustrative');
       }else join(group,toe,crest,materials.earthSurface,'Illustrative containment embankment');
       join(group,crest,innerCrest,materials.benchSurface,'Embankment crest access');
