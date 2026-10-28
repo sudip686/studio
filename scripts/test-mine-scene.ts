@@ -158,6 +158,14 @@ assert.equal(landformContourAudit.pointsPerRing,304,'Rounded site landforms use 
 assert.ok(landformContourAudit.maximumSegmentM<=6,`Rounded landform contours stay within the 6 m terrain-drape spacing (${landformContourAudit.maximumSegmentM.toFixed(2)} m)`);
 const tailingsProfileAudit=campus.root.userData.tailingsProfileAudit as {tierCount:number;intermediateBenchWidthM:number;totalRiseM:number;conceptual:boolean};
 assert.deepEqual(tailingsProfileAudit,{tierCount:2,intermediateBenchWidthM:12,totalRiseM:12,conceptual:true},'Tailings concept retains its added terrace as explicitly illustrative geometry');
+const landformMaterials=new Map<string,THREE.MeshStandardMaterial>();
+campus.root.traverse(object=>{if(object instanceof THREE.Mesh&&object.material instanceof THREE.MeshStandardMaterial)landformMaterials.set(object.material.color.getHexString(),object.material);});
+const decantWater=landformMaterials.get('426f70');
+assert.ok(decantWater,'The conceptual decant pool uses the shared lit water material');
+assert.ok(decantWater!.roughness>=.7&&decantWater!.metalness===0,'Water stays matte under fixed site lighting without camera-driven specular flicker');
+const tailingsBeach=landformMaterials.get('999487');
+assert.ok(tailingsBeach,'The tailings beach remains a separately readable lit surface');
+assert.ok(tailingsBeach!.roughness>=.95,'The dry beach uses a matte mineral finish at overview scale');
 const fixedTerrainColorAudit=campus.root.userData.fixedTerrainColorAudit as {vertexCount:number;min:number;max:number;source:string};
 assert.ok(fixedTerrainColorAudit.vertexCount>0&&fixedTerrainColorAudit.min<1&&fixedTerrainColorAudit.max>1,'Facility earthworks have restrained fixed-coordinate surface variation');
 assert.ok(fixedTerrainColorAudit.min>=.91&&fixedTerrainColorAudit.max<=1.09,'Fixed-coordinate earthwork variation remains within an 18% total luminance range');
