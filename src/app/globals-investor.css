@@ -1507,6 +1507,13 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content{display:grid;gap:6px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content .tanga-site-status-key{margin:0;padding:4px 0;min-height:34px}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content .tanga-development-select{min-height:36px;margin:0;padding-block:6px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls{display:grid;gap:4px;padding:6px 8px;border:1px solid #c9d8de24;border-radius:6px;background:#ffffff05}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls label{color:#c6d1d5;font-size:9px;font-weight:650}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls select{width:100%;min-height:36px;margin:0;padding:6px 9px;border:1px solid #86a5b166;border-radius:6px;background:#20323e;color:#edf3f3;font:inherit;font-size:10px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls__roof{min-height:36px;padding:7px 9px;border:1px solid #dca46a75;border-radius:5px;background:#493728;color:#fff0df;font:inherit;font-size:10px;font-weight:700;cursor:pointer}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls__roof:hover{background:#5b432f;border-color:#efbd86}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls :is(select,button):focus-visible{outline:2px solid #ffd0a7;outline-offset:2px}
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-plant-controls small{color:#b5c2c8;font-size:9px;line-height:1.4}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-facility-register{border-top:1px solid #c9d8de24;border-bottom:1px solid #c9d8de24;color:#c6d1d5}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-facility-register>summary{min-height:30px;padding:7px 1px;color:#e5bf98;font-size:10px;font-weight:650;cursor:pointer}
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-facility-register>summary:focus-visible{outline:2px solid #f6be91;outline-offset:2px}

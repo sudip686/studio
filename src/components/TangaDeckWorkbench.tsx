@@ -119,6 +119,8 @@ type ThreeCameraCommand = {
   action: ThreeCameraAction;
   degrees?: 90 | 180 | 360;
   pitIndex?: number;
+  stage?: string;
+  roofOpen?: boolean;
 };
 
 type ThreeLoadReport = {
@@ -2654,10 +2656,10 @@ export default function TangaDeckWorkbench() {
     mode === 'drillholes' || mode === 'subsurface' || mode === 'resource' || mode === 'mine_planning' || mode === 'metallurgy'
   ), [activeMode]);
 
-  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360, pitIndex?: number) => {
+  const issueThreeCameraCommand = useCallback((action: ThreeCameraCommand['action'], degrees?: 90 | 180 | 360, pitIndex?: number, detail?: Pick<ThreeCameraCommand, 'stage' | 'roofOpen'>) => {
     setThreeSceneRequested(true);
     setPitBlockFocusIndex(action==='revealPitBlocks'?(pitIndex??null):null);
-    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees,pitIndex});
+    setThreeCameraCommand({id:++threeCameraSequenceRef.current,action,degrees,pitIndex,...detail});
   }, []);
 
   const rotateNinety = useCallback(() => {
@@ -7043,7 +7045,8 @@ export default function TangaDeckWorkbench() {
         pitBlockFocusIndex={pitBlockFocusIndex}
         pitGradeFocus={pitGradeFocus}
         onPitGradeFocusChange={grade=>{setPitGradeFocus(grade);if(grade&&activeMode==='mine_planning'&&activeShot?.id!=='pit-blocks'){setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='pit-blocks')));issueThreeCameraCommand('revealPitBlocks');}}}
-        onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail');} : undefined}
+        onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage:'all',roofOpen:false});} : undefined}
+        onPlantProcessFocus={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? (stage,roofOpen) => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant')));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage,roofOpen});} : undefined}
         sceneMotionPaused={sceneMotionPaused}
         onToggleSceneMotion={() => setSceneMotionPaused(value => !value)}
       />}

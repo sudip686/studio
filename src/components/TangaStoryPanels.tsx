@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, X} from 'lucide-react';
 import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
 import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-development';
@@ -9,6 +9,11 @@ import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} f
 const PIT_RESOURCE_GRADE_BANDS=TGC_GRADE_BINS
   .filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high')
   .map(bin=>({...bin,displayRange:bin.key==='medium'?'4.5–<6%':bin.key==='high'?'6–<8%':'≥8%'}));
+
+const MINE_PLANT_FOCUSES=[
+  ['all','Whole plant'],['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],
+  ['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product handling'],
+] as const;
 
 export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   const [open, setOpen] = useState(false);
@@ -51,9 +56,12 @@ function SceneMotionControl({paused,onToggle}:{paused:boolean;onToggle:()=>void}
   </div>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void}) {
+  const panelRef=useRef<HTMLElement|null>(null);
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
   const [siteOrientation,setSiteOrientation]=useState<'plan'|'oblique'>('oblique');
+  const [plantProcessFocus,setPlantProcessFocus]=useState('all');
+  const [plantRoofOpen,setPlantRoofOpen]=useState(false);
 
   useEffect(()=>{
     if(chapter!=='mine_planning')return;
@@ -65,6 +73,16 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     setSiteOrientation('oblique');
     return()=>window.removeEventListener('tanga:mine-orientation-change',onOrientationChange);
   },[chapter]);
+
+  useEffect(()=>{
+    if(developmentViewId!=='plant'){
+      setPlantProcessFocus('all');
+      setPlantRoofOpen(false);
+      return;
+    }
+    const panel=panelRef.current;
+    if(panel)window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{if(panel.isConnected)panel.scrollTop=panel.scrollHeight;}));
+  },[developmentViewId]);
 
   useEffect(()=>{
     if(chapter!=='mine_planning')return;
@@ -152,10 +170,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <p className="tanga-story-panel__qualification">Indicated portion of the supplied AMC MRE. Displayed blocks and filters do not constitute a new resource estimate or an ore reserve.</p>
   </aside>;
 
-  if (chapter === 'mine_planning') return <aside className="tanga-story-panel tanga-story-panel--concept" aria-label={blockInspectorActive?'Mine plan information: pit-block controls':'Concept and terrain comparison'}>
+  if (chapter === 'mine_planning') return <aside ref={panelRef} className="tanga-story-panel tanga-story-panel--concept" aria-label={blockInspectorActive?'Mine plan information: pit-block controls':'Concept and terrain comparison'}>
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
     <h2>{blockInspectorActive?'Pit-block controls':developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
-    <p className="tanga-story-panel__intro">{blockInspectorActive?'Focus a pit or filter the source cells by displayed TGC band.':developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
+    <p className="tanga-story-panel__intro">{blockInspectorActive?'Focus a pit or filter the source cells by displayed TGC band.':developmentViewId==='plant'?'Explore six process areas. Equipment and roof cutaways are illustrative.':developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
       <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
@@ -175,10 +193,21 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
         <button type="button" aria-pressed={siteOrientation==='plan'} disabled={!onSiteOrientation} onClick={()=>{setSiteOrientation('plan');onSiteOrientation?.('plan');}}>North-up plan</button>
         <button type="button" aria-pressed={siteOrientation==='oblique'} disabled={!onSiteOrientation} onClick={()=>{setSiteOrientation('oblique');onSiteOrientation?.('oblique');}}>Oblique view</button>
       </div>
-      <div className="tanga-site-panel-actions">
+      {developmentViewId!=='plant'&&<div className="tanga-site-panel-actions">
         <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Processing plant <ArrowRight size={14}/></button>
         {onToggleSurfaceConcept&&<button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView?'Close terrain comparison':'Compare terrain'} <ArrowRight size={14}/></button>}
-      </div>
+      </div>}
+      {developmentViewId==='plant'&&<section className="tanga-site-plant-controls" aria-label="Processing plant roof cutaway">
+        <div className="tanga-site-panel-subtitle">PLANT WALKTHROUGH · CONCEPT ONLY</div>
+        <label htmlFor="tanga-mine-plant-focus">Process area</label>
+        <select id="tanga-mine-plant-focus" aria-label="Processing plant area" value={plantProcessFocus} onChange={event=>{const focus=event.target.value;setPlantProcessFocus(focus);onPlantProcessFocus?.(focus,plantRoofOpen);}}>
+          {MINE_PLANT_FOCUSES.map(([id,label])=><option key={id} value={id}>{label}</option>)}
+        </select>
+        <button type="button" className="tanga-site-plant-controls__roof" aria-pressed={plantRoofOpen} disabled={!onPlantProcessFocus} onClick={()=>{const open=!plantRoofOpen;setPlantRoofOpen(open);onPlantProcessFocus?.(plantProcessFocus,open);}}>
+          {plantRoofOpen?(plantProcessFocus==='all'?'Close plant roofs':'Close selected roof'):(plantProcessFocus==='all'?'Open plant roofs':'Open selected roof')}
+        </button>
+        <small>Concept equipment; not engineered.</small>
+      </section>}
     </div>}
     {minePanelSection==='blocks'&&<div className="tanga-site-panel-content">
       <div className="tanga-site-panel-subtitle">SOURCE BLOCK MODEL · OPEN PIT</div>

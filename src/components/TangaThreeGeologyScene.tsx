@@ -287,6 +287,7 @@ type ThreeCameraCommand = {
   action: 'geologyPlan' | 'geologyTilt' | 'geologyDepth' | 'resetView' | 'terrainProfile' | 'developmentOverview' | 'sitePlan' | 'siteOblique' | 'feedPoint' | 'siteServices' | 'tailingsView' | 'wasteView' | 'campusView' | 'plantDetail' | 'northPit' | 'southPit' | 'revealPitBlocks' | 'zoomIn' | 'zoomOut' | 'tiltUp' | 'projectAngle' | 'revealSection' | 'restoreSection' | 'bottomView' | 'rotateDegrees' | 'orbit360' | 'orbitVertical360';
   degrees?: 90 | 180 | 360;
   stage?: string;
+  roofOpen?: boolean;
   pitIndex?: number;
 };
 
@@ -3340,6 +3341,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStatus('Site services · workshop, laboratory and water provision');return;
       }
       if(command.action==='plantDetail'&&processPlant){
+        if(command.stage)setPlantProcess(command.stage);
+        if(typeof command.roofOpen==='boolean')setPlantCutaway(command.roofOpen);
         const ensurePlantDetail=processPlant.userData.ensurePlantDetail as (()=>boolean)|undefined;
         const detailBuildStartedAt=performance.now();
         const plantDetailBuilt=ensurePlantDetail?.()??false;
