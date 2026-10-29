@@ -1547,7 +1547,7 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
     return [
       {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff', binKey: 'very-high'},
       {label: 'GRSC interpretation', detail: 'Pale-grey graphitic-schist unit', tone: '#d8d8e1'},
-      {label: 'Drillhole collars', detail: 'Oversized deep-navy markers with ivory keyline · surface start', tone: '#08152f'},
+      {label: 'Drillhole collars', detail: 'Large deep-blue markers with ivory keyline · surface start', tone: '#0b3978'},
     ];
   }
   return [
@@ -4340,14 +4340,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // On the drilling slide collars need to separate cleanly from both the
       // terrain and every mapped lithology. A flat, unlit vermilion marker is
       // paired with a charcoal keyline below; it stays legible as the camera moves.
-      // The subsurface geology scene uses an oversized deep-navy head and an ivory
-      // surface keyline so collars remain distinct from the pale Graphitic Schist
-      // body and stay readable at the presentation overview distance.
-      const collarRadius = subsurfaceView ? 34 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
-      const collarLift = subsurfaceView ? 30 : mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT;
+      // The 3D geology scene uses a large deep-blue head and an ivory surface
+      // keyline so collars separate from the pale Graphitic Schist body and stay
+      // readable from the presentation overview distance.
+      const collarRadius = subsurfaceView ? 54 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
+      const collarLift = subsurfaceView ? 50 : mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT;
       const collarGeometry = new THREE.SphereGeometry(collarRadius, subsurfaceView ? 24 : 16, subsurfaceView ? 18 : 12);
       const collarMaterial = new THREE.MeshBasicMaterial({
-        color: subsurfaceView ? 0x08152f : mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
+        color: subsurfaceView ? 0x0b3978 : mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
         toneMapped: false,
         transparent: mode === 'resource',
         opacity: mode === 'resource' ? 0.5 : 1,
@@ -4365,7 +4365,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       collars.renderOrder = 8;
       collars.userData.tooltipItems = collarSegments.map((segment) => ({
         title: segment.holeId,
-        tone: subsurfaceView ? '#08152f' : mode === 'drillholes' ? '#ff704f' : '#eaffff',
+        tone: subsurfaceView ? '#0b3978' : mode === 'drillholes' ? '#ff704f' : '#eaffff',
         rows: [
           'Surface drill collar',
           `First logged interval ${formatDepth(segment)}`,
@@ -4380,8 +4380,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {
         const drillingSlide = mode === 'drillholes';
         const collarRingGeometry = new THREE.TorusGeometry(
-          subsurfaceView ? 54 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
-          subsurfaceView ? 5.5 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
+          subsurfaceView ? 82 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
+          subsurfaceView ? 7.5 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
           8,
           28
         );
@@ -4395,7 +4395,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const collarRings = new THREE.InstancedMesh(collarRingGeometry, collarRingMaterial, collarSegments.length);
         const ringDummy = new THREE.Object3D();
         collarSegments.forEach((segment, index) => {
-          const point = collarSurfacePoint(segment, terrainResources, subsurfaceView ? 35.5 : drillingSlide ? 7 : mode === 'resource' ? 8 : 11);
+          const point = collarSurfacePoint(segment, terrainResources, subsurfaceView ? 52 : drillingSlide ? 7 : mode === 'resource' ? 8 : 11);
           ringDummy.position.copy(point);
           ringDummy.rotation.set(Math.PI / 2, 0, 0);
           ringDummy.updateMatrix();
