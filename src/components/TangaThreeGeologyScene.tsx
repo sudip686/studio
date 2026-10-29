@@ -4361,7 +4361,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       collars.receiveShadow = true;
       const collarMatrix = new THREE.Matrix4();
       collarSegments.forEach((segment, index) => {
-        const point = collarSurfacePoint(segment, terrainResources, collarLift);
+        const point = collarSurfacePoint(segment, terrainResources, subsurfaceView ? 1 : collarLift);
+        if (subsurfaceView) point.y += collarLift;
         collarMatrix.makeTranslation(point.x, point.y, point.z);
         collars.setMatrixAt(index, collarMatrix);
       });
@@ -4385,7 +4386,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const collarHeadGeometry = new THREE.SphereGeometry(27, 16, 12);
         const collarHeads = new THREE.InstancedMesh(collarHeadGeometry, collarMaterial, collarSegments.length);
         collarSegments.forEach((segment, index) => {
-          const point = collarSurfacePoint(segment, terrainResources, collarHeight - 1);
+          const point = collarSurfacePoint(segment, terrainResources, 1);
+          point.y += collarHeight - 1;
           collarMatrix.makeTranslation(point.x, point.y, point.z);
           collarHeads.setMatrixAt(index, collarMatrix);
         });
