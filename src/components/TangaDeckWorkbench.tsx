@@ -3434,6 +3434,12 @@ export default function TangaDeckWorkbench() {
     };
     const styleIsReady = () => {
       try {
+        // MapLibre can expose its Map object before the style has been
+        // installed. Calling isStyleLoaded() in that window emits a warning
+        // on every direct Three.js chapter entry. getStyle() is safe before
+        // style initialization and lets the load event remain the readiness
+        // signal until the actual style is available.
+        if (typeof map.getStyle === 'function' && !map.getStyle()) return false;
         return typeof map.isStyleLoaded === 'function'
           ? map.isStyleLoaded()
           : typeof map.loaded === 'function' && map.loaded();
