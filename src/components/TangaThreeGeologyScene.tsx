@@ -3900,10 +3900,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // Keep the licence ring available to mine-planning calculations below,
       // but omit its graphic from the geology evidence scene. The mapped rock
       // polygons and interpreted geology should be the only outlined subjects
-      // there; the extra gold perimeter competes with their contacts.
+      // there; the extra gold perimeter competes with their contacts. Likewise,
+      // omit contextual road vectors from geology so their pale linework is not
+      // mistaken for geological contacts or a licence boundary.
       const [licenceRing, surfaceRoads] = await Promise.all([
         loadLicenceBoundary(),
-        loadSurfaceRoads(),
+        mode === 'subsurface' ? Promise.resolve([] as SurfaceRoad[]) : loadSurfaceRoads(),
       ]);
       if (cancelled) return;
 
