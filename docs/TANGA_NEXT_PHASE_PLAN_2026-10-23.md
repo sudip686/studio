@@ -681,3 +681,7 @@ The current public Worker was directly entered for all 12 chapters at 1707 × 84
 ## 30 October branch delivery check
 
 - [x] Verify Vercel and Cloudflare delivery for current pushed head `e7c6f0b`. GitHub's deployment API reports the Vercel Preview deployment succeeded at `https://studio-ikxohumd0-sudip686s-projects.vercel.app`; anonymous HEAD requests receive HTTP 302 to Vercel SSO. The public production hostname `https://studio-nine-rosy-71.vercel.app/` returns HTTP 200 but is a separate deployment. The current public Worker returns HTTP 200 and its deployed geology context-recovery run is recorded above. No Vercel access or promotion settings were changed. Branch preview is built; direct visual review remains behind SSO.
+
+## 30 October geology collar contrast refinement
+
+- [x] Make interpreted-depth drill collars more visible at desktop overview scale: deepen the marker to `#061b3d`, widen the tapered post, enlarge the rounded head from 27 to 44 scene units, and expand the amber surface ring from 46/7 to 64/8 radius/tube. Updated the geology legend swatch and description; the separate drilling-slide vermilion symbol is unchanged. `npm run typecheck`, `npm run cf:build`, and `git diff --check` passed. Local desktop `#subsurface` stage 03 reached `ready` with no page error overlay; visual capture: `.playwright-mcp/geology-collar-contrast-local.png`. The 1280 × 720 screenshot shows the deep-blue posts and amber surface rings clearly against the pale schist interpretation. Hosted deployment review remains pending.
