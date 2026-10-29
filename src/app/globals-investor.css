@@ -2350,9 +2350,13 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 /* Short desktop screens need room for the site qualification and both camera
    presets without pushing the concept actions into a nested scroll area. */
 @media(min-width:761px) and (max-height:800px){
-  .tanga-deck--present .tanga-story-panel--concept{top:170px;max-height:calc(100svh - 300px);padding:16px}
-  .tanga-deck--present .tanga-story-panel--concept h2{margin:4px 0 6px;font-size:22px;line-height:1.08}
+  .tanga-deck--present .tanga-story-panel--concept{top:170px;max-height:calc(100svh - 300px);padding:12px 16px}
+  .tanga-deck--present .tanga-story-panel--concept h2{margin:2px 0 3px;font-size:22px;line-height:1.08}
   .tanga-deck--present .tanga-story-panel--concept .tanga-story-panel__intro{font-size:11px;line-height:1.4}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-story-motion{margin:4px 0 5px}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-mine-haul-cycle{margin:5px 0 1px;padding:7px 9px}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher{margin:4px 0 5px}
+  .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-content{gap:4px}
   .tanga-deck--present .tanga-story-panel--concept .tanga-site-status-key{margin:3px 0;padding:4px 0}
   .tanga-deck--present .tanga-story-panel--concept .tanga-development-select{min-height:36px;margin:4px 0;padding-block:6px}
   .tanga-deck--present .tanga-story-panel--concept .tanga-development-source{margin:3px 0;padding:3px 0}
