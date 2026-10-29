@@ -4,6 +4,7 @@ import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
 
 import {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
+import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -13,12 +14,11 @@ import {buildConcentrator, placeConcentrator, buildPitSurface, buildConceptualPi
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition, updateHaulTruckCycle} from '@/lib/deck/mine-haulage';
 import type {HaulCycleStage} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
-import {buildGeologyReferenceGrid,buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologySurfaceData} from '@/lib/deck/geology-surface';
+import {buildGeologyRasterSurface,buildGeologyReferenceGrid,buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologyRasterLayer,type GeologySurfaceData} from '@/lib/deck/geology-surface';
 import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-campus';
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
-import MetallurgyVisualStory from './MetallurgyProcessExhibit';
 import {MAPPED_SURFACE_UNITS,modelRockUnit} from '@/lib/deck/geology-palette';
 import GeologyCrossSections from './GeologyCrossSections';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
@@ -36,6 +36,14 @@ import {
 } from '@/lib/assay/intercepts';
 import {DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {placeLabels, type LabelCandidate, type Rect} from '@/lib/labels/declutter';
+
+// Keep the detailed factory model and downstream end-use scenes out of the
+// shared geology/drilling client chunk. They are only needed after the viewer
+// opens the Metallurgy chapter.
+const MetallurgyVisualStory = dynamic(() => import('./MetallurgyProcessExhibit'), {
+  ssr: false,
+  loading: () => <section className="tanga-process-exhibit tanga-process-exhibit--factory tanga-process-exhibit--loading" role="status" aria-live="polite">Preparing the processing facility…</section>,
+});
 
 type GeologyMode = 'topography' | 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
 /**
@@ -1546,7 +1554,7 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
     {label: '>8% TGC', detail: 'Very high assay interval', tone: '#9d00ff', binKey: 'very-high'},
     {label: '6-8% TGC', detail: 'High assay interval', tone: '#ff1616', binKey: 'high'},
     {label: '3-6% TGC', detail: 'Mineralised assay interval', tone: '#ff9f0a', binKey: 'medium'},
-    {label: 'Collars', detail: 'Surface start points', tone: '#eaffff'},
+    {label: 'Collars', detail: 'Vermilion collar with dark keyline · surface start', tone: '#ff542e'},
   ];
 }
 
@@ -1669,32 +1677,35 @@ async function parseBlockGeoJsonInWorker(response: Response): Promise<ResourceBl
   }
 }
 
-let licenceBoundaryPromise: Promise<Array<[number, number]> | null> | null = null;
+let licenceBoundaryPromise: Promise<Array<Array<[number, number]>> | null> | null = null;
 
 /**
- * The licence outline, as a lon/lat ring.
+ * The supplied merged outline, as lon/lat rings.
  *
  * Same source the 2D scenes draw from, so the boundary a viewer sees on the
- * map and the one draped over the 3D terrain are the same polygon rather than
- * two drawings that could drift apart.
+ * map and the siting calculations use the same source geometry. The outline
+ * is intentionally displayed only on the project-introduction map.
  */
-function loadLicenceBoundary(): Promise<Array<[number, number]> | null> {
+function loadLicenceBoundary(): Promise<Array<Array<[number, number]>> | null> {
   if (licenceBoundaryPromise) return licenceBoundaryPromise;
 
-  licenceBoundaryPromise = fetchAsset('/generated/boundaries.geojson', {cache: 'force-cache'})
+  licenceBoundaryPromise = fetchAsset('/generated/merged-license-boundary.geojson', {cache: 'force-cache'})
     .then((response) => {
       if (!response.ok) throw new Error(`Project boundary unavailable: ${response.status}`);
       return response.json();
     })
     .then((payload) => {
       const features = Array.isArray(payload?.features) ? payload.features : [];
-      const boundary = features.find((feature: any) => feature?.properties?.layer === 'Project boundary');
-      const ring = boundary?.geometry?.coordinates?.[0];
-      if (!Array.isArray(ring) || ring.length < 3) return null;
-
-      return ring
-        .map((point: any) => [Number(point?.[0]), Number(point?.[1])] as [number, number])
-        .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+      const rings=features
+        .filter((feature: any) => feature?.properties?.layer === 'Merged license boundary')
+        .flatMap((feature: any) => feature?.geometry?.type==='MultiPolygon'
+          ?feature.geometry.coordinates.flatMap((polygon: unknown[])=>polygon)
+          :feature?.geometry?.coordinates??[])
+        .map((ring: any[])=>ring
+          .map((point: any) => [Number(point?.[0]), Number(point?.[1])] as [number, number])
+          .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat)))
+        .filter((ring: [number,number][])=>ring.length>=3);
+      return rings.length?rings:null;
     })
     .catch(() => {
       // Do not pin a transient network/server failure for the lifetime of the tab.
@@ -1703,44 +1714,6 @@ function loadLicenceBoundary(): Promise<Array<[number, number]> | null> {
     });
 
   return licenceBoundaryPromise;
-}
-
-/**
- * Drape the licence ring over the terrain.
- *
- * Each segment is subdivided before the terrain is sampled, so the line follows
- * the ground across a ridge instead of cutting a straight chord through it —
- * which is the difference between a boundary that looks surveyed onto the
- * surface and one that looks like a floating wireframe.
- */
-function buildDrapedBoundary(
-  ring: Array<[number, number]>,
-  resources: TangaTerrainResources | null,
-  lift: number
-): THREE.Vector3[] {
-  const SUBDIVISIONS = 24;
-  const points: THREE.Vector3[] = [];
-
-  for (let i = 0; i < ring.length; i += 1) {
-    const [lon0, lat0] = ring[i];
-    const [lon1, lat1] = ring[(i + 1) % ring.length];
-
-    for (let step = 0; step < SUBDIVISIONS; step += 1) {
-      const t = step / SUBDIVISIONS;
-      const lon = lon0 + (lon1 - lon0) * t;
-      const lat = lat0 + (lat1 - lat0) * t;
-      const flat = localPoint(lon, lat, 0);
-      points.push(new THREE.Vector3(
-        flat.x,
-        terrainSurfaceY(resources, flat.x, -flat.z, lift),
-        flat.z
-      ));
-    }
-  }
-
-  // Close the loop.
-  if (points.length > 0) points.push(points[0].clone());
-  return points;
 }
 
 type SurfaceRoad = {coordinates: Array<[number, number]>; highway: string};
@@ -3937,44 +3910,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         registerReveal(roadGroup, 0.3, 1.2, 0.98);
       }
 
-      if (mode !== 'subsurface' && licenceRing && licenceRing.length >= 3) {
-        const boundaryGroup = new THREE.Group();
-        boundaryGroup.name = 'licence-boundary';
-
-        const halo = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints(buildDrapedBoundary(licenceRing, terrainResources, 26)),
-          new THREE.LineBasicMaterial({
-            color: 0xffa860,
-            transparent: true,
-            opacity: 0.24,
-            depthWrite: false,
-            depthTest: false,
-            fog: false,
-            blending: THREE.AdditiveBlending,
-          })
-        );
-        halo.renderOrder = 24;
-        boundaryGroup.add(halo);
-
-        const core = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints(buildDrapedBoundary(licenceRing, terrainResources, 30)),
-          new THREE.LineBasicMaterial({
-            color: 0xf0b64a,
-            transparent: true,
-            opacity: 0.92,
-            depthWrite: false,
-            depthTest: false,
-            fog: false,
-          })
-        );
-        core.renderOrder = 25;
-        boundaryGroup.add(core);
-
-        tagDeckLayer(boundaryGroup, 'context');
-        stage.add(boundaryGroup);
-        registerReveal(boundaryGroup, 0.42, 1.2, 0.97);
-      }
-
       if (mode === 'topography') {
         // Choose surveyed cells from the actual elevation surface. A ridge
         // label cannot be attached to an invented, fixed-height coordinate.
@@ -4018,7 +3953,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (cancelled) return;
 
       if (mode === 'mine_planning' || mode === 'metallurgy' || mode === 'subsurface') {
-        const boundary: Point2[] = (licenceRing ?? []).map(([lon, lat]) => {const p = localPoint(lon, lat, 700); return [p.x, p.z];});
+        const boundary: Point2[] = (licenceRing?.[0] ?? []).map(([lon, lat]) => {const p = localPoint(lon, lat, 700); return [p.x, p.z];});
         const referenceResponse=await fetchAsset('/generated/orewaste-reference.json',{cache:'force-cache'});
         if(!referenceResponse.ok)throw new Error('Ore/waste scenario reference unavailable');
         const reference=await referenceResponse.json() as {blocks:number[][];provenance:{sourceTimestamp:string}};
@@ -4102,7 +4037,36 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const data=await response.json() as GeologySurfaceData;
             if(cancelled)return;
             const geologyHeight=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
-            const mapped=buildGeologySurface(data,PROJECT_UTM_CENTER,geologyHeight,{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
+            let rasterLayers:GeologyRasterLayer[]=[];
+            const layerResponse=await fetch('/generated/geology-lithology/layers.json',{cache:'force-cache'});
+            if(layerResponse.ok){
+              const collection=await layerResponse.json() as {layers?:GeologyRasterLayer[];crs?:string};
+              if(collection.crs==='EPSG:32737'&&Array.isArray(collection.layers))rasterLayers=collection.layers;
+            }
+            const rasterMeshes:THREE.Mesh[]=[];
+            const rasterBounds=new THREE.Box3();
+            const rasterUnits=new Set<string>();
+            const textureLoader=new THREE.TextureLoader();
+            const terrainGeometry=terrainMeshes[0]?.geometry;
+            if(terrainGeometry){
+              const loaded=await Promise.all(rasterLayers.map(async layer=>{
+                try{return {layer,texture:await textureLoader.loadAsync(layer.url)};}
+                catch{return null;}
+              }));
+              if(cancelled){loaded.forEach(item=>item?.texture.dispose());return;}
+              for(const item of loaded){
+                if(!item)continue;
+                const surface=buildGeologyRasterSurface(item.layer,item.texture,terrainGeometry,PROJECT_UTM_CENTER);
+                if(surface.bounds.isEmpty()){item.texture.dispose();surface.mesh.geometry.dispose();surface.mesh.material.dispose();continue;}
+                rasterBounds.union(surface.bounds);
+                rasterMeshes.push(surface.mesh);
+                rasterUnits.add(item.layer.unit);
+              }
+            }
+            const retainedFeatures=data.features.filter(feature=>feature.properties.unit==='Soil cover'||!rasterUnits.has(feature.properties.unit));
+            const mapped=buildGeologySurface({...data,features:retainedFeatures},PROJECT_UTM_CENTER,geologyHeight,{width:TERRAIN_PATCH_WIDTH,depth:TERRAIN_PATCH_DEPTH,surveyed:(x,z)=>Boolean(sampleTerrainAtLocal(terrainResources!,x,-z).surveyed)});
+            mapped.bounds.union(rasterBounds);
+            rasterMeshes.forEach(mesh=>mapped.group.add(mesh));
             const referenceGrid=buildGeologyReferenceGrid(mapped.bounds,PROJECT_UTM_CENTER,geologyHeight);
             if(referenceGrid)mapped.group.add(referenceGrid);
             geologySurface=mapped.group;tagDeckLayer(geologySurface,'context');stage.add(geologySurface);
@@ -4110,10 +4074,17 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             // loading. Start the reveal when the registered surface actually
             // enters the scene so every class is visible in sequence.
             if(mode==='subsurface')geologyMapRevealStartedAt=motionTime;
-            geologySurface.children.forEach(mesh=>pickables.push(mesh));
+            geologySurface.children.forEach(mesh=>{
+              // Texture masks have transparent pixels across the terrain-wide
+              // UV mesh; keep them out of ray-picking so empty areas do not
+              // report a false lithology or intercept clicks on the deposit.
+              if(!mesh.userData.geologyRasterLayer)pickables.push(mesh);
+            });
             if(!mapped.bounds.isEmpty()) {mapped.bounds.getCenter(geologyPlanTarget);mapped.bounds.getSize(geologyPlanExtent);}
-            host.dataset.geologySurfaceUnits=String(data.features.length);
-            host.dataset.geologySurfaceBasis='Digitized project map; approximate printed-grid registration';
+            host.dataset.geologySurfaceUnits=String(rasterUnits.size+retainedFeatures.length);
+            host.dataset.geologySurfaceBasis=rasterUnits.size
+              ? `${rasterUnits.size} georeferenced lithology rasters (EPSG:32737) plus soil-cover map; approximate source registration`
+              : 'Digitized project map; approximate printed-grid registration';
             host.dataset.geologyReferenceGrid=referenceGrid?'EPSG:32737 · 1 km spacing · approximate registration':'unavailable';
           }
         } catch {host.dataset.geologySurfaceBasis='Map overlay unavailable; existing model retained';}
@@ -4128,7 +4099,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         cameraShot.targetMid.copy(centre);
         cameraShot.drift.set(8, 3, 8);
         const crossHeight=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
-        const crossBoundary:Point2[]=(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z];});
+        const crossBoundary:Point2[]=(licenceRing?.[0]??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z];});
         setCrossSource({units:geologyMeshes.map(mesh=>({name:mesh.name,color:`#${mesh.material.color.getHexString()}`,geometry:mesh.geometry})),drills:drillholes.map(d=>({...d,from:drillPointFromCoords(d.from).toArray() as [number,number,number],to:drillPointFromCoords(d.to).toArray() as [number,number,number]})),blocks,pits:sitePlan?.pits??[],boundary:crossBoundary,height:crossHeight});
         const locator=new THREE.Group();locator.name='Active cross-section locator';geologySectionLocator=locator;stage.add(locator);
         crossViewRef.current=(definition,flat,moveCamera=true)=>{
@@ -4365,18 +4336,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (collarAnchorSegment) {
         calloutAnchorOverrides.set('collars', threeOwnerLocalAnchor(collarSurfacePoint(collarAnchorSegment, terrainResources, 18)));
       }
-      // Collars are reference points, not the subject. At r=7.8 with a bright
-      // emissive they bloomed into blobs that covered the drill traces and the
-      // ground — the traces are the evidence, so the collars give way to them.
-      const collarGeometry = new THREE.SphereGeometry(mode === 'resource' ? 3.4 : 4.6, 12, 10);
-      const collarMaterial = new THREE.MeshStandardMaterial({
-        color: 0xe8e2d6,
-        emissive: 0x8899a6,
-        emissiveIntensity: 0.12,
-        roughness: 0.55,
-        metalness: 0.04,
-        transparent: true,
-        opacity: mode === 'resource' ? 0.5 : 0.82,
+      // On the drilling slide collars need to separate cleanly from both the
+      // terrain and every mapped lithology. A flat, unlit vermilion marker is
+      // paired with a charcoal keyline below; it stays legible as the camera moves.
+      const collarGeometry = new THREE.SphereGeometry(mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6, 14, 10);
+      const collarMaterial = new THREE.MeshBasicMaterial({
+        color: mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
+        toneMapped: false,
+        transparent: mode === 'resource',
+        opacity: mode === 'resource' ? 0.5 : 1,
       });
       const collars = new THREE.InstancedMesh(collarGeometry, collarMaterial, collarSegments.length);
       collars.castShadow = true;
@@ -4391,7 +4359,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       collars.renderOrder = 8;
       collars.userData.tooltipItems = collarSegments.map((segment) => ({
         title: segment.holeId,
-        tone: '#eaffff',
+        tone: mode === 'drillholes' ? '#ff704f' : '#eaffff',
         rows: [
           'Surface drill collar',
           `First logged interval ${formatDepth(segment)}`,
@@ -4403,18 +4371,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       registerReveal(collars, 0.08, 0.9, 0.72, 18);
       pickables.push(collars);
 
-      if (mode !== 'drillholes') {
-        const collarRingGeometry = new THREE.TorusGeometry(mode === 'resource' ? 8.5 : 12.5, mode === 'resource' ? 1.1 : 1.35, 8, 28);
+      {
+        const drillingSlide = mode === 'drillholes';
+        const collarRingGeometry = new THREE.TorusGeometry(
+          drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
+          drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
+          8,
+          28
+        );
         const collarRingMaterial = new THREE.MeshBasicMaterial({
-          color: 0xffffff,
-          transparent: true,
+          color: drillingSlide ? 0x172127 : 0xffffff,
+          toneMapped: false,
+          transparent: !drillingSlide,
           opacity: mode === 'resource' ? 0.34 : 0.78,
           depthWrite: false,
         });
         const collarRings = new THREE.InstancedMesh(collarRingGeometry, collarRingMaterial, collarSegments.length);
         const ringDummy = new THREE.Object3D();
         collarSegments.forEach((segment, index) => {
-          const point = collarSurfacePoint(segment, terrainResources, mode === 'resource' ? 8 : 11);
+          const point = collarSurfacePoint(segment, terrainResources, drillingSlide ? 7 : mode === 'resource' ? 8 : 11);
           ringDummy.position.copy(point);
           ringDummy.rotation.set(Math.PI / 2, 0, 0);
           ringDummy.updateMatrix();
@@ -4425,6 +4400,30 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         tagDeckLayer(collarRings, 'drilling');
         stage.add(collarRings);
         registerReveal(collarRings, 0.2, 0.95, 0.74, 15);
+
+        if (drillingSlide) {
+          // A restrained warm inner ring completes a high-contrast survey
+          // target without turning every collar into a large glowing marker.
+          const innerGeometry = new THREE.TorusGeometry(9.5, 0.9, 8, 24);
+          const innerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff8a58,
+            toneMapped: false,
+            depthWrite: false,
+          });
+          const innerRings = new THREE.InstancedMesh(innerGeometry, innerMaterial, collarSegments.length);
+          collarSegments.forEach((segment, index) => {
+            const point = collarSurfacePoint(segment, terrainResources, 9.5);
+            ringDummy.position.copy(point);
+            ringDummy.rotation.set(Math.PI / 2, 0, 0);
+            ringDummy.updateMatrix();
+            innerRings.setMatrixAt(index, ringDummy.matrix);
+          });
+          innerRings.instanceMatrix.needsUpdate = true;
+          innerRings.renderOrder = 8;
+          tagDeckLayer(innerRings, 'drilling');
+          stage.add(innerRings);
+          registerReveal(innerRings, 0.2, 0.95, 0.74, 15);
+        }
 
         const collarLeaderMaterial = new THREE.LineBasicMaterial({
           color: 0xffffff,
@@ -4918,7 +4917,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             host.dataset.plantDetail = JSON.stringify({sourceMeshes:plant.userData.detailMeshCount,drawMeshes:plant.userData.batchedMeshCount,stages:plant.userData.processStages.length,detailLoaded:Boolean(plant.userData.plantDetailLoaded)});
             if(terrainResources){
               const utm=terrainResources.meta.bounds_utm;
-              const campus=buildMineSiteCampus({plant:[x,z],plantLevel:level,feed,pits:sitePlan.pits,boundary:(licenceRing??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z] as Point2;}),
+              const campus=buildMineSiteCampus({plant:[x,z],plantLevel:level,feed,pits:sitePlan.pits,boundary:(licenceRing?.[0]??[]).map(([lon,lat])=>{const p=localPoint(lon,lat,700);return [p.x,p.z] as Point2;}),
                 bounds:{minX:utm.minX-PROJECT_UTM_CENTER.easting,maxX:utm.maxX-PROJECT_UTM_CENTER.easting,minZ:PROJECT_UTM_CENTER.northing-utm.maxY,maxZ:PROJECT_UTM_CENTER.northing-utm.minY},
                 height:siteHeight,surveyed:(px,pz)=>Boolean(sampleTerrainAtLocal(terrainResources!,px,-pz).surveyed)});
               siteCampus=campus.root;campusFacilities=campus.facilities;host.dataset.siteAccessRoads=String(campus.root.userData.accessRoadCount??0);host.dataset.accessRoadDrapeAudit=JSON.stringify(campus.root.userData.accessRoadDrapeAudit);host.dataset.siteDrainageSwales=String(campus.root.userData.swaleCount??0);host.dataset.siteSwaleDrapeAudit=JSON.stringify(campus.root.userData.swaleDrapeAudit);tagDeckLayer(siteCampus,'context');stage.add(siteCampus);

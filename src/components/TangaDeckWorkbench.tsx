@@ -2144,7 +2144,7 @@ function powerGridCorridors(heightAt: (lon: number, lat: number) => number) {
 }
 
 function isProjectLayer(feature: any) {
-  return feature.properties?.layer === 'Project boundary';
+  return feature.properties?.layer === 'Merged license boundary' || feature.properties?.layer === 'Project boundary';
 }
 
 function featurePoint(
@@ -2316,8 +2316,10 @@ export default function TangaDeckWorkbench() {
   const [boundaryAnchor, setBoundaryAnchor] = useState<{lon: number; lat: number} | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch('/generated/boundaries.geojson').then(response => response.json()).then(payload => {
-      const ring = payload.features?.find((feature: any) => feature.properties?.layer === 'Project boundary')?.geometry?.coordinates?.[0];
+    fetch('/generated/merged-license-boundary.geojson').then(response => response.json()).then(payload => {
+      const feature=payload.features?.find((candidate: any) => isProjectLayer(candidate));
+      const coordinates=feature?.geometry?.coordinates;
+      const ring=feature?.geometry?.type==='MultiPolygon'?coordinates?.[0]?.[0]:coordinates?.[0];
       if (!cancelled && Array.isArray(ring) && ring.length) {
         const point = ring[Math.floor(ring.length / 4)];
         if (Number.isFinite(point?.[0]) && Number.isFinite(point?.[1])) setBoundaryAnchor({lon: point[0], lat: point[1]});
@@ -3788,14 +3790,13 @@ export default function TangaDeckWorkbench() {
         opacity: 1,
         parameters: {depthTest: false} as any,
       }),
-      // VRIFY-style license boundary: three-layer glow that reads bright and
-      // premium at any zoom. Uses the brand copper (matches the deck palette)
-      // instead of the older teal chrome noise.
+      // Keep the merged boundary on the project-introduction map only. Geology,
+      // drilling and other Three.js chapters stay focused on their evidence.
       //
       // Layer 1: wide diffused halo (soft brand glow bleeds around the polygon)
-      showLocalContext && new GeoJsonLayer<any>({
+      activeMode === 'project' && new GeoJsonLayer<any>({
         id: 'project-boundary-halo-wide',
-        data: '/generated/boundaries.geojson',
+        data: '/generated/merged-license-boundary.geojson',
         pickable: false,
         filled: false,
         stroked: true,
@@ -3807,9 +3808,9 @@ export default function TangaDeckWorkbench() {
         parameters: {depthTest: false} as any,
       }),
       // Layer 2: mid halo
-      showLocalContext && new GeoJsonLayer<any>({
+      activeMode === 'project' && new GeoJsonLayer<any>({
         id: 'project-boundary-halo',
-        data: '/generated/boundaries.geojson',
+        data: '/generated/merged-license-boundary.geojson',
         pickable: false,
         filled: false,
         stroked: true,
@@ -3823,9 +3824,9 @@ export default function TangaDeckWorkbench() {
       // Layer 3: crisp bright core + subtle brand-tinted fill so the shape
       // reads as a real license polygon, not just an outline. Higher fill
       // opacity on the active mode so the deck knows this is THE tenement.
-      showLocalContext && new GeoJsonLayer<any>({
+      activeMode === 'project' && new GeoJsonLayer<any>({
         id: 'boundaries',
-        data: '/generated/boundaries.geojson',
+        data: '/generated/merged-license-boundary.geojson',
         pickable: true,
         filled: true,
         stroked: true,

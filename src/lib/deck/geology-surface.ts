@@ -2,6 +2,13 @@ import * as THREE from 'three';
 
 type MapUnit = {properties:{unit:string;color:string;opacity?:number;basis?:string};geometry:{type:'MultiPolygon';coordinates:number[][][][]}};
 export type GeologySurfaceData = {features:MapUnit[]};
+export type GeologyRasterLayer = {
+  unit:string;
+  color:string;
+  url:string;
+  bounds:[number,number,number,number];
+  basis?:string;
+};
 // VRIFY-style map emphasis: strong enough to read on satellite imagery while
 // retaining the terrain texture beneath each mapped outcrop.
 export const GEOLOGY_SURFACE_DEFAULT_OPACITY=.82;
@@ -119,6 +126,68 @@ export function buildGeologySurface(data:GeologySurfaceData, origin:{easting:num
     }
   }
   return {group,bounds};
+}
+
+/**
+ * Project a georeferenced, transparent lithology mask onto the same measured
+ * terrain mesh used by the viewer. Source coordinates are EPSG:32737 and the
+ * image bounds are [west, south, east, north].
+ */
+export function buildGeologyRasterSurface(
+  layer:GeologyRasterLayer,
+  texture:THREE.Texture,
+  terrain:THREE.BufferGeometry,
+  origin:{easting:number;northing:number},
+) {
+  const source=terrain.getAttribute('position');
+  const positions=new Float32Array(source.count*3);
+  const uv=new Float32Array(source.count*2);
+  const [west,south,east,north]=layer.bounds;
+  for(let i=0;i<source.count;i++){
+    const x=source.getX(i),y=source.getY(i)+2.5,z=source.getZ(i);
+    positions[i*3]=x;positions[i*3+1]=y;positions[i*3+2]=z;
+    const easting=origin.easting+x;
+    const northing=origin.northing-z;
+    uv[i*2]=(easting-west)/(east-west);
+    // TextureLoader flips image data for WebGL, so north maps to v=1.
+    uv[i*2+1]=(northing-south)/(north-south);
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  const index=terrain.getIndex();
+  if(index)geometry.setIndex(index.clone());
+  geometry.computeBoundingSphere();
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.wrapS=THREE.ClampToEdgeWrapping;
+  texture.wrapT=THREE.ClampToEdgeWrapping;
+  texture.generateMipmaps=true;
+  const material=new THREE.MeshBasicMaterial({
+    map:texture,
+    transparent:true,
+    opacity:1,
+    alphaTest:.015,
+    depthWrite:false,
+    side:THREE.DoubleSide,
+    toneMapped:false,
+    polygonOffset:true,
+    polygonOffsetFactor:-2,
+  });
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.name=`${layer.unit} · georeferenced lithology mask`;
+  mesh.renderOrder=30;
+  mesh.userData.geologicUnit=layer.unit;
+  mesh.userData.surfaceOpacityScale=1;
+  mesh.userData.sourceRaster=layer.url;
+  mesh.userData.geologyRasterLayer=true;
+  mesh.userData.tooltipItems=[{title:layer.unit,rows:[layer.basis??'User-supplied georeferenced lithology raster.','WGS 84 / UTM zone 37S; approximate source registration.'],tone:layer.color}];
+  if(!terrain.boundingBox)terrain.computeBoundingBox();
+  const terrainBounds=terrain.boundingBox??new THREE.Box3();
+  const bounds=new THREE.Box3(
+    new THREE.Vector3(Math.max(west-origin.easting,terrainBounds.min.x),terrainBounds.min.y+2.5,Math.max(origin.northing-north,terrainBounds.min.z)),
+    new THREE.Vector3(Math.min(east-origin.easting,terrainBounds.max.x),terrainBounds.max.y+2.5,Math.min(origin.northing-south,terrainBounds.max.z)),
+  );
+  return {mesh,bounds};
 }
 
 /** A subtle 1 km UTM reference grid draped over the digitized surface-map bounds. */

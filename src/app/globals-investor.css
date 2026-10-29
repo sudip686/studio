@@ -2250,6 +2250,14 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   -webkit-backdrop-filter: blur(18px) saturate(1.08);
   backdrop-filter: blur(18px) saturate(1.08);
 }
+.tanga-deck .tanga-process-exhibit--factory.tanga-process-exhibit--loading {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  color: #dce5e6;
+  font-size: 14px;
+  letter-spacing: .02em;
+}
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-header small,
 .tanga-deck .tanga-process-exhibit--factory .tanga-process-kicker {
   color: var(--tanga-label, #9dc6d1);
