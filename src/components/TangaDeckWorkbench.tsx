@@ -427,7 +427,7 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
   tanzania: [
     {label: 'Region', value: 'Tanga, NE Tanzania'},
     {label: 'District', value: 'Mkinga'},
-    {label: 'Coast link', value: '~80 km to port'},
+    {label: 'Coast link', value: '72 km to Tanga Port'},
   ],
   // This scene answers "what ground do we control", so it states tenure, not
   // tonnage. The resource figures live on the resource scene, where the block
@@ -508,10 +508,10 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
   },
   accessibility: {
     title: 'Infrastructure Access',
-    source: 'Coastal NE Tanzania · real OSM locations',
+    source: 'Project-to-port distance supplied for the project; mapped road route is shown separately',
     columns: ['Destination', 'Distance', ''],
     rows: [
-      {cells: ['Tanga Port', '≈80 km', ''], emphasis: true},
+      {cells: ['Tanga Port', '72 km', ''], emphasis: true},
       {cells: ['Hale hydro station', '57 km', '']},
       {cells: ['New Pangani Falls', '61 km', '']},
       {cells: ['Tanga rail terminal', 'coastal link', '']},
@@ -655,7 +655,7 @@ const DEFAULT_RECENT_COMMANDS: PromptChip[] = [
 // suspend for background and offscreen tabs. Without a guarantee that it
 // finishes, a throttled frame loop leaves a *wrong* number on screen wearing
 // the authority of a data panel — observed showing "≈6 km" for a distance
-// whose real value is "≈80 km". Every exit path below therefore ends on the
+// whose route geometry was about 76 km. Every exit path below therefore ends on the
 // true value: a settle timer that fires regardless of frame delivery, a
 // visibility handler for a tab coming back to the foreground, and cleanup on
 // unmount. The animation is decoration; the number is not.
@@ -1787,7 +1787,7 @@ function sceneCalloutsForMode(
       // rather than telling the viewer anything about the country. Both now
       // answer the question this scene exists to answer: why Tanzania.
       {id: 'country', label: 'A graphite country', detail: 'Four ranked graphite projects sit in Tanzania, including Tanga', boxX: 42, boxY: 40, tone: '#a89c94', anchor: wgs84Anchor({lon: 35.2, lat: -6.2}, 160000), offset: {x: -260, y: -120}},
-      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 80 km from deep-water port at Tanga', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
+      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 72 km from Tanga Port', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
     ];
   }
   if (mode === 'project') {

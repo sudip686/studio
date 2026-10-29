@@ -7,7 +7,7 @@ import { ShowcaseDepositHero } from './ShowcaseDepositHero';
 const investmentMetrics = [
   { label: 'Resource base', value: '183 Mt @ 4.86% TGC' },
   { label: 'Confidence', value: '148 Mt indicated' },
-  { label: 'Logistics', value: '80 km to Tanga port' },
+  { label: 'Logistics', value: '72 km to Tanga port' },
 ];
 
 const investmentReasons = [

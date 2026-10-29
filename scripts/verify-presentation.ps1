@@ -3,7 +3,8 @@ param(
   [int]$Height = 768,
   [int]$First = 1,
   [int]$Last = 12,
-  [string]$BaseUrl = 'http://localhost:3016'
+  [string]$BaseUrl = 'http://localhost:3016',
+  [string]$BrowserSession = 'final-pass'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,18 +53,18 @@ $captureRoot = [IO.Path]::GetFullPath($captureRoot)
 New-Item -ItemType Directory -Path $captureRoot -Force | Out-Null
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
-& $browserCli --session final-pass set viewport $Width $Height
+& $browserCli --session $BrowserSession set viewport $Width $Height
 if ($LASTEXITCODE -ne 0) { throw 'Could not set the browser viewport.' }
-& $browserCli --session final-pass open "$BaseUrl/#project"
+& $browserCli --session $BrowserSession open "$BaseUrl/#project"
 if ($LASTEXITCODE -ne 0) { throw "Could not open $BaseUrl/#project" }
 
 for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
   $title = $titles[$slideIndex - 1]
   $mode = $modes[$slideIndex - 1]
-  & $browserCli --session final-pass find role tab click --name "Scene ${slideIndex}: $title"
+  & $browserCli --session $BrowserSession find role tab click --name "Scene ${slideIndex}: $title"
   if ($LASTEXITCODE -ne 0) { throw "Navigation failed for chapter $slideIndex ($title)." }
 
-  & $browserCli --session final-pass wait --fn "document.querySelector('.tanga-deck')?.dataset.mode === '$mode'"
+  & $browserCli --session $BrowserSession wait --fn "document.querySelector('.tanga-deck')?.dataset.mode === '$mode'"
   if ($LASTEXITCODE -ne 0) { throw "Wrong mode for chapter $slideIndex ($mode)." }
 
   if ($mapModes -contains $mode) {
@@ -71,19 +72,19 @@ for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
   } else {
     $readySource = "(()=>{const d=document.querySelector('.tanga-deck');return !!d&&d.dataset.mode==='$mode'&&!d.classList.contains('tanga-deck--transitioning')&&d.dataset.threeState==='ready'})()"
   }
-  & $browserCli --session final-pass wait --fn $readySource
+  & $browserCli --session $BrowserSession wait --fn $readySource
   if ($LASTEXITCODE -ne 0) { throw "Scene readiness failed for chapter $slideIndex ($mode)." }
 
   if ($mode -eq 'metallurgy') {
-    & $browserCli --session final-pass wait --fn "(()=>{const e=document.querySelector('.tanga-process-canvas');return !!e&&e.dataset.ready==='true'&&e.dataset.cameraSettled==='true'&&e.dataset.roofSettled==='true'})()"
+    & $browserCli --session $BrowserSession wait --fn "(()=>{const e=document.querySelector('.tanga-process-canvas');return !!e&&e.dataset.ready==='true'&&e.dataset.cameraSettled==='true'&&e.dataset.roofSettled==='true'})()"
     if ($LASTEXITCODE -ne 0) { throw 'Metallurgy factory camera or roof did not settle.' }
   }
 
-  $auditResult = (& $browserCli --session final-pass eval -b $auditEncoded) -join "`n"
+  $auditResult = (& $browserCli --session $BrowserSession eval -b $auditEncoded) -join "`n"
   if ($LASTEXITCODE -ne 0) { throw "Layout audit failed for chapter $slideIndex." }
   $auditObject = $auditResult | ConvertFrom-Json
   $capturePath = Join-Path $captureRoot "verify-$stamp-$($Width)x$($Height)-$($slideIndex.ToString('00'))-$mode.png"
-  & $browserCli --session final-pass screenshot $capturePath
+  & $browserCli --session $BrowserSession screenshot $capturePath
   if ($LASTEXITCODE -ne 0) { throw "Screenshot failed for chapter $slideIndex." }
 
   [pscustomobject]@{
@@ -100,4 +101,4 @@ for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
   } | ConvertTo-Json -Depth 8 -Compress
 }
 
-& $browserCli --session final-pass errors
+& $browserCli --session $BrowserSession errors

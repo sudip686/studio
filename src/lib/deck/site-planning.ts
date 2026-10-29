@@ -75,31 +75,51 @@ export function hull(points: Point2[]): Point2[] {
   const half=(ps: Point2[])=>{const h: Point2[]=[];for(const p of ps){while(h.length>1&&cross(h[h.length-2],h[h.length-1],p)<=0)h.pop();h.push(p);}return h.slice(0,-1);};
   return [...half(sorted),...half([...sorted].reverse())];
 }
+const CELL_NEIGHBORS:Point2[]=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+function connectedCellGroups(cells:Map<string,PlanningBlock[]>){
+  const groups:PlanningBlock[][]=[];const seen=new Set<string>();
+  for(const key of cells.keys()){
+    if(seen.has(key))continue;
+    const queue=[key],group:PlanningBlock[]=[];seen.add(key);
+    for(let i=0;i<queue.length;i++){
+      const current=queue[i];group.push(...cells.get(current)!);
+      const [x,z]=current.split(',').map(Number);
+      for(const [dx,dz] of CELL_NEIGHBORS){const next=`${x+dx},${z+dz}`;if(cells.has(next)&&!seen.has(next)){seen.add(next);queue.push(next);}}
+    }
+    if(group.length>=8)groups.push(group);
+  }
+  return groups;
+}
 export function planSite(blocks: PlanningBlock[], boundary: Point2[], height: (x:number,z:number)=>number, layout: 'clusters' | 'north-south' = 'clusters'): SitePlan {
   const cells=new Map<string,PlanningBlock[]>();
-  for(const b of blocks) if(b.carbon>=CONCEPT.threshold && inside([b.x,b.z],boundary)) {
+  for(const b of blocks) if(b.carbon>=CONCEPT.threshold && inside([b.x,b.z],boundary) && (layout!=='north-south'||rectangleContained([b.x,b.z],b.dx,b.dy,boundary))) {
     const key=`${Math.round(b.x/CONCEPT.cell)},${Math.round(b.z/CONCEPT.cell)}`;
     const list=cells.get(key)??[];list.push(b);cells.set(key,list);
   }
-  const groups: PlanningBlock[][]=[];
-  const seen=new Set<string>();
-  for(const key of cells.keys()) {if(seen.has(key))continue;const queue=[key],group:PlanningBlock[]=[];seen.add(key);
-    for(let i=0;i<queue.length;i++){const k=queue[i];group.push(...cells.get(k)!);const [x,z]=k.split(',').map(Number);
-      for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){const next=`${x+dx},${z+dz}`;if(cells.has(next)&&!seen.has(next)){seen.add(next);queue.push(next);}}}
-    if(group.length>=8)groups.push(group);
-  }
+  let groups=connectedCellGroups(cells);
   if(layout==='north-south') {
-    const eligible=[...cells.values()].flat();
-    const minZ=eligible.reduce((v,b)=>Math.min(v,b.z),Infinity),maxZ=eligible.reduce((v,b)=>Math.max(v,b.z),-Infinity);
-    const split=(minZ+maxZ)/2;
-    groups.splice(0,groups.length,eligible.filter(b=>b.z<split),eligible.filter(b=>b.z>=split));
+    // One connected shell cluster can wrap around a concave boundary and its
+    // convex hull then extends outside the project outline. Re-cluster into
+    // 500 m source-coordinate windows, retaining only whole source cells inside
+    // the boundary. This yields compact, separated presentation envelopes;
+    // the window is a display grouping, not a pit-design parameter.
+    const windows=new Map<string,Map<string,PlanningBlock[]>>();
+    for(const [cellKey,cellBlocks] of cells){
+      const b=cellBlocks[0],windowKey=`${Math.floor(b.x/500)},${Math.floor(b.z/500)}`;
+      const window=windows.get(windowKey)??new Map<string,PlanningBlock[]>();window.set(cellKey,cellBlocks);windows.set(windowKey,window);
+    }
+    groups=[...windows.values()].flatMap(connectedCellGroups)
+      .filter(group=>contained(hull(group.flatMap(b=>rectangle([b.x,b.z],b.dx,b.dy))),boundary))
+      .sort((a,b)=>b.length-a.length);
   }
   const pits:CandidatePit[]=[];let rejected=0;
   for(const group of groups.sort((a,b)=>b.length-a.length)) {
+    if(layout==='north-south'&&pits.length>=2)break;
     if(group.length<8)continue;
     let footprint=hull(group.flatMap(b=>rectangle([b.x,b.z],b.dx,b.dy)));
     if(footprint.length<3)continue;
     const centre:Point2=[footprint.reduce((s,p)=>s+p[0],0)/footprint.length,footprint.reduce((s,p)=>s+p[1],0)/footprint.length];
+    if(layout==='north-south'&&pits.some(p=>Math.hypot(p.centre[0]-centre[0],p.centre[1]-centre[1])<900))continue;
     const surface=height(...centre);
     let floor=group.reduce((lowest,b)=>Math.min(lowest,b.y-b.dz/2),Infinity);
     let depth=Math.max(CONCEPT.bench,Math.min(layout==='north-south'?160:Infinity,surface-floor));
@@ -126,6 +146,7 @@ export function planSite(blocks: PlanningBlock[], boundary: Point2[], height: (x
     if(!contained(ring,boundary)||pits.some(p=>overlaps(p.ring,ring))){rejected++;continue;}
     pits.push({ring,centre,surface,floor,depth,support:group.length});
   }
+  if(layout==='north-south')pits.sort((a,b)=>a.centre[1]-b.centre[1]);
   const xs=boundary.map(p=>p[0]),zs=boundary.map(p=>p[1]);
   let plant:Point2|null=null,best=Infinity;
   const anchor=pits[0]?.centre??[0,0];

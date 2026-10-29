@@ -4343,9 +4343,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // The subsurface geology scene uses a larger deep-navy head and an ivory
       // surface keyline so collars remain distinct from the pale Graphitic Schist
       // body and stay readable at the presentation overview distance.
-      const collarRadius = subsurfaceView ? 8.2 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
-      const collarLift = subsurfaceView ? 10 : mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT;
-      const collarGeometry = new THREE.SphereGeometry(collarRadius, 16, 12);
+      const collarRadius = subsurfaceView ? 24 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
+      const collarLift = subsurfaceView ? 30 : mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT;
+      const collarGeometry = new THREE.SphereGeometry(collarRadius, subsurfaceView ? 24 : 16, subsurfaceView ? 18 : 12);
       const collarMaterial = new THREE.MeshBasicMaterial({
         color: subsurfaceView ? 0x10264a : mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
         toneMapped: false,
@@ -4380,8 +4380,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {
         const drillingSlide = mode === 'drillholes';
         const collarRingGeometry = new THREE.TorusGeometry(
-          subsurfaceView ? 19.5 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
-          subsurfaceView ? 2.2 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
+          subsurfaceView ? 42 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
+          subsurfaceView ? 4.8 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
           8,
           28
         );
@@ -4395,7 +4395,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const collarRings = new THREE.InstancedMesh(collarRingGeometry, collarRingMaterial, collarSegments.length);
         const ringDummy = new THREE.Object3D();
         collarSegments.forEach((segment, index) => {
-          const point = collarSurfacePoint(segment, terrainResources, subsurfaceView ? 12.5 : drillingSlide ? 7 : mode === 'resource' ? 8 : 11);
+          const point = collarSurfacePoint(segment, terrainResources, subsurfaceView ? 35.5 : drillingSlide ? 7 : mode === 'resource' ? 8 : 11);
           ringDummy.position.copy(point);
           ringDummy.rotation.set(Math.PI / 2, 0, 0);
           ringDummy.updateMatrix();
