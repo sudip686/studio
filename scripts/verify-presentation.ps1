@@ -57,6 +57,16 @@ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 if ($LASTEXITCODE -ne 0) { throw 'Could not set the browser viewport.' }
 & $browserCli --session $BrowserSession open "$BaseUrl/#project"
 if ($LASTEXITCODE -ne 0) { throw "Could not open $BaseUrl/#project" }
+$navigationReady = $false
+for ($attempt = 0; $attempt -lt 20; $attempt++) {
+  $navigationSnapshot = (& $browserCli --session $BrowserSession snapshot -i) -join "`n"
+  if ($LASTEXITCODE -eq 0 -and $navigationSnapshot.Contains('tab "Scene 1: Meet Tanga"')) {
+    $navigationReady = $true
+    break
+  }
+  Start-Sleep -Milliseconds 500
+}
+if (-not $navigationReady) { throw 'The presentation chapter navigation did not mount.' }
 
 for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
   $title = $titles[$slideIndex - 1]
