@@ -4384,7 +4384,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
 
       if (subsurfaceView) {
         const collarHeadGeometry = new THREE.SphereGeometry(27, 16, 12);
-        const collarHeads = new THREE.InstancedMesh(collarHeadGeometry, collarMaterial, collarSegments.length);
+        // Each reveal owns its own material opacity; sharing one with the post
+        // lets the head animation overwrite the shaft animation every frame.
+        const collarHeadMaterial = collarMaterial.clone();
+        const collarHeads = new THREE.InstancedMesh(collarHeadGeometry, collarHeadMaterial, collarSegments.length);
         collarSegments.forEach((segment, index) => {
           const point = collarSurfacePoint(segment, terrainResources, 1);
           point.y += collarHeight - 1;
