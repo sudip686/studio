@@ -173,9 +173,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       selected = next;
       const item = PROCESS.find(candidate => candidate.id === next) ?? PROCESS[0];
       target.set(item.point[0], item.point[1], item.point[2]);
-      const distance = next === 'flotation' ? 72 : next === 'product' ? 88 : next === 'dewatering' ? 62 : next === 'milling' ? 48 : 62;
-      // Look down through the opened roof, clear of the retained wall height.
-      const localDirection = new THREE.Vector3(.55, 1.15, .8).normalize();
+      // Frame the whole working bay, not a close crop of its roof/floor. The
+      // flotation hall is the widest stage; product handling spans the longest
+      // building. Give each shot enough room for equipment and roof-cutaway
+      // context, then lower the view so the interior reads as a plant space.
+      const distanceByStage:Record<ProcessId,number>={feed:96,milling:82,flotation:116,dewatering:96,product:166};
+      const distance=distanceByStage[next];
+      // Keep the camera above the wall line while showing the equipment from a
+      // lower three-quarter angle, instead of looking nearly straight down.
+      const localDirection = new THREE.Vector3(.72, .86, 1.05).normalize();
       destination.copy(target).addScaledVector(localDirection, distance);
       moveCamera(animate, true);
     }

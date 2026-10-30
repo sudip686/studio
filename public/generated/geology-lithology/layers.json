@@ -1,0 +1,211 @@
+{
+  "type": "TangaGeologyRasterLayerCollection",
+  "crs": "EPSG:32737",
+  "resolutionMetresPerPixel": 4,
+  "edgeKeyline": "darkened source class colour",
+  "layers": [
+    {
+      "unit": "Graphitic schist",
+      "sourceUnit": "Graphitic schist",
+      "color": "#d8d8e1",
+      "url": "/generated/geology-lithology/graphitic-schist.webp",
+      "source": "Graphitic Schist.tiff",
+      "sourceSha256": "9516036ffcd51302f1e0b358b13f716860746927cd4462ec96a58122189f0e6d",
+      "crs": "EPSG:32737",
+      "bounds": [
+        473676.38787495776,
+        9464742.047673432,
+        479515.21207521367,
+        9472999.81332808
+      ],
+      "sourceDimensions": [
+        6614,
+        9354
+      ],
+      "pixelSizeMetres": [
+        0.882797732122152,
+        0.8828058215359977
+      ],
+      "dimensions": [
+        1460,
+        2065
+      ],
+      "mappedPixelFraction": 0.06113,
+      "basis": "User-supplied georeferenced lithology raster; WGS 84 / UTM zone 37S; colours follow the source project map."
+    },
+    {
+      "unit": "Khondalite",
+      "sourceUnit": "Khondalite",
+      "color": "#a188da",
+      "url": "/generated/geology-lithology/khondalite.webp",
+      "source": "Khondalite.tiff",
+      "sourceSha256": "348200c8dfa1764c844c3da223a55971607957492f8b708ee2d0ea05359ab00d",
+      "crs": "EPSG:32737",
+      "bounds": [
+        472486.85037551436,
+        9462804.680905417,
+        480014.3666549395,
+        9473450.739643449
+      ],
+      "sourceDimensions": [
+        6614,
+        9354
+      ],
+      "pixelSizeMetres": [
+        1.138118578685383,
+        1.138129007700701
+      ],
+      "dimensions": [
+        1882,
+        2662
+      ],
+      "mappedPixelFraction": 0.01416,
+      "basis": "User-supplied georeferenced lithology raster; WGS 84 / UTM zone 37S; colours follow the source project map."
+    },
+    {
+      "unit": "Kyanite sillimanite schist",
+      "sourceUnit": "Kyanite sillimanite schist",
+      "color": "#0755f5",
+      "url": "/generated/geology-lithology/kyanite-sillimanite-schist.webp",
+      "source": "Kyanite Sillimanite Schist.tiff",
+      "sourceSha256": "4b4c857e5c212d196503b1dcc55a7d48b8ba65b5453ccb6fe1eaedc0dbfc8830",
+      "crs": "EPSG:32737",
+      "bounds": [
+        475987.2784439199,
+        9467326.653815255,
+        476516.53949661384,
+        9468075.180161206
+      ],
+      "sourceDimensions": [
+        6614,
+        9354
+      ],
+      "pixelSizeMetres": [
+        0.08002132638251268,
+        0.08002205964843731
+      ],
+      "dimensions": [
+        133,
+        188
+      ],
+      "mappedPixelFraction": 0.02576,
+      "basis": "User-supplied georeferenced lithology raster; WGS 84 / UTM zone 37S; colours follow the source project map."
+    },
+    {
+      "unit": "Mafic granulite",
+      "sourceUnit": "Mafic granulite",
+      "color": "#b065ac",
+      "url": "/generated/geology-lithology/mafic-granulite.webp",
+      "source": "Mafic Granulite.tiff",
+      "sourceSha256": "06afd9608e723c5683cb4b5eea6ba864b5c103fdfecccf0fcb87dbb0cf6da236",
+      "crs": "EPSG:32737",
+      "bounds": [
+        473880.4377950596,
+        9466828.119626116,
+        479230.10307709745,
+        9474394.074810706
+      ],
+      "sourceDimensions": [
+        6614,
+        9354
+      ],
+      "pixelSizeMetres": [
+        0.8088396253459126,
+        0.8088470370526054
+      ],
+      "dimensions": [
+        1338,
+        1892
+      ],
+      "mappedPixelFraction": 0.01237,
+      "basis": "User-supplied georeferenced lithology raster; WGS 84 / UTM zone 37S; colours follow the source project map."
+    },
+    {
+      "unit": "Quartzofeldspathic rock",
+      "sourceUnit": "Quartzofeldspathic rock",
+      "color": "#f169e1",
+      "url": "/generated/geology-lithology/quartzofeldspathic-rock.webp",
+      "source": "Quartzofeldspathic Rock.tiff",
+      "sourceSha256": "5d0aa8ec602d068efd7aa63158cd28a25999c23d857dadcb184cccfaa67220a7",
+      "crs": "EPSG:32737",
+      "bounds": [
+        474136.51607853075,
+        9466293.693391949,
+        478370.6045000817,
+        9472281.904159566
+      ],
+      "sourceDimensions": [
+        6614,
+        9354
+      ],
+      "pixelSizeMetres": [
+        0.6401706110600134,
+        0.6401764771880959
+      ],
+      "dimensions": [
+        1059,
+        1498
+      ],
+      "mappedPixelFraction": 0.00616,
+      "basis": "User-supplied georeferenced lithology raster; WGS 84 / UTM zone 37S; colours follow the source project map."
+    },
+    {
+      "unit": "Quartzite",
+      "sourceUnit": "Quartzite",
+      "color": "#f5d333",
+      "url": "/generated/geology-lithology/quartzite.webp",
+      "source": "Quartzite.tiff",
+      "sourceSha256": "96c4438697fad64a9a85373432f80436a1daf3d9a71ed22ff8e77e5501a65c68",
+      "crs": "EPSG:32737",
+      "bounds": [
+        473470.9081199448,
+        9464595.965268984,
+        480367.79199910956,
+        9474350.129612366
+      ],
+      "sourceDimensions": [
+        6614,
+        9354
+      ],
+      "pixelSizeMetres": [
+        1.0427704685764678,
+        1.0427800238808318
+      ],
+      "dimensions": [
+        1725,
+        2440
+      ],
+      "mappedPixelFraction": 0.01327,
+      "basis": "User-supplied georeferenced lithology raster; WGS 84 / UTM zone 37S; colours follow the source project map."
+    },
+    {
+      "unit": "Crystalline limestone",
+      "sourceUnit": "Marble",
+      "color": "#41a9ec",
+      "url": "/generated/geology-lithology/crystalline-limestone.webp",
+      "source": "Marble.tiff",
+      "sourceSha256": "5ef53efe2826fd26e4104bbe39a594d249ce2443f88999953e9cb18a96633fae",
+      "crs": "EPSG:32737",
+      "bounds": [
+        475830.659198248,
+        9470338.450055655,
+        476195.58571076393,
+        9470854.56040907
+      ],
+      "sourceDimensions": [
+        6614,
+        9354
+      ],
+      "pixelSizeMetres": [
+        0.055174858257624596,
+        0.0551753638460372
+      ],
+      "dimensions": [
+        128,
+        181
+      ],
+      "mappedPixelFraction": 0.06695,
+      "basis": "User-supplied georeferenced lithology raster; WGS 84 / UTM zone 37S; colours follow the source project map."
+    }
+  ]
+}

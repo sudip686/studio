@@ -427,7 +427,7 @@ const SLIDE_FACTS: Record<WorkbenchMode, SlideFact[]> = {
   tanzania: [
     {label: 'Region', value: 'Tanga, NE Tanzania'},
     {label: 'District', value: 'Mkinga'},
-    {label: 'Coast link', value: '~80 km to port'},
+    {label: 'Coast link', value: '72 km to Tanga Port'},
   ],
   // This scene answers "what ground do we control", so it states tenure, not
   // tonnage. The resource figures live on the resource scene, where the block
@@ -508,10 +508,10 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
   },
   accessibility: {
     title: 'Infrastructure Access',
-    source: 'Coastal NE Tanzania · real OSM locations',
+    source: 'Project-to-port distance supplied for the project; mapped road route is shown separately',
     columns: ['Destination', 'Distance', ''],
     rows: [
-      {cells: ['Tanga Port', '≈80 km', ''], emphasis: true},
+      {cells: ['Tanga Port', '72 km', ''], emphasis: true},
       {cells: ['Hale hydro station', '57 km', '']},
       {cells: ['New Pangani Falls', '61 km', '']},
       {cells: ['Tanga rail terminal', 'coastal link', '']},
@@ -655,7 +655,7 @@ const DEFAULT_RECENT_COMMANDS: PromptChip[] = [
 // suspend for background and offscreen tabs. Without a guarantee that it
 // finishes, a throttled frame loop leaves a *wrong* number on screen wearing
 // the authority of a data panel — observed showing "≈6 km" for a distance
-// whose real value is "≈80 km". Every exit path below therefore ends on the
+// whose route geometry was about 76 km. Every exit path below therefore ends on the
 // true value: a settle timer that fires regardless of frame delivery, a
 // visibility handler for a tab coming back to the foreground, and cleanup on
 // unmount. The animation is decoration; the number is not.
@@ -1787,7 +1787,7 @@ function sceneCalloutsForMode(
       // rather than telling the viewer anything about the country. Both now
       // answer the question this scene exists to answer: why Tanzania.
       {id: 'country', label: 'A graphite country', detail: 'Four ranked graphite projects sit in Tanzania, including Tanga', boxX: 42, boxY: 40, tone: '#a89c94', anchor: wgs84Anchor({lon: 35.2, lat: -6.2}, 160000), offset: {x: -260, y: -120}},
-      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 80 km from deep-water port at Tanga', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
+      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 72 km from Tanga Port', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
     ];
   }
   if (mode === 'project') {
@@ -2144,7 +2144,7 @@ function powerGridCorridors(heightAt: (lon: number, lat: number) => number) {
 }
 
 function isProjectLayer(feature: any) {
-  return feature.properties?.layer === 'Project boundary';
+  return feature.properties?.layer === 'Merged license boundary' || feature.properties?.layer === 'Project boundary';
 }
 
 function featurePoint(
@@ -2316,8 +2316,10 @@ export default function TangaDeckWorkbench() {
   const [boundaryAnchor, setBoundaryAnchor] = useState<{lon: number; lat: number} | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch('/generated/boundaries.geojson').then(response => response.json()).then(payload => {
-      const ring = payload.features?.find((feature: any) => feature.properties?.layer === 'Project boundary')?.geometry?.coordinates?.[0];
+    fetch('/generated/merged-license-boundary.geojson').then(response => response.json()).then(payload => {
+      const feature=payload.features?.find((candidate: any) => isProjectLayer(candidate));
+      const coordinates=feature?.geometry?.coordinates;
+      const ring=feature?.geometry?.type==='MultiPolygon'?coordinates?.[0]?.[0]:coordinates?.[0];
       if (!cancelled && Array.isArray(ring) && ring.length) {
         const point = ring[Math.floor(ring.length / 4)];
         if (Number.isFinite(point?.[0]) && Number.isFinite(point?.[1])) setBoundaryAnchor({lon: point[0], lat: point[1]});
@@ -3432,6 +3434,12 @@ export default function TangaDeckWorkbench() {
     };
     const styleIsReady = () => {
       try {
+        // MapLibre can expose its Map object before the style has been
+        // installed. Calling isStyleLoaded() in that window emits a warning
+        // on every direct Three.js chapter entry. getStyle() is safe before
+        // style initialization and lets the load event remain the readiness
+        // signal until the actual style is available.
+        if (typeof map.getStyle === 'function' && !map.getStyle()) return false;
         return typeof map.isStyleLoaded === 'function'
           ? map.isStyleLoaded()
           : typeof map.loaded === 'function' && map.loaded();
@@ -3788,14 +3796,13 @@ export default function TangaDeckWorkbench() {
         opacity: 1,
         parameters: {depthTest: false} as any,
       }),
-      // VRIFY-style license boundary: three-layer glow that reads bright and
-      // premium at any zoom. Uses the brand copper (matches the deck palette)
-      // instead of the older teal chrome noise.
+      // Keep the merged boundary on the project-introduction map only. Geology,
+      // drilling and other Three.js chapters stay focused on their evidence.
       //
       // Layer 1: wide diffused halo (soft brand glow bleeds around the polygon)
-      showLocalContext && new GeoJsonLayer<any>({
+      activeMode === 'project' && new GeoJsonLayer<any>({
         id: 'project-boundary-halo-wide',
-        data: '/generated/boundaries.geojson',
+        data: '/generated/merged-license-boundary.geojson',
         pickable: false,
         filled: false,
         stroked: true,
@@ -3807,9 +3814,9 @@ export default function TangaDeckWorkbench() {
         parameters: {depthTest: false} as any,
       }),
       // Layer 2: mid halo
-      showLocalContext && new GeoJsonLayer<any>({
+      activeMode === 'project' && new GeoJsonLayer<any>({
         id: 'project-boundary-halo',
-        data: '/generated/boundaries.geojson',
+        data: '/generated/merged-license-boundary.geojson',
         pickable: false,
         filled: false,
         stroked: true,
@@ -3823,9 +3830,9 @@ export default function TangaDeckWorkbench() {
       // Layer 3: crisp bright core + subtle brand-tinted fill so the shape
       // reads as a real license polygon, not just an outline. Higher fill
       // opacity on the active mode so the deck knows this is THE tenement.
-      showLocalContext && new GeoJsonLayer<any>({
+      activeMode === 'project' && new GeoJsonLayer<any>({
         id: 'boundaries',
-        data: '/generated/boundaries.geojson',
+        data: '/generated/merged-license-boundary.geojson',
         pickable: true,
         filled: true,
         stroked: true,
@@ -5338,6 +5345,8 @@ export default function TangaDeckWorkbench() {
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [sceneMotionPaused, setSceneMotionPaused] = useState(false);
+  const [haulCycleStage,setHaulCycleStage]=useState<'loaded-haul'|'tip-off'|'empty-return'|'reload'|null>(null);
+  useEffect(()=>{if(activeMode!=='mine_planning')setHaulCycleStage(null);},[activeMode]);
   useEffect(() => { setSceneMotionPaused(false); }, [activeMode, activeShotIndex]);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);setIsHighlightsTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
@@ -5855,6 +5864,7 @@ export default function TangaDeckWorkbench() {
           inspectionMode={isExploreMode}
           onInspectEvidence={()=>{setIsAutoplay(false);setIsExecutiveTour(false);}}
           onSiteFacilities={setAvailableMineFacilities}
+          onHaulCycleStageChange={setHaulCycleStage}
           onAssayFacts={setAssayFacts}
           motionPaused={sceneMotionPaused}
           onMotionPausedChange={setSceneMotionPaused}
@@ -7048,6 +7058,7 @@ export default function TangaDeckWorkbench() {
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage:'all',roofOpen:false});} : undefined}
         onPlantProcessFocus={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? (stage,roofOpen) => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant')));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage,roofOpen});} : undefined}
         sceneMotionPaused={sceneMotionPaused}
+        haulCycleStage={haulCycleStage}
         onToggleSceneMotion={() => setSceneMotionPaused(value => !value)}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}

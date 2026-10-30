@@ -1,14 +1,36 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as THREE from 'three';
+import proj4 from 'proj4';
 import {buildConcentrator, placeConcentrator, buildPitSurface, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
-import {rectangle, inside} from '../src/lib/deck/site-planning';
-import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
+import {rectangle, inside, contained, overlaps, planSite, type PlanningBlock} from '../src/lib/deck/site-planning';
+import {planHaulRoute, routePosition, buildHaulTruck, updateHaulTruckCycle} from '../src/lib/deck/mine-haulage';
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
 import {SITE_EARTHWORK_OPACITY} from '../src/lib/deck/stable-materials';
 
 async function main(){
+proj4.defs('EPSG:32737','+proj=utm +zone=37 +south +datum=WGS84 +units=m +no_defs');
+const projectUtm=proj4('WGS84','EPSG:32737',[38.785,-4.813]) as [number,number];
+const licence=JSON.parse(fs.readFileSync('public/generated/merged-license-boundary.geojson','utf8'));
+const licenceFeature=licence.features.find((feature:any)=>feature.properties?.layer==='Merged license boundary');
+assert.ok(licenceFeature?.geometry?.type==='Polygon','The provisional project boundary is available to constrain candidate pits');
+const planningBoundary:[number,number][]=licenceFeature.geometry.coordinates[0].map(([lon,lat]:[number,number])=>{
+  const [easting,northing]=proj4('WGS84','EPSG:32737',[lon,lat]) as [number,number];
+  return [easting-projectUtm[0],-(northing-projectUtm[1])];
+});
+const oreWasteReference=JSON.parse(fs.readFileSync('public/generated/orewaste-reference.json','utf8'));
+const planningBlocks:PlanningBlock[]=oreWasteReference.blocks.map(([lon,lat,elevation,dx,dy,dz,carbon]:number[])=>{
+  const [easting,northing]=proj4('WGS84','EPSG:32737',[lon,lat]) as [number,number];
+  return {x:easting-projectUtm[0],y:elevation-700,z:-(northing-projectUtm[1]),dx,dy,dz,carbon};
+});
+const sourcePitPlan=planSite(planningBlocks,planningBoundary,()=>0,'north-south');
+assert.equal(sourcePitPlan.pits.length,2,'The current report-derived source supports two separated candidate pit envelopes');
+assert.ok(sourcePitPlan.pits[0].centre[1]<sourcePitPlan.pits[1].centre[1],'Candidate pits are returned north to south for stable labels and camera focus');
+assert.ok(sourcePitPlan.pits.every(pit=>pit.support>0&&contained(pit.ring,planningBoundary)),'Both candidate envelopes are supported by source blocks and fully contained by the provisional boundary');
+assert.ok(Math.hypot(sourcePitPlan.pits[0].centre[0]-sourcePitPlan.pits[1].centre[0],sourcePitPlan.pits[0].centre[1]-sourcePitPlan.pits[1].centre[1])>=900,'The two pit concepts remain spatially distinct');
+assert.equal(overlaps(sourcePitPlan.pits[0].ring,sourcePitPlan.pits[1].ring),false,'Candidate pit envelopes do not overlap');
 const ring=rectangle([0,0],400,320);
 const pit={ring,centre:[0,0] as [number,number],surface:100,floor:40,depth:60,support:100};
 const mesh=buildPitSurface(pit,()=>100);
@@ -50,6 +72,9 @@ for(let i=0;i<stockpilePositions.count;i++)if(stockpilePositions.getY(i)>=stockp
 assert.ok(crestVertices>80,'Stockpiles retain broad crests rather than pointed apices');
 const processStages=plant.userData.processStages as {id:string;label:string;point:number[]}[];
 assert.deepEqual(processStages.map(stage=>stage.id),['feed','milling','flotation','thickening','dewatering','product'],'The process plant exposes each current inspection stage');
+const flotationVessels=plant.userData.flotationVesselAudit as {vessels:number;hoppers:number;wallPanels:number;liquorSurfaces:number;designBasis:string};
+assert.deepEqual({vessels:flotationVessels.vessels,hoppers:flotationVessels.hoppers,wallPanels:flotationVessels.wallPanels,liquorSurfaces:flotationVessels.liquorSurfaces},{vessels:10,hoppers:10,wallPanels:40,liquorSurfaces:10},'The flotation bank contains ten open-top vessels with underflow hoppers, wall panels and liquor surfaces');
+assert.match(flotationVessels.designBasis,/concept visualization only/,'The industrial flotation geometry remains explicitly conceptual');
 for(const name of ['Flotation banks and walkways','Crushing and milling equipment','Dewatering and product handling','Thickener, water and reagent circuits'])
   assert.ok(plant.getObjectByName(name),`Batched plant detail retains its ${name} group`);
 const wallRibs=plant.getObjectByName('Steel-clad exterior wall ribs') as THREE.Mesh|undefined;
@@ -114,12 +139,33 @@ assert.equal(await planHaulRoute([-350,0],[350,0],rectangle([0,0],1200,1000),[],
 assert.equal(await planHaulRoute([-350,0],[350,0],rectangle([0,0],1200,1000),[],()=>100,undefined,()=>true),null,'Navigation cancellation stops queued route work');
 assert.ok(routePosition(route,0).position.distanceTo(route[0])<1e-6);
 const haulTruck=buildHaulTruck();
-assert.ok(haulTruck.children.length<=6,'Detailed truck assembly is batched by material');
+assert.ok(haulTruck.children.length<=7,'Detailed truck assembly and articulated dump body are batched by material');
 assert.ok(haulTruck.userData.components.includes('Haul truck windshield')&&haulTruck.userData.components.includes('Haul truck dump-bed tailgate'),'Truck has an enclosed cab and dump-body form');
 assert.equal(haulTruck.userData.componentCounts['Haul truck tire'],6,'Haul truck has three axles');
+const dumpBed=haulTruck.userData.dumpBed as THREE.Group;
+const cargo=haulTruck.userData.cargoMesh as THREE.Mesh;
+assert.ok(dumpBed instanceof THREE.Group&&cargo instanceof THREE.Mesh,'The tip body and conceptual load remain independently animated parts');
 haulTruck.updateMatrixWorld(true);
 const truckBounds=new THREE.Box3().setFromObject(haulTruck),truckSize=truckBounds.getSize(new THREE.Vector3());
 assert.ok(truckSize.x<=6.1&&truckSize.z<11&&truckSize.y<7,'Truck proportions remain within the screened concept envelope');
+const haulPath=[new THREE.Vector3(0,20,0),new THREE.Vector3(40,20,0)];
+let haulCycle=updateHaulTruckCycle(haulTruck,haulPath,40,0);
+assert.equal(haulCycle.stage,'loaded-haul','The route begins with a visible conceptual ore load');
+assert.equal((cargo.material as THREE.MeshStandardMaterial).opacity,1,'Loaded haul begins with a full load cue');
+haulCycle=updateHaulTruckCycle(haulTruck,haulPath,40,36.5);
+assert.equal(haulCycle.stage,'tip-off','The truck pauses at the feed end to tip off');
+assert.ok(dumpBed.rotation.x<-.4,'The dump body articulates during tip-off');
+assert.equal((cargo.material as THREE.MeshStandardMaterial).opacity,0,'The load cue clears during the tip-off pause');
+assert.ok(haulTruck.position.distanceTo(haulPath[1])<1e-6,'Tip-off is staged at the route destination');
+haulCycle=updateHaulTruckCycle(haulTruck,haulPath,40,48);
+assert.equal(haulCycle.stage,'empty-return','The truck returns empty after tip-off');
+assert.equal((cargo.material as THREE.MeshStandardMaterial).opacity,0,'The empty return does not carry the load cue');
+haulCycle=updateHaulTruckCycle(haulTruck,haulPath,40,78);
+assert.equal(haulCycle.stage,'reload','A short conceptual reload phase is shown at the pit');
+assert.ok((cargo.material as THREE.MeshStandardMaterial).opacity>0&& (cargo.material as THREE.MeshStandardMaterial).opacity<1,'Reload fades the load back in');
+haulCycle=updateHaulTruckCycle(haulTruck,haulPath,40,80);
+assert.equal(haulCycle.stage,'loaded-haul','The display cycle loops back to loaded haul');
+assert.equal((cargo.material as THREE.MeshStandardMaterial).opacity,1,'The next outbound leg carries the load cue again');
 const evidence:EvidenceInterval[]=Array.from({length:12},(_,i)=>({holeId:`H${i}`,depthFrom:0,from:[0,100,-140+i*25],to:[0,60,-140+i*25]}));
 const selected=selectPitEvidenceHoles(evidence,[pit]);
 assert.equal(selected.length,4,'Evidence label budget is bounded');

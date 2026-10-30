@@ -9,7 +9,7 @@ export const deckSlides: DeckSlide[] = [
       "350 km NW of Dar es Salaam, Tanzania",
       "100 DD holes (2022-2025 exploration program)",
       "6.4 sq km within Mozambique Belt",
-      "80 km from Tanga port - Indian Ocean access"
+      "72 km from Tanga port - Indian Ocean access"
     ],
     view: "original",
     camera: {
@@ -22,7 +22,7 @@ export const deckSlides: DeckSlide[] = [
       duration: 3.0,
     },
     layers: { terrain: true, imagery: true, kml: true, drillholes: false, blockModel: false },
-    speakerNotes: "Introduce the project location: 350km NW Dar es Salaam, 80km from Tanga port. Mozambique Belt - world-class graphite terrain. 100 DD holes completed 2022-2025.",
+    speakerNotes: "Introduce the project location: 350km NW Dar es Salaam, 72km from Tanga port. Mozambique Belt - world-class graphite terrain. 100 DD holes completed 2022-2025.",
     narrative: {
       act: 'setup',
       chapterTitle: 'Where We Are',
@@ -92,7 +92,7 @@ export const deckSlides: DeckSlide[] = [
     title: "Infrastructure Access",
     subtitle: "Roads, ports, and logistics",
     facts: [
-      "80 km to Tanga port - Indian Ocean",
+      "72 km to Tanga port - Indian Ocean",
       "Regional highway access maintained",
       "350 km to Dar es Salaam",
       "Power/water infrastructure accessible"
@@ -109,13 +109,13 @@ export const deckSlides: DeckSlide[] = [
       duration: 2.0,
     },
     layers: { imagery: true, kml: false },
-    speakerNotes: "80km to Tanga port (Indian Ocean access). Regional highway network maintained. 350km to Dar es Salaam. Power and water accessible for operations - reduces CAPEX.",
+    speakerNotes: "72km to Tanga port (Indian Ocean access). Regional highway network maintained. 350km to Dar es Salaam. Power and water accessible for operations - reduces CAPEX.",
     narrative: {
       act: 'journey',
       chapterTitle: 'How We Get Here',
       storyBeat: 'Demonstrate operational feasibility and low logistics costs',
       emotionalTone: 'reassuring',
-      narrationScript: "Infrastructure is a key de-risking factor. We're just 80 kilometers from Tanga port with road access via maintained regional highways. Power and water infrastructure are accessible for future mining operations—significantly reducing CAPEX requirements."
+      narrationScript: "Infrastructure is a key de-risking factor. We're just 72 kilometers from Tanga port with road access via maintained regional highways. Power and water infrastructure are accessible for future mining operations—significantly reducing CAPEX requirements."
     },
     revealSequence: {
       elements: [
@@ -647,7 +647,7 @@ export const deckSlides: DeckSlide[] = [
     facts: [
       "JORC-compliant resource ready for reporting",
       "100 DD holes de-risked asset",
-      "80 km to Tanga port - Indian Ocean access",
+      "72 km to Tanga port - Indian Ocean access",
       "Battery materials demand surge (EVs, energy storage)"
     ],
     view: "original",
@@ -670,13 +670,13 @@ export const deckSlides: DeckSlide[] = [
         title: "Market Opportunity",
       },
     ],
-    speakerNotes: "Investment highlights: Strategic land position in Mozambique Belt, 100 DD holes comprehensive data package, JORC-compliant resource classification, 80km from Tanga port (Indian Ocean access), low-risk jurisdiction (Tanzania mining-friendly). Graphite demand driven by battery anodes, EVs, energy storage. Next steps: Additional drilling for conversion (Inferred to Indicated), metallurgical testwork (flake size distribution), PFS/scoping study pathway, marketing agreements with off-takers.",
+    speakerNotes: "Investment highlights: Strategic land position in Mozambique Belt, 100 DD holes comprehensive data package, JORC-compliant resource classification, 72km from Tanga port (Indian Ocean access), low-risk jurisdiction (Tanzania mining-friendly). Graphite demand driven by battery anodes, EVs, energy storage. Next steps: Additional drilling for conversion (Inferred to Indicated), metallurgical testwork (flake size distribution), PFS/scoping study pathway, marketing agreements with off-takers.",
     narrative: {
       act: 'resolution',
       chapterTitle: 'The Investment Case',
       storyBeat: 'Close with compelling investment thesis and call to action',
       emotionalTone: 'inspiring',
-      narrationScript: "Tanga Graphite represents a compelling investment opportunity. We have a JORC-compliant resource in Tanzania's Mozambique Belt, de-risked by 100 drillholes, with port access just 80 kilometers away. With global graphite demand driven by battery anodes and EVs, the question isn't whether graphite will be in demand—it's whether you'll have exposure to quality assets like Tanga."
+      narrationScript: "Tanga Graphite represents a compelling investment opportunity. We have a JORC-compliant resource in Tanzania's Mozambique Belt, de-risked by 100 drillholes, with port access just 72 kilometers away. With global graphite demand driven by battery anodes and EVs, the question isn't whether graphite will be in demand—it's whether you'll have exposure to quality assets like Tanga."
     },
     revealSequence: {
       elements: [
