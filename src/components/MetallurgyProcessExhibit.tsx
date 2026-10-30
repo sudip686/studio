@@ -98,10 +98,21 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const plant = buildConcentrator();
     plant.name = 'Tanga conceptual processing plant';
     scene.add(plant);
-    const endUseScene = createMetallurgyEndUseScene();
-    scene.add(endUseScene.root);
+    // The end-use pathways are a separate illustrative model with many
+    // extruded flakes and product-detail meshes. Keep them out of the initial
+    // factory build and allocate them only when a viewer opens a pathway.
+    let endUseScene: ReturnType<typeof createMetallurgyEndUseScene> | null = null;
+    element.dataset.endUseSceneLoaded = 'false';
+    function getEndUseScene() {
+      if (!endUseScene) {
+        endUseScene = createMetallurgyEndUseScene();
+        scene.add(endUseScene.root);
+        element!.dataset.endUseSceneLoaded = 'true';
+      }
+      return endUseScene;
+    }
     function setEndUseHeroFocus(route: MetallurgyEndUseRoute, active: boolean) {
-      endUseScene.setHeroFocus(route, active);
+      getEndUseScene().setHeroFocus(route, active);
       if (element) element.dataset.endUseHeroFocus = String(active);
     }
     const roofs = plant.children.filter((object): object is RoofMesh => object instanceof THREE.Mesh && Boolean(object.userData.plantRoof));
@@ -186,19 +197,20 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       moveCamera(animate, true);
     }
     function showEndUse(route: MetallurgyEndUseRoute, animate: boolean) {
-      endUseScene.setRoute(route);
+      const downstream = getEndUseScene();
+      downstream.setRoute(route);
       const heroActive = journeyHeroRevealRef.current && endUseRouteRef.current === route;
       setEndUseHeroFocus(route, heroActive);
       if (heroActive) {
-        focusEndUseStep(route, endUseScene.steps[route].length - 1, false, true);
-        endUseScene.root.visible = true;
+        focusEndUseStep(route, downstream.steps[route].length - 1, false, true);
+        downstream.root.visible = true;
         plant.visible = false;
         ground.visible = false;
         scene.background = new THREE.Color(END_USE_BACKGROUND);
         dirty = true;
         return;
       }
-      endUseScene.root.visible = true;
+      downstream.root.visible = true;
       plant.visible = false;
       ground.visible = false;
       scene.background = new THREE.Color(END_USE_BACKGROUND);
@@ -238,7 +250,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     function returnToPlant(animate: boolean) {
       journeyHeroRevealRef.current = false;
       if (endUseRouteRef.current) setEndUseHeroFocus(endUseRouteRef.current, false);
-      endUseScene.root.visible = false;
+      if (endUseScene) endUseScene.root.visible = false;
       plant.visible = true;
       ground.visible = true;
       scene.background = new THREE.Color('#cbd3cf');
@@ -310,8 +322,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       // Recreate the industrial scene without discarding the presenter's
       // inspection angle, selected target or process-motion phase.
       if (recoveryView.endUseRoute) {
-        endUseScene.setRoute(recoveryView.endUseRoute);
-        endUseScene.root.visible = true;
+        const downstream = getEndUseScene();
+        downstream.setRoute(recoveryView.endUseRoute);
+        downstream.root.visible = true;
         plant.visible = false;
         ground.visible = false;
         scene.background = new THREE.Color(END_USE_BACKGROUND);
@@ -329,6 +342,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const dt = Math.min(.08, Math.max(0, (now - last) / 1000)); last = now;
       if (!document.hidden && element.getClientRects().length) {
         const inEndUse = Boolean(endUseRouteRef.current);
+        const downstream = inEndUse ? getEndUseScene() : null;
         const animateProcess = !inEndUse && !contextLost && !pausedRef.current && !reducedMotion.matches;
         if (animateProcess) elapsed += dt;
         if (plantTourActiveRef.current && animateProcess) {
@@ -359,27 +373,27 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         if (inEndUse) journeyElapsed = journeyElapsedRef.current;
         const journeyRunning = inEndUse && journeyActiveRef.current && !contextLost && !pausedRef.current && !reducedMotion.matches;
         if (journeyRunning) {
-          journeyElapsed = Math.min(endUseScene.duration, journeyElapsed + dt);
+          journeyElapsed = Math.min(downstream!.duration, journeyElapsed + dt);
           journeyElapsedRef.current = journeyElapsed;
           const route = endUseRouteRef.current;
-          const currentJourneyStep = route ? Math.min(endUseScene.steps[route].length - 1, Math.floor(journeyElapsed / 6)) : 0;
+          const currentJourneyStep = route ? Math.min(downstream!.steps[route].length - 1, Math.floor(journeyElapsed / 6)) : 0;
           if (currentJourneyStep !== journeyStepRef.current) {
             journeyStepRef.current = currentJourneyStep;
             setJourneyStep(currentJourneyStep);
-            if (route && currentJourneyStep === endUseScene.steps[route].length - 1) journeyHeroRevealRef.current = false;
+            if (route && currentJourneyStep === downstream!.steps[route].length - 1) journeyHeroRevealRef.current = false;
             if (route) focusEndUseStep(route, currentJourneyStep, true);
           }
           // Finish each pathway with a deliberate product close-up: the EV
           // battery-cell anode, or the graphite-bearing refractory working face.
           // This is a camera beat only; process timing and reported evidence do
           // not change. Reduced motion skips this secondary camera move.
-          const routeFinalStep = route ? endUseScene.steps[route].length - 1 : -1;
+          const routeFinalStep = route ? downstream!.steps[route].length - 1 : -1;
           if (route && currentJourneyStep === routeFinalStep && journeyElapsed - routeFinalStep * 6 >= 3 && !journeyHeroRevealRef.current && !userOrbit) {
             journeyHeroRevealRef.current = true;
             setEndUseHeroFocus(route, true);
             focusEndUseStep(route, currentJourneyStep, true, true);
           }
-          if (journeyElapsed >= endUseScene.duration) {
+          if (journeyElapsed >= downstream!.duration) {
             journeyActiveRef.current = false;
             setJourneyActive(false);
             setJourneyComplete(true);
@@ -424,7 +438,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           dirty = true;
         }
         if (inEndUse && (dirty || journeyRunning || tween)) {
-          const journey = endUseScene.update(journeyElapsed, journeyRunning);
+          const journey = downstream!.update(journeyElapsed, journeyRunning);
           element.dataset.endUseRoute = journey.route;
           element.dataset.endUseStep = String(journey.step);
           element.dataset.endUseProgress = journey.progress.toFixed(3);
