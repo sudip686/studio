@@ -3706,17 +3706,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           })
           : null;
         if (satelliteTerrainMaterial) {
-          const satelliteMidtoneGamma = mode === 'mine_planning' ? 0.76 : 0.94;
           // Lift dark satellite midtones in linear color space. This keeps the
           // basemap legible like a mapping surface without a canvas CSS filter
           // that also changes the grade palette and HUD compositing.
           satelliteTerrainMaterial.onBeforeCompile = shader => {
             shader.fragmentShader = shader.fragmentShader.replace(
               '#include <color_fragment>',
-              `#include <color_fragment>\ndiffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(${satelliteMidtoneGamma.toFixed(2)}));`
+              '#include <color_fragment>\ndiffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(0.94));'
             );
           };
-          satelliteTerrainMaterial.customProgramCacheKey = () => `tanga-satellite-terrain-midtones-${mode}-${satelliteMidtoneGamma.toFixed(2)}-v2`;
+          satelliteTerrainMaterial.customProgramCacheKey = () => 'tanga-satellite-terrain-midtones-v1';
         }
         const texturedTerrain = new THREE.Mesh(
           terrainGeometry,

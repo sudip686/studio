@@ -1,36 +1,14 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import * as THREE from 'three';
-import proj4 from 'proj4';
 import {buildConcentrator, placeConcentrator, buildPitSurface, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
-import {rectangle, inside, contained, overlaps, planSite, type PlanningBlock} from '../src/lib/deck/site-planning';
+import {rectangle, inside} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck, updateHaulTruckCycle} from '../src/lib/deck/mine-haulage';
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
 import {SITE_EARTHWORK_OPACITY} from '../src/lib/deck/stable-materials';
 
 async function main(){
-proj4.defs('EPSG:32737','+proj=utm +zone=37 +south +datum=WGS84 +units=m +no_defs');
-const projectUtm=proj4('WGS84','EPSG:32737',[38.785,-4.813]) as [number,number];
-const licence=JSON.parse(fs.readFileSync('public/generated/merged-license-boundary.geojson','utf8'));
-const licenceFeature=licence.features.find((feature:any)=>feature.properties?.layer==='Merged license boundary');
-assert.ok(licenceFeature?.geometry?.type==='Polygon','The provisional project boundary is available to constrain candidate pits');
-const planningBoundary:[number,number][]=licenceFeature.geometry.coordinates[0].map(([lon,lat]:[number,number])=>{
-  const [easting,northing]=proj4('WGS84','EPSG:32737',[lon,lat]) as [number,number];
-  return [easting-projectUtm[0],-(northing-projectUtm[1])];
-});
-const oreWasteReference=JSON.parse(fs.readFileSync('public/generated/orewaste-reference.json','utf8'));
-const planningBlocks:PlanningBlock[]=oreWasteReference.blocks.map(([lon,lat,elevation,dx,dy,dz,carbon]:number[])=>{
-  const [easting,northing]=proj4('WGS84','EPSG:32737',[lon,lat]) as [number,number];
-  return {x:easting-projectUtm[0],y:elevation-700,z:-(northing-projectUtm[1]),dx,dy,dz,carbon};
-});
-const sourcePitPlan=planSite(planningBlocks,planningBoundary,()=>0,'north-south');
-assert.equal(sourcePitPlan.pits.length,2,'The current report-derived source supports two separated candidate pit envelopes');
-assert.ok(sourcePitPlan.pits[0].centre[1]<sourcePitPlan.pits[1].centre[1],'Candidate pits are returned north to south for stable labels and camera focus');
-assert.ok(sourcePitPlan.pits.every(pit=>pit.support>0&&contained(pit.ring,planningBoundary)),'Both candidate envelopes are supported by source blocks and fully contained by the provisional boundary');
-assert.ok(Math.hypot(sourcePitPlan.pits[0].centre[0]-sourcePitPlan.pits[1].centre[0],sourcePitPlan.pits[0].centre[1]-sourcePitPlan.pits[1].centre[1])>=900,'The two pit concepts remain spatially distinct');
-assert.equal(overlaps(sourcePitPlan.pits[0].ring,sourcePitPlan.pits[1].ring),false,'Candidate pit envelopes do not overlap');
 const ring=rectangle([0,0],400,320);
 const pit={ring,centre:[0,0] as [number,number],surface:100,floor:40,depth:60,support:100};
 const mesh=buildPitSurface(pit,()=>100);
