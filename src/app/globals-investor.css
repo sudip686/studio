@@ -2363,3 +2363,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck--present .tanga-story-panel--concept .tanga-development-source{margin:3px 0;padding:3px 0}
   .tanga-deck--present .tanga-story-panel--concept :is(.tanga-story-panel__link,.tanga-story-panel__compare){min-height:36px;margin-top:5px;padding-block:7px}
 }
+
+@media(min-width:761px) and (min-height:801px){
+  .tanga-deck--present .tanga-story-panel--concept{top:168px;max-height:calc(100svh - 280px)}
+}
