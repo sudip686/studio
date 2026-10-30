@@ -14,9 +14,6 @@ const MINE_PLANT_FOCUSES=[
   ['all','Whole plant'],['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],
   ['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product handling'],
 ] as const;
-const MINE_HAUL_CYCLE_STEPS=[
-  ['loaded-haul','Loaded haul'],['tip-off','Tip-off'],['empty-return','Empty return'],['reload','Reload'],
-] as const;
 
 export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
   const [open, setOpen] = useState(false);
@@ -59,7 +56,7 @@ function SceneMotionControl({paused,onToggle}:{paused:boolean;onToggle:()=>void}
   </div>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion,haulCycleStage}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void;haulCycleStage?:'loaded-haul'|'tip-off'|'empty-return'|'reload'|null}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void}) {
   const panelRef=useRef<HTMLElement|null>(null);
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
   const [siteOrientation,setSiteOrientation]=useState<'plan'|'oblique'>('oblique');
@@ -178,11 +175,6 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <h2>{blockInspectorActive?'Pit-block controls':developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
     <p className="tanga-story-panel__intro">{blockInspectorActive?'Focus a pit or filter the source cells by displayed TGC band.':developmentViewId==='plant'?'Explore six process areas. Equipment and roof cutaways are illustrative.':developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
-    {haulCycleStage&&<div className="tanga-mine-haul-cycle" aria-label="Conceptual mine-to-feed truck movement">
-      <span>CONCEPT TRUCK CYCLE</span>
-      <ol>{MINE_HAUL_CYCLE_STEPS.map(([id,label])=><li key={id} data-active={haulCycleStage===id||undefined} aria-current={haulCycleStage===id?'step':undefined}>{label}</li>)}</ol>
-      <small>Illustrative movement and timing; route and operating rate are unverified.</small>
-    </div>}
     {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
       <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
       {onShowSiteContext&&<button type="button" onClick={onShowSiteContext}>Show site concept <ArrowRight size={14}/></button>}
