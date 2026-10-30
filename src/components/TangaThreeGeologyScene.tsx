@@ -4341,11 +4341,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // view, a larger deep-navy post and head stay distinct from the pale-grey
       // Graphitic Schist interpretation at project scale; the gold ring marks
       // the exact surface position and keeps the marker readable against terrain.
-      const collarRadius = subsurfaceView ? 38 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
-      const collarHeight = subsurfaceView ? 190 : 0;
+      // At the geology overview distance, collars need a stronger silhouette
+      // than the interpreted units beneath them. Keep the scale-up scoped to
+      // this view so the assay-focused drilling slide retains its finer pins.
+      const collarRadius = subsurfaceView ? 52 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
+      const collarHeight = subsurfaceView ? 255 : 0;
       const collarLift = subsurfaceView ? collarHeight / 2 : mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT;
       const collarGeometry = subsurfaceView
-        ? new THREE.CylinderGeometry(26, collarRadius, collarHeight, 16, 1)
+        ? new THREE.CylinderGeometry(36, collarRadius, collarHeight, 16, 1)
         : new THREE.SphereGeometry(collarRadius, 16, 12);
       const collarMaterial = new THREE.MeshBasicMaterial({
         color: subsurfaceView ? 0x071a52 : mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
@@ -4380,7 +4383,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       pickables.push(collars);
 
       if (subsurfaceView) {
-        const collarHeadGeometry = new THREE.SphereGeometry(58, 20, 16);
+        const collarHeadGeometry = new THREE.SphereGeometry(78, 20, 16);
         // Each reveal owns its own material opacity; sharing one with the post
         // lets the head animation overwrite the shaft animation every frame.
         const collarHeadMaterial = collarMaterial.clone();
@@ -4411,8 +4414,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {
         const drillingSlide = mode === 'drillholes';
         const collarRingGeometry = new THREE.TorusGeometry(
-          subsurfaceView ? 76 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
-          subsurfaceView ? 9 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
+          subsurfaceView ? 104 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
+          subsurfaceView ? 13 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
           8,
           28
         );
