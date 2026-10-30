@@ -2365,5 +2365,5 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 
 @media(min-width:761px) and (min-height:801px){
-  .tanga-deck--present .tanga-story-panel--concept{top:168px;max-height:calc(100svh - 280px)}
+  .tanga-deck--present .tanga-story-panel--concept{top:168px;max-height:calc(100svh - 276px)}
 }
