@@ -215,13 +215,43 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   const ribTransform=new THREE.Matrix4();
   for(let i=0;i<12;i++){const angle=i*Math.PI/6;ribTransform.makeTranslation(Math.cos(angle)*8.1,0,Math.sin(angle)*8.1);millRibs.setMatrixAt(i,ribTransform);}
   millRibs.name='Mill shell stiffeners';millRibs.castShadow=true;mill.add(millRibs);
-  // Flotation banks with agitator drives and a maintenance deck.
+  // Open-top flotation vessels replace solid box placeholders with visible
+  // liquor surfaces, tapered underflow hoppers, support legs and a continuous
+  // drive train. This is an illustrative industrial form; the lab report does
+  // not define production cell dimensions or a plant flowsheet.
+  let flotationVesselCount=0,flotationHopperCount=0,flotationWallPanelCount=0,flotationLiquorSurfaceCount=0;
   for(let row=0;row<2;row++)for(let i=0;i<5;i++){
     const x=8+i*15,z=-36+row*24;
-    box(12,10,16,x,7,z,materials.steel,'Flotation cell');
-    box(10,0.4,14,x,12.2,z,materials.water);
-    cylinder(1.1,9,x,14,z,materials.copper);box(4,3,4,x,20,z,materials.roof);
+    const hopperGeometry=new THREE.BufferGeometry();
+    hopperGeometry.setAttribute('position',new THREE.Float32BufferAttribute([
+      -5.7,4.4,-7.6, 5.7,4.4,-7.6, 5.7,4.4,7.6, -5.7,4.4,7.6,
+      -2.4,.75,-3.3, 2.4,.75,-3.3, 2.4,.75,3.3, -2.4,.75,3.3,
+    ],3));
+    hopperGeometry.setAttribute('uv',new THREE.Float32BufferAttribute([
+      0,0, 1,0, 1,1, 0,1, .3,.3, .7,.3, .7,.7, .3,.7,
+    ],2));
+    hopperGeometry.setIndex([0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7, 4,5,6, 4,6,7]);
+    hopperGeometry.computeVertexNormals();
+    mesh(hopperGeometry,materials.steel,x,0,z,'Flotation cell tapered underflow hopper');
+    flotationHopperCount++;
+
+    // Four heavy legs carry the tapered vessel into the shared plant pad.
+    for(const sideX of [-1,1])for(const sideZ of [-1,1])box(.85,3.6,.85,x+sideX*4.65,1.85,z+sideZ*6.35,materials.steel,'Flotation cell support leg');
+    // Open access sides make the contents visible from the roof cutaway.
+    box(.55,7.7,15.6,x-5.7,8.25,z,materials.steel,'Flotation cell long wall');
+    box(.55,7.7,15.6,x+5.7,8.25,z,materials.steel,'Flotation cell long wall');
+    box(11.8,7.7,.55,x,8.25,z-7.7,materials.steel,'Flotation cell end wall');
+    box(11.8,7.7,.55,x,8.25,z+7.7,materials.steel,'Flotation cell end wall');
+    flotationWallPanelCount+=4;
+    box(5.2,.75,6.8,x,.4,z,materials.roof,'Flotation cell underflow outlet');
+    const liquor=mesh(new THREE.PlaneGeometry(10.7,14.7),materials.water,x,11.55,z,'Flotation cell liquor surface');
+    liquor.rotation.x=-Math.PI/2;liquor.castShadow=false;liquor.receiveShadow=true;
+    flotationLiquorSurfaceCount++;
+    cylinder(1.1,9,x,14,z,materials.copper);
+    box(4,3,4,x,20,z,materials.roof);
+    flotationVesselCount++;
   }
+  root.userData.flotationVesselAudit={vessels:flotationVesselCount,hoppers:flotationHopperCount,wallPanels:flotationWallPanelCount,liquorSurfaces:flotationLiquorSurfaceCount,designBasis:'concept visualization only; dimensions and flowsheet are not defined by laboratory testwork'};
   box(78,1,5,38,15,0,materials.steel);
   for(let x=0;x<80;x+=6)box(0.5,4,0.5,x,17,2,materials.copper);
   box(80,0.4,0.4,38,19,2,materials.copper);

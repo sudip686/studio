@@ -72,6 +72,9 @@ for(let i=0;i<stockpilePositions.count;i++)if(stockpilePositions.getY(i)>=stockp
 assert.ok(crestVertices>80,'Stockpiles retain broad crests rather than pointed apices');
 const processStages=plant.userData.processStages as {id:string;label:string;point:number[]}[];
 assert.deepEqual(processStages.map(stage=>stage.id),['feed','milling','flotation','thickening','dewatering','product'],'The process plant exposes each current inspection stage');
+const flotationVessels=plant.userData.flotationVesselAudit as {vessels:number;hoppers:number;wallPanels:number;liquorSurfaces:number;designBasis:string};
+assert.deepEqual({vessels:flotationVessels.vessels,hoppers:flotationVessels.hoppers,wallPanels:flotationVessels.wallPanels,liquorSurfaces:flotationVessels.liquorSurfaces},{vessels:10,hoppers:10,wallPanels:40,liquorSurfaces:10},'The flotation bank contains ten open-top vessels with underflow hoppers, wall panels and liquor surfaces');
+assert.match(flotationVessels.designBasis,/concept visualization only/,'The industrial flotation geometry remains explicitly conceptual');
 for(const name of ['Flotation banks and walkways','Crushing and milling equipment','Dewatering and product handling','Thickener, water and reagent circuits'])
   assert.ok(plant.getObjectByName(name),`Batched plant detail retains its ${name} group`);
 const wallRibs=plant.getObjectByName('Steel-clad exterior wall ribs') as THREE.Mesh|undefined;
