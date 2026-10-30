@@ -1547,7 +1547,7 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
     return [
       {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff', binKey: 'very-high'},
       {label: 'GRSC interpretation', detail: 'Pale-grey graphitic-schist unit', tone: '#d8d8e1'},
-      {label: 'Drillhole collars', detail: 'Large indigo 3D pins with amber surface rings · hole starts', tone: '#24105e'},
+      {label: 'Drillhole collars', detail: 'Large deep-indigo 3D pins with amber surface rings · hole starts', tone: '#180b65'},
     ];
   }
   return [
@@ -4339,20 +4339,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       const subsurfaceView = mode === 'subsurface';
       // On the drilling slide collars use vermilion markers. In the 3D geology
-      // view, an enlarged deep-navy post and head stay distinct from the pale-grey
+      // view, an enlarged deep-indigo post and head stay distinct from the pale-grey
       // Graphitic Schist interpretation at project scale; the broad amber ring
       // marks the exact surface position against the terrain.
       // At the geology overview distance, collars need a stronger silhouette
       // than the interpreted units beneath them. Keep the scale-up scoped to
       // this view so the assay-focused drilling slide retains its finer pins.
-      const collarRadius = subsurfaceView ? 40 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
-      const collarHeight = subsurfaceView ? 270 : 0;
+      const collarRadius = subsurfaceView ? 46 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
+      const collarHeight = subsurfaceView ? 300 : 0;
       const collarLift = subsurfaceView ? collarHeight / 2 : mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT;
       const collarGeometry = subsurfaceView
-        ? new THREE.CylinderGeometry(30, collarRadius, collarHeight, 20, 1)
+        ? new THREE.CylinderGeometry(34, collarRadius, collarHeight, 20, 1)
         : new THREE.SphereGeometry(collarRadius, 16, 12);
       const collarMaterial = new THREE.MeshBasicMaterial({
-        color: subsurfaceView ? 0x071b3a : mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
+        color: subsurfaceView ? 0x180b65 : mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
         toneMapped: false,
         transparent: mode === 'resource',
         opacity: mode === 'resource' ? 0.5 : 1,
@@ -4371,7 +4371,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       collars.renderOrder = 8;
       collars.userData.tooltipItems = collarSegments.map((segment) => ({
         title: segment.holeId,
-        tone: subsurfaceView ? '#071b3a' : mode === 'drillholes' ? '#ff704f' : '#eaffff',
+        tone: subsurfaceView ? '#180b65' : mode === 'drillholes' ? '#ff704f' : '#eaffff',
         rows: [
           'Surface drill collar',
           `First logged interval ${formatDepth(segment)}`,
@@ -4384,7 +4384,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       pickables.push(collars);
 
       if (subsurfaceView) {
-        const collarHeadGeometry = new THREE.SphereGeometry(108, 24, 18);
+        const collarHeadGeometry = new THREE.SphereGeometry(132, 24, 18);
         // Each reveal owns its own material opacity; sharing one with the post
         // lets the head animation overwrite the shaft animation every frame.
         const collarHeadMaterial = collarMaterial.clone();
@@ -4399,7 +4399,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         collarHeads.renderOrder = 9;
         collarHeads.userData.tooltipItems = collarSegments.map((segment) => ({
           title: segment.holeId,
-          tone: '#071b3a',
+          tone: '#180b65',
           rows: [
             'Surface drill collar',
             `First logged interval ${formatDepth(segment)}`,
@@ -4415,8 +4415,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {
         const drillingSlide = mode === 'drillholes';
         const collarRingGeometry = new THREE.TorusGeometry(
-          subsurfaceView ? 112 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
-          subsurfaceView ? 15.5 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
+          subsurfaceView ? 126 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
+          subsurfaceView ? 18 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
           8,
           28
         );
