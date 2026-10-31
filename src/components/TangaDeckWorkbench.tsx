@@ -5345,8 +5345,6 @@ export default function TangaDeckWorkbench() {
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [sceneMotionPaused, setSceneMotionPaused] = useState(false);
-  const [haulCycleStage,setHaulCycleStage]=useState<'loaded-haul'|'tip-off'|'empty-return'|'reload'|null>(null);
-  useEffect(()=>{if(activeMode!=='mine_planning')setHaulCycleStage(null);},[activeMode]);
   useEffect(() => { setSceneMotionPaused(false); }, [activeMode, activeShotIndex]);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);setIsHighlightsTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
@@ -5864,7 +5862,6 @@ export default function TangaDeckWorkbench() {
           inspectionMode={isExploreMode}
           onInspectEvidence={()=>{setIsAutoplay(false);setIsExecutiveTour(false);}}
           onSiteFacilities={setAvailableMineFacilities}
-          onHaulCycleStageChange={setHaulCycleStage}
           onAssayFacts={setAssayFacts}
           motionPaused={sceneMotionPaused}
           onMotionPausedChange={setSceneMotionPaused}
@@ -5874,7 +5871,13 @@ export default function TangaDeckWorkbench() {
       {threeVisible && (threeLoadReport.scene === 'loading' || threeLoadReport.scene === 'error') && STATIC_SCENE_FALLBACKS[activeMode] && (
         <figure className={`tanga-deck__static-scene-fallback${threeLoadReport.scene === 'loading' ? ' is-loading' : ''}`} aria-label={`${MODE_LABELS[activeMode]} static scene preview`} aria-live="polite">
           <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
-          <figcaption>{STATIC_SCENE_FALLBACKS[activeMode]!.note} <span>·</span> {threeLoadReport.scene === 'loading' ? 'Interactive 3D loading' : '3D unavailable'}</figcaption>
+          <figcaption>
+            {STATIC_SCENE_FALLBACKS[activeMode]!.note}
+            <span aria-hidden="true">·</span>
+            {threeLoadReport.scene === 'loading'
+              ? threeLoadReport.message || 'Preparing interactive 3D'
+              : '3D unavailable'}
+          </figcaption>
         </figure>
       )}
 
@@ -7058,7 +7061,6 @@ export default function TangaDeckWorkbench() {
         onInspectPlant={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant'));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage:'all',roofOpen:false});} : undefined}
         onPlantProcessFocus={activeMode === 'mine_planning' && threeLoadReport.scene === 'ready' ? (stage,roofOpen) => {setIsAutoplay(false);setIsExecutiveTour(false);setActiveShotIndex(Math.max(0,STORY_SHOTS.mine_planning.findIndex(shot=>shot.id==='plant')));issueThreeCameraCommand('plantDetail',undefined,undefined,{stage,roofOpen});} : undefined}
         sceneMotionPaused={sceneMotionPaused}
-        haulCycleStage={haulCycleStage}
         onToggleSceneMotion={() => setSceneMotionPaused(value => !value)}
       />}
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}

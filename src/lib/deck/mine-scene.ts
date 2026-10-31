@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {CONCEPT, inside, insetCrest, type CandidatePit, type Point2} from './site-planning';
+import {CONCEPT, inside, insetCrest, type CandidatePit, type Point2, type SourcePitSurface} from './site-planning';
 import {addPlantDetail, batchPlantMeshes, PLANT_PROCESS_STAGES} from './mine-plant-detail';
 import {SITE_EARTHWORK_OPACITY} from './stable-materials';
 
@@ -555,6 +555,127 @@ export function carvePit(geometry:THREE.BufferGeometry,pits:CandidatePit[]) {
   retainSourceTerrain(geometry);
   for(let i=0;i<position.count;i++){const p:Point2=[position.getX(i),position.getZ(i)];for(const pit of pits){const y=pitHeight(p,pit);if(y!==null)position.setY(i,Math.min(position.getY(i),y));}}
   position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();retainConceptTerrain(geometry);
+}
+
+export function sourcePitElevationAt(surface:SourcePitSurface,x:number,z:number):number|null{
+  const i=Math.round((x-surface.x0)/surface.dx),j=Math.round((z-surface.z0)/surface.dz);
+  if(i<0||i>=surface.width||j<0||j>=surface.height||!surface.mask[i]?.[j])return null;
+  const elevation=surface.pitElevation[i]?.[j];return Number.isFinite(elevation)?elevation!:null;
+}
+
+/** Source topography RL for a cell inside the optimized-shell mask. */
+export function sourcePitTopographyAt(surface:SourcePitSurface,x:number,z:number):number|null{
+  const i=Math.round((x-surface.x0)/surface.dx),j=Math.round((z-surface.z0)/surface.dz);
+  if(i<0||i>=surface.width||j<0||j>=surface.height||!surface.mask[i]?.[j])return null;
+  const elevation=surface.topography[i]?.[j];return Number.isFinite(elevation)?elevation!:null;
+}
+
+/** Carve the displayed terrain to the supplied RF1 optimized-shell raster. */
+export function carvePitSurfaces(geometry:THREE.BufferGeometry,surfaces:SourcePitSurface[]){
+  const position=geometry.getAttribute('position'),sourceIndex=geometry.index;if(!position||!sourceIndex||!surfaces.length)return;
+  retainSourceTerrain(geometry);
+  // Remove whole terrain triangles where their centre falls inside the
+  // optimized-shell raster. Lowering shared terrain vertices created long,
+  // sloping wedges across the pit instead of an open excavation.
+  const kept:number[]=[];
+  for(let triangle=0;triangle<sourceIndex.count;triangle+=3){
+    const a=sourceIndex.getX(triangle),b=sourceIndex.getX(triangle+1),c=sourceIndex.getX(triangle+2);
+    const x=(position.getX(a)+position.getX(b)+position.getX(c))/3;
+    const z=(position.getZ(a)+position.getZ(b)+position.getZ(c))/3;
+    // The terrain triangles are about 20 m wide while the source shell cells
+    // are 10 m. Remove only triangles whose centroid is inside the shell;
+    // deleting every triangle with two inside vertices punched visible gaps
+    // outside the pit along the coarser terrain mesh boundary.
+    const intersectsPit=surfaces.some(surface=>sourcePitElevationAt(surface,x,z)!==null);
+    if(intersectsPit)continue;
+    kept.push(a,b,c);
+  }
+  if(kept.length!==sourceIndex.count){
+    geometry.userData.sourceTerrainIndex??=sourceIndex.clone();
+    geometry.setIndex(kept);
+    geometry.computeBoundingSphere();
+  }
+  geometry.userData.pitCarvedTriangleCount=(sourceIndex.count-kept.length)/3;
+  retainConceptTerrain(geometry);
+}
+
+/** Open the terrain to the same continuous pit envelopes used by the renderer. */
+export function carvePitEnvelopes(geometry:THREE.BufferGeometry,pits:CandidatePit[]){
+  const position=geometry.getAttribute('position'),sourceIndex=geometry.index;if(!position||!sourceIndex||!pits.length)return;
+  retainSourceTerrain(geometry);
+  const kept:number[]=[];
+  for(let triangle=0;triangle<sourceIndex.count;triangle+=3){
+    const a=sourceIndex.getX(triangle),b=sourceIndex.getX(triangle+1),c=sourceIndex.getX(triangle+2);
+    const x=(position.getX(a)+position.getX(b)+position.getX(c))/3;
+    const z=(position.getZ(a)+position.getZ(b)+position.getZ(c))/3;
+    if(pits.some(pit=>inside([x,z],pit.ring)))continue;
+    kept.push(a,b,c);
+  }
+  if(kept.length!==sourceIndex.count){geometry.userData.sourceTerrainIndex??=sourceIndex.clone();geometry.setIndex(kept);geometry.computeBoundingSphere();}
+  geometry.userData.pitCarvedTriangleCount=(sourceIndex.count-kept.length)/3;
+  retainConceptTerrain(geometry);
+}
+
+/** Restore terrain indices if a caller temporarily resets the optimized pit cutaway. */
+export function restorePitTerrain(geometry:THREE.BufferGeometry){
+  const index=geometry.userData.sourceTerrainIndex as THREE.BufferAttribute|undefined;
+  if(index){geometry.setIndex(index);geometry.computeBoundingSphere();geometry.userData.sourceTerrainIndex=undefined;}
+}
+
+/** Render the source optimized shell as flat floor cells and explicit bench risers. */
+export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:number,z:number)=>number){
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[],dark=new THREE.Color(0x675344),floor=new THREE.Color(0xb29a7d);
+  // Reuse vertices across adjacent cells on the same material surface. The
+  // previous per-quad duplicates made each 10 m source cell shade as a separate
+  // block even when it belonged to one continuous bench tread or riser.
+  const vertexByPosition=new Map<string,number>();
+  const addVertex=(x:number,y:number,z:number,color:THREE.Color)=>{
+    const key=`${Math.round(x*100)}:${Math.round(y*100)}:${Math.round(z*100)}:${color.getHex()}`;
+    const existing=vertexByPosition.get(key);if(existing!==undefined)return existing;
+    const index=positions.length/3;positions.push(x,y,z);colors.push(color.r,color.g,color.b);vertexByPosition.set(key,index);return index;
+  };
+  const addQuad=(a:[number,number,number],b:[number,number,number],c:[number,number,number],d:[number,number,number],color:THREE.Color)=>{
+    const v=[a,b,c,d].map(p=>addVertex(p[0],p[1],p[2],color));indices.push(v[0],v[1],v[2],v[0],v[2],v[3]);
+  };
+  const floorCache=new Map<string,number|null>();
+  const cellFloor=(i:number,j:number)=>{
+    if(!surface.mask[i]?.[j])return null;
+    const key=`${i}:${j}`,cached=floorCache.get(key);if(cached!==undefined)return cached;
+    const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz,elevation=surface.pitElevation[i]?.[j];
+    if(!Number.isFinite(elevation)){floorCache.set(key,null);return null;}
+    // The source shell and viewer terrain are registered from separate grids.
+    // Keep the whole bench cell below the displayed ground so a local
+    // interpolation mismatch cannot lift a tread above the terrain.
+    const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
+    const result=Math.min(elevation!,height(x,z)-.7,height(x-halfX,z-halfZ)-.7,height(x+halfX,z-halfZ)-.7,height(x+halfX,z+halfZ)-.7,height(x-halfX,z+halfZ)-.7);
+    floorCache.set(key,result);return result;
+  };
+  const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
+  for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++){
+    const baseFloor=cellFloor(i,j);if(baseFloor===null)continue;
+    const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz,y=baseFloor+.7;
+    const west=x-halfX,east=x+halfX,south=z+halfZ,north=z-halfZ;
+    addQuad([west,y,south],[east,y,south],[east,y,north],[west,y,north],floor);
+    const edges:[number,number,[number,number],[number,number]][]=[
+      [-1,0,[west,south],[west,north]],[1,0,[east,north],[east,south]],
+      [0,-1,[east,south],[west,south]],[0,1,[west,north],[east,north]],
+    ];
+    for(const [di,dj,a,b] of edges){
+      const other=cellFloor(i+di,j+dj),ax=a[0],az=a[1],bx=b[0],bz=b[1];
+      if(other!==null){
+        if(baseFloor>=other)continue;
+        const high=other+.7;
+        addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,high,bz],[ax,high,az],dark);
+        continue;
+      }
+      const topA=Math.max(baseFloor+.7,height(ax,az)),topB=Math.max(baseFloor+.7,height(bx,bz));
+      if(topA<=baseFloor+.75&&topB<=baseFloor+.75)continue;
+      addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,topB,bz],[ax,topA,az],dark);
+    }
+  }
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
+  const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+  mesh.name=`${surface.id==='north'?'North':'South'} RF1 optimized pit surface`;mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData.sourcePitSupport=surface.support;return mesh;
 }
 /** Exact contour bands eliminate the staircase aliasing of a clipped XY grid. */
 export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>number) {

@@ -3,6 +3,8 @@ export type Point2 = [number, number];
 export type PlanningBlock = {x: number; y: number; z: number; dx: number; dy: number; dz: number; carbon: number};
 export type CandidatePit = {ring: Point2[]; centre: Point2; surface: number; floor: number; depth: number; support: number};
 export type SitePlan = {pits: CandidatePit[]; plant: Point2 | null; rejected: number; audit: string[]};
+/** Optimized RF1 surface cells, transformed into the viewer's local metre coordinates. */
+export type SourcePitSurface = {id:'north'|'south';x0:number;z0:number;dx:number;dz:number;width:number;height:number;support:number;pitElevation:number[][];topography:number[][];benchIndex:number[][];mask:number[][]};
 export const CONCEPT = {threshold: 3, cell: 25, bench: 10, berm: 6.36, batterDegrees: 70, plantWidth: 200, plantDepth: 140};
 const cross = (a: Point2, b: Point2, c: Point2) => (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
 export function inside(p: Point2, ring: Point2[]) {
@@ -119,7 +121,6 @@ export function planSite(blocks: PlanningBlock[], boundary: Point2[], height: (x
     let footprint=hull(group.flatMap(b=>rectangle([b.x,b.z],b.dx,b.dy)));
     if(footprint.length<3)continue;
     const centre:Point2=[footprint.reduce((s,p)=>s+p[0],0)/footprint.length,footprint.reduce((s,p)=>s+p[1],0)/footprint.length];
-    if(layout==='north-south'&&pits.some(p=>Math.hypot(p.centre[0]-centre[0],p.centre[1]-centre[1])<900))continue;
     const surface=height(...centre);
     let floor=group.reduce((lowest,b)=>Math.min(lowest,b.y-b.dz/2),Infinity);
     let depth=Math.max(CONCEPT.bench,Math.min(layout==='north-south'?160:Infinity,surface-floor));
@@ -158,4 +159,31 @@ export function planSite(blocks: PlanningBlock[], boundary: Point2[], height: (x
     if(score<best){best=score;plant=p;}
   }
   return {pits,plant,rejected,audit:[`${pits.length} candidate excavations contained`,`${rejected} conflicting/outside candidates omitted`,plant?'Plant footprint + 20 m planning margin contained':'No admissible plant site found','Provisional project boundary; legal licence unconfirmed','RF 1-inspired concept: 10 m benches, 70° batter, 6.36 m berm; no economic optimisation']};
+}
+
+/** Preserve the two georeferenced RF1 pit surfaces instead of deriving new pit
+ * envelopes from grade-cell clusters. Convex hulls here are used only by the
+ * existing plant/route clearance helpers; rendering and block filtering use
+ * each source raster's exact active-cell mask and elevations. */
+export function planSiteFromPitSurfaces(surfaces:SourcePitSurface[],height:(x:number,z:number)=>number,boundary:Point2[]):SitePlan{
+  const pits=surfaces.map(surface=>{
+    const corners:Point2[]=[];let floor=Infinity,support=0;
+    for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++)if(surface.mask[i]?.[j]){
+      support++;
+      floor=Math.min(floor,surface.pitElevation[i]?.[j]??Infinity);
+      const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz;
+      corners.push([x-surface.dx/2,z-Math.abs(surface.dz)/2],[x+surface.dx/2,z-Math.abs(surface.dz)/2],[x+surface.dx/2,z+Math.abs(surface.dz)/2],[x-surface.dx/2,z+Math.abs(surface.dz)/2]);
+    }
+    const ring=hull(corners),centre:Point2=ring.length?ring.reduce<Point2>((sum,p)=>[sum[0]+p[0]/ring.length,sum[1]+p[1]/ring.length],[0,0]):[surface.x0,surface.z0];
+    const top=height(...centre);
+    return {ring,centre,surface:top,floor,depth:Math.max(0,top-floor),support};
+  }).filter(pit=>pit.ring.length>=3&&Number.isFinite(pit.floor)&&pit.support>0);
+  pits.sort((a,b)=>a.centre[1]-b.centre[1]);
+  const outside=pits.filter(pit=>!contained(pit.ring,boundary)).length;
+  return {pits,plant:null,rejected:0,audit:[
+    `RF1 source shell surfaces retained at native coordinates (${pits.map(pit=>pit.support.toLocaleString()).join(' / ')} terrain cells)`,
+    'Pit floor elevations and footprints use the supplied optimized shell grid; no grade-cluster shells are regenerated',
+    outside?`${outside} source shell footprint(s) extend beyond the provisional project boundary`:'Both source shell footprints fall within the provisional project boundary',
+    'Source optimized shell visualization; conceptual planning output, not an approved engineering design or Ore Reserve',
+  ]};
 }

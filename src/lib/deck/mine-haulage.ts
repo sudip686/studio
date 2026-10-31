@@ -71,8 +71,6 @@ export function buildHaulRoad(points:THREE.Vector3[]) {
 export function buildHaulTruck() {
   const truck=new THREE.Group();truck.name='Illustrative haul truck';
   truck.userData.displayOnly=true;
-  const dumpBed=new THREE.Group();dumpBed.name='Animated dump body · conceptual loading and tip-off';
-  const dumpPivot=new THREE.Vector3(0,3.02,-4.72);
   const body=new THREE.MeshStandardMaterial({color:0xc8873c,roughness:.88,metalness:0});
   const frame=new THREE.MeshStandardMaterial({color:0x303838,roughness:.96,metalness:0});
   const rubber=new THREE.MeshStandardMaterial({color:0x1d2222,roughness:1,metalness:0});
@@ -80,19 +78,14 @@ export function buildHaulTruck() {
   const lamp=new THREE.MeshBasicMaterial({color:0xe5d3a4,toneMapped:false});
   const marker=new THREE.MeshBasicMaterial({color:0xe2c389,toneMapped:false});
   const geometries=new Map<THREE.Material,THREE.BufferGeometry[]>();
-  const dumpGeometries=new Map<THREE.Material,THREE.BufferGeometry[]>();
   const componentCounts:Record<string,number>={};
-  const add=(geometry:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,rx=0,ry=0,rz=0,name='',animatedDumpBody=false)=>{
-    const part=new THREE.Mesh(geometry,m);
-    part.position.set(x,y,z);
-    if(animatedDumpBody)part.position.sub(dumpPivot);
-    part.rotation.set(rx,ry,rz);part.updateMatrix();
-    const target=animatedDumpBody?dumpGeometries:geometries;
-    const bucket=target.get(m)??[];bucket.push(geometry.clone().applyMatrix4(part.matrix));target.set(m,bucket);
+  const add=(geometry:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,rx=0,ry=0,rz=0,name='')=>{
+    const part=new THREE.Mesh(geometry,m);part.position.set(x,y,z);part.rotation.set(rx,ry,rz);part.updateMatrix();
+    const bucket=geometries.get(m)??[];bucket.push(geometry.clone().applyMatrix4(part.matrix));geometries.set(m,bucket);
     geometry.dispose();componentCounts[name]=(componentCounts[name]??0)+1;
   };
-  const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material,name:string,animatedDumpBody=false)=>{
-    add(new THREE.BoxGeometry(w,h,d),m,x,y,z,0,0,0,name,animatedDumpBody);
+  const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material,name:string)=>{
+    add(new THREE.BoxGeometry(w,h,d),m,x,y,z,0,0,0,name);
   };
   const cylinder=(radius:number,height:number,x:number,y:number,z:number,m:THREE.Material,name:string)=>{
     add(new THREE.CylinderGeometry(radius,radius,height,12),m,x,y,z,0,0,0,name);
@@ -105,14 +98,14 @@ export function buildHaulTruck() {
     add(new THREE.CylinderGeometry(.38,.38,.9,12),frame,side*2.55,1.25,axleZ,0,0,Math.PI/2,'Haul truck wheel hub');
   }
   // Low-sided dump body with a dark wear surface and reinforced outer panels.
-  box(5.15,.32,6.3,0,3.02,-1.58,frame,'Haul truck dump-bed floor',true);
+  box(5.15,.32,6.3,0,3.02,-1.58,frame,'Haul truck dump-bed floor');
   for(const side of [-1,1]){
-    box(.34,1.5,6.45,side*2.43,3.92,-1.55,body,'Haul truck dump-bed side',true);
-    box(.14,.16,6.38,side*2.43,4.76,-1.55,frame,'Haul truck dump-bed top rail',true);
+    box(.34,1.5,6.45,side*2.43,3.92,-1.55,body,'Haul truck dump-bed side');
+    box(.14,.16,6.38,side*2.43,4.76,-1.55,frame,'Haul truck dump-bed top rail');
   }
-  box(5.12,1.3,.34,0,3.82,-4.72,body,'Haul truck dump-bed tailgate',true);
-  box(5.12,1.55,.34,0,3.92,1.58,body,'Haul truck dump-bed headboard',true);
-  for(const side of [-1,1])for(const z of [-3.7,-.7,1.15])box(.42,.46,.48,side*2.42,3.05,z,frame,'Haul truck dump-body hinge',true);
+  box(5.12,1.3,.34,0,3.82,-4.72,body,'Haul truck dump-bed tailgate');
+  box(5.12,1.55,.34,0,3.92,1.58,body,'Haul truck dump-bed headboard');
+  for(const side of [-1,1])for(const z of [-3.7,-.7,1.15])box(.42,.46,.48,side*2.42,3.05,z,frame,'Haul truck dump-body hinge');
   // Enclosed operator cab, front glazing, protected steps and access mirrors.
   box(3.65,2.55,2.85,0,4.28,2.72,body,'Haul truck operator cab');
   box(3.55,.28,3.0,0,5.72,2.72,frame,'Haul truck cab roof');
@@ -134,70 +127,14 @@ export function buildHaulTruck() {
   }
   truck.userData.componentCounts=componentCounts;
   truck.userData.components=Object.keys(componentCounts);
-  const addBatchedParts=(partsByMaterial:Map<THREE.Material,THREE.BufferGeometry[]>,parent:THREE.Group,prefix:string)=>{
-    for(const [material,parts] of partsByMaterial){
-      const geometry=mergeGeometries(parts,false);
-      for(const part of parts)part.dispose();
-      if(!geometry)throw new Error('Unable to batch illustrative haul-truck detail');
-      const mesh=new THREE.Mesh(geometry,material);mesh.name=`${prefix} · ${material.uuid===body.uuid?'safety body':material.uuid===frame.uuid?'chassis and fittings':material.uuid===rubber.uuid?'six tires':material.uuid===glass.uuid?'cab glazing':material.uuid===lamp.uuid?'work lamps':'safety markers'}`;
-      mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);
-    }
-  };
-  addBatchedParts(geometries,truck,'Illustrative haul truck');
-  dumpBed.position.copy(dumpPivot);truck.add(dumpBed);
-  addBatchedParts(dumpGeometries,dumpBed,'Animated haul-truck dump body');
-  const cargoMaterial=new THREE.MeshStandardMaterial({color:0x746958,roughness:.98,metalness:0,transparent:true,opacity:1,depthWrite:true});
-  const cargoPieces:THREE.BufferGeometry[]=[];
-  for(const [x,y,z,scale] of [[-1.05,3.72,-.55,.78],[.35,3.92,-1.1,.95],[1.15,3.64,-2.25,.69],[-.25,3.7,-2.75,.62]] as const){
-    const piece=new THREE.Mesh(new THREE.IcosahedronGeometry(1,1),cargoMaterial);
-    piece.position.set(x,y,z).multiplyScalar(1).sub(dumpPivot);piece.scale.set(scale*.95,scale*.62,scale*1.2);piece.rotation.set(x*.21,z*.13,y*.17);piece.updateMatrix();
-    cargoPieces.push(piece.geometry.clone().applyMatrix4(piece.matrix));piece.geometry.dispose();
+  for(const [material,parts] of geometries){
+    const geometry=mergeGeometries(parts,false);
+    for(const part of parts)part.dispose();
+    if(!geometry)throw new Error('Unable to batch illustrative haul-truck detail');
+    const mesh=new THREE.Mesh(geometry,material);mesh.name=`Illustrative haul truck · ${material.uuid===body.uuid?'safety body':material.uuid===frame.uuid?'chassis and fittings':material.uuid===rubber.uuid?'six tires':material.uuid===glass.uuid?'cab glazing':material.uuid===lamp.uuid?'work lamps':'safety markers'}`;
+    mesh.castShadow=true;mesh.receiveShadow=true;truck.add(mesh);
   }
-  const cargoGeometry=mergeGeometries(cargoPieces,false);
-  cargoPieces.forEach(part=>part.dispose());
-  if(!cargoGeometry)throw new Error('Unable to batch illustrative haul-truck load cue');
-  const cargo=new THREE.Mesh(cargoGeometry,cargoMaterial);cargo.name='Illustrative ore load cue · no tonnage implied';cargo.castShadow=true;cargo.receiveShadow=true;dumpBed.add(cargo);
-  truck.userData.dumpBed=dumpBed;
-  truck.userData.dumpBedMaxTipRadians=.48;
-  truck.userData.cargoMesh=cargo;
-  truck.userData.cycleDurationSeconds=80;
   return truck;
-}
-
-export type HaulCycleStage='loaded-haul'|'tip-off'|'empty-return'|'reload';
-
-/** Display-only 80 s load/haul/tip/return/reload cycle; no production rate implied. */
-export function updateHaulTruckCycle(truck:THREE.Group,points:THREE.Vector3[],length:number,elapsedSeconds:number,offsetSeconds=0):{stage:HaulCycleStage;progress:number} {
-  const travelSeconds=36,dwellSeconds=4,tipSeconds=3,cycleSeconds=travelSeconds*2+dwellSeconds*2;
-  const time=((elapsedSeconds+offsetSeconds)%cycleSeconds+cycleSeconds)%cycleSeconds;
-  const smooth=(value:number)=>{const t=THREE.MathUtils.clamp(value,0,1);return t*t*(3-2*t);};
-  let distance=0,direction=1,tip=0,cargoOpacity=1,stage:HaulCycleStage,progress=0;
-  if(time<travelSeconds){
-    stage='loaded-haul';progress=time/travelSeconds;distance=progress*length;
-    tip=smooth((time-(travelSeconds-tipSeconds))/tipSeconds);
-    cargoOpacity=1-smooth((time-(travelSeconds-tipSeconds*.62))/(tipSeconds*.62));
-  }else if(time<travelSeconds+dwellSeconds){
-    stage='tip-off';progress=(time-travelSeconds)/dwellSeconds;distance=length;tip=1;cargoOpacity=0;
-  }else if(time<travelSeconds*2+dwellSeconds){
-    stage='empty-return';progress=(time-travelSeconds-dwellSeconds)/travelSeconds;distance=(1-progress)*length;direction=-1;
-    tip=1-smooth(progress/.08);cargoOpacity=0;
-  }else{
-    stage='reload';progress=(time-travelSeconds*2-dwellSeconds)/dwellSeconds;distance=0;tip=0;cargoOpacity=smooth(progress);
-  }
-  const at=routePosition(points,distance);
-  truck.position.copy(at.position);truck.rotation.y=Math.atan2(at.direction.x,at.direction.z)+(direction<0?Math.PI:0);
-  const dumpBed=truck.userData.dumpBed as THREE.Group|undefined;
-  if(dumpBed)dumpBed.rotation.x=-THREE.MathUtils.degToRad(27)*tip;
-  const cargo=truck.userData.cargoMesh as THREE.Mesh|undefined;
-  if(cargo){
-    const material=cargo.material as THREE.MeshStandardMaterial;
-    material.opacity=cargoOpacity;
-    material.transparent=cargoOpacity<.999;
-    material.depthWrite=cargoOpacity>.55;
-    cargo.visible=cargoOpacity>.01;
-  }
-  truck.userData.haulCycleStage=stage;truck.userData.haulCycleProgress=progress;
-  return {stage,progress};
 }
 
 export function routePosition(points:THREE.Vector3[],distance:number) {

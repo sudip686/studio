@@ -7,15 +7,12 @@ import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-developm
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
 
 const PIT_RESOURCE_GRADE_BANDS=TGC_GRADE_BINS
-  .filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high')
-  .map(bin=>({...bin,displayRange:bin.key==='medium'?'4.5–<6%':bin.key==='high'?'6–<8%':'≥8%'}));
+  .filter(bin=>bin.key==='low'||bin.key==='medium'||bin.key==='high'||bin.key==='very-high')
+  .map(bin=>({...bin,displayRange:bin.key==='low'?'3–<4.5%':bin.key==='medium'?'4.5–<6%':bin.key==='high'?'6–<8%':'≥8%'}));
 
 const MINE_PLANT_FOCUSES=[
   ['all','Whole plant'],['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],
   ['thickening','Thickener & water'],['dewatering','Filter press & dryer'],['product','Product handling'],
-] as const;
-const MINE_HAUL_CYCLE_STEPS=[
-  ['loaded-haul','Loaded haul'],['tip-off','Tip-off'],['empty-return','Empty return'],['reload','Reload'],
 ] as const;
 
 export function TangaEvidenceDrawer({chapter}: {chapter: TangaChapterId}) {
@@ -59,7 +56,7 @@ function SceneMotionControl({paused,onToggle}:{paused:boolean;onToggle:()=>void}
   </div>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion,haulCycleStage}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void;haulCycleStage?:'loaded-haul'|'tip-off'|'empty-return'|'reload'|null}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void}) {
   const panelRef=useRef<HTMLElement|null>(null);
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
   const [siteOrientation,setSiteOrientation]=useState<'plan'|'oblique'>('oblique');
@@ -92,7 +89,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     // Keep the information panel in step with the authored 3D pit-block view.
     setMinePanelSection(['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
   },[chapter,developmentViewId]);
-  const developmentView=DEVELOPMENT_FACILITIES.find(view=>view.id===developmentViewId) ?? (developmentViewId==='north-pit'?{title:'Read the northern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Benches and access path are illustrative, with no engineered road or grade.'}:developmentViewId==='south-pit'?{title:'Read the southern excavation',explanation:'Compare the candidate shell with terrain and model footprint. Excavation limits, access and slopes remain illustrative pending engineering.'}:developmentViewId==='pit-blocks'?{title:'Resource blocks in both pits',explanation:'Compare source grade cells within the two conceptual pit cutaways. Focus one excavation or return to the whole-site view.'}:undefined);
+  const developmentView=DEVELOPMENT_FACILITIES.find(view=>view.id===developmentViewId) ?? (developmentViewId==='north-pit'?{title:'Read the northern pit shell',explanation:'Inspect the report-derived RF1 bench surface with source ore blocks at their registered positions. Ramp engineering is not included in the supplied shell.'}:developmentViewId==='south-pit'?{title:'Read the southern pit shell',explanation:'Inspect the report-derived RF1 bench surface with source ore blocks at their registered positions. Ramp engineering is not included in the supplied shell.'}:developmentViewId==='pit-blocks'?{title:'RF1 shell and ore blocks',explanation:'Compare the two source bench surfaces and the RF1 ore cells contained within them. Grade colours are a viewing aid, not an economic cutoff.'}:undefined);
   const blockInspectorActive=chapter==='mine_planning'&&minePanelSection==='blocks';
   const developmentAvailable=(id:DevelopmentView)=>Boolean(onInspectDevelopment)&&!((id==='tailings'||id==='waste')&&!availableDevelopment.includes(id))&&!(id==='campus'&&!availableDevelopment.length);
   const milestoneIndex = Math.max(0, WORK_MILESTONES.findIndex((item) => item.id === milestoneId));
@@ -178,11 +175,6 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
     <h2>{blockInspectorActive?'Pit-block controls':developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
     <p className="tanga-story-panel__intro">{blockInspectorActive?'Focus a pit or filter the source cells by displayed TGC band.':developmentViewId==='plant'?'Explore six process areas. Equipment and roof cutaways are illustrative.':developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
-    {haulCycleStage&&<div className="tanga-mine-haul-cycle" aria-label="Conceptual mine-to-feed truck movement">
-      <span>CONCEPT TRUCK CYCLE</span>
-      <ol>{MINE_HAUL_CYCLE_STEPS.map(([id,label])=><li key={id} data-active={haulCycleStage===id||undefined} aria-current={haulCycleStage===id?'step':undefined}>{label}</li>)}</ol>
-      <small>Illustrative movement and timing; route and operating rate are unverified.</small>
-    </div>}
     {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
       <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
       {onShowSiteContext&&<button type="button" onClick={onShowSiteContext}>Show site concept <ArrowRight size={14}/></button>}
@@ -218,15 +210,15 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       </section>}
     </div>}
     {minePanelSection==='blocks'&&<div className="tanga-site-panel-content">
-      <div className="tanga-site-panel-subtitle">SOURCE BLOCK MODEL · OPEN PIT</div>
+      <div className="tanga-site-panel-subtitle">RF1 SOURCE SHELL · ORE BLOCKS</div>
       {pitBlocksStatus!=='ready'&&<small className="tanga-pit-grade-state tanga-pit-block-status" data-state={pitBlocksStatus} role="status">{pitBlocksStatus==='loading'?'Source cells are loading. You can still explore the pit cutaway.':'Source block data failed to load. Choose Inspect to retry.'}</small>}
-      <button type="button" className="tanga-story-panel__compare tanga-story-panel__pit-block-reveal" aria-label={pitBlocksStatus==='error'?'Retry source block model and frame both conceptual pits':'Frame source blocks in both conceptual pits'} aria-pressed={pitBlockFocusIndex===null} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.()}>{pitBlocksStatus==='error'?'Retry blocks & frame pits':'Frame both pit cutaways'} <ArrowRight size={14}/></button>
+      <button type="button" className="tanga-story-panel__compare tanga-story-panel__pit-block-reveal" aria-label={pitBlocksStatus==='error'?'Retry RF1 ore blocks and frame both pit shells':'Frame RF1 ore blocks in both source pit shells'} aria-pressed={pitBlockFocusIndex===null} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.()}>{pitBlocksStatus==='error'?'Retry RF1 blocks & frame pits':'Frame both RF1 pit shells'} <ArrowRight size={14}/></button>
       <div className="tanga-pit-focus-actions" role="group" aria-label="Focus source blocks inside pit shells">
         <button type="button" aria-pressed={pitBlockFocusIndex===0} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(0)}>North pit · inspect blocks</button>
         <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}>South pit · inspect blocks</button>
       </div>
       <div className="tanga-compact-grade-key tanga-pit-grade-key" aria-label="Filter resource blocks by TGC grade band"><span>RESOURCE BLOCKS · TGC</span><div role="group" aria-label="Show resource blocks by grade band">{PIT_RESOURCE_GRADE_BANDS.map(bin=><button key={bin.key} type="button" className="tanga-pit-grade-filter" aria-pressed={pitGradeFocus===bin.key} disabled={!onPitGradeFocusChange} onClick={()=>onPitGradeFocusChange?.(pitGradeFocus===bin.key?null:bin.key)}><i style={{background:bin.color}}/>{bin.displayRange}</button>)}</div><small className="tanga-pit-grade-state" role="status">{pitGradeFocus ? `Showing ${PIT_RESOURCE_GRADE_BANDS.find(bin=>bin.key===pitGradeFocus)?.displayRange ?? 'selected'} TGC blocks` : 'All displayed grade bands'}</small></div>
-      <p className="tanga-story-panel__qualification">Showing source cells at ≥4.5% TGC within the conceptual cutaways. Bands match the resource model; they are not economic cutoffs or reserves.</p>
+      <p className="tanga-story-panel__qualification">Showing RF1 source ore cells at ≥3% TGC inside the two continuous optimized shell surfaces. Grade colours are not economic cutoffs or reserve classifications.</p>
     </div>}
     {minePanelSection==='sources'&&<div className="tanga-site-panel-content">
       <div className="tanga-site-panel-subtitle">REPORT BASIS &amp; LIMITS</div>
