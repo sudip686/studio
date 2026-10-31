@@ -3,6 +3,8 @@ export type Point2 = [number, number];
 export type PlanningBlock = {x: number; y: number; z: number; dx: number; dy: number; dz: number; carbon: number};
 export type CandidatePit = {ring: Point2[]; centre: Point2; surface: number; floor: number; depth: number; support: number};
 export type SitePlan = {pits: CandidatePit[]; plant: Point2 | null; rejected: number; audit: string[]};
+/** Optimized RF1 surface cells, transformed into the viewer's local metre coordinates. */
+export type SourcePitSurface = {id:'north'|'south';x0:number;z0:number;dx:number;dz:number;width:number;height:number;support:number;pitElevation:number[][];topography:number[][];benchIndex:number[][];mask:number[][]};
 export const CONCEPT = {threshold: 3, cell: 25, bench: 10, berm: 6.36, batterDegrees: 70, plantWidth: 200, plantDepth: 140};
 const cross = (a: Point2, b: Point2, c: Point2) => (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
 export function inside(p: Point2, ring: Point2[]) {
@@ -75,27 +77,46 @@ export function hull(points: Point2[]): Point2[] {
   const half=(ps: Point2[])=>{const h: Point2[]=[];for(const p of ps){while(h.length>1&&cross(h[h.length-2],h[h.length-1],p)<=0)h.pop();h.push(p);}return h.slice(0,-1);};
   return [...half(sorted),...half([...sorted].reverse())];
 }
+const CELL_NEIGHBORS:Point2[]=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+function connectedCellGroups(cells:Map<string,PlanningBlock[]>){
+  const groups:PlanningBlock[][]=[];const seen=new Set<string>();
+  for(const key of cells.keys()){
+    if(seen.has(key))continue;
+    const queue=[key],group:PlanningBlock[]=[];seen.add(key);
+    for(let i=0;i<queue.length;i++){
+      const current=queue[i];group.push(...cells.get(current)!);
+      const [x,z]=current.split(',').map(Number);
+      for(const [dx,dz] of CELL_NEIGHBORS){const next=`${x+dx},${z+dz}`;if(cells.has(next)&&!seen.has(next)){seen.add(next);queue.push(next);}}
+    }
+    if(group.length>=8)groups.push(group);
+  }
+  return groups;
+}
 export function planSite(blocks: PlanningBlock[], boundary: Point2[], height: (x:number,z:number)=>number, layout: 'clusters' | 'north-south' = 'clusters'): SitePlan {
   const cells=new Map<string,PlanningBlock[]>();
-  for(const b of blocks) if(b.carbon>=CONCEPT.threshold && inside([b.x,b.z],boundary)) {
+  for(const b of blocks) if(b.carbon>=CONCEPT.threshold && inside([b.x,b.z],boundary) && (layout!=='north-south'||rectangleContained([b.x,b.z],b.dx,b.dy,boundary))) {
     const key=`${Math.round(b.x/CONCEPT.cell)},${Math.round(b.z/CONCEPT.cell)}`;
     const list=cells.get(key)??[];list.push(b);cells.set(key,list);
   }
-  const groups: PlanningBlock[][]=[];
-  const seen=new Set<string>();
-  for(const key of cells.keys()) {if(seen.has(key))continue;const queue=[key],group:PlanningBlock[]=[];seen.add(key);
-    for(let i=0;i<queue.length;i++){const k=queue[i];group.push(...cells.get(k)!);const [x,z]=k.split(',').map(Number);
-      for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){const next=`${x+dx},${z+dz}`;if(cells.has(next)&&!seen.has(next)){seen.add(next);queue.push(next);}}}
-    if(group.length>=8)groups.push(group);
-  }
+  let groups=connectedCellGroups(cells);
   if(layout==='north-south') {
-    const eligible=[...cells.values()].flat();
-    const minZ=eligible.reduce((v,b)=>Math.min(v,b.z),Infinity),maxZ=eligible.reduce((v,b)=>Math.max(v,b.z),-Infinity);
-    const split=(minZ+maxZ)/2;
-    groups.splice(0,groups.length,eligible.filter(b=>b.z<split),eligible.filter(b=>b.z>=split));
+    // One connected shell cluster can wrap around a concave boundary and its
+    // convex hull then extends outside the project outline. Re-cluster into
+    // 500 m source-coordinate windows, retaining only whole source cells inside
+    // the boundary. This yields compact, separated presentation envelopes;
+    // the window is a display grouping, not a pit-design parameter.
+    const windows=new Map<string,Map<string,PlanningBlock[]>>();
+    for(const [cellKey,cellBlocks] of cells){
+      const b=cellBlocks[0],windowKey=`${Math.floor(b.x/500)},${Math.floor(b.z/500)}`;
+      const window=windows.get(windowKey)??new Map<string,PlanningBlock[]>();window.set(cellKey,cellBlocks);windows.set(windowKey,window);
+    }
+    groups=[...windows.values()].flatMap(connectedCellGroups)
+      .filter(group=>contained(hull(group.flatMap(b=>rectangle([b.x,b.z],b.dx,b.dy))),boundary))
+      .sort((a,b)=>b.length-a.length);
   }
   const pits:CandidatePit[]=[];let rejected=0;
   for(const group of groups.sort((a,b)=>b.length-a.length)) {
+    if(layout==='north-south'&&pits.length>=2)break;
     if(group.length<8)continue;
     let footprint=hull(group.flatMap(b=>rectangle([b.x,b.z],b.dx,b.dy)));
     if(footprint.length<3)continue;
@@ -126,6 +147,7 @@ export function planSite(blocks: PlanningBlock[], boundary: Point2[], height: (x
     if(!contained(ring,boundary)||pits.some(p=>overlaps(p.ring,ring))){rejected++;continue;}
     pits.push({ring,centre,surface,floor,depth,support:group.length});
   }
+  if(layout==='north-south')pits.sort((a,b)=>a.centre[1]-b.centre[1]);
   const xs=boundary.map(p=>p[0]),zs=boundary.map(p=>p[1]);
   let plant:Point2|null=null,best=Infinity;
   const anchor=pits[0]?.centre??[0,0];
@@ -137,4 +159,31 @@ export function planSite(blocks: PlanningBlock[], boundary: Point2[], height: (x
     if(score<best){best=score;plant=p;}
   }
   return {pits,plant,rejected,audit:[`${pits.length} candidate excavations contained`,`${rejected} conflicting/outside candidates omitted`,plant?'Plant footprint + 20 m planning margin contained':'No admissible plant site found','Provisional project boundary; legal licence unconfirmed','RF 1-inspired concept: 10 m benches, 70° batter, 6.36 m berm; no economic optimisation']};
+}
+
+/** Preserve the two georeferenced RF1 pit surfaces instead of deriving new pit
+ * envelopes from grade-cell clusters. Convex hulls here are used only by the
+ * existing plant/route clearance helpers; rendering and block filtering use
+ * each source raster's exact active-cell mask and elevations. */
+export function planSiteFromPitSurfaces(surfaces:SourcePitSurface[],height:(x:number,z:number)=>number,boundary:Point2[]):SitePlan{
+  const pits=surfaces.map(surface=>{
+    const corners:Point2[]=[];let floor=Infinity,support=0;
+    for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++)if(surface.mask[i]?.[j]){
+      support++;
+      floor=Math.min(floor,surface.pitElevation[i]?.[j]??Infinity);
+      const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz;
+      corners.push([x-surface.dx/2,z-Math.abs(surface.dz)/2],[x+surface.dx/2,z-Math.abs(surface.dz)/2],[x+surface.dx/2,z+Math.abs(surface.dz)/2],[x-surface.dx/2,z+Math.abs(surface.dz)/2]);
+    }
+    const ring=hull(corners),centre:Point2=ring.length?ring.reduce<Point2>((sum,p)=>[sum[0]+p[0]/ring.length,sum[1]+p[1]/ring.length],[0,0]):[surface.x0,surface.z0];
+    const top=height(...centre);
+    return {ring,centre,surface:top,floor,depth:Math.max(0,top-floor),support};
+  }).filter(pit=>pit.ring.length>=3&&Number.isFinite(pit.floor)&&pit.support>0);
+  pits.sort((a,b)=>a.centre[1]-b.centre[1]);
+  const outside=pits.filter(pit=>!contained(pit.ring,boundary)).length;
+  return {pits,plant:null,rejected:0,audit:[
+    `RF1 source shell surfaces retained at native coordinates (${pits.map(pit=>pit.support.toLocaleString()).join(' / ')} terrain cells)`,
+    'Pit floor elevations and footprints use the supplied optimized shell grid; no grade-cluster shells are regenerated',
+    outside?`${outside} source shell footprint(s) extend beyond the provisional project boundary`:'Both source shell footprints fall within the provisional project boundary',
+    'Source optimized shell visualization; conceptual planning output, not an approved engineering design or Ore Reserve',
+  ]};
 }
