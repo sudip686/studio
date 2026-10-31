@@ -563,6 +563,13 @@ export function sourcePitElevationAt(surface:SourcePitSurface,x:number,z:number)
   const elevation=surface.pitElevation[i]?.[j];return Number.isFinite(elevation)?elevation!:null;
 }
 
+/** Source topography RL for a cell inside the optimized-shell mask. */
+export function sourcePitTopographyAt(surface:SourcePitSurface,x:number,z:number):number|null{
+  const i=Math.round((x-surface.x0)/surface.dx),j=Math.round((z-surface.z0)/surface.dz);
+  if(i<0||i>=surface.width||j<0||j>=surface.height||!surface.mask[i]?.[j])return null;
+  const elevation=surface.topography[i]?.[j];return Number.isFinite(elevation)?elevation!:null;
+}
+
 /** Carve the displayed terrain to the supplied RF1 optimized-shell raster. */
 export function carvePitSurfaces(geometry:THREE.BufferGeometry,surfaces:SourcePitSurface[]){
   const position=geometry.getAttribute('position'),sourceIndex=geometry.index;if(!position||!sourceIndex||!surfaces.length)return;
@@ -573,13 +580,13 @@ export function carvePitSurfaces(geometry:THREE.BufferGeometry,surfaces:SourcePi
   const kept:number[]=[];
   for(let triangle=0;triangle<sourceIndex.count;triangle+=3){
     const a=sourceIndex.getX(triangle),b=sourceIndex.getX(triangle+1),c=sourceIndex.getX(triangle+2);
-    const points=[a,b,c].map(vertex=>[position.getX(vertex),position.getZ(vertex)] as const);
-    const x=(points[0][0]+points[1][0]+points[2][0])/3;
-    const z=(points[0][1]+points[1][1]+points[2][1])/3;
-    const intersectsPit=surfaces.some(surface=>{
-      const insideCount=points.filter(([px,pz])=>sourcePitElevationAt(surface,px,pz)!==null).length;
-      return insideCount>=2||sourcePitElevationAt(surface,x,z)!==null;
-    });
+    const x=(position.getX(a)+position.getX(b)+position.getX(c))/3;
+    const z=(position.getZ(a)+position.getZ(b)+position.getZ(c))/3;
+    // The terrain triangles are about 20 m wide while the source shell cells
+    // are 10 m. Remove only triangles whose centroid is inside the shell;
+    // deleting every triangle with two inside vertices punched visible gaps
+    // outside the pit along the coarser terrain mesh boundary.
+    const intersectsPit=surfaces.some(surface=>sourcePitElevationAt(surface,x,z)!==null);
     if(intersectsPit)continue;
     kept.push(a,b,c);
   }
@@ -588,6 +595,23 @@ export function carvePitSurfaces(geometry:THREE.BufferGeometry,surfaces:SourcePi
     geometry.setIndex(kept);
     geometry.computeBoundingSphere();
   }
+  geometry.userData.pitCarvedTriangleCount=(sourceIndex.count-kept.length)/3;
+  retainConceptTerrain(geometry);
+}
+
+/** Open the terrain to the same continuous pit envelopes used by the renderer. */
+export function carvePitEnvelopes(geometry:THREE.BufferGeometry,pits:CandidatePit[]){
+  const position=geometry.getAttribute('position'),sourceIndex=geometry.index;if(!position||!sourceIndex||!pits.length)return;
+  retainSourceTerrain(geometry);
+  const kept:number[]=[];
+  for(let triangle=0;triangle<sourceIndex.count;triangle+=3){
+    const a=sourceIndex.getX(triangle),b=sourceIndex.getX(triangle+1),c=sourceIndex.getX(triangle+2);
+    const x=(position.getX(a)+position.getX(b)+position.getX(c))/3;
+    const z=(position.getZ(a)+position.getZ(b)+position.getZ(c))/3;
+    if(pits.some(pit=>inside([x,z],pit.ring)))continue;
+    kept.push(a,b,c);
+  }
+  if(kept.length!==sourceIndex.count){geometry.userData.sourceTerrainIndex??=sourceIndex.clone();geometry.setIndex(kept);geometry.computeBoundingSphere();}
   geometry.userData.pitCarvedTriangleCount=(sourceIndex.count-kept.length)/3;
   retainConceptTerrain(geometry);
 }

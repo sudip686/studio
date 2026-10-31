@@ -7,8 +7,8 @@ import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-developm
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
 
 const PIT_RESOURCE_GRADE_BANDS=TGC_GRADE_BINS
-  .filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high')
-  .map(bin=>({...bin,displayRange:bin.key==='medium'?'4.5–<6%':bin.key==='high'?'6–<8%':'≥8%'}));
+  .filter(bin=>bin.key==='low'||bin.key==='medium'||bin.key==='high'||bin.key==='very-high')
+  .map(bin=>({...bin,displayRange:bin.key==='low'?'3–<4.5%':bin.key==='medium'?'4.5–<6%':bin.key==='high'?'6–<8%':'≥8%'}));
 
 const MINE_PLANT_FOCUSES=[
   ['all','Whole plant'],['feed','ROM & crushing'],['milling','Milling & cyclones'],['flotation','Flotation cells'],
@@ -218,7 +218,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
         <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}>South pit · inspect blocks</button>
       </div>
       <div className="tanga-compact-grade-key tanga-pit-grade-key" aria-label="Filter resource blocks by TGC grade band"><span>RESOURCE BLOCKS · TGC</span><div role="group" aria-label="Show resource blocks by grade band">{PIT_RESOURCE_GRADE_BANDS.map(bin=><button key={bin.key} type="button" className="tanga-pit-grade-filter" aria-pressed={pitGradeFocus===bin.key} disabled={!onPitGradeFocusChange} onClick={()=>onPitGradeFocusChange?.(pitGradeFocus===bin.key?null:bin.key)}><i style={{background:bin.color}}/>{bin.displayRange}</button>)}</div><small className="tanga-pit-grade-state" role="status">{pitGradeFocus ? `Showing ${PIT_RESOURCE_GRADE_BANDS.find(bin=>bin.key===pitGradeFocus)?.displayRange ?? 'selected'} TGC blocks` : 'All displayed grade bands'}</small></div>
-      <p className="tanga-story-panel__qualification">Showing RF1 source ore cells at ≥4.5% TGC inside the two continuous optimized shell surfaces. Grade colours are not economic cutoffs or reserve classifications.</p>
+      <p className="tanga-story-panel__qualification">Showing RF1 source ore cells at ≥3% TGC inside the two continuous optimized shell surfaces. Grade colours are not economic cutoffs or reserve classifications.</p>
     </div>}
     {minePanelSection==='sources'&&<div className="tanga-site-panel-content">
       <div className="tanga-site-panel-subtitle">REPORT BASIS &amp; LIMITS</div>

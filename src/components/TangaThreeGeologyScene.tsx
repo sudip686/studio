@@ -10,7 +10,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
 import {planSiteFromPitSurfaces, inside, rectangleContained, overlaps, rectangle, type SitePlan, type Point2, type SourcePitSurface} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurfaceFromRaster, carvePitSurfaces, sourcePitElevationAt, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, carvePitEnvelopes, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
 import {buildGeologyRasterSurface,buildGeologyReferenceGrid,buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologyRasterLayer,type GeologySurfaceData} from '@/lib/deck/geology-surface';
@@ -3656,7 +3656,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         host.dataset.terrainGrid = `${resources.meta.context_grid?.width}×${resources.meta.context_grid?.height}`;
         host.dataset.surveyReady = String(Boolean(resources.surveyHeightData && resources.surveyCoverageData));
         if (mode === 'mine_planning' && sitePlan) {
-          carvePitSurfaces(terrainGeometry, sourcePitSurfaces);
+          carvePitEnvelopes(terrainGeometry,sitePlan.pits);
           const pad=processPlant?.userData.conceptPad as ConceptPad|undefined;if(pad)gradeConceptPad(terrainGeometry,pad);
         }
         const isSatelliteTerrain = mode !== 'topography';
@@ -3930,21 +3930,49 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if(!referenceResponse.ok)throw new Error('Ore/waste scenario reference unavailable');
         const reference=await referenceResponse.json() as {blocks:number[][];provenance:{sourceTimestamp:string;sourceFile?:string};pitSurfaces?:{components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>}};
         if(cancelled)return;
-        if(mode==='mine_planning')minePlanSourceBlocks=reference.blocks.map(([lon,lat,elevation,dx,dy,dz,carbon])=>{
-          const p=localPoint(lon,lat,elevation);return {x:p.x,y:p.y,z:p.z,dx,dy,dz,carbon,classification:'RF1 optimized-shell ore'};
-        });
         const sourceComponents=reference.pitSurfaces?.components??[];
-        sourcePitSurfaces=sourceComponents.map((source,index)=>({
-          id:index===0?'north':'south',
-          x0:source.x0+source.dx/2-PROJECT_UTM_CENTER.easting,
-          z0:PROJECT_UTM_CENTER.northing-(source.y0+source.dy/2),
-          dx:source.dx,dz:-source.dy,width:source.width,height:source.height,support:source.support,
-          pitElevation:source.pitElevation.map(column=>column.map(rl=>(rl-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION)),
-          topography:source.topography.map(column=>column.map(rl=>(rl-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION)),
-          benchIndex:source.benchIndex,
-          mask:source.mask,
-        }));
+        sourcePitSurfaces=sourceComponents.map((source,index)=>{
+          const x0=source.x0+source.dx/2-PROJECT_UTM_CENTER.easting;
+          const z0=PROJECT_UTM_CENTER.northing-(source.y0+source.dy/2);
+          return {
+            id:index===0?'north':'south',x0,z0,dx:source.dx,dz:-source.dy,width:source.width,height:source.height,support:source.support,
+            // The RF1 pit and topography grids share a datum, but that datum is
+            // offset from the displayed DTM/DEM by up to 150 m. Preserve the
+            // source pit depth and register it below rendered ground; raw RLs
+            // placed parts of the bench surface above the displayed terrain.
+            pitElevation:source.pitElevation.map((column,i)=>column.map((rl,j)=>{
+              const x=x0+i*source.dx,z=z0-j*source.dy,sourceGround=source.topography[i]?.[j];
+              return terrainSurfaceY(terrainResources,x,-z)+(rl-sourceGround)*VERTICAL_EXAGGERATION;
+            })),
+            topography:source.topography.map(column=>column.map(rl=>(rl-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION)),
+            benchIndex:source.benchIndex,mask:source.mask,
+          };
+        });
         if(sourcePitSurfaces.length!==2)throw new Error('Two RF1 optimized pit surfaces are required for Mine Planning');
+        if(mode==='mine_planning')minePlanSourceBlocks=reference.blocks.map(([lon,lat,elevation,dx,dy,dz,carbon])=>{
+          const p=localPoint(lon,lat,elevation);
+          const sourcePit=sourcePitSurfaces.find(surface=>sourcePitElevationAt(surface,p.x,p.z)!==null);
+          const sourceGround=sourcePit?sourcePitTopographyAt(sourcePit,p.x,p.z):null;
+          if(sourceGround!==null){
+            // Register the block's source RL by its depth below the RF1 source
+            // topography. The block model uses the same shifted vertical datum
+            // as the pit shell, so raw RLs made ore cells float above the DTM.
+            p.y=terrainSurfaceY(terrainResources,p.x,-p.z)+(p.y-sourceGround)*VERTICAL_EXAGGERATION;
+          }
+          return {x:p.x,y:p.y,z:p.z,dx,dy,dz,carbon,classification:'RF1 optimized-shell ore'};
+        });
+        const pitRegistrationSamples:number[]=[];let pitSourceFloorAboveTerrain=0;
+        for(const pit of sourcePitSurfaces)for(let i=0;i<pit.width;i++)for(let j=0;j<pit.height;j++)if(pit.mask[i]?.[j]){
+          const x=pit.x0+i*pit.dx,z=pit.z0+j*pit.dz,displayed=terrainSurfaceY(terrainResources,x,-z);
+          const sourceTop=pit.topography[i]?.[j],pitFloor=pit.pitElevation[i]?.[j];
+          if(Number.isFinite(sourceTop))pitRegistrationSamples.push(sourceTop!-displayed);
+          if(Number.isFinite(pitFloor)&&pitFloor!>displayed)pitSourceFloorAboveTerrain++;
+        }
+        host.dataset.pitSourceFloorAboveTerrain=String(pitSourceFloorAboveTerrain);
+        if(pitRegistrationSamples.length){
+          const sorted=[...pitRegistrationSamples].sort((a,b)=>a-b);
+          host.dataset.pitTerrainRegistrationM=JSON.stringify({count:sorted.length,min:Number(sorted[0].toFixed(1)),median:Number(sorted[Math.floor(sorted.length*.5)].toFixed(1)),p95:Number(sorted[Math.floor(sorted.length*.95)].toFixed(1)),max:Number(sorted.at(-1)!.toFixed(1))});
+        }
         sitePlan = planSiteFromPitSurfaces(sourcePitSurfaces,(x,z)=>terrainSurfaceY(terrainResources,x,-z),boundary);
         if(mode==='mine_planning'){
           sitePlan.plant=[DEVELOPMENT_SITE.dischargeUtm[0]-PROJECT_UTM_CENTER.easting,PROJECT_UTM_CENTER.northing-DEVELOPMENT_SITE.dischargeUtm[1]];
@@ -4703,8 +4731,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const pitShapes=orderedPits.map((pit,index)=>preparePitCutawayShape(pit,orderedSources[index]));
             const pitHeightCaches=orderedPits.map(()=>new Map<string,number|null>());
             const terrainHeightCache=new Map<string,number>();
-            const gradeCounts:Record<string,number>={medium:0,high:0,'very-high':0};
-            const gradeTargets=orderedPits.map(()=>new Map<string,ResourceBlock[]>([['medium',[]],['high',[]],['very-high',[]]]));
+            const gradeCounts:Record<string,number>={low:0,medium:0,high:0,'very-high':0};
+            const gradeTargets=orderedPits.map(()=>new Map<string,ResourceBlock[]>([['low',[]],['medium',[]],['high',[]],['very-high',[]]]));
             let targetsCount=0;
             // The source block model can contain more than 150,000 cells. Keep
             // the exact footprint, bench-height and terrain checks, but yield
@@ -4715,14 +4743,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               const sliceStartedAt=performance.now();
               while(cursor<sourceBlocks.length&&performance.now()-sliceStartedAt<8){
                 const block=sourceBlocks[cursor++];
-                if(block.carbon<4.5)continue;
+                if(block.carbon<3)continue;
                 for(let pitIndex=0;pitIndex<orderedPits.length;pitIndex++){
                   if(!resourceBlockFitsPitCutaway(block,pitShapes[pitIndex],terrainResources,pitHeightCaches[pitIndex],terrainHeightCache))continue;
-                  const gradeKey=tgcGradeBin(block.carbon).key;
-                  if(gradeKey==='medium'||gradeKey==='high'||gradeKey==='very-high'){
-                    gradeCounts[gradeKey]=(gradeCounts[gradeKey]??0)+1;
-                    gradeTargets[pitIndex].get(gradeKey)!.push(block);
-                  }
+                  const gradeKey=block.carbon>=8?'very-high':block.carbon>=6?'high':block.carbon>=4.5?'medium':'low';
+                  gradeCounts[gradeKey]=(gradeCounts[gradeKey]??0)+1;
+                  gradeTargets[pitIndex].get(gradeKey)!.push(block);
                   targetsCount++;
                   break;
                 }
@@ -4744,7 +4770,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             setTargetDisplayCount(targetsCount);
             host.dataset.miningTargets=String(targetsCount);
             host.dataset.miningTargetsDisplayed=String(targetsCount);
-            const pitGradeBands=TGC_GRADE_BINS.filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high');
+            const pitGradeBands=TGC_GRADE_BINS.filter(bin=>bin.key==='low'||bin.key==='medium'||bin.key==='high'||bin.key==='very-high');
             host.dataset.miningGradeCounts=JSON.stringify(gradeCounts);
             displayedByPit.forEach((pitBlocks,pitIndex)=>{
               for(const [bandIndex,band] of pitGradeBands.entries()){
@@ -4802,13 +4828,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             setStatus('RF1 source ore blocks registered inside both optimized pit shells');
             if(siteSceneReady)reportLoadState('ready',resources?'ready':'degraded',resources?.quality??assetQuality,`${host.dataset.miningTargetsDisplayed??0} source ore blocks registered in Mine Planning`);
           }
-          for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePitSurfaces(mesh.geometry, sourcePitSurfaces);
+          for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePitEnvelopes(mesh.geometry,sitePlan.pits);
           host.dataset.pitCarvedTriangles=String(terrainMeshes.reduce((sum,mesh)=>sum+Number(mesh.geometry.userData.pitCarvedTriangleCount??0),0));
           sitePlan.audit.push('Haul-road geometry omitted: the supplied optimized shell does not include an engineered ramp alignment or checked gradient');
           for (const [index,pit] of sitePlan.pits.entries()) {
-            const sourcePit=sourcePitSurfaces[index];
-            if(!sourcePit)continue;
-            const mesh = buildPitSurfaceFromRaster(sourcePit, (x, z) => terrainSurfaceY(terrainResources, x, -z));
+            const mesh = buildPitSurface(pit, (x, z) => terrainSurfaceY(terrainResources, x, -z));
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
             pitSurfaces.push(mesh);
@@ -6148,7 +6172,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               } as any}
             >
               <span data-site-index={mode === 'mine_planning' ? MINE_SITE_CALLOUT_INDEX[callout.id] : undefined}>{mode==='mine_planning'&&callout.compact&&MINE_SITE_CALLOUT_SHORT_LABEL[callout.id] ? MINE_SITE_CALLOUT_SHORT_LABEL[callout.id] : mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? `${callout.id==='pit-0'?'North':'South'} · ${miningBeat===0?'sampling context':'grade targets'}` : callout.label}</span>
-              {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥4.5% TGC display selection · not reserves' : callout.detail}</strong>}
+              {!callout.id.startsWith('section-end-')&&<strong>{mode==='mine_planning'&&miningBeat<2&&callout.id.startsWith('pit-') ? miningBeat===0?'Selected source traces · inspect the hole IDs':'≥3% TGC display selection · not reserves' : callout.detail}</strong>}
             </div>
           ))}
         </section>
@@ -6325,8 +6349,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             <button aria-pressed={revealAction==='benches'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='benches'?'Replay staged bench reveal':'Focus resource blocks inside pits'}</button>
             <small>{pitBlocksStatus==='loading'?'Loading source block cells; the site and pit cutaway remain interactive.':pitBlocksStatus==='error'?'Source block model unavailable. The RF1 shell surfaces remain viewable.':`${targetDisplayCount.toLocaleString()} grade-selected source blocks inside the RF1 optimized pit shells. Source positions, dimensions and grades are retained.`}</small>
           </div>
-          <div className="tanga-mine-story__key" aria-label="Resource block grade bands">{TGC_GRADE_BINS.filter(bin=>bin.key==='medium'||bin.key==='high'||bin.key==='very-high').map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.key==='medium'?'4.5–<6% TGC':bin.key==='high'?'6–<8% TGC':'≥8% TGC'}</span>)}</div>
-          <small>{pitBlocksStatus==='ready'?`${targetCount.toLocaleString()} source cells at ≥4.5% TGC. Display threshold, not an economic cutoff or reserve.`:'Display threshold, not an economic cutoff or reserve.'}</small>
+          <div className="tanga-mine-story__key" aria-label="Resource block grade bands">{TGC_GRADE_BINS.filter(bin=>bin.key==='low'||bin.key==='medium'||bin.key==='high'||bin.key==='very-high').map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.key==='low'?'3–<4.5% TGC':bin.key==='medium'?'4.5–<6% TGC':bin.key==='high'?'6–<8% TGC':'≥8% TGC'}</span>)}</div>
+          <small>{pitBlocksStatus==='ready'?`${targetCount.toLocaleString()} source cells at ≥3% TGC. Display threshold, not an economic cutoff or reserve.`:'Display threshold, not an economic cutoff or reserve.'}</small>
           <button aria-pressed={targetXray} onClick={()=>setTargetXray(v=>!v)}>{targetXray?'X-ray targets on · turn off':'Enable X-ray inspection'}</button>
         </>}
         <div className="tanga-mine-story__orientation" role="group" aria-label="Site orientation">
