@@ -601,11 +601,31 @@ export function restorePitTerrain(geometry:THREE.BufferGeometry){
 /** Render the source optimized shell as flat floor cells and explicit bench risers. */
 export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:number,z:number)=>number){
   const positions:number[]=[],colors:number[]=[],indices:number[]=[],dark=new THREE.Color(0x675344),floor=new THREE.Color(0xb29a7d);
-  const addVertex=(x:number,y:number,z:number,color:THREE.Color)=>{positions.push(x,y,z);colors.push(color.r,color.g,color.b);};
-  const addQuad=(a:[number,number,number],b:[number,number,number],c:[number,number,number],d:[number,number,number],color:THREE.Color)=>{
-    const base=positions.length/3;for(const p of [a,b,c,d])addVertex(p[0],p[1],p[2],color);indices.push(base,base+1,base+2,base,base+2,base+3);
+  // Reuse vertices across adjacent cells on the same material surface. The
+  // previous per-quad duplicates made each 10 m source cell shade as a separate
+  // block even when it belonged to one continuous bench tread or riser.
+  const vertexByPosition=new Map<string,number>();
+  const addVertex=(x:number,y:number,z:number,color:THREE.Color)=>{
+    const key=`${Math.round(x*100)}:${Math.round(y*100)}:${Math.round(z*100)}:${color.getHex()}`;
+    const existing=vertexByPosition.get(key);if(existing!==undefined)return existing;
+    const index=positions.length/3;positions.push(x,y,z);colors.push(color.r,color.g,color.b);vertexByPosition.set(key,index);return index;
   };
-  const cellFloor=(i:number,j:number)=>surface.mask[i]?.[j]?surface.pitElevation[i]?.[j]??null:null;
+  const addQuad=(a:[number,number,number],b:[number,number,number],c:[number,number,number],d:[number,number,number],color:THREE.Color)=>{
+    const v=[a,b,c,d].map(p=>addVertex(p[0],p[1],p[2],color));indices.push(v[0],v[1],v[2],v[0],v[2],v[3]);
+  };
+  const floorCache=new Map<string,number|null>();
+  const cellFloor=(i:number,j:number)=>{
+    if(!surface.mask[i]?.[j])return null;
+    const key=`${i}:${j}`,cached=floorCache.get(key);if(cached!==undefined)return cached;
+    const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz,elevation=surface.pitElevation[i]?.[j];
+    if(!Number.isFinite(elevation)){floorCache.set(key,null);return null;}
+    // The source shell and viewer terrain are registered from separate grids.
+    // Keep the whole bench cell below the displayed ground so a local
+    // interpolation mismatch cannot lift a tread above the terrain.
+    const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
+    const result=Math.min(elevation!,height(x,z)-.7,height(x-halfX,z-halfZ)-.7,height(x+halfX,z-halfZ)-.7,height(x+halfX,z+halfZ)-.7,height(x-halfX,z+halfZ)-.7);
+    floorCache.set(key,result);return result;
+  };
   const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
   for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++){
     const baseFloor=cellFloor(i,j);if(baseFloor===null)continue;
