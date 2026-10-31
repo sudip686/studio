@@ -1516,7 +1516,7 @@ function drillholeLegend(mode: GeologyMode): ThreeLegendItem[] {
     return [
       {label: '>8% TGC', detail: 'Purple assay intervals', tone: '#9d00ff', binKey: 'very-high'},
       {label: 'GRSC interpretation', detail: 'Pale-grey graphitic-schist unit', tone: '#d8d8e1'},
-      {label: 'Drillhole collars', detail: 'Large deep-indigo 3D pins with amber surface rings · hole starts', tone: '#180b65'},
+      {label: 'Drillhole collars', detail: 'Low-profile deep-indigo surface markers · hole starts', tone: '#180b65'},
     ];
   }
   return [
@@ -4350,17 +4350,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       const subsurfaceView = mode === 'subsurface';
       // On the drilling slide collars use vermilion markers. In the 3D geology
-      // view, an enlarged deep-indigo post and head stay distinct from the pale-grey
-      // Graphitic Schist interpretation at project scale; the broad amber ring
-      // marks the exact surface position against the terrain.
-      // At the geology overview distance, collars need a stronger silhouette
-      // than the interpreted units beneath them. Keep the scale-up scoped to
-      // this view so the assay-focused drilling slide retains its finer pins.
-      const collarRadius = subsurfaceView ? 46 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
-      const collarHeight = subsurfaceView ? 300 : 0;
+      // view, use a low-profile indigo surface marker. Keep it distinct from
+      // the pale-grey Graphitic Schist without obscuring the interpreted model.
+      const collarRadius = subsurfaceView ? 48 : mode === 'drillholes' ? 6.2 : mode === 'resource' ? 3.4 : 4.6;
+      const collarHeight = subsurfaceView ? 18 : 0;
       const collarLift = subsurfaceView ? collarHeight / 2 : mode === 'resource' ? 10 : DRILL_COLLAR_SURFACE_LIFT;
       const collarGeometry = subsurfaceView
-        ? new THREE.CylinderGeometry(34, collarRadius, collarHeight, 20, 1)
+        ? new THREE.CylinderGeometry(collarRadius, collarRadius, collarHeight, 20)
         : new THREE.SphereGeometry(collarRadius, 16, 12);
       const collarMaterial = new THREE.MeshBasicMaterial({
         color: subsurfaceView ? 0x180b65 : mode === 'drillholes' ? 0xff542e : 0xe8e2d6,
@@ -4369,7 +4365,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         opacity: mode === 'resource' ? 0.5 : 1,
       });
       const collars = new THREE.InstancedMesh(collarGeometry, collarMaterial, collarSegments.length);
-      collars.castShadow = true;
+      collars.castShadow = !subsurfaceView;
       collars.receiveShadow = true;
       const collarMatrix = new THREE.Matrix4();
       collarSegments.forEach((segment, index) => {
@@ -4394,54 +4390,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       registerReveal(collars, 0.08, 0.9, 0.72, 18);
       pickables.push(collars);
 
-      if (subsurfaceView) {
-        const collarHeadGeometry = new THREE.SphereGeometry(132, 24, 18);
-        // Each reveal owns its own material opacity; sharing one with the post
-        // lets the head animation overwrite the shaft animation every frame.
-        const collarHeadMaterial = collarMaterial.clone();
-        const collarHeads = new THREE.InstancedMesh(collarHeadGeometry, collarHeadMaterial, collarSegments.length);
-        collarSegments.forEach((segment, index) => {
-          const point = collarSurfacePoint(segment, terrainResources, 1);
-          point.y += collarHeight - 1;
-          collarMatrix.makeTranslation(point.x, point.y, point.z);
-          collarHeads.setMatrixAt(index, collarMatrix);
-        });
-        collarHeads.instanceMatrix.needsUpdate = true;
-        collarHeads.renderOrder = 9;
-        collarHeads.userData.tooltipItems = collarSegments.map((segment) => ({
-          title: segment.holeId,
-          tone: '#180b65',
-          rows: [
-            'Surface drill collar',
-            `First logged interval ${formatDepth(segment)}`,
-            `Lithology ${lithologyLabel(segment.lithology)}`,
-          ],
-        }));
-        tagDeckLayer(collarHeads, 'drilling');
-        stage.add(collarHeads);
-        registerReveal(collarHeads, 0.08, 0.9, 0.72, 18);
-        pickables.push(collarHeads);
-      }
-
-      {
+      if (!subsurfaceView) {
         const drillingSlide = mode === 'drillholes';
         const collarRingGeometry = new THREE.TorusGeometry(
-          subsurfaceView ? 126 : drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
-          subsurfaceView ? 18 : drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
+          drillingSlide ? 14 : mode === 'resource' ? 8.5 : 12.5,
+          drillingSlide ? 1.55 : mode === 'resource' ? 1.1 : 1.35,
           8,
           28
         );
         const collarRingMaterial = new THREE.MeshBasicMaterial({
-          color: subsurfaceView ? 0xffb83f : drillingSlide ? 0x172127 : 0xffffff,
+          color: drillingSlide ? 0x172127 : 0xffffff,
           toneMapped: false,
-          transparent: !drillingSlide && !subsurfaceView,
-          opacity: subsurfaceView ? 1 : mode === 'resource' ? 0.34 : 0.78,
+          transparent: !drillingSlide,
+          opacity: mode === 'resource' ? 0.34 : 0.78,
           depthWrite: false,
         });
         const collarRings = new THREE.InstancedMesh(collarRingGeometry, collarRingMaterial, collarSegments.length);
         const ringDummy = new THREE.Object3D();
         collarSegments.forEach((segment, index) => {
-          const point = collarSurfacePoint(segment, terrainResources, subsurfaceView ? 4 : drillingSlide ? 7 : mode === 'resource' ? 8 : 11);
+          const point = collarSurfacePoint(segment, terrainResources, drillingSlide ? 7 : mode === 'resource' ? 8 : 11);
           ringDummy.position.copy(point);
           ringDummy.rotation.set(Math.PI / 2, 0, 0);
           ringDummy.updateMatrix();
