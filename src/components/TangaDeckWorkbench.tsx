@@ -5349,6 +5349,13 @@ export default function TangaDeckWorkbench() {
   const [sceneMotionPaused, setSceneMotionPaused] = useState(false);
   useEffect(() => { setSceneMotionPaused(false); }, [activeMode, activeShotIndex]);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);setIsHighlightsTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
+  useEffect(() => {
+    const pauseInBackground = () => {
+      if (document.hidden) setIsAutoplay(false);
+    };
+    document.addEventListener('visibilitychange', pauseInBackground);
+    return () => document.removeEventListener('visibilitychange', pauseInBackground);
+  }, []);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
   const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
@@ -5550,6 +5557,7 @@ export default function TangaDeckWorkbench() {
   useEffect(() => {
     if (!isAutoplay || (threeVisible && threeLoadReport.scene !== 'ready')) return;
     const timer = window.setTimeout(() => {
+      if (document.hidden) return;
       if (isExecutiveTour) { handleExecutiveAdvance(); return; }
       if (isLastStory) setIsAutoplay(false);
       else handleNextStory();
@@ -5668,10 +5676,10 @@ export default function TangaDeckWorkbench() {
       if (key === 'ArrowRight' || key === 'PageDown') {
         event.preventDefault();
         if (activeStoryIndex === 0 && !coverDismissed) { setCoverDismissed(true); return; }
-        handleNextStory();
+        handleManualNext();
         return;
       }
-      if (key === 'ArrowLeft' || key === 'PageUp')    { event.preventDefault(); handlePrevStory(); return; }
+      if (key === 'ArrowLeft' || key === 'PageUp')    { event.preventDefault(); handleManualPrev(); return; }
       if (key === 'Home') { event.preventDefault(); goToStoryIndex(0); return; }
       if (key === 'End')  { event.preventDefault(); goToStoryIndex(STORY_STEPS.length - 1); return; }
       if (/^[1-9]$/.test(key)) {
@@ -5699,7 +5707,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
+  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -5789,7 +5797,19 @@ export default function TangaDeckWorkbench() {
       data-three-state={threeLoadReport.scene}
       data-three-load-ms={threeLoadReport.elapsedMs ?? undefined}
       onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
-      onPointerDownCapture={event => { setIsAutoplay(false); setIsExecutiveTour(false); if(!(event.target as Element).closest('.tanga-presentation-tools')) { const tools=stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');if(tools)tools.open=false; } }}
+      onPointerDownCapture={event => {
+        const target = event.target as Element;
+        // Playback controls handle their own state. Cancelling here would run
+        // before the button's click and discard the guided route on Pause.
+        if (!target.closest('.tanga-deck__autoplay-group')) {
+          setIsAutoplay(false);
+          setIsExecutiveTour(false);
+        }
+        if (!target.closest('.tanga-presentation-tools')) {
+          const tools = stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');
+          if (tools) tools.open = false;
+        }
+      }}
       data-testid="tanga-deck-workbench"
     >
       <DeckHoverGuide mode={activeMode}/>
@@ -6468,7 +6488,7 @@ export default function TangaDeckWorkbench() {
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', activeChapterTourName && !isExecutiveTour && 'tanga-deck__pager-play--named', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
             style={{'--autoplay-dwell': `${shotDwellSec}s`} as any}
-            key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}-${isAutoplay}`}
+            key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}`}
             onClick={toggleAutoplay}
             aria-label={isExecutiveTour ? (isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}` : `Resume ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}`) : (isAutoplay ? `Pause ${activeChapterTourName ?? 'current chapter playback'}` : `Play ${activeChapterTourName ?? 'current chapter views'}`)}
             aria-pressed={isAutoplay}

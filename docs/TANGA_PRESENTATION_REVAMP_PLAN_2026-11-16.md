@@ -143,6 +143,7 @@ Acceptance per chapter: the question and takeaway are understandable within five
 - **Gate:** selected details at 1366 × 768 and 1707 × 842 remain composed, labels and controls avoid the visual focal point, reset restores the authored overview, and browser capture confirms no model is hidden by the HUD.
 
 - [ ] **Guided film behavior:** preserve a visible pause/skip affordance, keep the current chapter and progress discoverable, pause camera choreography on any direct user input, and restore full Explore controls on demand. A deep link opens directly into Explore at its authored frame.
+  - [x] Fix guided playback controls so clicking Pause keeps the current route and focus on the same button. At 1366 × 768 in foreground Chrome, both Full Story and Highlights paused and resumed on the current chapter. Space resumed Highlights from the focused button. Switching to another tab paused Highlights, which remained paused on return. A map drag stopped Full Story, and Arrow Right advanced to the next Project view and stopped autoplay. Capture: `.playwright-mcp/presentation-highlights-paused.png`. These checks cover the playback controls and manual interruption on the Project view.
 - [ ] **Opening and act transitions:** make the first frame feel like an aerial arrival, then use brief act transitions at meaningful story boundaries only. Avoid a full-screen interstitial on every chapter; reduced-motion removes holds and camera travel.
 
 ### Phase 3 — Polish the remaining chapters (P1)
