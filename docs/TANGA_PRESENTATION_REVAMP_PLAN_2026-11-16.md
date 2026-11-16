@@ -1,8 +1,8 @@
 # Tanga investor presentation — desktop revamp plan
 
-Date: 16 November 2026  
-Status: planning refresh; no visual implementation is claimed by this document.  
-Primary audience: investors, senior management and technical reviewers.  
+Date: 16 November 2026
+Status: planning refresh; no visual implementation is claimed by this document.
+Primary audience: investors, senior management and technical reviewers.
 Priority: desktop presentation quality and release reliability; phone/tablet work remains deferred as requested.
 
 ## Direction
