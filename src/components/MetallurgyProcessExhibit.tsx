@@ -618,13 +618,13 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         </> : <>
           <small className="tanga-process-kicker">{plantTourActive ? `${fullStoryActive ? 'FULL STORY' : 'GUIDED TOUR'} · STOP ${String(plantTourStep + 1).padStart(2, '0')} / 05` : overview ? 'FACILITY OVERVIEW' : `AREA ${String(PROCESS.findIndex(item => item.id === stage) + 1).padStart(2, '0')} / 05`}</small>
           <h3>{overview ? 'A single connected campus' : selected.title}</h3>
-          <p className="tanga-process-explanation">{overview ? 'Follow the conceptual route from feed receiving through preparation, flotation, dewatering and product handling. The layout and equipment are illustrative.' : selected.description}</p>
+          <p className="tanga-process-explanation">{overview ? 'Concept route: feed receiving, preparation, flotation, dewatering and product handling. Layout and equipment are illustrative.' : selected.description}</p>
           {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
           {!overview&&<><p className="tanga-factory-motion-note">{selected.motion}</p><details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
           {!overview && selected.id==='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>}
           {!overview && selected.id!=='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
-          {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>Separate measures for TC, recovery and coarse mass fraction.</small><i>Open comparison board ↗</i></button>}
-          <button className="tanga-factory-pathway-cta" type="button" onClick={openEndUse}><span>NEXT</span><strong>Explore end-use pathways ↗</strong></button>
+          {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>TC, recovery and coarse fraction are separate measures.</small><i>Open comparison board ↗</i></button>}
+          {overview && <button className="tanga-factory-pathway-cta" type="button" onClick={openEndUse}><span>NEXT</span><strong>Explore end-use pathways ↗</strong></button>}
           <small className="tanga-factory-disclosure">Concept layout only · no approved location, flowsheet or residue design.</small>
         </>}
       </aside>

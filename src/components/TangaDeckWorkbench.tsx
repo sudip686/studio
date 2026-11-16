@@ -231,6 +231,8 @@ type DeckViewState = {
 // geolibre-style move) instead of a linear snap.
 const cinematicEase = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const CINEMATIC_FLY = () => new FlyToInterpolator({curve: 1.55});
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const mapFlightDuration = (duration: number) => prefersReducedMotion() ? 0 : duration;
 
 type GeoJsonFeature = {
   type: 'Feature';
@@ -343,6 +345,7 @@ type RouteProfile = {
 };
 
 const PROJECT_CENTER = {lon: 38.785, lat: -4.813};
+const PROJECT_PORT_DISTANCE = '72 km';
 const TOPO_BOUNDS: [number, number, number, number] = [38.72, -5.12, 39.17, -4.72];
 const TOPO_VERTICAL_EXAGGERATION = 4.65;
 const DEFAULT_MODE: WorkbenchMode = 'project';
@@ -511,7 +514,7 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
     source: 'Project-to-port distance supplied for the project; mapped road route is shown separately',
     columns: ['Destination', 'Distance', ''],
     rows: [
-      {cells: ['Tanga Port', '72 km', ''], emphasis: true},
+      {cells: ['Tanga Port', PROJECT_PORT_DISTANCE, ''], emphasis: true},
       {cells: ['Hale hydro station', '57 km', '']},
       {cells: ['New Pangani Falls', '61 km', '']},
       {cells: ['Tanga rail terminal', 'coastal link', '']},
@@ -881,7 +884,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id:'campus',label:'Lowland site from above',detail:'Read the relationships across the conceptual campus',threeAction:'campusView'},
   ],
   comparison: [
-    {id: 'decisions', label: 'Next study decisions', detail: 'Close on evidence reconciliation and development questions', view: VIEW_STATES.comparison},
+    {id: 'decisions', label: 'Next study decisions', detail: 'Revisit drill coverage, flotation testwork or the proposed site layout', view: VIEW_STATES.comparison},
   ],
 };
 
@@ -1064,7 +1067,7 @@ const SCENE_INDEX_META: Record<WorkbenchMode, {question: string; thumbnail?: str
   mine_planning: {question: 'How could the proposed facilities connect?', thumbnail: STATIC_SCENE_FALLBACKS.mine_planning!.src, alt: STATIC_SCENE_FALLBACKS.mine_planning!.alt},
   metallurgy: {question: 'What did the reported testwork measure?', thumbnail: '/presentation-assets/metallurgy-report-page.png', alt: 'Metallurgy report results page'},
   accessibility: {question: 'What infrastructure links need study?', thumbnail: '/presentation-assets/paulsam-conveyor-sites.jpg', alt: 'Planning report view of conveyor and site candidates'},
-  comparison: {question: 'Which evidence and decisions come next?'},
+  comparison: {question: 'Review the evidence for the next study'},
 };
 
 
@@ -2600,7 +2603,7 @@ export default function TangaDeckWorkbench() {
       ...target,
       ...(mode==='ranking'&&window.innerWidth<760?{zoom:.72}:{}),
       bearing: bearingOverride ?? target.bearing,
-      transitionDuration: 2400,
+      transitionDuration: mapFlightDuration(2400),
       transitionInterpolator: CINEMATIC_FLY(),
       transitionEasing: cinematicEase,
     });
@@ -2676,7 +2679,7 @@ export default function TangaDeckWorkbench() {
     setViewState({
       ...viewState,
       bearing: nextBearing,
-      transitionDuration: 1500,
+      transitionDuration: mapFlightDuration(1500),
       transitionInterpolator: CINEMATIC_FLY(),
       transitionEasing: cinematicEase,
     });
@@ -2721,7 +2724,7 @@ export default function TangaDeckWorkbench() {
     setViewState((current) => {
       const next: DeckViewState = {
         ...current,
-        transitionDuration: 1500,
+        transitionDuration: mapFlightDuration(1500),
         transitionInterpolator: CINEMATIC_FLY(),
         transitionEasing: cinematicEase,
       };
@@ -3552,7 +3555,7 @@ export default function TangaDeckWorkbench() {
       // peer field around it stays in frame — this scene is a comparison, so
       // diving to project scale would lose the point of the slide.
       zoom: activeMode === 'ranking' ? (window.innerWidth<760?.72:1.55) : Math.max(current.zoom, 3.4),
-      transitionDuration: DURATION,
+      transitionDuration: mapFlightDuration(DURATION),
       transitionInterpolator: CINEMATIC_FLY(),
       transitionEasing: cinematicEase,
     }));
@@ -4919,6 +4922,7 @@ export default function TangaDeckWorkbench() {
     return () => window.removeEventListener('tanga:geology-perspective', restoreDepth);
   }, [activeMode]);
   const activeShots = STORY_SHOTS[activeMode] ?? [];
+  const activeChapterTourName = activeMode === 'mine_planning' ? 'Mine-site flyover' : null;
   const activeShot = activeShots[Math.min(activeShotIndex, Math.max(0, activeShots.length - 1))];
   const isFirstStory = activeStoryIndex <= 0 && activeShotIndex <= 0;
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1 && activeShotIndex >= activeShots.length - 1;
@@ -4971,10 +4975,7 @@ export default function TangaDeckWorkbench() {
     window.addEventListener('tanga:intro-complete', enter);
     return () => window.removeEventListener('tanga:intro-complete', enter);
   }, []);
-  // Act interstitial — a brief chapter card when the story crosses into a new
-  // act (Opportunity → Asset → Value). Never on first mount or behind the cover.
   const [actCard, setActCard] = useState<StoryAct | null>(null);
-  const lastActRef = useRef<string | null>(null);
   const showCover = activeStoryIndex === 0 && !coverDismissed && storyHeroState !== 'complete' && storyHeroState !== 'dismissed';
   const isCoverScene = showCover;
   // Scenes without a source-data table still get a panel — key insight chips
@@ -4996,12 +4997,15 @@ export default function TangaDeckWorkbench() {
   // resume the last-seen scene from localStorage, which surprised the user.
   const restoredRef = useRef(false);
 
-  const goToStoryIndex = useCallback((index: number) => {
+  const goToStoryIndex = useCallback((index: number, source: 'story' | 'link' = 'story') => {
     setExploreMode(false);
     setShowCoach(false);
     try { window.localStorage?.setItem('tanga:coachSeen', '1'); } catch { /* ignore */ }
     const clamped = clamp(index, 0, STORY_STEPS.length - 1);
     const targetStep = STORY_STEPS[clamped];
+    const targetAct = MODE_ACT[targetStep.mode];
+    const crossesAct = source === 'story' && !isExploreMode && targetAct !== MODE_ACT[activeMode];
+    setActCard(crossesAct && !prefersReducedMotion() ? STORY_ACTS.find(act => act.id === targetAct) ?? null : null);
     if (targetStep.mode === 'work_completed') setSelectedMilestoneId('drilling');
     const defaults = storyStepDefaults(targetStep.mode);
     setActiveShotIndex(0);
@@ -5011,7 +5015,7 @@ export default function TangaDeckWorkbench() {
       routeTarget: defaults.routeTarget,
       resourceFocus: defaults.resourceFocus,
     });
-  }, [activateMode]);
+  }, [activateMode, activeMode, isExploreMode]);
 
   const applyStoryShot = useCallback((mode: WorkbenchMode, requestedIndex: number) => {
     const shots = STORY_SHOTS[mode];
@@ -5028,7 +5032,7 @@ export default function TangaDeckWorkbench() {
       setViewState({
         ...shot.view,
         ...(mode==='ranking'&&window.innerWidth<760?{zoom:.72}:{}),
-        transitionDuration: 2100,
+        transitionDuration: mapFlightDuration(2100),
         transitionInterpolator: CINEMATIC_FLY(),
         transitionEasing: cinematicEase,
       });
@@ -5046,7 +5050,7 @@ export default function TangaDeckWorkbench() {
     const requestedMode = readHashScene();
     const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
     const targetMode = targetIndex >= 0 ? STORY_STEPS[targetIndex].mode : null;
-    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex, 'link');
     if (targetMode) {
       const supportsVersionOneState = params.get('v') === '1';
       const shotId = params.get('view');
@@ -5084,7 +5088,8 @@ export default function TangaDeckWorkbench() {
       const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
       if (targetIndex < 0) return;
       const targetMode = STORY_STEPS[targetIndex].mode;
-      if (targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+      setActCard(null);
+      if (targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex, 'link');
 
       const supportsVersionOneState = params.get('v') === '1';
       const shotId = params.get('view');
@@ -5347,6 +5352,13 @@ export default function TangaDeckWorkbench() {
   const [sceneMotionPaused, setSceneMotionPaused] = useState(false);
   useEffect(() => { setSceneMotionPaused(false); }, [activeMode, activeShotIndex]);
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);setIsHighlightsTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
+  useEffect(() => {
+    const pauseInBackground = () => {
+      if (document.hidden) setIsAutoplay(false);
+    };
+    document.addEventListener('visibilitychange', pauseInBackground);
+    return () => document.removeEventListener('visibilitychange', pauseInBackground);
+  }, []);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
   const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
@@ -5548,6 +5560,7 @@ export default function TangaDeckWorkbench() {
   useEffect(() => {
     if (!isAutoplay || (threeVisible && threeLoadReport.scene !== 'ready')) return;
     const timer = window.setTimeout(() => {
+      if (document.hidden) return;
       if (isExecutiveTour) { handleExecutiveAdvance(); return; }
       if (isLastStory) setIsAutoplay(false);
       else handleNextStory();
@@ -5588,28 +5601,15 @@ export default function TangaDeckWorkbench() {
     return () => cancelAnimationFrame(raf);
   }, [activeMode, threeVisible, isCoverScene]);
 
-  // Fire the act interstitial on an act crossing. It overlays the incoming
-  // scene while its camera flies in, then dissolves. Always skippable.
-  useEffect(() => {
-    const act = MODE_ACT[activeMode];
-    const previous = lastActRef.current;
-    lastActRef.current = act;
-    if (previous === null || previous === act) return;   // first mount / same act
-    if (showCover) return;
-    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const next = STORY_ACTS.find((a) => a.id === act) ?? null;
-    setActCard(next);
-    const timer = window.setTimeout(() => setActCard(null), reduce ? 700 : 1900);
-    return () => window.clearTimeout(timer);
-  }, [activeMode, showCover]);
-
-  // Any click or key dismisses the act card immediately.
+  // Keep the cue brief and let presenter input dismiss it immediately.
   useEffect(() => {
     if (!actCard) return;
     const dismiss = () => setActCard(null);
+    const timer = window.setTimeout(dismiss, 1500);
     window.addEventListener('keydown', dismiss);
     window.addEventListener('pointerdown', dismiss);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('keydown', dismiss);
       window.removeEventListener('pointerdown', dismiss);
     };
@@ -5666,10 +5666,10 @@ export default function TangaDeckWorkbench() {
       if (key === 'ArrowRight' || key === 'PageDown') {
         event.preventDefault();
         if (activeStoryIndex === 0 && !coverDismissed) { setCoverDismissed(true); return; }
-        handleNextStory();
+        handleManualNext();
         return;
       }
-      if (key === 'ArrowLeft' || key === 'PageUp')    { event.preventDefault(); handlePrevStory(); return; }
+      if (key === 'ArrowLeft' || key === 'PageUp')    { event.preventDefault(); handleManualPrev(); return; }
       if (key === 'Home') { event.preventDefault(); goToStoryIndex(0); return; }
       if (key === 'End')  { event.preventDefault(); goToStoryIndex(STORY_STEPS.length - 1); return; }
       if (/^[1-9]$/.test(key)) {
@@ -5697,7 +5697,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleNextStory, handlePrevStory, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
+  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -5787,7 +5787,19 @@ export default function TangaDeckWorkbench() {
       data-three-state={threeLoadReport.scene}
       data-three-load-ms={threeLoadReport.elapsedMs ?? undefined}
       onWheelCapture={() => { setIsAutoplay(false); setIsExecutiveTour(false); }}
-      onPointerDownCapture={event => { setIsAutoplay(false); setIsExecutiveTour(false); if(!(event.target as Element).closest('.tanga-presentation-tools')) { const tools=stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');if(tools)tools.open=false; } }}
+      onPointerDownCapture={event => {
+        const target = event.target as Element;
+        // Playback controls handle their own state. Cancelling here would run
+        // before the button's click and discard the guided route on Pause.
+        if (!target.closest('.tanga-deck__autoplay-group')) {
+          setIsAutoplay(false);
+          setIsExecutiveTour(false);
+        }
+        if (!target.closest('.tanga-presentation-tools')) {
+          const tools = stageRef.current?.querySelector<HTMLDetailsElement>('.tanga-presentation-tools[open]');
+          if (tools) tools.open = false;
+        }
+      }}
       data-testid="tanga-deck-workbench"
     >
       <DeckHoverGuide mode={activeMode}/>
@@ -6332,9 +6344,7 @@ export default function TangaDeckWorkbench() {
           aria-label={`Act ${actCard.numeral}: ${actCard.label}`}
         >
           <div className="tanga-deck__act-card-inner">
-            <span className="tanga-deck__act-card-numeral" aria-hidden="true">{actCard.numeral}</span>
             <strong className="tanga-deck__act-card-label">{actCard.label}</strong>
-            <span className="tanga-deck__act-card-rule" aria-hidden="true" />
             <p className="tanga-deck__act-card-thesis">{actCard.thesis}</p>
           </div>
         </section>
@@ -6464,15 +6474,16 @@ export default function TangaDeckWorkbench() {
           <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
           <button
             type="button"
-            className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
+            className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', activeChapterTourName && !isExecutiveTour && 'tanga-deck__pager-play--named', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
             style={{'--autoplay-dwell': `${shotDwellSec}s`} as any}
-            key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}-${isAutoplay}`}
+            key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}`}
             onClick={toggleAutoplay}
-            aria-label={isExecutiveTour ? (isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}` : `Resume ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}`) : (isAutoplay ? 'Pause current chapter playback' : 'Play current chapter views')}
+            aria-label={isExecutiveTour ? (isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}` : `Resume ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}`) : (isAutoplay ? `Pause ${activeChapterTourName ?? 'current chapter playback'}` : `Play ${activeChapterTourName ?? 'current chapter views'}`)}
             aria-pressed={isAutoplay}
-            title={isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : isExecutiveTour ? 'full story' : 'chapter playback'}  (P)` : `${isExecutiveHighlightsActive ? 'Resume executive highlights' : isExecutiveTour ? 'Resume full story' : 'Play chapter views'}  (P)`}
+            title={isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : isExecutiveTour ? 'full story' : activeChapterTourName ?? 'chapter playback'}  (P)` : `${isExecutiveHighlightsActive ? 'Resume executive highlights' : isExecutiveTour ? 'Resume full story' : `Play ${activeChapterTourName ?? 'chapter views'}`}  (P)`}
           >
             {isAutoplay ? <Pause size={16} strokeWidth={2.4} /> : <Play size={16} strokeWidth={2.4} />}
+            {!isExecutiveTour && activeChapterTourName && <span className="tanga-deck__pager-play-label">{isAutoplay ? 'Pause' : 'Play'} {activeChapterTourName}</span>}
           </button>
           <button
             type="button"
@@ -7038,6 +7049,12 @@ export default function TangaDeckWorkbench() {
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
       {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaChapterStoryPanel
         chapter={activeMode as TangaChapterId}
+        portDistanceInfo={activeMode === 'accessibility' && routeTarget === 'port' ? {
+          projectStated: PROJECT_PORT_DISTANCE,
+          mappedRoute: routeProfile.distanceLabel,
+          mappedDuration: routeProfile.durationLabel,
+          mappedRouteSource: routeProfile.source,
+        } : undefined}
         developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id}
         availableDevelopment={availableMineFacilities}
         siteContextVisible={layerSettings.context.visible}
@@ -7071,7 +7088,7 @@ export default function TangaDeckWorkbench() {
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">
           <div className="tanga-deck__route-profile-head">
-            <span>Route elevation</span>
+            <span>Mapped road profile</span>
             <strong>{routeProfile.targetLabel}</strong>
           </div>
           <svg viewBox="0 0 230 66" role="img" aria-label={`Elevation profile from ${routeProfile.minElevation} to ${routeProfile.maxElevation} metres`}>

@@ -1840,7 +1840,11 @@ function drillSegmentsForMode(segments: DrillSegment[], mode: GeologyMode) {
     return sampleSegmentsAcrossHoles(segments, 3200);
   }
   if (mode === 'subsurface') {
-    return sampleSegmentsAcrossHoles(segments, 2400);
+    // The geology chapter is a mapped-surface → interpretation sequence.
+    // Drillhole collars and traces belong to the dedicated drilling chapter;
+    // rendering them here obscures the lithology surface and implies a
+    // surface-to-depth correlation that the source data does not establish.
+    return [];
   }
   return sampleSegmentsAcrossHoles(segments, 1800);
 }
@@ -2287,6 +2291,8 @@ export type WebGlRecoveryView = {
   target: [number, number, number];
   up?: [number, number, number];
   sitePlanView?: boolean;
+  pitBlockFocus?: 0 | 1 | null;
+  miningBeat?: number;
   fov: number;
   geologyStage?: 'plan' | 'mapped-relief' | 'interpreted-depth';
 };
@@ -2357,7 +2363,7 @@ export default function TangaThreeGeologyScene({
   // Solid, depth-tested targets are the stable default. X-ray is an explicit
   // presenter choice because always-on-top categories can visually fight.
   const [targetXray, setTargetXray] = useState(false);
-  const activePitBlockFocusRef = useRef<number | null>(null);
+  const activePitBlockFocusRef = useRef<0 | 1 | null>(null);
   const pitGradeFocusRef = useRef<string | null>(pitGradeFocus);
   pitGradeFocusRef.current = pitGradeFocus;
   const [localMotionPaused, setLocalMotionPaused] = useState(false);
@@ -2798,7 +2804,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     try {
       const stored = sessionStorage.getItem(recoveryViewKey);
       if (!recoveryView && stored) {
-        const candidate = JSON.parse(stored) as {position?: number[]; target?: number[]; up?: number[]; sitePlanView?: boolean; fov?: number; geologyStage?: string};
+        const candidate = JSON.parse(stored) as Partial<WebGlRecoveryView>;
         const validVector = (value?: number[]): value is [number, number, number] =>
           Array.isArray(value) && value.length === 3 && value.every((coordinate) => Number.isFinite(coordinate) && Math.abs(coordinate) <= 1e7);
         const distance = validVector(candidate.position) && validVector(candidate.target)
@@ -2812,6 +2818,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             target: candidate.target,
             ...(validVector(candidate.up)?{up:candidate.up}:{}),
             ...(typeof candidate.sitePlanView==='boolean'?{sitePlanView:candidate.sitePlanView}:{}),
+            ...(mode === 'mine_planning' && (candidate.pitBlockFocus === 0 || candidate.pitBlockFocus === 1 || candidate.pitBlockFocus === null)
+              ? {pitBlockFocus: candidate.pitBlockFocus} : {}),
+            ...(mode === 'mine_planning' && typeof candidate.miningBeat === 'number' && [0, 1, 2, 3].includes(candidate.miningBeat)
+              ? {miningBeat: candidate.miningBeat} : {}),
             fov: candidate.fov!,
             ...(mode==='subsurface'&&['plan','mapped-relief','interpreted-depth'].includes(candidate.geologyStage??'')?{geologyStage:candidate.geologyStage as 'plan'|'mapped-relief'|'interpreted-depth'}:{}),
           };
@@ -2865,6 +2875,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         target: controlsRef.current?.target.toArray() as [number, number, number] ?? DEFAULT_CAMERA_TARGET.toArray() as [number, number, number],
         up: camera.up.toArray() as [number, number, number],
         sitePlanView,
+        ...(mode === 'mine_planning' ? {
+          pitBlockFocus: activePitBlockFocusRef.current,
+          miningBeat: Number(host.dataset.miningBeat ?? miningStoryOptions.current.beat),
+        } : {}),
         fov: camera.fov,
         geologyStage: mode === 'subsurface'
           ? ['plan','mapped-relief','interpreted-depth'].includes(host.dataset.geologyStage ?? '')
@@ -3325,7 +3339,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setStoryPlaying(false);
         setMiningBeat(2);
         setMotionPaused(false);
-        activePitBlockFocusRef.current = Number.isInteger(command.pitIndex) ? command.pitIndex! : null;
+        activePitBlockFocusRef.current = command.pitIndex === 0 || command.pitIndex === 1 ? command.pitIndex : null;
         // The terrain is already carved to the pit shell. Keep the entire
         // source-cell population inside that open excavation; a second plane
         // through the middle of the pit made the grade model read as a detached
@@ -3344,12 +3358,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
         const span=Math.max(size.x,size.z,focusPit?150:240);
         centre.y+=(size.y*.2);
-        // Look across the north/south separation from the east. This holds both
-        // source footprints side-by-side while lowering the horizon enough to
-        // read their continuous benches and block depth.
+        // Keep both source footprints in the overview from a high oblique
+        // angle. The wide view leaves room for the story panel and shows the
+        // continuous bench faces with the registered grade cells inside them.
         const offset=focusPit
           ? new THREE.Vector3(span*.88,span*.58,span*.22)
-          : new THREE.Vector3(span*1.08,span*.68,span*.05);
+          : new THREE.Vector3(span*.55,span*1.2,span*.30);
         offset.multiplyScalar(Math.max(1,.72/camera.aspect));
         scheduleCameraTween(centre.clone().add(offset),centre,1.8,43);
         setStatus('RF1 source ore cells shown within both continuous optimized pit surfaces');
@@ -4798,8 +4812,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePitEnvelopes(mesh.geometry,sitePlan.pits);
           host.dataset.pitCarvedTriangles=String(terrainMeshes.reduce((sum,mesh)=>sum+Number(mesh.geometry.userData.pitCarvedTriangleCount??0),0));
           sitePlan.audit.push('Haul-road geometry omitted: the supplied optimized shell does not include an engineered ramp alignment or checked gradient');
+          const orderedSourcePitSurfaces=[...sourcePitSurfaces].sort((a,b)=>(a.z0+(a.height-1)*a.dz/2)-(b.z0+(b.height-1)*b.dz/2));
+          if(mode==='mine_planning'){
+            host.dataset.minePitSurfaceSource='Continuous RF1 footprint benches';
+            host.dataset.minePitSurfaceSupports=JSON.stringify(orderedSourcePitSurfaces.map(surface=>({id:surface.id,support:surface.support,width:surface.width,height:surface.height})));
+          }
           for (const [index,pit] of sitePlan.pits.entries()) {
-            const mesh = buildPitSurface(pit, (x, z) => terrainSurfaceY(terrainResources, x, -z));
+            const height=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
+            const sourceSurface=mode==='mine_planning'?orderedSourcePitSurfaces[index]:undefined;
+            const mesh=buildPitSurface(pit,height);
+            if(sourceSurface){mesh.name=`${sourceSurface.id==='north'?'North':'South'} RF1 continuous bench interpretation`;mesh.userData.sourcePitSupport=sourceSurface.support;}
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
             pitSurfaces.push(mesh);
@@ -4990,7 +5012,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if(!(object instanceof THREE.Mesh)||pickables.includes(object))return;
         let parent:THREE.Object3D|null=object,plantPart=false;
         while(parent){if(parent.name==='conceptual-concentrator')plantPart=true;parent=parent.parent;}
-        const pit=object.name==='Terraced conceptual excavation';
+        const pit=object.name==='Terraced conceptual excavation'||typeof object.userData.sourcePitSupport==='number';
         const ramp=object.name.startsWith('Illustrative internal pit access ramp');
         const target=object.name.startsWith('Target blocks');
         if(!plantPart&&!pit&&!ramp&&!target)return;
@@ -5002,6 +5024,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const pending=cameraCommandRef.current;
         if(pending&&!recoveryView&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit','revealPitBlocks'].includes(pending.action))consumeCameraCommand(pending);
         if(recoveryView){
+          const {pitBlockFocus, miningBeat: recoveredBeat} = recoveryView;
+          if (pitBlockFocus !== undefined) activePitBlockFocusRef.current = pitBlockFocus;
+          if (recoveredBeat !== undefined) {
+            miningStoryOptions.current.beat = recoveredBeat;
+            setMiningBeat(recoveredBeat);
+          }
           // Mine-plan site construction can schedule view transitions while its
           // terrain and facilities are rebuilding. Reapply the captured pose
           // once those objects are ready, so recovery wins over stale commands.
@@ -5631,6 +5659,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         mesh.material.depthWrite=!presentationOptions.current.targetXray&&!transparent;
       });
       host.dataset.mineTargetBlocksVisible=String(targetMeshes.some(mesh=>mesh.visible));
+      if (mode === 'mine_planning') {
+        const northVisible = targetMeshes.some(mesh => mesh.visible && mesh.userData.pitIndex === 0);
+        const southVisible = targetMeshes.some(mesh => mesh.visible && mesh.userData.pitIndex === 1);
+        host.dataset.mineVisibleBlockPits = northVisible ? (southVisible ? 'north,south' : 'north') : (southVisible ? 'south' : '');
+      }
       pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
       pitRamps.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
       if (processPlant && processMarker) {

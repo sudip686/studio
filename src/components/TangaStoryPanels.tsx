@@ -56,7 +56,7 @@ function SceneMotionControl({paused,onToggle}:{paused:boolean;onToggle:()=>void}
   </div>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion, portDistanceInfo}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void; portDistanceInfo?:{projectStated:string;mappedRoute:string;mappedDuration:string;mappedRouteSource:'osrm'|'fallback'}}) {
   const panelRef=useRef<HTMLElement|null>(null);
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
   const [siteOrientation,setSiteOrientation]=useState<'plan'|'oblique'>('oblique');
@@ -243,28 +243,28 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
   if (chapter === 'accessibility') return <aside className="tanga-story-panel tanga-story-panel--logistics" aria-label="Report development and export chain">
     <div className="tanga-story-panel__eyebrow">PAULSAM · JUNE 2023 · LOGISTICS CONCEPT</div><h2>Ore, concentrate, export cargo</h2>
     <p className="tanga-story-panel__intro">Different materials need different links. The report separates hillside ore transport from road delivery of concentrate.</p>
+    {portDistanceInfo&&<section className="tanga-logistics-distances" aria-label="Project-stated and mapped route distances to Tanga Port">
+      <div><span>PROJECT-STATED DISTANCE</span><strong>{portDistanceInfo.projectStated}</strong><small>Project to Tanga Port</small></div>
+      <div><span>DISPLAYED ROAD GEOMETRY</span><strong>{portDistanceInfo.mappedRoute}</strong><small>{portDistanceInfo.mappedRouteSource==='osrm'?`${portDistanceInfo.mappedDuration} · mapped road network`:'Indicative mapped path · route not verified'}</small></div>
+      <p>The supplied project distance and mapped road route use different bases. The route is a geographic visualisation, not a confirmed haulage or travel-time study.</p>
+    </section>}
     <ol className="tanga-development-chain">{[['Mine to feed point','Local ore haulage · route requires survey'],['Feed point to lowlands','Candidate conveyor · planning option 2'],['Processing to stuffing yard','Concentrate haulage · road upgrades assessed'],['Stuffing and storage','Mabokweni / Kwa Songoro alternatives'],['Port of exit','Tanga preferred in the 2023 study']].map(([title,detail],i)=><li key={title}><span>{String(i+1).padStart(2,'0')}</span><div><strong>{title}</strong><small>{detail}</small></div></li>)}</ol>
     <p className="tanga-story-panel__qualification">Study §§3.3, 5.3 and 6. A stuffing yard plot is not georeferenced in the supplied report. Map infrastructure and the displayed route do not establish a project connection or current capacity.</p>
   </aside>;
 
   if (chapter === 'comparison') return <aside className="tanga-story-panel tanga-story-panel--decisions" aria-label="Evidence-led next decisions">
-    <div className="tanga-story-panel__eyebrow">CLOSE · WHAT COMES NEXT</div>
-    <h2>Turn evidence into the next decisions</h2>
-    <p className="tanga-story-panel__intro">Choose a question to open its supporting chapter or source; this decision view stays open in this tab.</p>
+    <h2>What should the next study resolve?</h2>
     <ol>{NEXT_DECISIONS.map((decision) => <li key={decision.number}>
-      <span>{decision.number}</span>
       <div>
         <strong>{decision.title}</strong>
         <p>{decision.detail}</p>
         <nav className="tanga-decision-links" aria-label={`${decision.title} supporting evidence`}>
-          <a href={`/?v=1#${decision.chapter}`} target="_blank" rel="noreferrer">{decision.chapterLabel}<ArrowRight size={13}/></a>
-          <details className="tanga-decision-source">
-            <summary>{decision.evidenceLabel}</summary>
-            <a href={decision.evidenceHref} target="_blank" rel="noreferrer">Open source evidence<ArrowRight size={13}/></a>
-          </details>
+          <a href={`/?v=1&view=${decision.view}#${decision.chapter}`} target="_blank" rel="noreferrer">{decision.chapterLabel}<ArrowRight size={13} aria-hidden="true"/></a>
+          <a href={decision.evidenceHref} target="_blank" rel="noreferrer">{decision.evidenceLabel}<ArrowRight size={13} aria-hidden="true"/></a>
         </nav>
       </div>
     </li>)}</ol>
+    <p className="tanga-story-panel__qualification">Evidence opens in a new tab.</p>
   </aside>;
 
   return null;

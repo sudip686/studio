@@ -13,7 +13,7 @@ export const TANGA_STORY: Record<WorkbenchMode, {question: string; takeaway: str
   mine_planning: {question: 'How could the site fit together?', takeaway: 'Connect the report-based plant candidate with illustrative waste, tailings and water facilities.', seconds: 45},
   metallurgy: {question: 'What did the testwork show?', takeaway: 'Concentrate carbon, recovery and flake size answer different processing questions.', seconds: 24},
   accessibility: {question: 'How does the site connect outward?', takeaway: 'Road, port, rail and power locations frame the next infrastructure questions.', seconds: 16},
-  comparison: {question: 'What should the next study resolve?', takeaway: 'Reconcile the evidence, strengthen study confidence and test development constraints.', seconds: 14},
+  comparison: {question: 'Review the supporting evidence', takeaway: 'Reconcile the evidence, strengthen study confidence and test development constraints.', seconds: 14},
 };
 
 export const EXECUTIVE_STORY_SECONDS = Object.values(TANGA_STORY).reduce((sum, chapter) => sum + chapter.seconds, 0);

@@ -12155,6 +12155,9 @@ body:has(.tanga-deck__notes) .tanga-deck__geo-overlay {
 }
 .tanga-deck__pager-play { position: relative; overflow: visible !important; }
 .tanga-deck__pager-play > * { position: relative; z-index: 1; }
+.tanga-deck__pager-play--named { width:auto; min-width:40px; padding:0 10px; gap:7px; border-radius:999px; }
+.tanga-deck__pager-play-label { color:inherit; font-size:9px; font-weight:550; letter-spacing:.01em; white-space:nowrap; }
+@media (max-width:900px) { .tanga-deck__pager-play--named { width:40px; padding:0; } .tanga-deck__pager-play-label { display:none; } }
 @keyframes proPlayRing {
   to { background: conic-gradient(from -90deg, var(--pro-brand, #d96a2a) 100%, rgba(255,255,255,0.14) 100%); }
 }

@@ -1,15 +1,160 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as THREE from 'three';
-import {buildConcentrator, placeConcentrator, buildPitSurface, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
+import proj4 from 'proj4';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
-import {rectangle, inside} from '../src/lib/deck/site-planning';
+import {rectangle, inside, overlaps, planSiteFromPitSurfaces, type SourcePitSurface} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
 import {SITE_EARTHWORK_OPACITY} from '../src/lib/deck/stable-materials';
+import {cutPitTerrain} from '../src/lib/deck/pit-terrain-cut';
 
 async function main(){
 const ring=rectangle([0,0],400,320);
+// Regression invariant: source RF1 north/south shells stay two distinct
+// footprints in their source coordinates. Do not replace these with one
+// merged grade-cluster hull or sort away the north/south story identity.
+const sourceSurface=(id:'north'|'south',x0:number,z0:number):SourcePitSurface=>({
+  id,x0,z0,dx:20,dz:20,width:2,height:2,support:4,
+  pitElevation:[[20,18],[16,14]],topography:[[100,100],[100,100]],
+  benchIndex:[[0,1],[1,2]],mask:[[1,1],[1,1]],
+});
+const sourcePits=planSiteFromPitSurfaces([
+  sourceSurface('south',400,500),sourceSurface('north',-500,-600),
+],()=>100,rectangle([0,0],2000,2000));
+assert.equal(sourcePits.pits.length,2,'Mine Planning retains both source RF1 pits');
+assert.deepEqual(sourcePits.pits.map(p=>p.support),[4,4],'Each source pit retains its own active source cells');
+assert.ok(sourcePits.pits[0].centre[1]<sourcePits.pits[1].centre[1],'Source pits remain ordered north to south');
+assert.ok(!overlaps(sourcePits.pits[0].ring,sourcePits.pits[1].ring),'The two source pits remain spatially distinct');
+assert.ok(sourcePits.pits.every(p=>p.ring.every(point=>inside(point,rectangle([0,0],2000,2000)))),'Both source pit footprints remain within the supplied project extent');
+assert.ok(sourcePits.pits[0].centre[0]<0&&sourcePits.pits[1].centre[0]>0,'Each pit keeps its own source-coordinate side of the site');
+const sourcePitMeshes=[sourceSurface('north',-500,-600),sourceSurface('south',400,500)].map(surface=>buildPitSurfaceFromRaster(surface,()=>100));
+assert.deepEqual(sourcePitMeshes.map(mesh=>mesh.name),['North RF1 optimized pit surface','South RF1 optimized pit surface'],'Both source pits retain distinct named render meshes');
+for(let i=0;i<sourcePitMeshes.length;i++){
+  const mesh=sourcePitMeshes[i],position=mesh.geometry.getAttribute('position');
+  assert.ok(position.count>0&&mesh.geometry.index!.count>0,`${mesh.name} produces visible bench geometry`);
+  assert.ok(Array.from(position.array).every(Number.isFinite),`${mesh.name} vertices remain finite`);
+  assert.ok(mesh.geometry.getAttribute('color')&&mesh.receiveShadow&&mesh.castShadow,`${mesh.name} retains its shaded source material`);
+  const bounds=new THREE.Box3().setFromObject(mesh);
+  assert.ok(i===0?bounds.max.x<0:bounds.min.x>0,`${mesh.name} stays at its separate source-coordinate location`);
+  assert.ok(bounds.max.y<=100.001,`${mesh.name} remains at or below the terrain surface`);
+}
+// Protect the actual RF1 source rasters as well as the synthetic geometry
+// fixture: Mine Planning must keep the two supplied bench surfaces and use
+// their source coordinates, masks, elevations and support counts.
+const reference=JSON.parse(fs.readFileSync('public/generated/orewaste-reference.json','utf8')) as {
+  provenance:{scenarioRF:number;sourceSha256:string};
+  blocks:number[][];
+  pitSurfaces:{components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>};
+};
+assert.equal(reference.provenance.scenarioRF,1,'Mine Planning is tied to the supplied RF 1 source scenario');
+assert.equal(reference.pitSurfaces.components.length,2,'The source reference provides two RF1 pit surfaces');
+const [projectEasting,projectNorthing]=proj4('WGS84','EPSG:32737',[38.785,-4.813]) as [number,number];
+const actualSourcePits:SourcePitSurface[]=reference.pitSurfaces.components.map((source,index)=>({
+  id:index===0?'north':'south',
+  x0:source.x0+source.dx/2-projectEasting,
+  z0:projectNorthing-(source.y0+source.dy/2),
+  dx:source.dx,dz:-source.dy,width:source.width,height:source.height,support:source.support,
+  topography:source.topography.map(column=>column.map(rl=>rl-700)),
+  pitElevation:source.pitElevation.map(column=>column.map((rl,i)=>rl-700)),
+  benchIndex:source.benchIndex,mask:source.mask,
+}));
+assert.deepEqual(actualSourcePits.map(pit=>pit.support),[4376,5618],'RF1 source masks retain their measured north/south support');
+const actualPlan=planSiteFromPitSurfaces([...actualSourcePits].reverse(),()=>100,rectangle([0,0],2000,5000));
+assert.equal(actualPlan.pits.length,2,'Planning the real RF1 surfaces retains both distinct pits');
+assert.deepEqual(actualPlan.pits.map(pit=>pit.support),[4376,5618],'The planned pits retain the actual RF1 mask counts');
+assert.ok(actualPlan.pits[0].centre[1]<actualPlan.pits[1].centre[1],'The real north pit remains north of the real south pit');
+// Use the actual footprint contours on a sloped terrain fixture. Its linear
+// elevation and UV fields make incorrect interpolation easy to detect.
+const terrainFixture = new THREE.PlaneGeometry(2000, 5200, 73, 173).rotateX(-Math.PI / 2);
+const fixturePosition = terrainFixture.getAttribute('position');
+const fixtureHeight = (x: number, z: number) => 75 + x * .04 - z * .02;
+for (let i = 0; i < fixturePosition.count; i++) fixturePosition.setY(i, fixtureHeight(fixturePosition.getX(i), fixturePosition.getZ(i)));
+const originalTriangleCount = terrainFixture.getIndex()!.count;
+const pitRings = actualPlan.pits.map(pit => pit.ring);
+const cut = cutPitTerrain(terrainFixture, pitRings);
+assert.ok(cut.changedTriangles > 0);
+assert.equal(terrainFixture.getIndex()!.count, originalTriangleCount, 'The original terrain remains available for comparison');
+const cutPositions = cut.geometry.getAttribute('position');
+const cutUV = cut.geometry.getAttribute('uv');
+const edgeCounts = new Map<string, number>();
+const vertexKey = (x: number, y: number, z: number) => `${x},${y},${z}`;
+const pointKey = (i: number) => vertexKey(cutPositions.getX(i), cutPositions.getY(i), cutPositions.getZ(i));
+const edgeKey = (a: string, b: string) => [a, b].sort().join('|');
+let retainedArea = 0;
+const cutIndex = cut.geometry.getIndex()!;
+for (let i = 0; i < cutIndex.count; i += 3) {
+  const a = cutIndex.getX(i), b = cutIndex.getX(i + 1), c = cutIndex.getX(i + 2);
+  const ax = cutPositions.getX(a), az = cutPositions.getZ(a);
+  const twiceArea = Math.abs((cutPositions.getX(b) - ax) * (cutPositions.getZ(c) - az) - (cutPositions.getZ(b) - az) * (cutPositions.getX(c) - ax));
+  assert.ok(twiceArea > 0, 'No cut terrain triangle collapses');
+  retainedArea += twiceArea / 2;
+  for (const [u, v] of [[a, b], [b, c], [c, a]]) {
+    const key = edgeKey(pointKey(u), pointKey(v));
+    edgeCounts.set(key, (edgeCounts.get(key) ?? 0) + 1);
+  }
+}
+const pitArea = pitRings.reduce((total, ring) => total + Math.abs(ring.reduce((sum, [x, z], i) => {
+  const [nextX, nextZ] = ring[(i + 1) % ring.length];
+  return sum + x * nextZ - nextX * z;
+}, 0)) / 2, 0);
+assert.ok(Math.abs(retainedArea - (2000 * 5200 - pitArea)) < .1, 'Only the exact pit footprint area is removed');
+for (const rim of cut.rims) {
+  assert.ok(rim.length > 50, 'The shared rim includes terrain triangle intersections');
+  rim.forEach(([x, y, z], i) => {
+    assert.ok(Math.abs(y - fixtureHeight(x, z)) < .001);
+    assert.equal(edgeCounts.get(edgeKey(vertexKey(x, y, z), vertexKey(...rim[(i + 1) % rim.length]))), 1, 'Every rim segment is an exposed terrain edge');
+  });
+}
+for (let i = fixturePosition.count; i < cutPositions.count; i++) {
+  assert.ok(Math.abs(cutUV.getX(i) - (cutPositions.getX(i) / 2000 + .5)) < 1e-6);
+  assert.ok(Math.abs(cutUV.getY(i) - (.5 - cutPositions.getZ(i) / 5200)) < 1e-6);
+}
+const alignedTerrain = new THREE.PlaneGeometry(40, 40, 4, 4).rotateX(-Math.PI / 2);
+const alignedCut = cutPitTerrain(alignedTerrain, [rectangle([0, 0], 20, 14)]);
+const alignedPositions = alignedCut.geometry.getAttribute('position');
+const alignedIndex = alignedCut.geometry.getIndex()!;
+const alignedEdges = new Map<string, number>();
+for (let i = 0; i < alignedIndex.count; i += 3) {
+  for (let j = 0; j < 3; j++) {
+    const a = alignedIndex.getX(i + j), b = alignedIndex.getX(i + (j + 1) % 3);
+    const key = edgeKey(
+      vertexKey(alignedPositions.getX(a), alignedPositions.getY(a), alignedPositions.getZ(a)),
+      vertexKey(alignedPositions.getX(b), alignedPositions.getY(b), alignedPositions.getZ(b)),
+    );
+    alignedEdges.set(key, (alignedEdges.get(key) ?? 0) + 1);
+  }
+}
+alignedCut.rims[0].forEach((point, i, rim) => {
+  assert.equal(alignedEdges.get(edgeKey(vertexKey(...point), vertexKey(...rim[(i + 1) % rim.length]))), 1, 'A rim aligned with existing grid edges remains stitched');
+});
+const actualPitMeshes=actualPlan.pits.map((pit,index)=>{
+  const mesh=buildPitSurface(pit,()=>pit.surface);
+  mesh.name=`${actualSourcePits[index].id==='north'?'North':'South'} RF1 continuous bench interpretation`;
+  mesh.userData.sourcePitSupport=actualSourcePits[index].support;
+  return mesh;
+});
+assert.deepEqual(actualPitMeshes.map(mesh=>mesh.name),['North RF1 continuous bench interpretation','South RF1 continuous bench interpretation'],'Rendered pit faces use a continuous interpretation of both source footprints');
+for(let i=0;i<actualPitMeshes.length;i++){
+  const mesh=actualPitMeshes[i],position=mesh.geometry.getAttribute('position');
+  assert.equal(mesh.userData.sourcePitSupport,actualSourcePits[i].support,`${mesh.name} retains the actual RF1 source support`);
+  assert.ok(position.count>0&&mesh.geometry.index!.count>0,`${mesh.name} builds visible continuous bench geometry`);
+  assert.ok(Array.from(position.array).every(Number.isFinite),`${mesh.name} has finite source-derived continuous vertices`);
+  const bounds=new THREE.Box3().setFromObject(mesh);
+  assert.ok(bounds.max.y<=Math.max(...actualSourcePits[i].topography.flat())+.01,`${mesh.name} stays at or below the registered source topography`);
+  assert.ok(i===0?bounds.max.z<0:bounds.min.z>0,`${mesh.name} remains at its separate source north/south location`);
+}
+const sourceBlockSupport=[0,0];
+for(const block of reference.blocks){
+  const [lon,lat]=block,carbon=block[6]??0;
+  if(carbon<3)continue;
+  const [easting,northing]=proj4('WGS84','EPSG:32737',[lon,lat]) as [number,number];
+  const pitIndex=actualSourcePits.findIndex(surface=>sourcePitElevationAt(surface,easting-projectEasting,-(northing-projectNorthing))!==null);
+  if(pitIndex>=0)sourceBlockSupport[pitIndex]++;
+}
+assert.deepEqual(sourceBlockSupport,[7083,7922],'Displayed grade-qualified source blocks retain their actual north/south RF1 registration');
 const pit={ring,centre:[0,0] as [number,number],surface:100,floor:40,depth:60,support:100};
 const mesh=buildPitSurface(pit,()=>100);
 const p=mesh.geometry.getAttribute('position'),index=mesh.geometry.index!;
