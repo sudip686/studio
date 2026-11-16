@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {buildConcentrator, placeConcentrator, buildPitSurface, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
 import {rectangle, inside, overlaps, planSiteFromPitSurfaces, type SourcePitSurface} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
@@ -27,6 +27,17 @@ assert.ok(sourcePits.pits[0].centre[1]<sourcePits.pits[1].centre[1],'Source pits
 assert.ok(!overlaps(sourcePits.pits[0].ring,sourcePits.pits[1].ring),'The two source pits remain spatially distinct');
 assert.ok(sourcePits.pits.every(p=>p.ring.every(point=>inside(point,rectangle([0,0],2000,2000)))),'Both source pit footprints remain within the supplied project extent');
 assert.ok(sourcePits.pits[0].centre[0]<0&&sourcePits.pits[1].centre[0]>0,'Each pit keeps its own source-coordinate side of the site');
+const sourcePitMeshes=[sourceSurface('north',-500,-600),sourceSurface('south',400,500)].map(surface=>buildPitSurfaceFromRaster(surface,()=>100));
+assert.deepEqual(sourcePitMeshes.map(mesh=>mesh.name),['North RF1 optimized pit surface','South RF1 optimized pit surface'],'Both source pits retain distinct named render meshes');
+for(let i=0;i<sourcePitMeshes.length;i++){
+  const mesh=sourcePitMeshes[i],position=mesh.geometry.getAttribute('position');
+  assert.ok(position.count>0&&mesh.geometry.index!.count>0,`${mesh.name} produces visible bench geometry`);
+  assert.ok(Array.from(position.array).every(Number.isFinite),`${mesh.name} vertices remain finite`);
+  assert.ok(mesh.geometry.getAttribute('color')&&mesh.receiveShadow&&mesh.castShadow,`${mesh.name} retains its shaded source material`);
+  const bounds=new THREE.Box3().setFromObject(mesh);
+  assert.ok(i===0?bounds.max.x<0:bounds.min.x>0,`${mesh.name} stays at its separate source-coordinate location`);
+  assert.ok(bounds.max.y<=100.001,`${mesh.name} remains at or below the terrain surface`);
+}
 const pit={ring,centre:[0,0] as [number,number],surface:100,floor:40,depth:60,support:100};
 const mesh=buildPitSurface(pit,()=>100);
 const p=mesh.geometry.getAttribute('position'),index=mesh.geometry.index!;
