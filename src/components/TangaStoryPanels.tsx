@@ -253,23 +253,18 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
   </aside>;
 
   if (chapter === 'comparison') return <aside className="tanga-story-panel tanga-story-panel--decisions" aria-label="Evidence-led next decisions">
-    <div className="tanga-story-panel__eyebrow">CLOSE · WHAT COMES NEXT</div>
-    <h2>Turn evidence into the next decisions</h2>
-    <p className="tanga-story-panel__intro">Choose a question to open its supporting chapter or source; this decision view stays open in this tab.</p>
+    <h2>What should the next study resolve?</h2>
     <ol>{NEXT_DECISIONS.map((decision) => <li key={decision.number}>
-      <span>{decision.number}</span>
       <div>
         <strong>{decision.title}</strong>
         <p>{decision.detail}</p>
         <nav className="tanga-decision-links" aria-label={`${decision.title} supporting evidence`}>
-          <a href={`/?v=1#${decision.chapter}`} target="_blank" rel="noreferrer">{decision.chapterLabel}<ArrowRight size={13}/></a>
-          <details className="tanga-decision-source">
-            <summary>{decision.evidenceLabel}</summary>
-            <a href={decision.evidenceHref} target="_blank" rel="noreferrer">Open source evidence<ArrowRight size={13}/></a>
-          </details>
+          <a href={`/?v=1&view=${decision.view}#${decision.chapter}`} target="_blank" rel="noreferrer">{decision.chapterLabel}<ArrowRight size={13} aria-hidden="true"/></a>
+          <a href={decision.evidenceHref} target="_blank" rel="noreferrer">{decision.evidenceLabel}<ArrowRight size={13} aria-hidden="true"/></a>
         </nav>
       </div>
     </li>)}</ol>
+    <p className="tanga-story-panel__qualification">Evidence opens in a new tab.</p>
   </aside>;
 
   return null;

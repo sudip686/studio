@@ -882,7 +882,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id:'campus',label:'Lowland site from above',detail:'Read the relationships across the conceptual campus',threeAction:'campusView'},
   ],
   comparison: [
-    {id: 'decisions', label: 'Next study decisions', detail: 'Close on evidence reconciliation and development questions', view: VIEW_STATES.comparison},
+    {id: 'decisions', label: 'Next study decisions', detail: 'Revisit drill coverage, flotation testwork or the proposed site layout', view: VIEW_STATES.comparison},
   ],
 };
 
@@ -1065,7 +1065,7 @@ const SCENE_INDEX_META: Record<WorkbenchMode, {question: string; thumbnail?: str
   mine_planning: {question: 'How could the proposed facilities connect?', thumbnail: STATIC_SCENE_FALLBACKS.mine_planning!.src, alt: STATIC_SCENE_FALLBACKS.mine_planning!.alt},
   metallurgy: {question: 'What did the reported testwork measure?', thumbnail: '/presentation-assets/metallurgy-report-page.png', alt: 'Metallurgy report results page'},
   accessibility: {question: 'What infrastructure links need study?', thumbnail: '/presentation-assets/paulsam-conveyor-sites.jpg', alt: 'Planning report view of conveyor and site candidates'},
-  comparison: {question: 'Which evidence and decisions come next?'},
+  comparison: {question: 'Review the evidence for the next study'},
 };
 
 
