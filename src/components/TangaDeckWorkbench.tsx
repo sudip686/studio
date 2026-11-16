@@ -231,6 +231,8 @@ type DeckViewState = {
 // geolibre-style move) instead of a linear snap.
 const cinematicEase = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const CINEMATIC_FLY = () => new FlyToInterpolator({curve: 1.55});
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const mapFlightDuration = (duration: number) => prefersReducedMotion() ? 0 : duration;
 
 type GeoJsonFeature = {
   type: 'Feature';
@@ -2601,7 +2603,7 @@ export default function TangaDeckWorkbench() {
       ...target,
       ...(mode==='ranking'&&window.innerWidth<760?{zoom:.72}:{}),
       bearing: bearingOverride ?? target.bearing,
-      transitionDuration: 2400,
+      transitionDuration: mapFlightDuration(2400),
       transitionInterpolator: CINEMATIC_FLY(),
       transitionEasing: cinematicEase,
     });
@@ -2677,7 +2679,7 @@ export default function TangaDeckWorkbench() {
     setViewState({
       ...viewState,
       bearing: nextBearing,
-      transitionDuration: 1500,
+      transitionDuration: mapFlightDuration(1500),
       transitionInterpolator: CINEMATIC_FLY(),
       transitionEasing: cinematicEase,
     });
@@ -2722,7 +2724,7 @@ export default function TangaDeckWorkbench() {
     setViewState((current) => {
       const next: DeckViewState = {
         ...current,
-        transitionDuration: 1500,
+        transitionDuration: mapFlightDuration(1500),
         transitionInterpolator: CINEMATIC_FLY(),
         transitionEasing: cinematicEase,
       };
@@ -3553,7 +3555,7 @@ export default function TangaDeckWorkbench() {
       // peer field around it stays in frame — this scene is a comparison, so
       // diving to project scale would lose the point of the slide.
       zoom: activeMode === 'ranking' ? (window.innerWidth<760?.72:1.55) : Math.max(current.zoom, 3.4),
-      transitionDuration: DURATION,
+      transitionDuration: mapFlightDuration(DURATION),
       transitionInterpolator: CINEMATIC_FLY(),
       transitionEasing: cinematicEase,
     }));
@@ -4973,10 +4975,7 @@ export default function TangaDeckWorkbench() {
     window.addEventListener('tanga:intro-complete', enter);
     return () => window.removeEventListener('tanga:intro-complete', enter);
   }, []);
-  // Act interstitial — a brief chapter card when the story crosses into a new
-  // act (Opportunity → Asset → Value). Never on first mount or behind the cover.
   const [actCard, setActCard] = useState<StoryAct | null>(null);
-  const lastActRef = useRef<string | null>(null);
   const showCover = activeStoryIndex === 0 && !coverDismissed && storyHeroState !== 'complete' && storyHeroState !== 'dismissed';
   const isCoverScene = showCover;
   // Scenes without a source-data table still get a panel — key insight chips
@@ -4998,12 +4997,15 @@ export default function TangaDeckWorkbench() {
   // resume the last-seen scene from localStorage, which surprised the user.
   const restoredRef = useRef(false);
 
-  const goToStoryIndex = useCallback((index: number) => {
+  const goToStoryIndex = useCallback((index: number, source: 'story' | 'link' = 'story') => {
     setExploreMode(false);
     setShowCoach(false);
     try { window.localStorage?.setItem('tanga:coachSeen', '1'); } catch { /* ignore */ }
     const clamped = clamp(index, 0, STORY_STEPS.length - 1);
     const targetStep = STORY_STEPS[clamped];
+    const targetAct = MODE_ACT[targetStep.mode];
+    const crossesAct = source === 'story' && !isExploreMode && targetAct !== MODE_ACT[activeMode];
+    setActCard(crossesAct && !prefersReducedMotion() ? STORY_ACTS.find(act => act.id === targetAct) ?? null : null);
     if (targetStep.mode === 'work_completed') setSelectedMilestoneId('drilling');
     const defaults = storyStepDefaults(targetStep.mode);
     setActiveShotIndex(0);
@@ -5013,7 +5015,7 @@ export default function TangaDeckWorkbench() {
       routeTarget: defaults.routeTarget,
       resourceFocus: defaults.resourceFocus,
     });
-  }, [activateMode]);
+  }, [activateMode, activeMode, isExploreMode]);
 
   const applyStoryShot = useCallback((mode: WorkbenchMode, requestedIndex: number) => {
     const shots = STORY_SHOTS[mode];
@@ -5030,7 +5032,7 @@ export default function TangaDeckWorkbench() {
       setViewState({
         ...shot.view,
         ...(mode==='ranking'&&window.innerWidth<760?{zoom:.72}:{}),
-        transitionDuration: 2100,
+        transitionDuration: mapFlightDuration(2100),
         transitionInterpolator: CINEMATIC_FLY(),
         transitionEasing: cinematicEase,
       });
@@ -5048,7 +5050,7 @@ export default function TangaDeckWorkbench() {
     const requestedMode = readHashScene();
     const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
     const targetMode = targetIndex >= 0 ? STORY_STEPS[targetIndex].mode : null;
-    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+    if (targetIndex >= 0 && targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex, 'link');
     if (targetMode) {
       const supportsVersionOneState = params.get('v') === '1';
       const shotId = params.get('view');
@@ -5086,7 +5088,8 @@ export default function TangaDeckWorkbench() {
       const targetIndex = STORY_STEPS.findIndex((step) => step.mode === requestedMode);
       if (targetIndex < 0) return;
       const targetMode = STORY_STEPS[targetIndex].mode;
-      if (targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex);
+      setActCard(null);
+      if (targetIndex !== activeStoryIndex) goToStoryIndex(targetIndex, 'link');
 
       const supportsVersionOneState = params.get('v') === '1';
       const shotId = params.get('view');
@@ -5598,28 +5601,15 @@ export default function TangaDeckWorkbench() {
     return () => cancelAnimationFrame(raf);
   }, [activeMode, threeVisible, isCoverScene]);
 
-  // Fire the act interstitial on an act crossing. It overlays the incoming
-  // scene while its camera flies in, then dissolves. Always skippable.
-  useEffect(() => {
-    const act = MODE_ACT[activeMode];
-    const previous = lastActRef.current;
-    lastActRef.current = act;
-    if (previous === null || previous === act) return;   // first mount / same act
-    if (showCover) return;
-    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const next = STORY_ACTS.find((a) => a.id === act) ?? null;
-    setActCard(next);
-    const timer = window.setTimeout(() => setActCard(null), reduce ? 700 : 1900);
-    return () => window.clearTimeout(timer);
-  }, [activeMode, showCover]);
-
-  // Any click or key dismisses the act card immediately.
+  // Keep the cue brief and let presenter input dismiss it immediately.
   useEffect(() => {
     if (!actCard) return;
     const dismiss = () => setActCard(null);
+    const timer = window.setTimeout(dismiss, 1500);
     window.addEventListener('keydown', dismiss);
     window.addEventListener('pointerdown', dismiss);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('keydown', dismiss);
       window.removeEventListener('pointerdown', dismiss);
     };
@@ -6354,9 +6344,7 @@ export default function TangaDeckWorkbench() {
           aria-label={`Act ${actCard.numeral}: ${actCard.label}`}
         >
           <div className="tanga-deck__act-card-inner">
-            <span className="tanga-deck__act-card-numeral" aria-hidden="true">{actCard.numeral}</span>
             <strong className="tanga-deck__act-card-label">{actCard.label}</strong>
-            <span className="tanga-deck__act-card-rule" aria-hidden="true" />
             <p className="tanga-deck__act-card-thesis">{actCard.thesis}</p>
           </div>
         </section>
