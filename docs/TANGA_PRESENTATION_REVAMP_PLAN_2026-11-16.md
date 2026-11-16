@@ -7,7 +7,33 @@ Priority: desktop presentation quality and release reliability; phone/tablet wor
 
 ## Direction
 
-Shape the experience as an evidence-led project briefing with cinematic 3D used to clarify scale and relationships. Each chapter should answer one question, foreground one piece of evidence, and make the next step in the story obvious. Keep the existing 12 chapters and source basis. Polish the way they connect and appear before adding more scene features.
+### Creative concept: **Tanga — From Ground to Graphite**
+
+Make the guided presentation feel like a premium mining-project film that the viewer can pause and explore. The terrain is the continuous stage: begin with Tanzania and the coastal setting, descend to the Tanga landscape, reveal measured work and geology, then travel through the reported resource, a qualified mine concept, testwork and the route to port. End by returning to the evidence and the decisions still ahead. The film-like quality comes from authored camera shots, natural scale cues, purposeful reveals and strong scene composition—not from adding decorative motion to every object.
+
+Provide two complementary ways to experience the same story:
+
+- **Guided tour:** a deliberate, presenter-ready sequence of composed shots, short camera moves and concise chapter statements. The viewer can pause, skip, or take control at any moment. A user interaction stops the active camera move immediately.
+- **Explore:** the existing direct chapter navigation, layer toggles, evidence panels and free camera controls. Opening a direct link must still land on the intended view without forcing a cinematic intro.
+
+Use a three-act film grammar inside the existing chapters: **I · The place** (Tanzania, project setting, completed work); **II · What the evidence shows** (terrain, drilling, geology, resource, selected peers); **III · What development could involve** (mine concept, testwork, logistics, decisions). Each chapter gets a distinct establishing frame, one focal subject, one evidence beat and a clear visual handoff. The camera preserves orientation when moving between scales and resets to the authored frame with one action.
+
+### Art direction: premium field-film, not a generic dashboard
+
+- **Hero canvas:** full-bleed natural terrain with realistic ground color, readable elevation, broad daylight and atmospheric depth. Keep the active geography large in frame; avoid a darkened global filter that makes the ground look synthetic.
+- **Editorial type:** large, confident chapter headlines (about 40–64 px on desktop), one short takeaway, readable supporting copy and small restrained technical labels. Let the visual carry the scene; keep the detailed source notes one deliberate action away.
+- **Color:** use Sakariya identity as a restrained interface accent, warm mineral/earth color in the landscape, source-matched lithology colors in geology, stable grade colors in resource, and disciplined dark/cyan callouts where they help equipment labels. Do not recolor data layers to fit a cinematic grade.
+- **Panels:** one active story panel at a time, anchored to a safe area with a maximum useful width. Give evidence and source controls a repeatable visual treatment. Fade HUD density down during an authored flyover, then restore full controls on pause, pointer/keyboard use, or Explore.
+- **Motion:** use short establishing moves, push-ins, orbit reveals, and layer builds only where they explain a change in scale or evidence. Keep camera motion smooth and spatially legible; avoid rapid cuts, perpetual orbit, simultaneous moving callouts, or repeated camera spins. Reduced motion uses direct composed-frame changes.
+- **Sound:** no auto-playing soundtrack. If narration is added later, make it optional, muted by default, captioned and independent of camera controls.
+
+### Film-to-interactive shot grammar
+
+Every guided chapter follows the same simple rhythm, adapted to its evidence: **establish** the place or dataset; **reveal** one focal layer/object; **read** the key fact with its date/source; **hand off** to the next question. Keep each beat visually distinct from the prior chapter. During a transition, retain a stable compass cue and a small chapter marker so a cinematic move does not disorient a technical viewer. The opening should feel like an aerial arrival over the real project terrain; the closing should pull back to the Tanga-to-port context and return to the evidence/decision list.
+
+Reference review: the repository’s Sarytogan Graphite PFS animation notes a sequence of globe/location, satellite approach, geology/resource, open pits, processing plant, workforce/infrastructure, downstream technology and logistics. Borrow its continuity, oblique pit framing, plant flyover, restrained leader labels and one visual idea per shot; do not copy its project data, claims, exact graphics or downstream product assumptions. VRIFY describes its presentations as a shareable blend of 3D models, 360° imagery and corporate PDF content, and its newer 3D slide guidance includes topography, drillholes, 2D lines, layers, labels, highlights and a compass. This supports a cinematic experience with technical evidence and navigation kept together. [Sarytogan PFS 3D animation](https://www.youtube.com/watch?v=EVKrPWzrIFc), [VRIFY 3D Presentation overview](https://help.vrify.com/en/articles/8339480-what-is-a-vrify-3d-presentation), [VRIFY 3D slide guide](https://help.vrify.com/en/articles/13893832-create-a-3d-slide-beta), [VRIFY community-engagement case study](https://www.vrify.com/articles/transforming-community-engagement-through-interactive-presentation-software).
+
+The UI/UX Pro Max design-system query returned a generic enterprise Swiss/minimal pattern rather than a geospatial presentation match. A narrower style search also returned no relevant match. Use only its applicable guidance: clear hierarchy, visible focus, reduced-motion support, lazy loading, and at most one or two purposeful moving elements in a view. Do not import its suggested blue/orange palette; the existing Sakariya identity and source-derived geology colors govern this deck.
 
 Use one consistent presentation shell: Sakariya identity, chapter progress, one active story panel, one evidence/source path, predictable camera controls and a quiet navigation rail. Keep geological unit colors tied to their source maps. Let each chapter have its own visual grammar inside that shell:
 
@@ -29,7 +55,7 @@ The UI/UX Pro Max design-system query returned a generic enterprise Swiss/minima
 
 ## Story arc and distinct purpose for every chapter
 
-The current chapter order already supports a useful arc. Keep it, but make the change in evidence unmistakable at each step.
+Keep the current chapter order and make the film feel like one journey with carefully differentiated visual sequences. Use a short aerial arrival for the opening; use camera travel only when moving between real scales or revealing a relationship. A repeatable frame does not mean repeating the same composition: the map, timeline, profile, drill trajectory, geology, block model, peer comparison, site concept, testwork, route and closing each need their own visual language.
 
 | # | Chapter | One question | Focal visual | What changes from the previous chapter |
 |---:|---|---|---|---|
@@ -46,6 +72,17 @@ The current chapter order already supports a useful arc. Keep it, but make the c
 | 11 | Connect to the port | What route and distance information is available? | Project-to-port route and provenance card | Extends the project into logistics and infrastructure context |
 | 12 | Evidence to decisions | What must be resolved or studied next? | Three decision questions linked back to evidence | Closes with actions and traceable evidence returns |
 
+### Signature sequence direction
+
+| Beat | Shot treatment | Viewer takeaway |
+|---|---|---|
+| Opening | Start above the regional terrain; descend toward the project and settle into a broad, natural site frame. Project name and location arrive after the ground is visible. | This is a real place with a defined setting. |
+| Evidence journey | Match camera direction and scale as the story moves from surface survey to recorded holes, mapped geology and a separate subsurface interpretation. Use a clean graphic/section treatment when the evidence changes from geographic context to measured values. | Show what was measured, what was interpreted, and where the boundary between them lies. |
+| Resource and peers | Build the resource view from the report’s own legend and totals; transition to a simple common-scale ranking before opening the globe. | Place the reported estimate in context, with dates and category limitations visible. |
+| Development concept | Pull back to a natural oblique site overview, then make a single controlled move to the pits, material path, plant and services. Keep conceptual facilities visibly labeled as such. | Explain spatial relationships without implying an approved design. |
+| Testwork and destination | Change the visual grammar to a bright, editorial laboratory/results board; use a short optional conceptual plant tour to explain process stages, then separate illustrative product pathways. | Report testwork findings and explain possible downstream context without asserting qualification. |
+| Close | Trace the sourced route to the port, then pull back to the regional frame and finish with three evidence-linked decisions. | Leave the audience with a clear next step and a way back to its evidence. |
+
 Acceptance per chapter: the question and takeaway are understandable within five seconds; the focal object remains visible; source/qualification is reachable in one action; there is one clear primary next action; no duplicate visual or copy carries over without a new purpose.
 
 ## Work sequence
@@ -61,6 +98,8 @@ Acceptance per chapter: the question and takeaway are understandable within five
 ### Phase 1 — Story structure and reusable composition (P0)
 
 - [ ] Use the chapter table above to edit headings, one-sentence takeaways, transition cues and primary actions. Keep source details in disclosure panels.
+- [ ] Write and rehearse one concise guided-tour line per chapter. Align its timing to the visual reveal; keep sound optional and captions available if narration is introduced.
+- [ ] Define authored camera start, focus and end frames for the opening arrival and every signature sequence. Validate the destination before animating; user input interrupts camera travel immediately.
 - [ ] Define shared desktop safe areas for header, left instrument rail, right story/evidence panel, bottom story cue and chapter navigation. Reserve the scene focal region from measured bounds rather than fixed assumptions.
 - [ ] Set shared type scale, spacing, panel width, contrast, border, button and focus tokens using current Sakariya styling. Remove redundant overlays only when their function is preserved elsewhere.
 - [ ] For each chapter write a one-page shot card: default frame, target, visible layers, focal object, takeaway, interaction, evidence link, source qualification and fallback.
@@ -90,6 +129,9 @@ Acceptance per chapter: the question and takeaway are understandable within five
 - [ ] Limit motion to a meaningful material path (pit to feed to plant) only where route evidence supports it. Pause and reduced-motion states must be clear; unsupported routes remain static or explicitly illustrative.
 
 - **Gate:** selected details at 1366 × 768 and 1707 × 842 remain composed, labels and controls avoid the visual focal point, reset restores the authored overview, and browser capture confirms no model is hidden by the HUD.
+
+- [ ] **Guided film behavior:** preserve a visible pause/skip affordance, keep the current chapter and progress discoverable, pause camera choreography on any direct user input, and restore full Explore controls on demand. A deep link opens directly into Explore at its authored frame.
+- [ ] **Opening and act transitions:** make the first frame feel like an aerial arrival, then use brief act transitions at meaningful story boundaries only. Avoid a full-screen interstitial on every chapter; reduced-motion removes holds and camera travel.
 
 ### Phase 3 — Polish the remaining chapters (P1)
 
