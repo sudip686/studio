@@ -3400,7 +3400,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // on the hillside; this angle exposes their cube faces against the
         // stepped benches while preserving the registered source elevations.
         const span=Math.max(size.x,size.z)*.84+110;
-        const position=centre.clone().add(new THREE.Vector3(span*.88,span*.58,span*.20));
+        // The pit centres are separated mostly along local Z. Approach each
+        // named pit from its outside edge so the other shell does not fill the
+        // foreground and hide the selected benches/ore cells in the detail
+        // frame. The whole-site shot continues to show both pits together.
+        const outsideZ=pitIndex===0?-1:1;
+        const offset=new THREE.Vector3(span*.72,span*.58,outsideZ*span*.72).multiplyScalar(1.22);
+        const position=centre.clone().add(offset);
         stage.localToWorld(centre);stage.localToWorld(position);
         scheduleCameraTween(position,centre,2,42);
         setStatus(`${command.action==='northPit'?'North':'South'} pit · source ore blocks within the RF1 optimized shell`);
