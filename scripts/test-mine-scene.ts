@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {buildConcentrator, placeConcentrator, buildPitSurface, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
-import {rectangle, inside} from '../src/lib/deck/site-planning';
+import {rectangle, inside, overlaps, planSiteFromPitSurfaces, type SourcePitSurface} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
@@ -10,6 +10,23 @@ import {SITE_EARTHWORK_OPACITY} from '../src/lib/deck/stable-materials';
 
 async function main(){
 const ring=rectangle([0,0],400,320);
+// Regression invariant: source RF1 north/south shells stay two distinct
+// footprints in their source coordinates. Do not replace these with one
+// merged grade-cluster hull or sort away the north/south story identity.
+const sourceSurface=(id:'north'|'south',x0:number,z0:number):SourcePitSurface=>({
+  id,x0,z0,dx:20,dz:20,width:2,height:2,support:4,
+  pitElevation:[[20,18],[16,14]],topography:[[100,100],[100,100]],
+  benchIndex:[[0,1],[1,2]],mask:[[1,1],[1,1]],
+});
+const sourcePits=planSiteFromPitSurfaces([
+  sourceSurface('south',400,500),sourceSurface('north',-500,-600),
+],()=>100,rectangle([0,0],2000,2000));
+assert.equal(sourcePits.pits.length,2,'Mine Planning retains both source RF1 pits');
+assert.deepEqual(sourcePits.pits.map(p=>p.support),[4,4],'Each source pit retains its own active source cells');
+assert.ok(sourcePits.pits[0].centre[1]<sourcePits.pits[1].centre[1],'Source pits remain ordered north to south');
+assert.ok(!overlaps(sourcePits.pits[0].ring,sourcePits.pits[1].ring),'The two source pits remain spatially distinct');
+assert.ok(sourcePits.pits.every(p=>p.ring.every(point=>inside(point,rectangle([0,0],2000,2000)))),'Both source pit footprints remain within the supplied project extent');
+assert.ok(sourcePits.pits[0].centre[0]<0&&sourcePits.pits[1].centre[0]>0,'Each pit keeps its own source-coordinate side of the site');
 const pit={ring,centre:[0,0] as [number,number],surface:100,floor:40,depth:60,support:100};
 const mesh=buildPitSurface(pit,()=>100);
 const p=mesh.geometry.getAttribute('position'),index=mesh.geometry.index!;
