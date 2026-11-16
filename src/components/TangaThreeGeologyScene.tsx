@@ -1840,7 +1840,11 @@ function drillSegmentsForMode(segments: DrillSegment[], mode: GeologyMode) {
     return sampleSegmentsAcrossHoles(segments, 3200);
   }
   if (mode === 'subsurface') {
-    return sampleSegmentsAcrossHoles(segments, 2400);
+    // The geology chapter is a mapped-surface → interpretation sequence.
+    // Drillhole collars and traces belong to the dedicated drilling chapter;
+    // rendering them here obscures the lithology surface and implies a
+    // surface-to-depth correlation that the source data does not establish.
+    return [];
   }
   return sampleSegmentsAcrossHoles(segments, 1800);
 }

@@ -1,7 +1,7 @@
 # Tanga investor presentation — desktop revamp plan
 
 Date: 16 November 2026
-Status: planning refresh; no visual implementation is claimed by this document.
+Status: implementation in progress. The desktop 1366 × 768 opening baseline has been captured for all 12 chapters and all 12 routes were revisited after the geology update (0 local browser errors/warnings). Chapter 6 now removes drilling geometry from the mapped-surface-to-interpretation sequence. Chapters 9–11 received focused source-data checks: both RF1 pit views/blocks, the selected metallurgy cutaway/end-use qualification, and the distinct 72 km project-stated distance vs 76 km mapped road geometry. TypeScript typecheck passes. See `TANGA_SLIDE_BY_SLIDE_IMPLEMENTATION_CHECKLIST_2026-11-16.md` for current acceptance status. The second desktop viewport, remaining selected-detail audits, remaining visual work and release verification are still pending.
 Primary audience: investors, senior management and technical reviewers.
 Priority: desktop presentation quality and release reliability; phone/tablet work remains deferred as requested.
 
@@ -188,6 +188,7 @@ The deck is ready for an investor/management presentation when the current publi
 ## References and project records
 
 - Existing implementation checklist: `TANGA_NEXT_PHASE_PLAN_2026-10-23.md`
+- Current implementation and data-fidelity checklist: `TANGA_SLIDE_BY_SLIDE_IMPLEMENTATION_CHECKLIST_2026-11-16.md`
 - Existing presentation purpose/reference review: `TANGA_PRESENTATION_FLOW_2026-10-22.md`
 - Current shot inventory and evidence mapping: `TANGA_AUTHORED_SHOT_SPEC_2026-10-24.md`
 - Current capture limitations: `TANGA_DESKTOP_CAPTURE_MATRIX_2026-10-28.md`

@@ -343,6 +343,7 @@ type RouteProfile = {
 };
 
 const PROJECT_CENTER = {lon: 38.785, lat: -4.813};
+const PROJECT_PORT_DISTANCE = '72 km';
 const TOPO_BOUNDS: [number, number, number, number] = [38.72, -5.12, 39.17, -4.72];
 const TOPO_VERTICAL_EXAGGERATION = 4.65;
 const DEFAULT_MODE: WorkbenchMode = 'project';
@@ -511,7 +512,7 @@ const MODE_DATA_TABLES: Partial<Record<WorkbenchMode, ModeDataTable>> = {
     source: 'Project-to-port distance supplied for the project; mapped road route is shown separately',
     columns: ['Destination', 'Distance', ''],
     rows: [
-      {cells: ['Tanga Port', '72 km', ''], emphasis: true},
+      {cells: ['Tanga Port', PROJECT_PORT_DISTANCE, ''], emphasis: true},
       {cells: ['Hale hydro station', '57 km', '']},
       {cells: ['New Pangani Falls', '61 km', '']},
       {cells: ['Tanga rail terminal', 'coastal link', '']},
@@ -4919,6 +4920,7 @@ export default function TangaDeckWorkbench() {
     return () => window.removeEventListener('tanga:geology-perspective', restoreDepth);
   }, [activeMode]);
   const activeShots = STORY_SHOTS[activeMode] ?? [];
+  const activeChapterTourName = activeMode === 'mine_planning' ? 'Mine-site flyover' : null;
   const activeShot = activeShots[Math.min(activeShotIndex, Math.max(0, activeShots.length - 1))];
   const isFirstStory = activeStoryIndex <= 0 && activeShotIndex <= 0;
   const isLastStory = activeStoryIndex >= STORY_STEPS.length - 1 && activeShotIndex >= activeShots.length - 1;
@@ -6464,15 +6466,16 @@ export default function TangaDeckWorkbench() {
           <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
           <button
             type="button"
-            className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
+            className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', activeChapterTourName && !isExecutiveTour && 'tanga-deck__pager-play--named', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
             style={{'--autoplay-dwell': `${shotDwellSec}s`} as any}
             key={`play-${activeStoryIndex}-${activeShotIndex}-${pendingInfo}-${autoplaySec}-${isAutoplay}`}
             onClick={toggleAutoplay}
-            aria-label={isExecutiveTour ? (isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}` : `Resume ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}`) : (isAutoplay ? 'Pause current chapter playback' : 'Play current chapter views')}
+            aria-label={isExecutiveTour ? (isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}` : `Resume ${isExecutiveHighlightsActive ? 'executive highlights' : 'full guided story'}`) : (isAutoplay ? `Pause ${activeChapterTourName ?? 'current chapter playback'}` : `Play ${activeChapterTourName ?? 'current chapter views'}`)}
             aria-pressed={isAutoplay}
-            title={isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : isExecutiveTour ? 'full story' : 'chapter playback'}  (P)` : `${isExecutiveHighlightsActive ? 'Resume executive highlights' : isExecutiveTour ? 'Resume full story' : 'Play chapter views'}  (P)`}
+            title={isAutoplay ? `Pause ${isExecutiveHighlightsActive ? 'executive highlights' : isExecutiveTour ? 'full story' : activeChapterTourName ?? 'chapter playback'}  (P)` : `${isExecutiveHighlightsActive ? 'Resume executive highlights' : isExecutiveTour ? 'Resume full story' : `Play ${activeChapterTourName ?? 'chapter views'}`}  (P)`}
           >
             {isAutoplay ? <Pause size={16} strokeWidth={2.4} /> : <Play size={16} strokeWidth={2.4} />}
+            {!isExecutiveTour && activeChapterTourName && <span className="tanga-deck__pager-play-label">{isAutoplay ? 'Pause' : 'Play'} {activeChapterTourName}</span>}
           </button>
           <button
             type="button"
@@ -7038,6 +7041,12 @@ export default function TangaDeckWorkbench() {
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
       {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaChapterStoryPanel
         chapter={activeMode as TangaChapterId}
+        portDistanceInfo={activeMode === 'accessibility' && routeTarget === 'port' ? {
+          projectStated: PROJECT_PORT_DISTANCE,
+          mappedRoute: routeProfile.distanceLabel,
+          mappedDuration: routeProfile.durationLabel,
+          mappedRouteSource: routeProfile.source,
+        } : undefined}
         developmentViewId={activeShot?.id === 'shell' ? 'overview' : activeShot?.id}
         availableDevelopment={availableMineFacilities}
         siteContextVisible={layerSettings.context.visible}
@@ -7071,7 +7080,7 @@ export default function TangaDeckWorkbench() {
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">
           <div className="tanga-deck__route-profile-head">
-            <span>Route elevation</span>
+            <span>Mapped road profile</span>
             <strong>{routeProfile.targetLabel}</strong>
           </div>
           <svg viewBox="0 0 230 66" role="img" aria-label={`Elevation profile from ${routeProfile.minElevation} to ${routeProfile.maxElevation} metres`}>
