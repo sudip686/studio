@@ -166,6 +166,7 @@ Local review recorded 16 November 2026:
 - [x] The intro's Place, Evidence and Next-stage links resolve to `#tanzania`, `#resource` and `#mine_planning`. Browser capture confirmed the Place and Next-stage headings and the Evidence model chapter; the sound control toggles its accessible state.
 - [x] Reviewed North and South pit camera frames at both desktop sizes. The selected pit is presented with terrain context, and both RF1 shells remain together in the whole-site view. This camera composition change does not alter pit geometry or source blocks.
 - [ ] The intro-to-live-scene crossfade, keyboard-only skip/waypoint navigation, sound-track audibility, and measured asset-load percentage still need explicit verification. Do not display a numeric loading percentage until the app exposes actual progress events.
+- [x] Fix a hydration mismatch on direct chapter links: initialize waypoint state identically on server and client, then read the URL hash after mount. A fresh local `#mine_planning` entry selected “Fit a concept to ground” with no hydration warning, console message or page error.
 
 ### Phase 0 — Release truth and clean baseline (P0)
 

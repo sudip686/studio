@@ -12,12 +12,6 @@ const INTRO_VIDEO_SRC_LOCAL = VIDEO_KEY + '?v=intro-opt-1080-20260819';
 const INTRO_POSTER_SRC = assetUrl(POSTER_KEY) + '?v=full-bleed-bright-20260625';
 const ERROR_FALLBACK_MS = 2000;
 
-// The pristine URL hash, captured once at module load — BEFORE the workbench
-// mounts and starts syncing the hash to the current scene. If the page was
-// opened on a deep link (e.g. #tanzania), we skip the cinematic intro and drop
-// the viewer straight onto that scene instead of replaying "the beginning".
-const DEEP_LINK_HASH = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
-
 type IntroState = 'checking' | 'playing' | 'blocked' | 'finishing' | 'done';
 
 type TangaIntroGateProps = {
@@ -33,7 +27,8 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   const [videoUnavailable, setVideoUnavailable] = useState(false);
   const [introDuration, setIntroDuration] = useState(50);
   const [soundOn, setSoundOn] = useState(false);
-  const [activeRoute, setActiveRoute] = useState(DEEP_LINK_HASH);
+  const [activeRoute, setActiveRoute] = useState('');
+  const [deepLinked, setDeepLinked] = useState(false);
 
   const completeIntro = () => {
     if (finishTimerRef.current !== null) return;
@@ -49,8 +44,12 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   };
 
   useEffect(() => {
-    // Deep link present → skip the intro and reveal the deck immediately.
-    if (DEEP_LINK_HASH) {
+    // Read browser-only URL state after hydration so server and client markup
+    // agree on the active waypoint for direct chapter links.
+    const initialRoute = window.location.hash.replace(/^#/, '');
+    setActiveRoute(initialRoute);
+    if (initialRoute) {
+      setDeepLinked(true);
       setIntroState('done');
       return;
     }
@@ -135,7 +134,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
 
   return (
     <>
-      <div className={showIntro ? 'tanga-intro-app is-preloading' : 'tanga-intro-app'} data-intro-complete={!DEEP_LINK_HASH&&(introState==='finishing'||introState==='done')?'true':undefined}>
+      <div className={showIntro ? 'tanga-intro-app is-preloading' : 'tanga-intro-app'} data-intro-complete={!deepLinked&&(introState==='finishing'||introState==='done')?'true':undefined}>
         {children}
       </div>
 
