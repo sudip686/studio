@@ -270,3 +270,15 @@ The deck is ready for an investor/management presentation when the current publi
 - Current capture limitations: `TANGA_DESKTOP_CAPTURE_MATRIX_2026-10-28.md`
 - Reference review: `TANGA_POLISH_REFERENCE_REVIEW_2026-10-23.md`
 - UI guidance applied: `.agents/skills/ui-ux-pro-max/SKILL.md` (reduced motion, limited purposeful animation, lazy loading, focus and hierarchy)
+
+## 17 November 2026 — conceptual process, mine sequence, and closing bookend
+
+- [x] **Metallurgy separation concept:** add rising graphite-flake cues and a distinct sinking gangue stream in the flotation stage. The scene says the particles are illustrative and do not encode recovery or a plant mass balance.
+- [x] **Testwork-linked sizing:** use the selected composite’s reported cumulative +150 µm mass fraction for the coarse bin and show its arithmetic complement separately with an explicit caveat. This is a visual explanation of the reported size split, not a plant product distribution.
+- [x] **Mine-site concept sequence:** add an interactive 0–12 sequence with a consistent starting state, gradual pit reveal, source RF1 blocks only during the operating concept interval, conceptual facility reveal, fixed-site sun motion, fading nested pit cues, and final conceptual lake surfaces positioned from the RF1 registered pit elevations.
+- [x] **Mine-plan disclosure:** name the control “Illustrative development sequence” and state that it is not a year-by-year mine schedule or closure design. Preserve the two RF1 pit shells and source ore blocks; keep generated facility layout and sequence cues explicitly conceptual.
+- [x] **Closing orbit:** close on the globe, sourced milestone dates, a compact orbit/title emblem with animated graphite-hex dust, and a brighter animated project-to-port display arc. The arc remains illustrative; the orbital motif is explicitly not a licence boundary.
+- [x] **Desktop visual review:** inspect the metallurgy overview and flotation cutaway, the mine-planning overview, and the closing globe at 1707 × 842. The new HUD elements remain inside their reserved side/footer zones. `npm run typecheck` and `git diff --check` pass.
+- [ ] **Remaining acceptance:** inspect the product-sizing view and mine sequence at both target desktop sizes; confirm the final lake reveal in a close pit camera; run the full 12-chapter screenshot matrix and deployed-URL checks before calling the whole deck release-ready.
+
+**Evidence boundary:** the process effect is a conceptual explanation grounded by the report’s composite results; the mine sequence is an illustrative animation grounded by the supplied RF1 shells, block model, and PaulSam site-context references. The source folder does not provide a staged annual pit schedule, engineered haul-road alignment, plant mass balance, or closure design, so the visuals do not claim those designs exist.

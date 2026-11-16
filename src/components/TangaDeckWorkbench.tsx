@@ -3,7 +3,7 @@
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {DeckGL} from '@deck.gl/react';
-import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
+import {ArcLayer, BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, Copy, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
@@ -32,7 +32,7 @@ import TangaStoryCue from './TangaStoryCue';
 import TangaGeologyMapStage, {type GeologyUnitSelection} from './TangaGeologyMapStage';
 import type {DevelopmentView} from '@/data/tanga-development';
 import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
-import {type TangaChapterId} from '@/data/tanga-evidence';
+import {type TangaChapterId, WORK_MILESTONES} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
 import {MAPPED_SURFACE_UNITS} from '@/lib/deck/geology-palette';
 import {presentationBuild} from '@/lib/presentation-build';
@@ -4145,6 +4145,19 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
+      activeMode === 'comparison' && !isExploreMode && new ArcLayer<any>({
+        id: 'closing-project-to-port-concept-arc',
+        data: [{source: [PROJECT_CENTER.lon, PROJECT_CENTER.lat], target: [ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat]}],
+        getSourcePosition: (item: any) => item.source,
+        getTargetPosition: (item: any) => item.target,
+        getSourceColor: [99, 220, 216, 235],
+        getTargetColor: [237, 174, 120, 225],
+        getWidth: 2.5,
+        widthMinPixels: 2,
+        getHeight: .32,
+        greatCircle: true,
+        parameters: {depthTest: false} as any,
+      }),
       showGraphitePeers && tangaRankingInserted && new TextLayer<any>({
         id: 'graphite-peer-labels',
         data: graphiteRows.filter((project) => project.isTanga),
@@ -5001,6 +5014,23 @@ export default function TangaDeckWorkbench() {
   const [actCard, setActCard] = useState<StoryAct | null>(null);
   const showCover = activeStoryIndex === 0 && !coverDismissed && storyHeroState !== 'complete' && storyHeroState !== 'dismissed';
   const isCoverScene = showCover;
+  const closingArcScreen = useMemo(() => {
+    if (activeMode !== 'comparison' || isExploreMode || isCoverScene) return null;
+    const map = (mapRef.current as any)?.getMap?.() ?? (mapRef.current as any);
+    if (!map?.project || !map?.getContainer) return null;
+    const rect = map.getContainer().getBoundingClientRect();
+    const start = map.project([PROJECT_CENTER.lon, PROJECT_CENTER.lat]);
+    const finish = map.project([ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat]);
+    const x1=rect.left+start.x,y1=rect.top+start.y,x2=rect.left+finish.x,y2=rect.top+finish.y;
+    // At orbit scale the 72 km project-to-port separation can be only a few
+    // screen pixels. Lift the display arc enough to remain legible; endpoints
+    // still use the projected report locations and the card labels it illustrative.
+    const bend=Math.max(148,Math.min(180,Math.abs(x2-x1)*.14));
+    // Add a small screen-space bow because both real endpoints overlap at the
+    // globe's orbit scale; the path still terminates at their projected points.
+    const bow=Math.max(56,Math.min(112,Math.abs(x2-x1)*.42));
+    return {path:`M ${x1} ${y1} Q ${(x1+x2)/2+bow} ${Math.min(y1,y2)-bend} ${x2} ${y2}`,x1,y1,x2,y2};
+  }, [activeMode, isExploreMode, isCoverScene, viewState, mapLoadState]);
   // Scenes without a source-data table still get a panel — key insight chips
   // from SLIDE_FACTS — so the top-left zone is never awkwardly empty.
   const insightFacts = !activeDataTable ? (SLIDE_FACTS[activeMode] ?? []) : [];
@@ -7286,7 +7316,15 @@ export default function TangaDeckWorkbench() {
       {activeMode === 'work_completed' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaMilestoneStage milestoneId={selectedMilestoneId}/>}
       {activeMode === 'ranking' && !isExploreMode && !isCoverScene && !storyHeroVisible && <TangaPeerBenchmark selected={selectedPeerProject} onSelect={selectPeerProject} onResetView={() => {setSelectedPeerProject(null);flyTo('ranking');}} revealed={tangaRankingInserted} onReveal={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(true);setActiveShotIndex(1);}} onReset={() => {setIsAutoplay(false);setIsExecutiveTour(false);setPeerMreRevealed(false);setActiveShotIndex(0);}}/>}
       {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 3 && <TangaGeologyMapStage legendMount={geologyLegendMount} step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
-      {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory}/>}
+      {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory} closingMilestones={activeMode==='comparison'&&isLastStory?WORK_MILESTONES:undefined}/>}
+      {closingArcScreen && <svg className="tanga-closing-route" aria-hidden="true">
+        <path className="tanga-closing-route__glow" d={closingArcScreen.path}/>
+        <path className="tanga-closing-route__track" d={closingArcScreen.path}/>
+        <circle className="tanga-closing-route__beacon" cx={closingArcScreen.x1} cy={closingArcScreen.y1} r="5"/>
+        <circle className="tanga-closing-route__port" cx={closingArcScreen.x2} cy={closingArcScreen.y2} r="4"/>
+        <circle className="tanga-closing-route__traveller" r="3.5"><animateMotion dur="6.5s" repeatCount="indefinite" path={closingArcScreen.path}/></circle>
+        <circle className="tanga-closing-route__traveller" r="2.3"><animateMotion dur="6.5s" begin="-3.25s" repeatCount="indefinite" path={closingArcScreen.path}/></circle>
+      </svg>}
 
       {activeMode === 'accessibility' && (
         <section className="tanga-deck__route-profile" aria-label="Route elevation profile">

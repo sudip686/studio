@@ -36,6 +36,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
   const [openRoof, setOpenRoof] = useState(false);
   const [overview, setOverview] = useState(true);
   const [sample, setSample] = useState(0);
+  const coarseFractionRef = useRef(Number.parseFloat(MET_GROUPS[0].coarse) / 100);
+  coarseFractionRef.current = Number.parseFloat(MET_GROUPS[sample]?.coarse ?? '50') / 100;
   const [showEvidence, setShowEvidence] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [endUseRoute, setEndUseRoute] = useState<MetallurgyEndUseRoute | null>(null);
@@ -369,7 +371,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
             }
           }
         }
-        const activity=processMotion.update(dt, overviewRef.current?'overview':selected, animateProcess&&(overviewRef.current||openRoofRef.current));
+        const activity=processMotion.update(dt, overviewRef.current?'overview':selected, animateProcess&&(overviewRef.current||openRoofRef.current), coarseFractionRef.current);
         if (inEndUse) journeyElapsed = journeyElapsedRef.current;
         const journeyRunning = inEndUse && journeyActiveRef.current && !contextLost && !pausedRef.current && !reducedMotion.matches;
         if (journeyRunning) {
@@ -621,7 +623,19 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           <p className="tanga-process-explanation">{overview ? 'Concept route: feed receiving, preparation, flotation, dewatering and product handling. Layout and equipment are illustrative.' : selected.description}</p>
           {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
           {!overview&&<><p className="tanga-factory-motion-note">{selected.motion}</p><details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
-          {!overview && selected.id==='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>}
+          {!overview && selected.id==='flotation' && <>
+            <div className="tanga-factory-separation" aria-label="Conceptual graphite and gangue separation"><span><i className="is-graphite"/>Graphite flakes rise with froth</span><span><i className="is-gangue"/>Gangue sinks to underflow</span><small>Particle paths are illustrative; they do not encode recovery or a plant mass balance.</small></div>
+            <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>
+          </>}
+          {!overview && selected.id==='product' && <>
+            <div className="tanga-factory-sizing" aria-label={`Illustrative size split for ${result.id}`}>
+              <span>ILLUSTRATIVE SCREEN SPLIT · {result.id}</span>
+              <div><strong>{result.coarse}</strong><small>+150 µm · reported coarse fraction</small></div>
+              <div><strong>{(100-Number.parseFloat(result.coarse)).toFixed(1)}%</strong><small>&lt;150 µm · arithmetic complement</small></div>
+              <small>Particles and bins are conceptual. No industrial sizing circuit or product specification is established.</small>
+            </div>
+            <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO / AMC LAB · {result.id}</span><strong>{result.coarse}</strong><small>Reported cumulative +150 µm graphite mass fraction</small></button>
+          </>}
           {!overview && selected.id!=='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
           {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>TC, recovery and coarse fraction are separate measures.</small><i>Open comparison board ↗</i></button>}
           {overview && <button className="tanga-factory-pathway-cta" type="button" onClick={openEndUse}><span>NEXT</span><strong>Explore end-use pathways ↗</strong></button>}
