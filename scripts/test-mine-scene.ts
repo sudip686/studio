@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as THREE from 'three';
-import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
+import proj4 from 'proj4';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
 import {rectangle, inside, overlaps, planSiteFromPitSurfaces, type SourcePitSurface} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
@@ -38,6 +40,56 @@ for(let i=0;i<sourcePitMeshes.length;i++){
   assert.ok(i===0?bounds.max.x<0:bounds.min.x>0,`${mesh.name} stays at its separate source-coordinate location`);
   assert.ok(bounds.max.y<=100.001,`${mesh.name} remains at or below the terrain surface`);
 }
+// Protect the actual RF1 source rasters as well as the synthetic geometry
+// fixture: Mine Planning must keep the two supplied bench surfaces and use
+// their source coordinates, masks, elevations and support counts.
+const reference=JSON.parse(fs.readFileSync('public/generated/orewaste-reference.json','utf8')) as {
+  provenance:{scenarioRF:number;sourceSha256:string};
+  blocks:number[][];
+  pitSurfaces:{components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>};
+};
+assert.equal(reference.provenance.scenarioRF,1,'Mine Planning is tied to the supplied RF 1 source scenario');
+assert.equal(reference.pitSurfaces.components.length,2,'The source reference provides two RF1 pit surfaces');
+const [projectEasting,projectNorthing]=proj4('WGS84','EPSG:32737',[38.785,-4.813]) as [number,number];
+const actualSourcePits:SourcePitSurface[]=reference.pitSurfaces.components.map((source,index)=>({
+  id:index===0?'north':'south',
+  x0:source.x0+source.dx/2-projectEasting,
+  z0:projectNorthing-(source.y0+source.dy/2),
+  dx:source.dx,dz:-source.dy,width:source.width,height:source.height,support:source.support,
+  topography:source.topography.map(column=>column.map(rl=>rl-700)),
+  pitElevation:source.pitElevation.map(column=>column.map((rl,i)=>rl-700)),
+  benchIndex:source.benchIndex,mask:source.mask,
+}));
+assert.deepEqual(actualSourcePits.map(pit=>pit.support),[4376,5618],'RF1 source masks retain their measured north/south support');
+const actualPlan=planSiteFromPitSurfaces([...actualSourcePits].reverse(),()=>100,rectangle([0,0],2000,5000));
+assert.equal(actualPlan.pits.length,2,'Planning the real RF1 surfaces retains both distinct pits');
+assert.deepEqual(actualPlan.pits.map(pit=>pit.support),[4376,5618],'The planned pits retain the actual RF1 mask counts');
+assert.ok(actualPlan.pits[0].centre[1]<actualPlan.pits[1].centre[1],'The real north pit remains north of the real south pit');
+const actualPitMeshes=actualPlan.pits.map((pit,index)=>{
+  const mesh=buildPitSurface(pit,()=>pit.surface);
+  mesh.name=`${actualSourcePits[index].id==='north'?'North':'South'} RF1 continuous bench interpretation`;
+  mesh.userData.sourcePitSupport=actualSourcePits[index].support;
+  return mesh;
+});
+assert.deepEqual(actualPitMeshes.map(mesh=>mesh.name),['North RF1 continuous bench interpretation','South RF1 continuous bench interpretation'],'Rendered pit faces use a continuous interpretation of both source footprints');
+for(let i=0;i<actualPitMeshes.length;i++){
+  const mesh=actualPitMeshes[i],position=mesh.geometry.getAttribute('position');
+  assert.equal(mesh.userData.sourcePitSupport,actualSourcePits[i].support,`${mesh.name} retains the actual RF1 source support`);
+  assert.ok(position.count>0&&mesh.geometry.index!.count>0,`${mesh.name} builds visible continuous bench geometry`);
+  assert.ok(Array.from(position.array).every(Number.isFinite),`${mesh.name} has finite source-derived continuous vertices`);
+  const bounds=new THREE.Box3().setFromObject(mesh);
+  assert.ok(bounds.max.y<=Math.max(...actualSourcePits[i].topography.flat())+.01,`${mesh.name} stays at or below the registered source topography`);
+  assert.ok(i===0?bounds.max.z<0:bounds.min.z>0,`${mesh.name} remains at its separate source north/south location`);
+}
+const sourceBlockSupport=[0,0];
+for(const block of reference.blocks){
+  const [lon,lat]=block,carbon=block[6]??0;
+  if(carbon<3)continue;
+  const [easting,northing]=proj4('WGS84','EPSG:32737',[lon,lat]) as [number,number];
+  const pitIndex=actualSourcePits.findIndex(surface=>sourcePitElevationAt(surface,easting-projectEasting,-(northing-projectNorthing))!==null);
+  if(pitIndex>=0)sourceBlockSupport[pitIndex]++;
+}
+assert.deepEqual(sourceBlockSupport,[7083,7922],'Displayed grade-qualified source blocks retain their actual north/south RF1 registration');
 const pit={ring,centre:[0,0] as [number,number],surface:100,floor:40,depth:60,support:100};
 const mesh=buildPitSurface(pit,()=>100);
 const p=mesh.geometry.getAttribute('position'),index=mesh.geometry.index!;

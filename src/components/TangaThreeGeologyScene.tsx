@@ -3348,12 +3348,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const centre=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
         const span=Math.max(size.x,size.z,focusPit?150:240);
         centre.y+=(size.y*.2);
-        // Look across the north/south separation from the east. This holds both
-        // source footprints side-by-side while lowering the horizon enough to
-        // read their continuous benches and block depth.
+        // Keep both source footprints in the overview from a high oblique
+        // angle. The wide view leaves room for the story panel and shows the
+        // continuous bench faces with the registered grade cells inside them.
         const offset=focusPit
           ? new THREE.Vector3(span*.88,span*.58,span*.22)
-          : new THREE.Vector3(span*1.08,span*.68,span*.05);
+          : new THREE.Vector3(span*.55,span*1.2,span*.30);
         offset.multiplyScalar(Math.max(1,.72/camera.aspect));
         scheduleCameraTween(centre.clone().add(offset),centre,1.8,43);
         setStatus('RF1 source ore cells shown within both continuous optimized pit surfaces');
@@ -4802,8 +4802,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePitEnvelopes(mesh.geometry,sitePlan.pits);
           host.dataset.pitCarvedTriangles=String(terrainMeshes.reduce((sum,mesh)=>sum+Number(mesh.geometry.userData.pitCarvedTriangleCount??0),0));
           sitePlan.audit.push('Haul-road geometry omitted: the supplied optimized shell does not include an engineered ramp alignment or checked gradient');
+          const orderedSourcePitSurfaces=[...sourcePitSurfaces].sort((a,b)=>(a.z0+(a.height-1)*a.dz/2)-(b.z0+(b.height-1)*b.dz/2));
+          if(mode==='mine_planning'){
+            host.dataset.minePitSurfaceSource='Continuous RF1 footprint benches';
+            host.dataset.minePitSurfaceSupports=JSON.stringify(orderedSourcePitSurfaces.map(surface=>({id:surface.id,support:surface.support,width:surface.width,height:surface.height})));
+          }
           for (const [index,pit] of sitePlan.pits.entries()) {
-            const mesh = buildPitSurface(pit, (x, z) => terrainSurfaceY(terrainResources, x, -z));
+            const height=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
+            const sourceSurface=mode==='mine_planning'?orderedSourcePitSurfaces[index]:undefined;
+            const mesh=buildPitSurface(pit,height);
+            if(sourceSurface){mesh.name=`${sourceSurface.id==='north'?'North':'South'} RF1 continuous bench interpretation`;mesh.userData.sourcePitSupport=sourceSurface.support;}
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
             pitSurfaces.push(mesh);
