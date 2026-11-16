@@ -1001,7 +1001,9 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media(max-width:760px) { .tanga-evidence-sequence { display:none; } .tanga-material-entry { flex-wrap:wrap; } .tanga-material-counts { gap:7px; font-size:9px; } .tanga-material-counts strong { display:block; font-size:23px; } .tanga-material-evidence { padding:16px; } .tanga-material-evidence h2 { font-size:23px; } }
 @media(max-width:760px) { .tanga-material-evidence figure img { display:block; height:auto; max-height:42svh; } }
 .tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:540px!important; max-height:calc(100svh - 646px)!important; }
-.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-three__grade-legend { top:400px!important; bottom:auto!important; max-height:calc(100svh - 588px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-three__grade-legend { top:400px!important; bottom:auto!important; max-height:calc(100svh - 500px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-surface-control { display:none!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-surface-control { display:none!important; }
 /* Geological documents -> registered plan -> depth, sharing the chapter HUD. */
 .tanga-geology-map-sheet{position:absolute;z-index:24;left:300px;right:440px;top:215px;bottom:185px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #ffffff24;border-radius:14px;background:#252a2f;box-shadow:0 20px 70px #0004}
 .tanga-geology-map-sheet__toolbar{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#171e23}
@@ -1421,6 +1423,17 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-surface-control>div{display:flex;justify-content:space-between;align-items:center;font-size:8px;color:#aebfc8}
 .tanga-surface-control button{border:0;padding:1px 8px;background:none;color:#d9b48d;font-size:9px;cursor:pointer}
 .tanga-surface-control :focus-visible{outline:2px solid #9fe4e0;outline-offset:3px}
+.tanga-three__grade-legend .tanga-three__resource-threshold,.tanga-three__grade-legend .tanga-three__resource-section{display:grid;width:100%;justify-content:stretch;align-items:stretch;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #a0bcc32b;font-size:inherit;color:inherit}
+.tanga-three__resource-threshold label,.tanga-three__resource-section label{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#e6edf0;font-size:10px;letter-spacing:.02em}
+.tanga-three__resource-threshold output,.tanga-three__resource-section output{color:#a9e1df;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tanga-three__resource-threshold input,.tanga-three__resource-section input{height:18px;margin:0;accent-color:#61d9d1}
+.tanga-three__resource-threshold-stats{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#bac8cc;font-size:9px;font-variant-numeric:tabular-nums}
+.tanga-three__resource-threshold-stats strong{color:#e8f6f3;font-weight:600;white-space:nowrap}
+.tanga-three__resource-threshold small,.tanga-three__resource-section small{color:#aebfc8;font-size:9px;line-height:1.35}
+.tanga-three__resource-basis{justify-self:start;border:1px solid #d9b48d55;border-radius:4px;padding:4px 8px;color:#f0c89c;background:#d9b48d0d;font-size:10px}
+.tanga-three__resource-section>button{justify-self:start;min-height:30px;white-space:nowrap;border:1px solid #a9e1df55;border-radius:4px;padding:4px 8px;color:#d7f4ef;background:#a9e1df0d;font-size:10px}
+.tanga-three__resource-section>button[aria-pressed=true]{border-color:#6fe0d2;background:#4ac5b422;color:#eafffb}
+.tanga-three__resource-section input:disabled{opacity:.45;cursor:not-allowed}
 .tanga-deck:has(.tanga-geology-map-sheet) .tanga-surface-control{display:none}
 .tanga-deck .tanga-three__grade-legend{max-height:calc(100svh - 600px)!important}
 /* One instrument, one question, one result card. */

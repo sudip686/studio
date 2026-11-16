@@ -351,6 +351,24 @@ type ResourceBlock = {
   carbon: number;
 };
 
+type ResourceCutoffMeshGroup = {
+  mesh: THREE.InstancedMesh;
+  wireMesh: THREE.InstancedMesh | null;
+  gradesDescending: number[];
+  prefixGradeSum: Float64Array;
+};
+
+type ResourceCutoffSummary = {
+  visibleCells: number;
+  availableCells: number;
+  meanTgc: number;
+};
+
+type ResourceDrillRevealMesh = {
+  mesh: THREE.InstancedMesh;
+  revealRanks: number[];
+};
+
 type DrillSegment = {
   from: [number, number, number];
   to: [number, number, number];
@@ -2375,9 +2393,12 @@ export default function TangaThreeGeologyScene({
     onMotionPausedChange?.(next);
   };
   const [sectionEnabled,setSectionEnabled]=useState(false);
+  const [resourceSectionEnabled,setResourceSectionEnabled]=useState(false);
   const [crossSource,setCrossSource]=useState<SectionSource|null>(null);
   const crossViewRef=useRef<((section:SectionDefinition|null,flat:boolean,moveCamera?:boolean)=>void)|null>(null);
   const [sectionPosition,setSectionPosition]=useState(50);
+  const [resourceSectionPosition,setResourceSectionPosition]=useState(50);
+  const resourceSectionBoundsRef=useRef<[number,number]|null>(null);
   const [hostOnly,setHostOnly]=useState(false);
   const [exploded,setExploded]=useState(false);
   const explodedRef=useRef(false);explodedRef.current=exploded;
@@ -2393,6 +2414,44 @@ export default function TangaThreeGeologyScene({
   const [authoredSurfaceOpacity,setAuthoredSurfaceOpacity]=useState(1);
   useEffect(()=>{if(surfaceOpacity===null)resetSurfaceRef.current?.();},[surfaceOpacity]);
   const surfaceOpacityRef=useRef<number|null>(null);surfaceOpacityRef.current=surfaceOpacity;
+  const [resourceCutoff, setResourceCutoff] = useState(3);
+  const [resourceCutoffSummary, setResourceCutoffSummary] = useState<ResourceCutoffSummary|null>(null);
+  const resourceCutoffRef=useRef(resourceCutoff);resourceCutoffRef.current=resourceCutoff;
+  const resourceCutoffMeshesRef=useRef<ResourceCutoffMeshGroup[]>([]);
+  const resourceDrillRevealMeshesRef=useRef<ResourceDrillRevealMesh[]>([]);
+  const resourceDrillRevealAnimationRef=useRef({active:false,elapsed:0});
+  const resourceDrillRevealProgressRef=useRef(0);
+  const resourceDrillRevealSegmentCountRef=useRef(0);
+  const resourceDrillRevealCommandRef=useRef<(()=>void)|null>(null);
+  resourceDrillRevealCommandRef.current=()=>{
+    resourceDrillRevealAnimationRef.current={active:true,elapsed:0};
+    resourceDrillRevealProgressRef.current=0;
+    resourceDrillRevealMeshesRef.current.forEach(({mesh})=>{mesh.count=0;});
+    hostRef.current?.setAttribute('data-resource-drill-reveal','0');
+  };
+  const applyResourceCutoffRef=useRef<((cutoff:number)=>void)|null>(null);
+  applyResourceCutoffRef.current=(cutoff:number)=>{
+    const groups=resourceCutoffMeshesRef.current;
+    if(!groups.length)return;
+    let visibleCells=0,availableCells=0,gradeSum=0;
+    for(const group of groups){
+      const grades=group.gradesDescending;
+      let low=0,high=grades.length;
+      while(low<high){
+        const middle=(low+high)>>>1;
+        if(grades[middle]>=cutoff)low=middle+1;else high=middle;
+      }
+      group.mesh.count=low;
+      if(group.wireMesh)group.wireMesh.count=low;
+      visibleCells+=low;
+      availableCells+=grades.length;
+      gradeSum+=group.prefixGradeSum[low]??0;
+    }
+    hostRef.current?.setAttribute('data-resource-cutoff',cutoff.toFixed(1));
+    hostRef.current?.setAttribute('data-resource-cutoff-visible',String(visibleCells));
+    setResourceCutoffSummary({visibleCells,availableCells,meanTgc:visibleCells?gradeSum/visibleCells:0});
+  };
+  useEffect(()=>{applyResourceCutoffRef.current?.(resourceCutoff);},[resourceCutoff]);
   useEffect(()=>{setSurfaceOpacity(null);},[mode]);
   const [terrainDisplay, setTerrainDisplay] = useState<TerrainDisplay>('elevation');
   const terrainDisplayRef = useRef(terrainDisplay);
@@ -2409,8 +2468,8 @@ export default function TangaThreeGeologyScene({
   const [plantCutaway,setPlantCutaway]=useState(false);
   const [plantProcess,setPlantProcess]=useState('all');
   const [mappedSurfaceStage,setMappedSurfaceStage]=useState(false);
-  const detailOptions=useRef({sectionEnabled,sectionPosition,hostOnly,plantCutaway,plantProcess});
-  detailOptions.current={sectionEnabled,sectionPosition,hostOnly,plantCutaway,plantProcess};
+  const detailOptions=useRef({sectionEnabled,sectionPosition,resourceSectionEnabled,resourceSectionPosition,hostOnly,plantCutaway,plantProcess});
+  detailOptions.current={sectionEnabled,sectionPosition,resourceSectionEnabled,resourceSectionPosition,hostOnly,plantCutaway,plantProcess};
   const [haulCount, setHaulCount] = useState(0);
   const [haulStatus,setHaulStatus]=useState<'idle'|'loading'|'ready'|'failed'>('idle');
   const [targetCount, setTargetCount] = useState(0);
@@ -2532,6 +2591,13 @@ export default function TangaThreeGeologyScene({
   useEffect(() => {
     if (!visible || !hostRef.current) return;
 
+    resourceCutoffMeshesRef.current=[];
+    resourceDrillRevealMeshesRef.current=[];
+    resourceDrillRevealAnimationRef.current={active:false,elapsed:0};
+    resourceDrillRevealProgressRef.current=0;
+    resourceDrillRevealSegmentCountRef.current=0;
+    resourceSectionBoundsRef.current=null;
+    setResourceCutoffSummary(null);
     let cancelled = false;
     let siteSceneReady = false;
     let cancelTerrainUpgrade: (() => void) | null = null;
@@ -4041,6 +4107,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const shownDrillholes = drillSegmentsForMode(drillholes, mode);
       host.dataset.drillSegmentsRendered = String(shownDrillholes.length);
       host.dataset.drillEvidenceVisible = String(shownDrillholes.length > 0);
+      const resourceDrillOrder=mode==='resource'
+        ? [...shownDrillholes].sort((a,b)=>a.holeId.localeCompare(b.holeId)||a.depthFrom-b.depthFrom||a.depthTo-b.depthTo)
+        : shownDrillholes;
+      const resourceDrillRanks=new Map<DrillSegment,number>();
+      if(mode==='resource'){
+        resourceDrillRevealSegmentCountRef.current=resourceDrillOrder.length;
+        resourceDrillOrder.forEach((segment,index)=>resourceDrillRanks.set(segment,index));
+      }
       if (mode === 'subsurface') {
         const response = await earlyGeology;
         // The public asset request may be shared with a later chapter visit.
@@ -4301,17 +4375,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         shownDrillholes.length
       );
       const tubeMatrix = new THREE.Matrix4();
-      shownDrillholes.forEach((segment, index) => {
+      resourceDrillOrder.forEach((segment, index) => {
         const start = registeredDrillPoint(segment, 'from', terrainResources, drillSurfaceOffsets);
         const end = registeredDrillPoint(segment, 'to', terrainResources, drillSurfaceOffsets);
         makeDrillTubeMatrix(start, end, tubeMatrix, mode === 'resource' ? 1.85 : 2.15);
         traceMesh.setMatrixAt(index, tubeMatrix);
       });
+      if(mode==='resource')traceMesh.count=0;
       traceMesh.instanceMatrix.needsUpdate = true;
       traceMesh.renderOrder = 2;
       traceMesh.userData.tooltipItems = shownDrillholes.map((segment) => drillTooltip(segment, 'Drill trace', '#f8fafc'));
       tagDeckLayer(traceMesh, 'drilling');
       stage.add(traceMesh);
+      if(mode==='resource')resourceDrillRevealMeshesRef.current.push({mesh:traceMesh,revealRanks:resourceDrillOrder.map((_,index)=>index)});
       registerReveal(traceMesh, mode === 'metallurgy' ? 0.32 : 0.18, 1.05, 0.98);
       pickables.push(traceMesh);
 
@@ -4356,7 +4432,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         ? assayCandidates
         : sampleSegmentsAcrossHoles(assayCandidates, assayLimit);
       ASSAY_INTERVAL_BINS.forEach((bin) => {
-        const segments = assaySource.filter((segment) => assayIntervalBin(segment.carbon)?.key === bin.key);
+        const segments = assaySource.filter((segment) => assayIntervalBin(segment.carbon)?.key === bin.key)
+          .sort((a,b)=>(resourceDrillRanks.get(a)??0)-(resourceDrillRanks.get(b)??0));
         if (!segments.length) return;
         const color = new THREE.Color(bin.color);
         const mesh = new THREE.InstancedMesh(
@@ -4381,6 +4458,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           mesh.setMatrixAt(index, tubeMatrix);
         });
         mesh.instanceMatrix.needsUpdate = true;
+        if(mode==='resource'){
+          mesh.count=0;
+          resourceDrillRevealMeshesRef.current.push({mesh,revealRanks:segments.map(segment=>resourceDrillRanks.get(segment)??0)});
+        }
         mesh.userData.tooltipItems = segments.map((segment) => drillTooltip(segment, bin.label, bin.color, [bin.detail]));
         tagDeckLayer(mesh, 'drilling');
         stage.add(mesh);
@@ -4393,7 +4474,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const current = collarByHole.get(segment.holeId);
         if (!current || segment.depthFrom < current.depthFrom) collarByHole.set(segment.holeId, segment);
       });
-      const collarSegments = Array.from(collarByHole.values()).slice(0, mode === 'resource' ? 120 : 220);
+      const collarSegments = Array.from(collarByHole.values())
+        .sort((a,b)=>a.holeId.localeCompare(b.holeId)||a.depthFrom-b.depthFrom)
+        .slice(0, mode === 'resource' ? 120 : 220);
       const residuals = collarSegments.filter(segment => segment.depthFrom === 0).map(segment => {
         const point = drillPointFromCoords(segment.from);
         return point.y - terrainSurfaceY(terrainResources, point.x, -point.z);
@@ -4430,6 +4513,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         collars.setMatrixAt(index, collarMatrix);
       });
       collars.instanceMatrix.needsUpdate = true;
+      if(mode==='resource'){
+        collars.count=0;
+        resourceDrillRevealMeshesRef.current.push({mesh:collars,revealRanks:collarSegments.map(segment=>resourceDrillRanks.get(segment)??0)});
+      }
       collars.renderOrder = 8;
       collars.userData.tooltipItems = collarSegments.map((segment) => ({
         title: segment.holeId,
@@ -4590,6 +4677,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             minY=Math.min(minY,b.y-b.dz/2);maxY=Math.max(maxY,b.y+b.dz/2);
             minZ=Math.min(minZ,b.z-b.dy/2);maxZ=Math.max(maxZ,b.z+b.dy/2);
           }
+          resourceSectionBoundsRef.current=[minZ,maxZ];
           const sizeX=maxX-minX,sizeZ=maxZ-minZ,distance=Math.max(sizeX,sizeZ)*1.5+200;
           cameraShot.target.set((minX+maxX)/2,(minY+maxY)/2,(minZ+maxZ)/2);
           cameraShot.to.copy(cameraShot.target).add(new THREE.Vector3(distance*.85,distance*.55,distance*.12));
@@ -4623,6 +4711,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         TGC_GRADE_BINS.forEach((bin, binIndex) => {
           const gradeBlocks = solidByGrade.get(bin.key) ?? [];
           if (!gradeBlocks.length || mode === 'mine_planning') return;
+
+          // Keep instances ordered by their actual block-model TGC. The
+          // InstancedMesh draw count can then act as a live grade threshold
+          // without rebuilding 150k transforms while the slider moves.
+          gradeBlocks.sort((a,b)=>b.carbon-a.carbon);
+          const prefixGradeSum=new Float64Array(gradeBlocks.length+1);
+          gradeBlocks.forEach((block,index)=>{prefixGradeSum[index+1]=prefixGradeSum[index]+block.carbon;});
 
           const blockColor = new THREE.Color(bin.color);
           // Grade is evidence. Keep each reported class at its exact palette
@@ -4686,7 +4781,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           if(sampled.length<=20000)registerReveal(wireMesh, 0.62 + binIndex * 0.16, 1.16, 0.68, -76 + binIndex * 6);
           else {wireMesh.dispose();wireMaterial.dispose();}
           pickables.push(mesh);
+          if(mode==='resource')resourceCutoffMeshesRef.current.push({
+            mesh,
+            wireMesh:sampled.length<=20000?wireMesh:null,
+            gradesDescending:gradeBlocks.map(block=>block.carbon),
+            prefixGradeSum,
+          });
         });
+
+        if(mode==='resource'){
+          applyResourceCutoffRef.current?.(resourceCutoffRef.current);
+          resourceDrillRevealCommandRef.current?.();
+        }
 
         if (mode === 'resource' && activeFocus === 'HighFlake' && sampled.length) {
           const flakeGeometry = new THREE.CircleGeometry(44, 6);
@@ -5603,6 +5709,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if(Math.abs(separation-Number(separate))<.001)separation=Number(separate);
         geologyMeshes.forEach((mesh,i)=>{mesh.visible=layerSettingsRef.current.blocks.visible&&(!detail.hostOnly||mesh.name.includes('GRSC'));mesh.position.y=separation*i*85;});
         host.dataset.geologySeparation=separation.toFixed(3);
+      }else if(mode==='resource'){
+        stage.updateMatrixWorld(true);
+        const bounds=resourceSectionBoundsRef.current;
+        const fraction=detail.resourceSectionPosition/100;
+        const cutZ=bounds?bounds[1]-(bounds[1]-bounds[0])*fraction:0;
+        // Clip terrain and model with the same world-space plane so the sweep
+        // reads as one section through the supplied resource scene.
+        sectionPlane.set(new THREE.Vector3(0,0,1),-cutZ).applyMatrix4(stage.matrixWorld);
+        renderer.clippingPlanes=detail.resourceSectionEnabled?sectionPlanes:[];
+        host.dataset.section=detail.resourceSectionEnabled?String(detail.resourceSectionPosition):'off';
+      }else{
+        renderer.clippingPlanes=[];
+        delete host.dataset.section;
       }
       const plantMotionDelta=Math.min(.1,Math.max(0,elapsed-lastMotionElapsed));
       const targetRoofProgress=detail.plantCutaway?1:0;
@@ -5669,6 +5788,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       displayReveal.update(paused?0:elapsed-lastMotionElapsed,reducedMotion.matches);
       renderer.localClippingEnabled=true;
       if(!paused)motionTime+=Math.min(.5,elapsed-lastMotionElapsed);
+      const drillReveal=resourceDrillRevealAnimationRef.current;
+      if(mode==='resource'&&drillReveal.active){
+        if(!paused)drillReveal.elapsed+=Math.max(0,elapsed-lastMotionElapsed);
+        const progress=reducedMotion.matches?1:Math.min(1,drillReveal.elapsed/3.6);
+        const revealedSegments=Math.floor(resourceDrillRevealSegmentCountRef.current*progress);
+        resourceDrillRevealMeshesRef.current.forEach(({mesh,revealRanks})=>{
+          let low=0,high=revealRanks.length;
+          while(low<high){const middle=(low+high)>>>1;if(revealRanks[middle]<revealedSegments)low=middle+1;else high=middle;}
+          mesh.count=low;
+        });
+        resourceDrillRevealProgressRef.current=progress;
+        host.dataset.resourceDrillReveal=progress.toFixed(2);
+        if(progress>=1)drillReveal.active=false;
+      }
       journeyUpdate?.(motionTime);
       lastMotionElapsed=elapsed;
       host.dataset.haulMotion=paused?'paused':'playing';
@@ -6321,7 +6454,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
           {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-label={mode==='subsurface'?(inspectionOpen?'Close inspection tools':'Inspection tools'):undefined} title={mode==='subsurface'?'Geology inspection tools':'Inspection tools'} aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{mode==='subsurface'?(inspectionOpen?'Close tools':'Inspect'):(inspectionOpen ? 'Close inspection tools' : 'Inspection tools')}</button>}
         </div>
-        {mode==='resource'&&<details className="tanga-three-animation-tools" onToggle={event=>{if(event.currentTarget.open){const legend=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three__grade-legend');if(legend?.open)legend.open=false;}}}><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
+        {mode==='resource'&&<details className="tanga-three-animation-tools" onToggle={event=>{if(event.currentTarget.open){const legend=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three__grade-legend');if(legend?.open)legend.open=false;}}}><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);resourceDrillRevealCommandRef.current?.();}}>Replay source drillhole reveal</button><small>Actual assay intervals shown by hole ID and downhole depth for presentation; this is not drilling chronology.</small><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
           <>
           {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>Recorded intervals only; gaps are not interpolated into new assays. Highlight is visible through the terrain.</small></details>}
@@ -6446,11 +6579,27 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
       {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}
       {mode === 'resource' && (
-        <details className="tanga-three__grade-legend" aria-label="TGC grade legend" onToggle={event=>{if(event.currentTarget.open){const tools=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three-animation-tools');if(tools?.open)tools.open=false;}}}>
-          <summary>Read the grade colours · % TGC</summary>
+        <details className="tanga-three__grade-legend" aria-label="TGC grade legend" onToggle={event=>{if(event.currentTarget.open){event.currentTarget.scrollTop=0;const tools=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three-animation-tools');if(tools?.open)tools.open=false;}}}>
+          <summary>Grade filter · cutaway</summary>
           <div className="tanga-three__grade-head">
             <span>TGC Grade</span>
             <strong>{resourceFocusLabel(resourceFocus)} view</strong>
+          </div>
+          <div className="tanga-three__resource-threshold">
+            <label htmlFor="tanga-resource-threshold"><span>Show blocks ≥</span><output>{resourceCutoff.toFixed(1)}% TGC</output></label>
+            <input id="tanga-resource-threshold" aria-label="Resource block display threshold in percent TGC" type="range" min="0" max="12" step="0.1" value={resourceCutoff} onChange={event=>{setResourceCutoff(Number(event.target.value));window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
+            <div className="tanga-three__resource-threshold-stats" aria-live="polite">
+              <span>{resourceCutoffSummary?`${resourceCutoffSummary.visibleCells.toLocaleString()} / ${resourceCutoffSummary.availableCells.toLocaleString()} cells`:sceneReady?'Preparing model counts':'Loading source cells'}</span>
+              {resourceCutoffSummary?.visibleCells?<strong>{resourceCutoffSummary.meanTgc.toFixed(2)}% mean cell TGC</strong>:null}
+            </div>
+            <button className="tanga-three__resource-basis" type="button" onClick={()=>{setResourceCutoff(3);window.dispatchEvent(new Event('tanga:manual-exploration'));}}>Use 3% MRE cut-off</button>
+            <small>Source-cell view filter only. It does not recalculate reported tonnes, grade or contained graphite, and is not an economic cutoff.</small>
+          </div>
+          <div className="tanga-three__resource-section">
+            <button type="button" aria-pressed={resourceSectionEnabled} disabled={!sceneReady} onClick={()=>{setExploded(false);setResourceSectionEnabled(value=>!value);window.dispatchEvent(new Event('tanga:manual-exploration'));}}>{resourceSectionEnabled?'Close model cutaway':'Open model cutaway'}</button>
+            <label htmlFor="tanga-resource-section-position"><span>Section sweep</span><output>{resourceSectionPosition}%</output></label>
+            <input id="tanga-resource-section-position" aria-label="Sweep the resource model cutaway" type="range" min="0" max="100" step="1" value={resourceSectionPosition} disabled={!resourceSectionEnabled} onChange={event=>setResourceSectionPosition(Number(event.target.value))}/>
+            <small>Clips the displayed model and terrain together; it is not a new geological interpretation.</small>
           </div>
           <div className="tanga-three__grade-ramp" aria-hidden="true" />
           <ol className="tanga-three__grade-list">
