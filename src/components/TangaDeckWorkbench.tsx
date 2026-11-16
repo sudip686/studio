@@ -5298,6 +5298,10 @@ export default function TangaDeckWorkbench() {
 
   const [isExecutiveTour, setIsExecutiveTour] = useState(false);
   const [isHighlightsTour, setIsHighlightsTour] = useState(false);
+  const [isKioskMode, setIsKioskMode] = useState(false);
+  const [isKioskExploring, setIsKioskExploring] = useState(false);
+  const kioskModeRef = useRef(false);
+  const kioskIdleTimerRef = useRef<number | null>(null);
   // Manual interruption leaves the presenter in ordinary chapter playback.
   // Gate the route mode on the active executive tour so a stale highlight flag
   // cannot make a later Play action jump to a different chapter.
@@ -5309,6 +5313,21 @@ export default function TangaDeckWorkbench() {
       const nextIndex = highlightStopIndex + 1;
       const nextStop = EXECUTIVE_HIGHLIGHTS[nextIndex];
       if (!nextStop) {
+        if (kioskModeRef.current) {
+          const firstStop = EXECUTIVE_HIGHLIGHTS[0];
+          const firstIndex = STORY_STEPS.findIndex((step) => step.mode === firstStop.mode);
+          window.setTimeout(() => {
+            if (!kioskModeRef.current) return;
+            setIsAutoplay(false);
+            setIsExecutiveTour(true);
+            setIsHighlightsTour(true);
+            setHighlightStopIndex(0);
+            setPendingInfo(null);
+            goToStoryIndex(firstIndex);
+            window.setTimeout(() => {if(kioskModeRef.current)setIsAutoplay(true);}, 0);
+          }, 700);
+          return;
+        }
         setIsAutoplay(false);
         setIsExecutiveTour(false);
         setIsHighlightsTour(false);
@@ -5356,6 +5375,58 @@ export default function TangaDeckWorkbench() {
     window.setTimeout(() => setIsAutoplay(true), 0);
   }, [goToStoryIndex]);
 
+  const exitKioskMode = useCallback(() => {
+    kioskModeRef.current = false;
+    if (kioskIdleTimerRef.current !== null) window.clearTimeout(kioskIdleTimerRef.current);
+    kioskIdleTimerRef.current = null;
+    setIsKioskMode(false);
+    setIsKioskExploring(false);
+    setIsAutoplay(false);
+    setIsExecutiveTour(false);
+    setIsHighlightsTour(false);
+  }, []);
+
+  const enterKioskMode = useCallback(() => {
+    kioskModeRef.current = true;
+    setIsKioskMode(true);
+    setIsKioskExploring(false);
+    startExecutiveHighlights();
+  }, [startExecutiveHighlights]);
+
+  const markKioskInteraction = useCallback(() => {
+    if (!kioskModeRef.current) return;
+    setIsKioskExploring(true);
+    setIsAutoplay(false);
+    setIsExecutiveTour(false);
+    setIsHighlightsTour(false);
+    if (kioskIdleTimerRef.current !== null) window.clearTimeout(kioskIdleTimerRef.current);
+    kioskIdleTimerRef.current = window.setTimeout(() => {
+      kioskIdleTimerRef.current = null;
+      if (!kioskModeRef.current) return;
+      setIsKioskExploring(false);
+      startExecutiveHighlights();
+    }, 60_000);
+  }, [startExecutiveHighlights]);
+
+  useEffect(() => {
+    if (!isKioskMode) return;
+    const onActivity = () => markKioskInteraction();
+    window.addEventListener('pointerdown', onActivity, true);
+    window.addEventListener('keydown', onActivity, true);
+    window.addEventListener('wheel', onActivity, {capture: true, passive: true});
+    window.addEventListener('touchstart', onActivity, {capture: true, passive: true});
+    return () => {
+      window.removeEventListener('pointerdown', onActivity, true);
+      window.removeEventListener('keydown', onActivity, true);
+      window.removeEventListener('wheel', onActivity, true);
+      window.removeEventListener('touchstart', onActivity, true);
+    };
+  }, [isKioskMode, markKioskInteraction]);
+
+  useEffect(() => () => {
+    if (kioskIdleTimerRef.current !== null) window.clearTimeout(kioskIdleTimerRef.current);
+  }, []);
+
   useEffect(() => {
     if (!isExecutiveHighlightsActive) return;
     const stop = EXECUTIVE_HIGHLIGHTS[highlightStopIndex];
@@ -5381,11 +5452,17 @@ export default function TangaDeckWorkbench() {
   useEffect(()=>{const stop=()=>{setIsAutoplay(false);setIsExecutiveTour(false);setIsHighlightsTour(false);};window.addEventListener('tanga:manual-exploration',stop);return()=>window.removeEventListener('tanga:manual-exploration',stop);},[]);
   useEffect(() => {
     const pauseInBackground = () => {
-      if (document.hidden) setIsAutoplay(false);
+      if (document.hidden) {
+        setIsAutoplay(false);
+        if (kioskIdleTimerRef.current !== null) window.clearTimeout(kioskIdleTimerRef.current);
+        kioskIdleTimerRef.current = null;
+        return;
+      }
+      if (kioskModeRef.current) markKioskInteraction();
     };
     document.addEventListener('visibilitychange', pauseInBackground);
     return () => document.removeEventListener('visibilitychange', pauseInBackground);
-  }, []);
+  }, [markKioskInteraction]);
   // Chapter budgets are shared across authored shots, not repeated per shot.
   const [autoplaySec, setAutoplaySec] = useState<60 | 90 | 120>(90);
   const nextChapterMode = STORY_STEPS[activeStoryIndex + 1]?.mode;
@@ -5690,6 +5767,11 @@ export default function TangaDeckWorkbench() {
         setIsCommandPaletteOpen(false);
         return;
       }
+      if (key === 'Escape' && isKioskMode) {
+        event.preventDefault();
+        exitKioskMode();
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && key.toLowerCase() === 'k') {
         event.preventDefault();
         if (!isCommandPaletteOpen) {
@@ -5738,7 +5820,11 @@ export default function TangaDeckWorkbench() {
       if (key === 's' || key === 'S') { event.preventDefault(); toggleNotes(); return; }
       if (key === 'l' || key === 'L') { event.preventDefault(); toggleLayers(); return; }
       if (key === 'g' || key === 'G') { event.preventDefault(); toggleIndex(); return; }
-      if (key === 'p' || key === 'P' || key === ' ') { event.preventDefault(); toggleAutoplay(); return; }
+      if (key === 'p' || key === 'P' || key === ' ') {
+        event.preventDefault();
+        if (!isKioskMode) toggleAutoplay();
+        return;
+      }
       if (key === '?' || key === '/') { event.preventDefault(); toggleShortcuts(); return; }
 
       if (key === 'Escape') {
@@ -5752,7 +5838,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, isCommandPaletteOpen, activeStoryIndex, coverDismissed]);
+  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, isCommandPaletteOpen, isKioskMode, exitKioskMode, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -5828,6 +5914,7 @@ export default function TangaDeckWorkbench() {
         activeMode === 'comparison' && isExploreMode && 'tanga-deck--comparison',
         activeMode === 'work_completed' && !isExploreMode && 'tanga-deck--work-completed-story',
         activeMode === 'comparison' && !isExploreMode && 'tanga-deck--decision-story',
+        isKioskMode && 'tanga-deck--kiosk',
         isLayersOpen && 'tanga-deck--layers-open',
         isNotesOpen && 'tanga-deck--notes-open',
         isInspectorOpen && 'tanga-deck--inspector-open',
@@ -5837,6 +5924,7 @@ export default function TangaDeckWorkbench() {
       )}
       data-act={MODE_ACT[activeMode]}
       data-mode={activeMode}
+      data-kiosk={isKioskMode ? 'true' : undefined}
       data-map-state={mapStageState}
       data-map-first-idle-ms={threeVisible ? undefined : mapFirstIdleMs ?? undefined}
       data-three-state={threeLoadReport.scene}
@@ -5956,6 +6044,14 @@ export default function TangaDeckWorkbench() {
       )}
 
       <div className="tanga-deck__shade" />
+
+      {isKioskMode && (
+        <aside className="tanga-kiosk-cue" aria-live="polite" role="status">
+          <span>Exhibition mode</span>
+          <strong>{isKioskExploring ? 'Explore freely' : 'Touch or click to explore'}</strong>
+          <small>{isKioskExploring ? 'The story restarts after 60 seconds without interaction.' : 'A guided Tanga project tour is playing.'}</small>
+        </aside>
+      )}
 
       {/* HUD command-center frame: viewport-corner reticles + edge vignette.
           Pure decoration, non-interactive. Styled in hud.css (Phase 3). */}
@@ -6516,6 +6612,15 @@ export default function TangaDeckWorkbench() {
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
+          <button
+            type="button"
+            className={classNames('tanga-deck__executive-tour', 'tanga-deck__executive-tour--kiosk', isKioskMode && 'is-active')}
+            onClick={isKioskMode ? exitKioskMode : enterKioskMode}
+            aria-label={isKioskMode ? 'Exit booth presentation mode' : 'Start booth presentation mode'}
+            title={isKioskMode ? 'Exit booth mode · Escape' : 'Loop the authored investor highlights; interaction pauses for exploration'}
+          >
+            {isKioskMode ? 'Exit booth' : 'Booth mode'}
+          </button>
           <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
           <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
           <button

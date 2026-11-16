@@ -800,6 +800,16 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck__executive-tour--highlights { border-color: rgba(191,205,209,.28); background: rgba(122,151,163,.1); color: #c6d5d9; }
 .tanga-deck__executive-tour--highlights:hover { background: rgba(122,151,163,.19); }
 .tanga-deck__executive-tour:focus-visible { outline: 2px solid #f6be91; outline-offset: 3px; }
+.tanga-deck__executive-tour--kiosk { border-color: rgba(126,201,189,.34); background: rgba(56,119,112,.16); color: #c5eee4; }
+.tanga-deck__executive-tour--kiosk:hover,.tanga-deck__executive-tour--kiosk.is-active { border-color: rgba(126,201,189,.7); background: rgba(56,119,112,.3); color: #ecfff9; }
+.tanga-kiosk-cue { position:absolute; z-index:72; top:18px; left:50%; display:grid; gap:3px; max-width:min(340px,calc(100vw - 36px)); padding:9px 14px; transform:translateX(-50%); border:1px solid rgba(196,225,219,.24); border-radius:999px; background:rgba(8,17,21,.78); color:#f1f3ee; text-align:center; pointer-events:none; box-shadow:0 10px 30px rgba(0,0,0,.2); backdrop-filter:blur(12px); }
+.tanga-kiosk-cue span { color:#9fd2c7; font-size:8px; font-weight:750; letter-spacing:.14em; text-transform:uppercase; }
+.tanga-kiosk-cue strong { font-size:12px; font-weight:680; line-height:1.25; }
+.tanga-kiosk-cue small { color:rgba(241,243,238,.7); font-size:10px; line-height:1.35; }
+.tanga-deck--kiosk .tanga-deck__executive-tour--kiosk:focus-visible { outline:2px solid #b7ece1; outline-offset:3px; }
+.tanga-deck--kiosk .tanga-deck__autoplay-group > :not(.tanga-deck__executive-tour--kiosk),
+.tanga-deck--kiosk .tanga-tour-mobile { display:none!important; }
+.tanga-deck--kiosk .tanga-deck__autoplay-group > .tanga-deck__executive-tour--kiosk { display:inline-flex!important; }
 .tanga-deck--bright-room .tanga-story-panel { border-color: rgba(255,255,255,.34); background: linear-gradient(150deg,rgba(29,35,39,.98),rgba(18,24,29,.97)); box-shadow: 0 24px 70px rgba(0,0,0,.62); }
 .tanga-deck--bright-room .tanga-story-panel__intro,.tanga-deck--bright-room .tanga-story-panel__qualification { color: rgba(255,255,255,.82); }
 .tanga-deck--bright-room .tanga-story-panel__eyebrow,.tanga-deck--bright-room .tanga-story-image-caption span { color: #ffc092; }
