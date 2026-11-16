@@ -28,6 +28,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
   const [introDuration, setIntroDuration] = useState(50);
   const [soundOn, setSoundOn] = useState(false);
   const [activeRoute, setActiveRoute] = useState('');
+  const [routeHydrated, setRouteHydrated] = useState(false);
   const [deepLinked, setDeepLinked] = useState(false);
 
   const completeIntro = () => {
@@ -48,6 +49,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
     // agree on the active waypoint for direct chapter links.
     const initialRoute = window.location.hash.replace(/^#/, '');
     setActiveRoute(initialRoute);
+    setRouteHydrated(true);
     if (initialRoute) {
       setDeepLinked(true);
       setIntroState('done');
@@ -187,7 +189,7 @@ export default function TangaIntroGate({children}: TangaIntroGateProps) {
                     {href: '#mine_planning', label: '03 · The next stage'},
                   ].map(({href, label}) => {
                     const route = href.slice(1);
-                    return <a key={route} href={href} aria-current={activeRoute === route ? 'page' : undefined}>{label}</a>;
+                    return <a key={route} href={href} aria-current={routeHydrated && activeRoute === route ? 'page' : undefined}>{label}</a>;
                   })}
                 </nav>
               </div>
