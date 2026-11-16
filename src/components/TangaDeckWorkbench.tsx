@@ -808,6 +808,21 @@ const STORY_STEPS: StoryStep[] = [
   {mode: 'comparison', act: '12', label: 'Evidence to decisions', command: 'show next decisions', tone: '#b9954b'},
 ];
 
+type StoryWaypoint = {id: string; label: string; entryMode: WorkbenchMode; modes: ReadonlyArray<WorkbenchMode>};
+const STORY_WAYPOINTS: ReadonlyArray<StoryWaypoint> = [
+  {id: 'place', label: 'Place & scale', entryMode: 'project', modes: ['project', 'tanzania', 'work_completed', 'topography']},
+  {id: 'geology', label: 'Geology', entryMode: 'subsurface', modes: ['subsurface']},
+  {id: 'drilling', label: 'Drilling', entryMode: 'drillholes', modes: ['drillholes']},
+  {id: 'resource', label: 'Resource & peers', entryMode: 'resource', modes: ['resource', 'ranking']},
+  {id: 'metallurgy', label: 'Metallurgy', entryMode: 'metallurgy', modes: ['metallurgy']},
+  {id: 'mine-planning', label: 'Mine planning', entryMode: 'mine_planning', modes: ['mine_planning']},
+  {id: 'decisions', label: 'Close & decisions', entryMode: 'comparison', modes: ['accessibility', 'comparison']},
+];
+function storyWaypointIndexForMode(mode: WorkbenchMode) {
+  const index = STORY_WAYPOINTS.findIndex(waypoint => waypoint.modes.includes(mode));
+  return Math.max(0, index);
+}
+
 // The guided route covers the complete evidence-to-decisions narrative.
 const EXECUTIVE_ROUTE: WorkbenchMode[] = STORY_STEPS.map(step => step.mode);
 // A short investor route through six already authored, evidence-backed views.
@@ -4410,6 +4425,14 @@ export default function TangaDeckWorkbench() {
     const sorted = scored.sort((a, b) => b.score - a.score).map((item) => item.prompt);
     return (sorted.length > 0 ? sorted : COMMON_PROMPTS).slice(0, 6);
   }, [activeMode, commandText, resourceFocus, routeTarget]);
+  const commandPalettePrompts = useMemo(() => {
+    const tokens = commandText.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return shortlistedPrompts;
+    return shortlistedPrompts.filter(prompt => {
+      const haystack = `${prompt.label} ${prompt.command}`.toLowerCase();
+      return tokens.every(token => haystack.includes(token));
+    });
+  }, [commandText, shortlistedPrompts]);
   const threeMode = (threeVisible ? activeMode : 'drillholes') as 'topography' | 'drillholes' | 'subsurface' | 'resource' | 'mine_planning' | 'metallurgy';
   const storyHeroVisible = false;
   const legendItems = legendForMode(activeMode, routeTarget, resourceFocus);
@@ -4916,6 +4939,7 @@ export default function TangaDeckWorkbench() {
   }, [peerGlobeLabels,pinnedMapLabels,projectedSceneCallouts,stageSize.width,stageSize.height,activeMode]);
 
   const activeStoryIndex = Math.max(0, STORY_STEPS.findIndex((step) => step.mode === activeMode));
+  const activeWaypointIndex = storyWaypointIndexForMode(activeMode);
   useEffect(() => {
     const restoreDepth = () => {if(activeMode === 'subsurface') setActiveShotIndex(index => index === 0 || index === 1 ? 2 : index);};
     window.addEventListener('tanga:geology-perspective', restoreDepth);
@@ -4964,7 +4988,6 @@ export default function TangaDeckWorkbench() {
       }),
     };
   }, [activeMode, relief]);
-  const activeActIndex = actIndexForMode(activeMode);
   const isClosingScene = activeStoryIndex === STORY_STEPS.length - 1;
   // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
   // the ranking underneath (it does NOT advance — scene 1 is the peer field).
@@ -5347,6 +5370,10 @@ export default function TangaDeckWorkbench() {
   const [brightRoom, setBrightRoom] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const commandPaletteInputRef = useRef<HTMLInputElement | null>(null);
+  const commandPaletteReturnFocusRef = useRef<HTMLElement | null>(null);
+  const commandPaletteWasOpenRef = useRef(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [sceneMotionPaused, setSceneMotionPaused] = useState(false);
@@ -5367,6 +5394,21 @@ export default function TangaDeckWorkbench() {
     ? EXECUTIVE_HIGHLIGHTS_SECONDS / EXECUTIVE_HIGHLIGHTS.length
     : (isExecutiveTour ? TANGA_STORY[activeMode].seconds : autoplaySec) / Math.max(1, activeShots.length + (isExecutiveTour ? 0 : transitionCardCount));
   const [isAutoplayMenuOpen, setIsAutoplayMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!isCommandPaletteOpen) {
+      if (commandPaletteWasOpenRef.current) {
+        commandPaletteWasOpenRef.current = false;
+        commandPaletteReturnFocusRef.current?.focus();
+        commandPaletteReturnFocusRef.current = null;
+      }
+      return;
+    }
+    commandPaletteWasOpenRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      commandPaletteInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isCommandPaletteOpen]);
   // Annotation density, cycled with Ctrl+A:
   //   key → authored scene callouts plus the strongest anchored drill intercept
   //   all → the dense data-label view, for detailed questions
@@ -5642,6 +5684,21 @@ export default function TangaDeckWorkbench() {
   //   Esc                        → close open panels; second Esc exits fullscreen
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      const key = event.key;
+      if (key === 'Escape' && isCommandPaletteOpen) {
+        event.preventDefault();
+        setIsCommandPaletteOpen(false);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && key.toLowerCase() === 'k') {
+        event.preventDefault();
+        if (!isCommandPaletteOpen) {
+          commandPaletteReturnFocusRef.current = document.activeElement as HTMLElement | null;
+          setCommandText('');
+        }
+        setIsCommandPaletteOpen(true);
+        return;
+      }
       const target = event.target as HTMLElement | null;
       // Native form/disclosure controls own arrows and Space while focused.
       // In particular, sample selectors must not advance the presentation.
@@ -5659,8 +5716,6 @@ export default function TangaDeckWorkbench() {
         return;
       }
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-
-      const key = event.key;
 
       // Navigation
       if (key === 'ArrowRight' || key === 'PageDown') {
@@ -5697,7 +5752,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, activeStoryIndex, coverDismissed]);
+  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, isCommandPaletteOpen, activeStoryIndex, coverDismissed]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -6261,26 +6316,6 @@ export default function TangaDeckWorkbench() {
         </aside>
       )}
 
-      {/* Three-act story ribbon — top-center, shows narrative progression. */}
-      {activeMode !== 'subsurface' && (
-        <div className="tanga-deck__act-ribbon" aria-hidden="true">
-          {STORY_ACTS.map((act, i) => (
-            <div
-              key={act.id}
-              className={classNames(
-                'tanga-deck__act-seg',
-                i === activeActIndex && 'is-active',
-                i < activeActIndex && 'is-done',
-              )}
-              style={{'--act-theme': act.theme} as any}
-            >
-              <span className="tanga-deck__act-num">{`Act ${['I', 'II', 'III'][i]}`}</span>
-              <span className="tanga-deck__act-label">{act.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* First-run coach marks — one-time interactive hint. */}
       {showCoach && !showCover && !isAutoplayMenuOpen && !isNotesOpen && !isLayersOpen && !isAutoplay && (
         <button type="button" className="tanga-deck__coach" onClick={dismissCoach} aria-label="Dismiss navigation hint">
@@ -6420,7 +6455,7 @@ export default function TangaDeckWorkbench() {
         </button>
         <div className="tanga-deck__pager-status" aria-live="polite">
           <span className="tanga-deck__pager-label">
-            {STORY_STEPS[activeStoryIndex]?.label ?? 'Scene'}
+            {STORY_WAYPOINTS[activeWaypointIndex]?.label ?? 'Story'}
           </span>
           <button
             type="button"
@@ -6434,29 +6469,40 @@ export default function TangaDeckWorkbench() {
             {String(activeStoryIndex + 1).padStart(2, '0')}
             {activeShots.length > 1 ? `.${activeShotIndex + 1}` : ''} / {String(STORY_STEPS.length).padStart(2, '0')}
           </button>
-          <div
-            className="tanga-deck__pager-dots"
-            role="tablist"
-            aria-label="Jump to scene"
-            style={{'--pager-progress': STORY_STEPS.length > 1 ? activeStoryIndex / (STORY_STEPS.length - 1) : 0} as any}
+          <nav
+            className="tanga-deck__pager-dots tanga-deck__story-waypoints"
+            aria-label="Story waypoints"
+            style={{'--pager-progress': STORY_WAYPOINTS.length > 1 ? activeWaypointIndex / (STORY_WAYPOINTS.length - 1) : 0} as any}
           >
-            {STORY_STEPS.map((step, i) => (
+            {STORY_WAYPOINTS.map((waypoint, i) => (
               <button
-                key={step.mode}
+                key={waypoint.id}
                 type="button"
-                role="tab"
-                aria-selected={i === activeStoryIndex}
-                aria-label={`Scene ${i + 1}: ${step.label}`}
-                title={`${i + 1}. ${step.label}`}
+                aria-current={i === activeWaypointIndex ? 'step' : undefined}
+                aria-label={`Waypoint ${i + 1} of ${STORY_WAYPOINTS.length}: ${waypoint.label}`}
+                title={`${i + 1} · ${waypoint.label}`}
                 className={classNames(
                   'tanga-deck__pager-dot',
-                  i === activeStoryIndex && 'is-active',
-                  i < activeStoryIndex && 'is-seen'
+                  i === activeWaypointIndex && 'is-active',
+                  i < activeWaypointIndex && 'is-seen'
                 )}
-                onClick={() => { setIsAutoplay(false); goToStoryIndex(i); }}
+                onClick={() => {
+                  setIsAutoplay(false);
+                  setIsExecutiveTour(false);
+                  goToStoryIndex(STORY_STEPS.findIndex(step => step.mode === waypoint.entryMode));
+                }}
+                onKeyDown={event => {
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const buttons = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+                  const next = (i + (event.key === 'ArrowRight' ? 1 : -1) + STORY_WAYPOINTS.length) % STORY_WAYPOINTS.length;
+                  buttons[next]?.focus();
+                  buttons[next]?.click();
+                }}
               />
             ))}
-          </div>
+          </nav>
         </div>
         <button
           type="button"
@@ -6962,6 +7008,7 @@ export default function TangaDeckWorkbench() {
             <dt><kbd>F</kbd></dt><dd>Fullscreen</dd>
             <dt><kbd>S</kbd></dt><dd>Speaker notes</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>Cycle labels: key &rarr; all data &rarr; off</dd>
+            <dt><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd></dt><dd>Open command palette</dd>
             <dt><kbd>L</kbd></dt><dd>Layer controls</dd>
             <dt><kbd>G</kbd></dt><dd>All scenes</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>I</kbd></dt><dd>Why this matters</dd>
@@ -7014,6 +7061,57 @@ export default function TangaDeckWorkbench() {
           </div>
         </form>
       </header>
+
+      {isCommandPaletteOpen && (
+        <div
+          className="tanga-command-palette__scrim"
+          onMouseDown={event => {if(event.target===event.currentTarget)setIsCommandPaletteOpen(false);}}
+          onKeyDown={event => {
+            if (event.key !== 'Tab') return;
+            const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input,button:not([disabled])'));
+            if (!controls.length) return;
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {event.preventDefault();last.focus();}
+            else if (!event.shiftKey && document.activeElement === last) {event.preventDefault();first.focus();}
+          }}
+        >
+          <section className="tanga-command-palette" role="dialog" aria-modal="true" aria-labelledby="tanga-command-palette-title" aria-describedby="tanga-command-palette-help">
+            <header className="tanga-command-palette__header">
+              <div>
+                <span>Presentation controls · Ctrl/⌘ K</span>
+                <h2 id="tanga-command-palette-title">Go to a view or run a command</h2>
+              </div>
+              <button type="button" onClick={() => setIsCommandPaletteOpen(false)} aria-label="Close command palette">Esc</button>
+            </header>
+            <p id="tanga-command-palette-help">Choose a supported action. Grade and resource values stay tied to the source model.</p>
+            <form
+              className="tanga-command-palette__form"
+              onSubmit={event => {event.preventDefault();if(commandText.trim()){setIsCommandPaletteOpen(false);void runCommand(commandText.trim());}}}
+            >
+              <input
+                ref={commandPaletteInputRef}
+                value={commandText}
+                onChange={event => setCommandText(event.target.value)}
+                placeholder="Try ‘metallurgy’, ‘show resource model’…"
+                aria-label="Search presentation commands"
+                autoComplete="off"
+              />
+              <button type="submit" disabled={!commandText.trim()}>Run</button>
+            </form>
+            {commandPalettePrompts.length ? (
+              <div className="tanga-command-palette__results" aria-label="Matching supported commands">
+                {commandPalettePrompts.map(prompt => (
+                  <button key={prompt.command} type="button" onClick={() => {runPrompt(prompt.command);setIsCommandPaletteOpen(false);}}>
+                    <span>{prompt.label}</span><small>{prompt.command}</small><kbd>↵</kbd>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="tanga-command-palette__empty" role="status">No matching supported command. Try a chapter name, “resource model,” “topography,” or “Tanga port.”</p>
+            )}
+          </section>
+        </div>
+      )}
 
       <section className="tanga-deck__load-strip" aria-label="Scene readiness">
         {loadStages.map((stage) => (

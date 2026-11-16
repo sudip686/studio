@@ -282,6 +282,21 @@ Implementation details, priorities, reference evidence and acceptance conditions
   - [x] Label the active highlight number, explain the duration and pause when the presenter takes manual control. Desktop production walkthrough visited all six stops, preserved the share URL at each shot, reached the closing decisions, and logged no JavaScript errors. Manual interruption and starting the full story afterward also worked.
   - [x] Fix the interruption/resume state so a later Play action returns to chapter playback instead of resuming the highlight route. Production regression: after Highlights entered drilling, a camera drag changed the control to “Play current chapter views”; with 60 s chapter timing, playback stayed in drilling for the first 16 s and advanced to geology after the authored chapter hold. Zero alerts and JavaScript errors.
 
+- [ ] **G4 · Presenter and analyst extensions:** build on the existing Story/Explore modes without adding duplicate navigation or exposing unreviewed project data.
+  - [x] Replace the noninteractive three-act ribbon and 12-dot footer indicator with seven named story waypoints: Place & scale, Geology, Drilling, Resource & peers, Metallurgy, Mine planning, and Close & decisions. Arrow keys move and activate waypoints; the existing 12-chapter scene index remains available for detailed navigation. Desktop local browser verified seven nodes, one active step, geology activation, keyboard advance from Geology to Drilling, and all 12 chapter cards. Capture: `.playwright-mcp/story-waypoints-mine-1366x768.png`.
+  - [x] Add a command palette on Ctrl/Cmd+K for authored chapters and supported scene actions; unsupported numeric/grade queries show a no-match message. Local desktop browser verified open/focus, contextual filtering, routing to Metallurgy, unsupported `cutoff 8%` rejection, Escape close and focus return, with no page errors. Captures: `.playwright-mcp/command-palette-default-1707x842.png`, `.playwright-mcp/command-palette-metallurgy-1366x768.png`.
+  - [ ] Add an optional night-view preset only if categorical geology/grade colors remain stable and labels retain contrast. Keep daylight as the default.
+  - [ ] Prototype kiosk/attract mode with an explicit start/exit, “touch to explore” cue, pause on interaction, and reset after 60 seconds only after a desktop presenter acceptance pass.
+  - [ ] Add Analyst tools such as visible-hole CSV export only after the exported fields and assays are approved for investor/public disclosure; include units, sample identifiers and source basis in the file.
+  - [ ] Add world-anchored annotations, a fading pointer and sync-to-presenter only after defining coordinate persistence, access control, annotation ownership and viewer opt-out.
+  - [ ] Add layer presets, live depth/coordinate readout and in-scene PDF/image/video hotspots with explicit source links and owner-local/WGS84 anchor validation.
+  - [ ] Evaluate offline preparation for an installable conference mode; enumerate required assets and clearly state that live map tiles, browser eviction and unsupported APIs limit offline use.
+  - [ ] Do not add an exploration-upside/target layer without supplied geophysical target data and a clear “target, not resource” qualification.
+  - [ ] Keep the cut-off snap limited to the reported model basis; verify table totals and grade/cut-off semantics before displaying alternate values.
+  - [ ] Gate core-photo/assay synchronized playback and “actual sample” micrographs on a verified drillhole/sample crosswalk and image permissions.
+  - [ ] Gate closure/rehabilitation animation on dated spatial phases or a sourced final landform. The staged cash-flow timeline is not pit geometry.
+  - [ ] Scope Swahili localization to professionally reviewed translations; scope AR export to a separate iPad performance/scale prototype; scope IR analytics to an explicit consent and retention design.
+
 Acceptance: the new index, comparison and route reuse existing scene state, controls and caches; source limitations remain visible; new interactions pass the existing responsive, accessibility, failure and performance gates.
 
 ### H. Redesign geology and metallurgy; clarify mine-planning orientation — P1

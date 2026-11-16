@@ -141,7 +141,7 @@ The requested build order is **shared foundation → Metallurgy → Resource →
 Add seven story waypoints over the existing 12 chapter IDs; retain every detailed chapter and shareable deep link. The waypoints are **Place & scale** (`project`, `tanzania`, `work_completed`, `topography`), **Geology** (`subsurface`), **Drilling** (`drillholes`), **Resource** (`resource`, `ranking`), **Metallurgy** (`metallurgy`), **Mine planning** (`mine_planning`), and **Close** (`accessibility`, `comparison`). Keep the 12-scene selector as the detailed-view picker within those seven story waypoints.
 
 - [ ] Keep the 3D/map canvas visually full-bleed. Place the headline/takeaway in the top-left safe area, optional collapsible controls at the right, and compact legend/timeline at the bottom. Measure panel bounds against the active scene focal area so scene anchors remain visible.
-- [ ] Make the seven story waypoints a persistent, keyboard-operable rail with a progress fill, active state and left/right arrow navigation. Preserve the 12 scene deep links as detailed view navigation and keep Story/Explore mode available.
+- [x] Replace the noninteractive three-act ribbon and 12-dot footer with a persistent seven-waypoint rail, active label/progress fill and left/right arrow navigation. Preserve the 12 scene deep links in the All scenes picker and keep Story/Explore mode available.
 - [ ] Give every chapter a finding-led headline, concise “what am I looking at?” legend, one-shot “try this” hint, reset action and source/provenance chip. Hints disappear after the first successful interaction and remain available to keyboard users until then.
 - [ ] Use stable semantic colors, labels or patterns alongside color, and a colorblind-safe sequential grade ramp. Match lithology swatches to mapped-source categories; do not recolor the geology data for visual effect.
 - [ ] Use 400–700 ms interface transitions and 2–4 s authored camera moves only where they preserve orientation and explain scale. Respect `prefers-reduced-motion` throughout.
@@ -167,6 +167,7 @@ Local review recorded 16 November 2026:
 - [x] Reviewed North and South pit camera frames at both desktop sizes. The selected pit is presented with terrain context, and both RF1 shells remain together in the whole-site view. This camera composition change does not alter pit geometry or source blocks.
 - [ ] The intro-to-live-scene crossfade, keyboard-only skip/waypoint navigation, sound-track audibility, and measured asset-load percentage still need explicit verification. Do not display a numeric loading percentage until the app exposes actual progress events.
 - [x] Fix a hydration mismatch on direct chapter links: initialize waypoint state identically on server and client, then read the URL hash after mount. A fresh local `#mine_planning` entry selected “Fit a concept to ground” with no hydration warning, console message or page error.
+- [x] At 1366 × 768 and 1707 × 842, the new rail shows seven nodes with exactly one current step; clicking Geology loads the mapped-geology chapter, ArrowRight from the Geology node advances to Drilling, and the existing scene index still lists all 12 chapters. Captures: `.playwright-mcp/story-waypoints-mine-1366x768.png` and `.playwright-mcp/story-waypoints-mine-1707x842.png`.
 
 ### Phase 0 — Release truth and clean baseline (P0)
 
