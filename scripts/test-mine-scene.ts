@@ -9,6 +9,7 @@ import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
 import {SITE_EARTHWORK_OPACITY} from '../src/lib/deck/stable-materials';
+import {cutPitTerrain} from '../src/lib/deck/pit-terrain-cut';
 
 async function main(){
 const ring=rectangle([0,0],400,320);
@@ -65,6 +66,70 @@ const actualPlan=planSiteFromPitSurfaces([...actualSourcePits].reverse(),()=>100
 assert.equal(actualPlan.pits.length,2,'Planning the real RF1 surfaces retains both distinct pits');
 assert.deepEqual(actualPlan.pits.map(pit=>pit.support),[4376,5618],'The planned pits retain the actual RF1 mask counts');
 assert.ok(actualPlan.pits[0].centre[1]<actualPlan.pits[1].centre[1],'The real north pit remains north of the real south pit');
+// Use the actual footprint contours on a sloped terrain fixture. Its linear
+// elevation and UV fields make incorrect interpolation easy to detect.
+const terrainFixture = new THREE.PlaneGeometry(2000, 5200, 73, 173).rotateX(-Math.PI / 2);
+const fixturePosition = terrainFixture.getAttribute('position');
+const fixtureHeight = (x: number, z: number) => 75 + x * .04 - z * .02;
+for (let i = 0; i < fixturePosition.count; i++) fixturePosition.setY(i, fixtureHeight(fixturePosition.getX(i), fixturePosition.getZ(i)));
+const originalTriangleCount = terrainFixture.getIndex()!.count;
+const pitRings = actualPlan.pits.map(pit => pit.ring);
+const cut = cutPitTerrain(terrainFixture, pitRings);
+assert.ok(cut.changedTriangles > 0);
+assert.equal(terrainFixture.getIndex()!.count, originalTriangleCount, 'The original terrain remains available for comparison');
+const cutPositions = cut.geometry.getAttribute('position');
+const cutUV = cut.geometry.getAttribute('uv');
+const edgeCounts = new Map<string, number>();
+const vertexKey = (x: number, y: number, z: number) => `${x},${y},${z}`;
+const pointKey = (i: number) => vertexKey(cutPositions.getX(i), cutPositions.getY(i), cutPositions.getZ(i));
+const edgeKey = (a: string, b: string) => [a, b].sort().join('|');
+let retainedArea = 0;
+const cutIndex = cut.geometry.getIndex()!;
+for (let i = 0; i < cutIndex.count; i += 3) {
+  const a = cutIndex.getX(i), b = cutIndex.getX(i + 1), c = cutIndex.getX(i + 2);
+  const ax = cutPositions.getX(a), az = cutPositions.getZ(a);
+  const twiceArea = Math.abs((cutPositions.getX(b) - ax) * (cutPositions.getZ(c) - az) - (cutPositions.getZ(b) - az) * (cutPositions.getX(c) - ax));
+  assert.ok(twiceArea > 0, 'No cut terrain triangle collapses');
+  retainedArea += twiceArea / 2;
+  for (const [u, v] of [[a, b], [b, c], [c, a]]) {
+    const key = edgeKey(pointKey(u), pointKey(v));
+    edgeCounts.set(key, (edgeCounts.get(key) ?? 0) + 1);
+  }
+}
+const pitArea = pitRings.reduce((total, ring) => total + Math.abs(ring.reduce((sum, [x, z], i) => {
+  const [nextX, nextZ] = ring[(i + 1) % ring.length];
+  return sum + x * nextZ - nextX * z;
+}, 0)) / 2, 0);
+assert.ok(Math.abs(retainedArea - (2000 * 5200 - pitArea)) < .1, 'Only the exact pit footprint area is removed');
+for (const rim of cut.rims) {
+  assert.ok(rim.length > 50, 'The shared rim includes terrain triangle intersections');
+  rim.forEach(([x, y, z], i) => {
+    assert.ok(Math.abs(y - fixtureHeight(x, z)) < .001);
+    assert.equal(edgeCounts.get(edgeKey(vertexKey(x, y, z), vertexKey(...rim[(i + 1) % rim.length]))), 1, 'Every rim segment is an exposed terrain edge');
+  });
+}
+for (let i = fixturePosition.count; i < cutPositions.count; i++) {
+  assert.ok(Math.abs(cutUV.getX(i) - (cutPositions.getX(i) / 2000 + .5)) < 1e-6);
+  assert.ok(Math.abs(cutUV.getY(i) - (.5 - cutPositions.getZ(i) / 5200)) < 1e-6);
+}
+const alignedTerrain = new THREE.PlaneGeometry(40, 40, 4, 4).rotateX(-Math.PI / 2);
+const alignedCut = cutPitTerrain(alignedTerrain, [rectangle([0, 0], 20, 14)]);
+const alignedPositions = alignedCut.geometry.getAttribute('position');
+const alignedIndex = alignedCut.geometry.getIndex()!;
+const alignedEdges = new Map<string, number>();
+for (let i = 0; i < alignedIndex.count; i += 3) {
+  for (let j = 0; j < 3; j++) {
+    const a = alignedIndex.getX(i + j), b = alignedIndex.getX(i + (j + 1) % 3);
+    const key = edgeKey(
+      vertexKey(alignedPositions.getX(a), alignedPositions.getY(a), alignedPositions.getZ(a)),
+      vertexKey(alignedPositions.getX(b), alignedPositions.getY(b), alignedPositions.getZ(b)),
+    );
+    alignedEdges.set(key, (alignedEdges.get(key) ?? 0) + 1);
+  }
+}
+alignedCut.rims[0].forEach((point, i, rim) => {
+  assert.equal(alignedEdges.get(edgeKey(vertexKey(...point), vertexKey(...rim[(i + 1) % rim.length]))), 1, 'A rim aligned with existing grid edges remains stitched');
+});
 const actualPitMeshes=actualPlan.pits.map((pit,index)=>{
   const mesh=buildPitSurface(pit,()=>pit.surface);
   mesh.name=`${actualSourcePits[index].id==='north'?'North':'South'} RF1 continuous bench interpretation`;
