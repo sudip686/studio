@@ -2,6 +2,8 @@
 
 Date: 23 October 2026. Status: implementation in progress on `codex/tanga-investor-experience`.
 
+Planning refresh, 16 November 2026: for the sequenced desktop story, signature-chapter art direction, release gate and acceptance definition, see [TANGA_PRESENTATION_REVAMP_PLAN_2026-11-16.md](TANGA_PRESENTATION_REVAMP_PLAN_2026-11-16.md). This planning document supplements the implementation checklist below; it does not mark open implementation, production-release or physical-device items complete.
+
 Planning refresh: the user paused implementation, then requested a fresh current-state/online design review. The [reference review](TANGA_POLISH_REFERENCE_REVIEW_2026-10-23.md) records the current branch and Vercel preview separately, six sampled VRIFY views across the four open decks, GeoLibre, and live Cesium/ArcGIS examples. Its twelve implementation packages refine A–F and add the three scoped enhancements in G below. The earlier review findings remain historical context; the refresh identifies which problems are still visible on the current branch. Research/planning does not mark implementation or verification complete.
 
 ## Outcome
