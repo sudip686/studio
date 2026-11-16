@@ -537,8 +537,18 @@ export function showConceptTerrain(geometry:THREE.BufferGeometry,show:boolean){
   const normal=show?geometry.userData.conceptNormalAttribute:geometry.userData.sourceNormalAttribute;
   if(position)geometry.setAttribute('position',position);
   if(normal)geometry.setAttribute('normal',normal);
+  const index = show ? geometry.userData.conceptTerrainIndex : geometry.userData.originalTerrainIndex;
+  if (index) geometry.setIndex(index);
   geometry.boundingSphere=show?geometry.userData.conceptBoundingSphere:geometry.userData.sourceBoundingSphere;
   geometry.userData.conceptVisible=show;
+}
+
+/** Keep the terrain opening and the uncut comparison surface on one set of vertices. */
+export function setPitTerrainComparison(geometry: THREE.BufferGeometry, uncutIndex: THREE.BufferAttribute) {
+  geometry.userData.originalTerrainIndex = uncutIndex;
+  geometry.userData.conceptTerrainIndex = geometry.getIndex();
+  retainSourceTerrain(geometry);
+  retainConceptTerrain(geometry);
 }
 
 export function pitHeight(p:Point2,pit:CandidatePit) {
@@ -678,7 +688,8 @@ export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:num
   mesh.name=`${surface.id==='north'?'North':'South'} RF1 optimized pit surface`;mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData.sourcePitSupport=surface.support;return mesh;
 }
 /** Exact contour bands eliminate the staircase aliasing of a clipped XY grid. */
-export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>number) {
+export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>number, terrainRim?: [number, number, number][]) {
+  if (terrainRim?.length) return buildStitchedPitSurface(pit, height, terrainRim);
   const positions:number[]=[],colors:number[]=[],indices:number[]=[];
   const perimeter=(ring:Point2[])=>ring.reduce((sum,a,i)=>sum+Math.hypot(ring[(i+1)%ring.length][0]-a[0],ring[(i+1)%ring.length][1]-a[1]),0);
   const sample = (ring:Point2[],count:number) => {
@@ -735,6 +746,82 @@ export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>num
   // The mine-plan sun is fixed in site coordinates, so diffuse shading adds
   // readable bench walls and contact shadows without changing with the camera.
   const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.94,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));mesh.name='Terraced conceptual excavation';mesh.receiveShadow=true;mesh.castShadow=true;return mesh;
+}
+
+function buildStitchedPitSurface(pit: CandidatePit, height: (x: number, z: number) => number, rim: [number, number, number][]) {
+  type Point = [number, number, number];
+  const positions: number[] = [], colors: number[] = [], indices: number[] = [];
+  const appendRing = (ring: Point[], tone: number) => {
+    const offset = positions.length / 3;
+    const color = new THREE.Color(tone);
+    for (const [x, y, z] of ring) {
+      positions.push(x, y, z);
+      const shade = .98 + Math.sin(x * .031 + z * .017 + y * .23) * Math.sin(z * .026 - x * .012) * .035;
+      colors.push(color.r * shade, color.g * shade, color.b * shade);
+    }
+    return offset;
+  };
+  const join = (outer: Point[], inner: Point[], tone: number) => {
+    // Use a centre within both convex contours. Angular ordering joins the
+    // unequal vertex counts without resampling or breaking either seam.
+    const centre = inner.reduce(([x, z], point) => [x + point[0] / inner.length, z + point[2] / inner.length], [0, 0]);
+    const angles = (ring: Point[]) => ring.map(([x, , z], i) => ({i, angle: Math.atan2(z - centre[1], x - centre[0])})).sort((a, b) => a.angle - b.angle);
+    const a = angles(outer), b = angles(inner);
+    const outerOffset = appendRing(outer, tone), innerOffset = appendRing(inner, tone);
+    let oldOuter = outerOffset + a[a.length - 1].i, oldInner = innerOffset + b[b.length - 1].i;
+    let i = 0, j = 0;
+    while (i < a.length || j < b.length) {
+      if (j === b.length || (i < a.length && a[i].angle <= b[j].angle)) {
+        const next = outerOffset + a[i++].i;
+        indices.push(oldOuter, next, oldInner);
+        oldOuter = next;
+      } else {
+        const next = innerOffset + b[j++].i;
+        indices.push(oldOuter, next, oldInner);
+        oldInner = next;
+      }
+    }
+  };
+  const contourAt = (distance: number, level: number): Point[] => insetCrest(pit.ring, distance).flatMap(([x, z], i, ring) => {
+    const [endX, endZ] = ring[(i + 1) % ring.length];
+    const count = Math.max(1, Math.ceil(Math.hypot(endX - x, endZ - z) / 12));
+    return Array.from({length: count}, (_, n) => {
+      const px = THREE.MathUtils.lerp(x, endX, n / count), pz = THREE.MathUtils.lerp(z, endZ, n / count);
+      return [px, Math.min(height(px, pz), level), pz] as Point;
+    });
+  });
+  let outer = rim, distance = 0, level = pit.surface;
+  const slope = Math.tan(CONCEPT.batterDegrees * Math.PI / 180);
+  while (level > pit.floor + 1e-6) {
+    const drop = Math.min(CONCEPT.bench, level - pit.floor);
+    distance += drop / slope;
+    const toe = contourAt(distance, level - drop);
+    if (toe.length < 3) break;
+    join(outer, toe, 0x997b59);
+    outer = toe;
+    level -= drop;
+    if (level <= pit.floor + 1e-6) break;
+    distance += CONCEPT.berm;
+    const berm = contourAt(distance, level);
+    if (berm.length < 3) break;
+    join(outer, berm, 0xc1a17a);
+    outer = berm;
+  }
+  const x = outer.reduce((sum, p) => sum + p[0] / outer.length, 0);
+  const z = outer.reduce((sum, p) => sum + p[2] / outer.length, 0);
+  const floor = appendRing(outer, 0xa88b66);
+  const centre = appendRing([[x, Math.min(height(x, z), level), z]], 0xa88b66);
+  outer.forEach((_, i) => indices.push(centre, floor + i, floor + (i + 1) % outer.length));
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({vertexColors: true, roughness: .94, toneMapped: false, side: THREE.DoubleSide}));
+  mesh.name = 'Terraced conceptual excavation';
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+  return mesh;
 }
 
 /**

@@ -10,7 +10,8 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
 import {planSiteFromPitSurfaces, inside, rectangleContained, overlaps, rectangle, type SitePlan, type Point2, type SourcePitSurface} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurface, carvePitEnvelopes, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, setPitTerrainComparison, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {cutPitTerrain} from '@/lib/deck/pit-terrain-cut';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
 import {buildGeologyRasterSurface,buildGeologyReferenceGrid,buildGeologySurface,GEOLOGY_SURFACE_DEFAULT_OPACITY,type GeologyRasterLayer,type GeologySurfaceData} from '@/lib/deck/geology-surface';
@@ -3021,7 +3022,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       cameraTween = {
         start: clock.getElapsedTime(),
-        duration: reducedMotion.matches ? .001 : duration,
+        duration,
         fromPosition: camera.position.clone(),
         toPosition,
         fromTarget: controls.target.clone(),
@@ -3050,6 +3051,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(command===cameraCommandRef.current){
         if (command.id <= consumedCameraCommandIdRef.current) return;
         consumedCameraCommandIdRef.current = command.id;
+      }
+
+      if (reducedMotion.matches && (command.action === 'orbit360' || command.action === 'orbitVertical360')) {
+        setStatus('360 degree spin skipped because reduced motion is enabled');
+        return;
       }
 
       // Reset within geology must restore the currently authored composition.
@@ -3597,6 +3603,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       applyTerrainSurfaceView();
     };
     let terrainResources: TangaTerrainResources | null = null;
+    const prepareMineTerrain = (original: THREE.BufferGeometry) => {
+      const originalIndex = original.getIndex();
+      if (!sitePlan || !originalIndex) return null;
+      const cut = cutPitTerrain(original, sitePlan.pits.map(pit => pit.ring));
+      if (!cut.rims.every(rim => rim.length >= 3)) {
+        cut.geometry.dispose();
+        return null;
+      }
+      setPitTerrainComparison(cut.geometry, originalIndex);
+      host.dataset.pitCarvedTriangles = String(cut.changedTriangles);
+      host.dataset.pitRimVertices = cut.rims.map(rim => rim.length).join(',');
+      return cut;
+    };
     let surveyProfile: TerrainProfilePoint[] = [];
     let terrainProfileMarker: THREE.Mesh | null = null;
 
@@ -3658,21 +3677,37 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             setTerrainProfile([]);
           }
         }
+        const geometryStartedAt = performance.now();
+        let terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terrainDisplayRef.current);
+        if (mode === 'mine_planning' && sitePlan && pitSurfaces.length) {
+          const cut = prepareMineTerrain(terrainGeometry);
+          if (!cut) {
+            terrainGeometry.dispose();
+            throw new Error('Replacement terrain does not cover both pit rims');
+          }
+          terrainGeometry.dispose();
+          terrainGeometry = cut.geometry;
+          for (const owner of [processPlant, developmentInfrastructure]) {
+            const pad = owner?.userData.conceptPad as ConceptPad | undefined;
+            if (pad) gradeConceptPad(terrainGeometry, pad);
+          }
+          const height = (x: number, z: number) => terrainSurfaceY(resources, x, -z);
+          sitePlan.pits.forEach((pit, i) => {
+            const replacement = buildPitSurface(pit, height, cut.rims[i]);
+            pitSurfaces[i].geometry.dispose();
+            pitSurfaces[i].geometry = replacement.geometry;
+            replacement.material.dispose();
+          });
+        }
         disposeObject(terrainLayer);
         terrainLayer.clear();
         terrainMeshes.length = 0;
         terrainOccluders.length = 0;
         terrainSurfaceMaterials.length = 0;
-        const geometryStartedAt = performance.now();
-        const terrainGeometry = createTexturedTerrainPatchGeometry(resources, mode, terrainDisplayRef.current);
         host.dataset.terrainBuildMs = String(Math.round(performance.now() - geometryStartedAt));
         host.dataset.terrainTriangles = String((terrainGeometry.index?.count ?? 0) / 3);
         host.dataset.terrainGrid = `${resources.meta.context_grid?.width}×${resources.meta.context_grid?.height}`;
         host.dataset.surveyReady = String(Boolean(resources.surveyHeightData && resources.surveyCoverageData));
-        if (mode === 'mine_planning' && sitePlan) {
-          carvePitEnvelopes(terrainGeometry,sitePlan.pits);
-          const pad=processPlant?.userData.conceptPad as ConceptPad|undefined;if(pad)gradeConceptPad(terrainGeometry,pad);
-        }
         const isSatelliteTerrain = mode !== 'topography';
         const satelliteTerrainMaterial = isSatelliteTerrain
           ? new THREE.MeshBasicMaterial({
@@ -4809,18 +4844,26 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             setStatus('RF1 source ore blocks registered inside both optimized pit shells');
             if(siteSceneReady)reportLoadState('ready',resources?'ready':'degraded',resources?.quality??assetQuality,`${host.dataset.miningTargetsDisplayed??0} source ore blocks registered in Mine Planning`);
           }
-          for (const mesh of [...terrainMeshes, ...terrainOccluders]) carvePitEnvelopes(mesh.geometry,sitePlan.pits);
-          host.dataset.pitCarvedTriangles=String(terrainMeshes.reduce((sum,mesh)=>sum+Number(mesh.geometry.userData.pitCarvedTriangleCount??0),0));
+          const sourceTerrain = terrainMeshes[0]?.geometry;
+          const cut = sourceTerrain ? prepareMineTerrain(sourceTerrain) : null;
+          if (cut) {
+            terrainMeshes[0].geometry = cut.geometry;
+            sourceTerrain.dispose();
+            for (const occluder of terrainOccluders) {
+              occluder.geometry.dispose();
+              occluder.geometry = cut.geometry;
+            }
+          }
           sitePlan.audit.push('Haul-road geometry omitted: the supplied optimized shell does not include an engineered ramp alignment or checked gradient');
           const orderedSourcePitSurfaces=[...sourcePitSurfaces].sort((a,b)=>(a.z0+(a.height-1)*a.dz/2)-(b.z0+(b.height-1)*b.dz/2));
           if(mode==='mine_planning'){
-            host.dataset.minePitSurfaceSource='Continuous RF1 footprint benches';
+            host.dataset.minePitSurfaceSource=cut?'RF1 benches stitched to terrain':'RF1 footprint benches · terrain unavailable';
             host.dataset.minePitSurfaceSupports=JSON.stringify(orderedSourcePitSurfaces.map(surface=>({id:surface.id,support:surface.support,width:surface.width,height:surface.height})));
           }
           for (const [index,pit] of sitePlan.pits.entries()) {
             const height=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
             const sourceSurface=mode==='mine_planning'?orderedSourcePitSurfaces[index]:undefined;
-            const mesh=buildPitSurface(pit,height);
+            const mesh=buildPitSurface(pit,height,cut?.rims[index]);
             if(sourceSurface){mesh.name=`${sourceSurface.id==='north'?'North':'South'} RF1 continuous bench interpretation`;mesh.userData.sourcePitSupport=sourceSurface.support;}
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
@@ -4835,7 +4878,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             const level=placeConcentrator(plant,x,z,(px,pz)=>terrainSurfaceY(terrainResources,px,-pz),{width:250,depth:250});
             host.dataset.sitePlantFoundationContactAudit=JSON.stringify(plant.userData.plantFoundationContactAudit??null);
             host.dataset.sitePlantServiceRoadContactAudit=JSON.stringify(plant.userData.plantServiceRoadContactRuntimeAudit??null);
-            for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,plant.userData.conceptPad as ConceptPad);
+            for(const geometry of new Set([...terrainMeshes,...terrainOccluders].map(mesh => mesh.geometry)))gradeConceptPad(geometry,plant.userData.conceptPad as ConceptPad);
             tagDeckLayer(plant, 'context');
             stage.add(plant);
             processPlant=plant;
@@ -4896,7 +4939,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               host.dataset.conveyorSupportAudit=JSON.stringify({count:conveyorSupports.length,minimumClearanceM:Number(Math.min(...heights).toFixed(2)),maximumClearanceM:Number(Math.max(...heights).toFixed(2)),footingsSampledIndividually:true});
             }
             const feedPad=developmentInfrastructure.userData.conceptPad as ConceptPad|undefined;
-            if(feedPad)for(const mesh of [...terrainMeshes,...terrainOccluders])gradeConceptPad(mesh.geometry,feedPad);
+            if(feedPad)for(const geometry of new Set([...terrainMeshes,...terrainOccluders].map(mesh => mesh.geometry)))gradeConceptPad(geometry,feedPad);
             tagDeckLayer(developmentInfrastructure,'context');stage.add(developmentInfrastructure);
             feedAnchor=new THREE.Vector3(...(developmentInfrastructure.userData.feedAnchor as [number,number,number]));
             const transferPath=developmentInfrastructure.userData.flow as THREE.Vector3[];
@@ -5627,8 +5670,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(story.replay!==consumedReplay){consumedReplay=story.replay;storyMotionStart=motionTime;lastStoryBeat=-1;}
       const storyAge=Math.max(0,motionTime-storyMotionStart);
       const beat=story.playing?(reducedMotion.matches?3:Math.min(3,Math.floor(storyAge/4))):story.beat;
+      // Open the terrain and reveal its continuous pit faces as one scene
+      // state. Cutting the terrain before the pit opacity fade completed left
+      // a visible void around the benches during the mine-planning transition.
+      const pitConceptVisible = mode === 'mine_planning'
+        && (beat >= 2 || terrainCompareRef.current.enabled)
+        && layerSettingsRef.current.context.visible
+        && layerSettingsRef.current.context.opacity > .001;
       if(mode==='mine_planning'){
-        for(const mesh of [...terrainMeshes,...terrainOccluders])showConceptTerrain(mesh.geometry,layerSettingsRef.current.context.visible);
+        for(const mesh of [...terrainMeshes,...terrainOccluders])showConceptTerrain(mesh.geometry,pitConceptVisible);
+        host.dataset.pitTerrainCutActive=String(pitConceptVisible);
         if(beat!==lastStoryBeat){lastStoryBeat=beat;setMiningBeat(beat);}
         host.dataset.miningBeat=String(beat);
         evidenceGroup.visible=(!facilityFocused||beat<3)&&story.holes&&layerSettingsRef.current.context.visible;
@@ -5664,8 +5715,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const southVisible = targetMeshes.some(mesh => mesh.visible && mesh.userData.pitIndex === 1);
         host.dataset.mineVisibleBlockPits = northVisible ? (southVisible ? 'north,south' : 'north') : (southVisible ? 'south' : '');
       }
-      pitSurfaces.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
-      pitRamps.forEach(mesh=>{mesh.visible=beat>=2&&layerSettingsRef.current.context.visible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const reveal=reducedMotion.matches||!story.playing?1:Math.min(1,Math.max(0,storyAge-8)/1.5),opacity=reveal*layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
+      pitSurfaces.forEach(mesh=>{mesh.visible=pitConceptVisible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const opacity=layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
+      pitRamps.forEach(mesh=>{mesh.visible=pitConceptVisible;const m=mesh.material as THREE.Material&{opacity:number;transparent:boolean;depthWrite:boolean};const opacity=layerSettingsRef.current.context.opacity,transparent=opacity<.999;if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}m.opacity=opacity;m.depthWrite=!transparent;});
       if (processPlant && processMarker) {
         const points = processPlant.userData.flow as THREE.Vector3[];
         const phase = (motionTime / 3) % (points.length - 1), index = Math.floor(phase);
@@ -5683,7 +5734,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
       const flyProgress = reducedMotion.matches?1:ease(Math.min(1, elapsed / cameraShot.flySeconds));
       if (cameraTween) {
-        const tweenProgress = ease(Math.min(1, (elapsed - cameraTween.start) / cameraTween.duration));
+        const tweenProgress = reducedMotion.matches ? 1 : ease(Math.min(1, (elapsed - cameraTween.start) / cameraTween.duration));
         camera.position.lerpVectors(cameraTween.fromPosition, cameraTween.toPosition, tweenProgress);
         controls.target.lerpVectors(cameraTween.fromTarget, cameraTween.toTarget, tweenProgress);
         camera.fov = THREE.MathUtils.lerp(cameraTween.fromFov, cameraTween.toFov, tweenProgress);
@@ -5721,14 +5772,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       let rotationTweenActive = false;
       if (rotationTween) {
         rotationTweenActive = true;
-        const tweenProgress = ease(Math.min(1, (elapsed - rotationTween.start) / rotationTween.duration));
+        const tweenProgress = reducedMotion.matches ? 1 : ease(Math.min(1, (elapsed - rotationTween.start) / rotationTween.duration));
         stageBaseRotation = THREE.MathUtils.lerp(rotationTween.from, rotationTween.to, tweenProgress);
         if (tweenProgress >= 1) rotationTween = null;
       }
       let verticalRotationTweenActive = false;
       if (verticalRotationTween) {
         verticalRotationTweenActive = true;
-        const tweenProgress = ease(Math.min(1, (elapsed - verticalRotationTween.start) / verticalRotationTween.duration));
+        const tweenProgress = reducedMotion.matches ? 1 : ease(Math.min(1, (elapsed - verticalRotationTween.start) / verticalRotationTween.duration));
         stageVerticalBaseRotation = THREE.MathUtils.lerp(verticalRotationTween.from, verticalRotationTween.to, tweenProgress);
         if (tweenProgress >= 1) {
           verticalRotationTween = null;
@@ -5738,12 +5789,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         }
       }
       const targetRotation = stageBaseRotation + driftYaw;
-      if (rotationTweenActive) {
+      if (rotationTweenActive || reducedMotion.matches) {
         stage.rotation.y = targetRotation;
       } else {
         stage.rotation.y += (targetRotation - stage.rotation.y) * 0.028;
       }
-      if (verticalRotationTweenActive) {
+      if (verticalRotationTweenActive || reducedMotion.matches) {
         stage.rotation.x = stageVerticalBaseRotation;
       } else {
         stage.rotation.x += (0 - stage.rotation.x) * 0.04;
@@ -5914,7 +5965,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(terrainSurfaceMaterials[0])host.dataset.surfaceOpacity=terrainSurfaceMaterials[0].opacity.toFixed(3);
       if (!wasContextLost && mode === 'mine_planning' && terrainCompareRef.current.enabled && terrainMeshes.some(mesh => mesh.geometry.userData.sourcePositions && mesh.geometry.userData.conceptPositions)) {
         const split = THREE.MathUtils.clamp(terrainCompareRef.current.split, 8, 92) / 100;
-        const conceptSurfaceVisible = layerSettingsRef.current.context.visible;
+        const conceptSurfaceVisible = pitConceptVisible;
         const width = renderer.domElement.width;
         const height = renderer.domElement.height;
         const splitX = Math.round(width * split);
@@ -5925,18 +5976,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             object.visible = false;
           }
         });
-        for (const mesh of terrainMeshes) showConceptTerrain(mesh.geometry, false);
+        for (const mesh of [...terrainMeshes,...terrainOccluders]) showConceptTerrain(mesh.geometry, false);
         renderer.setScissorTest(false);
         renderer.clear(true, true, true);
         renderer.setScissorTest(true);
         renderer.setScissor(0, 0, splitX, height);
         renderer.render(scene, camera);
         conceptVisibility.forEach((visible, object) => { object.visible = visible; });
-        for (const mesh of terrainMeshes) showConceptTerrain(mesh.geometry, true);
+        for (const mesh of [...terrainMeshes,...terrainOccluders]) showConceptTerrain(mesh.geometry, conceptSurfaceVisible);
         renderer.setScissor(splitX, 0, width - splitX, height);
         renderer.render(scene, camera);
         renderer.setScissorTest(false);
-        for (const mesh of terrainMeshes) showConceptTerrain(mesh.geometry, conceptSurfaceVisible);
+        for (const mesh of [...terrainMeshes,...terrainOccluders]) showConceptTerrain(mesh.geometry, conceptSurfaceVisible);
       } else if (!wasContextLost) renderer.render(scene,camera);
       frame = requestAnimationFrame(animate);
     };
