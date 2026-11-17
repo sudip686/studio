@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as THREE from 'three';
 import proj4 from 'proj4';
-import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, conceptPadHeight, type ConceptPad} from '../src/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, conceptPadHeight, showConceptTerrain, setPitTerrainComparison, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
 import {rectangle, inside, overlaps, planSiteFromPitSurfaces, type SourcePitSurface} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
@@ -77,6 +77,12 @@ const pitRings = actualPlan.pits.map(pit => pit.ring);
 const cut = cutPitTerrain(terrainFixture, pitRings);
 assert.ok(cut.changedTriangles > 0);
 assert.equal(terrainFixture.getIndex()!.count, originalTriangleCount, 'The original terrain remains available for comparison');
+setPitTerrainComparison(cut.geometry, terrainFixture.getIndex()!);
+const cutTriangleCount = cut.geometry.getIndex()!.count;
+showConceptTerrain(cut.geometry, false);
+assert.equal(cut.geometry.getIndex()!.count, originalTriangleCount, 'The unopened scene restores the original continuous terrain');
+showConceptTerrain(cut.geometry, true);
+assert.equal(cut.geometry.getIndex()!.count, cutTriangleCount, 'The pit reveal activates the matching terrain cut');
 const cutPositions = cut.geometry.getAttribute('position');
 const cutUV = cut.geometry.getAttribute('uv');
 const edgeCounts = new Map<string, number>();
@@ -131,7 +137,7 @@ alignedCut.rims[0].forEach((point, i, rim) => {
   assert.equal(alignedEdges.get(edgeKey(vertexKey(...point), vertexKey(...rim[(i + 1) % rim.length]))), 1, 'A rim aligned with existing grid edges remains stitched');
 });
 const actualPitMeshes=actualPlan.pits.map((pit,index)=>{
-  const mesh=buildPitSurface(pit,()=>pit.surface);
+  const mesh=buildPitSurface(pit,()=>pit.surface,cut.rims[index]);
   mesh.name=`${actualSourcePits[index].id==='north'?'North':'South'} RF1 continuous bench interpretation`;
   mesh.userData.sourcePitSupport=actualSourcePits[index].support;
   return mesh;
@@ -145,6 +151,28 @@ for(let i=0;i<actualPitMeshes.length;i++){
   const bounds=new THREE.Box3().setFromObject(mesh);
   assert.ok(bounds.max.y<=Math.max(...actualSourcePits[i].topography.flat())+.01,`${mesh.name} stays at or below the registered source topography`);
   assert.ok(i===0?bounds.max.z<0:bounds.min.z>0,`${mesh.name} remains at its separate source north/south location`);
+}
+for (const [pitIndex, mesh] of actualPitMeshes.entries()) {
+  const position = mesh.geometry.getAttribute('position'), index = mesh.geometry.getIndex()!;
+  const surfaceEdges = new Map<string, number>();
+  for (let i = 0; i < index.count; i += 3) {
+    for (const [a, b] of [[index.getX(i), index.getX(i + 1)], [index.getX(i + 1), index.getX(i + 2)], [index.getX(i + 2), index.getX(i)]]) {
+      const key = edgeKey(
+        vertexKey(position.getX(a), position.getY(a), position.getZ(a)),
+        vertexKey(position.getX(b), position.getY(b), position.getZ(b)),
+      );
+      surfaceEdges.set(key, (surfaceEdges.get(key) ?? 0) + 1);
+    }
+  }
+  const rim = cut.rims[pitIndex];
+  rim.forEach((point, i) => {
+    const next = rim[(i + 1) % rim.length];
+    const seam = edgeKey(vertexKey(...point), vertexKey(...next));
+    assert.equal(surfaceEdges.get(seam), 1, 'Every pit-face seam edge exactly matches one terrain rim edge');
+    assert.equal(edgeCounts.get(seam), 1, 'The terrain side exposes exactly the same seam edge');
+    assert.equal(surfaceEdges.get(seam)! + edgeCounts.get(seam)!, 2, 'Terrain and pit faces close each rim segment without a gap');
+  });
+  assert.equal(position.count > 0, true);
 }
 const sourceBlockSupport=[0,0];
 for(const block of reference.blocks){

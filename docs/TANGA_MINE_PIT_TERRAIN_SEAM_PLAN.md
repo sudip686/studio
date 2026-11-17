@@ -6,7 +6,7 @@ The South pit detail shows triangular notches along the rim and a dark strip aga
 
 - `carvePitEnvelopes` in `src/lib/deck/mine-scene.ts` deletes entire terrain triangles when their centroids fall inside the pit outline. The exposed terrain edge therefore follows grid triangles, including where those triangles cross the outline.
 - `buildPitSurface` builds its own independently sampled rim. It caps rim elevations at a pit-wide level and adds 1.2 m of lift. The rendered walls, cuts and terrain can meet at different horizontal and vertical positions. Inspect adjacent bench bands for the same issue where a ring is resampled at a different point count on each side.
-- Mine Planning can replace the terrain mesh during a quality upgrade. The replacement currently cuts its own opening while the existing pit meshes keep the rim built against the previous terrain. The animation also switches cut terrain independently of when the benches become visible. Original terrain comparison needs its original triangle indices as well as its elevations.
+- Mine Planning can replace the terrain mesh during a quality upgrade. The replacement must publish its opening and rebuilt pit rims together. The guided animation previously opened the terrain before fading in the benches, leaving a temporary visible void; terrain and pit faces now share one visibility state. Original terrain comparison needs its original triangle indices as well as its elevations.
 - Some dark strips in the screenshot extend away from the pit rim. Check those separately against terrain coverage and triangles. A gap between bench and rim and a gap in the surrounding terrain can look similar from this angle.
 
 ## Implementation order
@@ -21,12 +21,13 @@ The South pit detail shows triangular notches along the rim and a dark strip aga
 
 - Match the clipped terrain boundary and pit rim segment for segment around both pits. Count unmatched rim edges, degenerate faces and overlaps. The seam should have zero unmatched edges and a maximum 3D vertex mismatch of 1 cm in local coordinates. Check internal bench joins with the same edge audit.
 - Inspect both pits from overhead, both oblique sides and a low approach at 1366 × 768 and 1707 × 842. Look for background visible at the rim, floating crests, terrain triangles intruding into the pit, broken benches and flicker while orbiting.
-- Exercise cold entry, a terrain quality upgrade, Original / Concept comparison, the opening mine story stage and the North, South and both-pit block views. Record the initial stable view and the settled view after all assets load. Check that the two source pits, camera restoration and grade filters still work after a forced WebGL reset.
+- Exercise cold entry, a terrain quality upgrade, Original / Concept comparison, the opening mine story stage and the North, South and both-pit block views. Record the initial stable view and the settled view after all assets load. Check that the two source pits, camera restoration and grade filters still work after a forced WebGL reset. Current local browser data confirms both RF1 rims are stitched (470 North / 495 South vertices, 9,301 terrain triangles changed); close screenshot inspection remains outstanding because capture times out while the WebGL canvas moves.
 - Run the geometry checks against the actual RF1 reference and check the production build and both deployment targets. Compare the new terrain preparation time with the baseline to catch a noticeable delay before the scene becomes usable.
 
 ## Implementation checklist
 
 - [x] Capture the South pit baseline and confirm the source pit supports and loaded block count.
 - [x] Implement the indexed terrain cut. The RF1 outlines on a sloped terrain fixture remove only the footprint area, keep UV and elevation interpolation, and return the rim in perimeter order. The geometry check finds each returned rim segment exactly once in the terrain and covers a second outline aligned with existing grid edges.
-- [ ] Join the pit benches to the returned rim and integrate the paired meshes into Mine Planning.
+- [x] Join the pit benches directly to the returned rim and rebuild those rims when replacement terrain loads. A geometry regression checks every pit rim edge against both source RF1 outlines on a sloped terrain fixture.
+- [x] Synchronize the cut terrain with the pit faces in guided stages and comparison rendering, removing the separate fade that exposed a void before benches appeared.
 - [ ] Verify the joined meshes on the displayed terrain, including quality changes, guided reveals, terrain comparison, blocks and graphics recovery.

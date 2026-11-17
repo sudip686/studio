@@ -36,6 +36,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
   const [openRoof, setOpenRoof] = useState(false);
   const [overview, setOverview] = useState(true);
   const [sample, setSample] = useState(0);
+  const coarseFractionRef = useRef(Number.parseFloat(MET_GROUPS[0].coarse) / 100);
+  coarseFractionRef.current = Number.parseFloat(MET_GROUPS[sample]?.coarse ?? '50') / 100;
   const [showEvidence, setShowEvidence] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [endUseRoute, setEndUseRoute] = useState<MetallurgyEndUseRoute | null>(null);
@@ -95,7 +97,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     controls.minDistance = 18; controls.maxDistance = 2200;
     controls.minPolarAngle = .12; controls.maxPolarAngle = Math.PI * .48;
 
-    const plant = buildConcentrator();
+    const plant = buildConcentrator({processCutaway: true});
     plant.name = 'Tanga conceptual processing plant';
     scene.add(plant);
     // The end-use pathways are a separate illustrative model with many
@@ -184,15 +186,17 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       selected = next;
       const item = PROCESS.find(candidate => candidate.id === next) ?? PROCESS[0];
       target.set(item.point[0], item.point[1], item.point[2]);
+      if (next === 'flotation') plant.localToWorld(target.set(200, 10, -160));
+      if (next === 'product') plant.localToWorld(target.set(184, 7, 77));
       // Frame the whole working bay, not a close crop of its roof/floor. The
       // flotation hall is the widest stage; product handling spans the longest
       // building. Give each shot enough room for equipment and roof-cutaway
       // context, then lower the view so the interior reads as a plant space.
-      const distanceByStage:Record<ProcessId,number>={feed:96,milling:82,flotation:116,dewatering:96,product:166};
+      const distanceByStage:Record<ProcessId,number>={feed:96,milling:82,flotation:47,dewatering:96,product:45};
       const distance=distanceByStage[next];
       // Keep the camera above the wall line while showing the equipment from a
       // lower three-quarter angle, instead of looking nearly straight down.
-      const localDirection = new THREE.Vector3(.72, .86, 1.05).normalize();
+      const localDirection = next === 'flotation' ? new THREE.Vector3(.13, .43, -1).normalize() : new THREE.Vector3(.72, .86, 1.05).normalize();
       destination.copy(target).addScaledVector(localDirection, distance);
       moveCamera(animate, true);
     }
@@ -369,7 +373,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
             }
           }
         }
-        const activity=processMotion.update(dt, overviewRef.current?'overview':selected, animateProcess&&(overviewRef.current||openRoofRef.current));
+        const activity=processMotion.update(dt, overviewRef.current?'overview':selected, animateProcess&&(overviewRef.current||openRoofRef.current), coarseFractionRef.current);
         if (inEndUse) journeyElapsed = journeyElapsedRef.current;
         const journeyRunning = inEndUse && journeyActiveRef.current && !contextLost && !pausedRef.current && !reducedMotion.matches;
         if (journeyRunning) {
@@ -606,7 +610,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     <div className="tanga-factory-body">
       <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage} />
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
-        <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
+        <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : selected.id === 'flotation' ? 'Flotation cell · illustrative section' : selected.id === 'product' ? 'Sizing screen · illustrative split' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
       </div>
       <aside className="tanga-factory-inspector" aria-live="polite">
         {endUseRoute ? <>
@@ -621,7 +625,19 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           <p className="tanga-process-explanation">{overview ? 'Concept route: feed receiving, preparation, flotation, dewatering and product handling. Layout and equipment are illustrative.' : selected.description}</p>
           {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
           {!overview&&<><p className="tanga-factory-motion-note">{selected.motion}</p><details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
-          {!overview && selected.id==='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>}
+          {!overview && selected.id==='flotation' && <>
+            <div className="tanga-factory-separation" aria-label="Conceptual graphite and gangue separation"><span><i className="is-graphite"/>Froth carries graphite into the launder</span><span><i className="is-gangue"/>The lower outlet carries the tailings stream</span><small>Illustrative flow. See the composite results below for measured recovery.</small></div>
+            <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>
+          </>}
+          {!overview && selected.id==='product' && <>
+            <div className="tanga-factory-sizing" aria-label={`Illustrative size split for ${result.id}`}>
+              <span>ILLUSTRATIVE SCREEN SPLIT · {result.id}</span>
+              <div><strong>{result.coarse}</strong><small>+150 µm · reported coarse fraction</small></div>
+              <div><strong>{(100-Number.parseFloat(result.coarse)).toFixed(1)}%</strong><small>Passing 150 µm · calculated remainder</small></div>
+              <small>Particles and bins are conceptual. No industrial sizing circuit or product specification is established.</small>
+            </div>
+            <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO / AMC LAB · {result.id}</span><strong>{result.coarse}</strong><small>Reported cumulative +150 µm graphite mass fraction</small></button>
+          </>}
           {!overview && selected.id!=='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
           {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>TC, recovery and coarse fraction are separate measures.</small><i>Open comparison board ↗</i></button>}
           {overview && <button className="tanga-factory-pathway-cta" type="button" onClick={openEndUse}><span>NEXT</span><strong>Explore end-use pathways ↗</strong></button>}

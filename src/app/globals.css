@@ -12016,6 +12016,10 @@ body:has(.tanga-deck__notes) .tanga-deck__geo-overlay {
     border-color var(--pro-fast, 160ms) var(--pro-ease, ease),
     box-shadow var(--pro-fast, 160ms) var(--pro-ease, ease);
 }
+.tanga-deck__story-waypoints .tanga-deck__pager-dot {
+  width: 12px;
+  height: 12px;
+}
 .tanga-deck__pager-dot:hover {
   border-color: rgba(255, 255, 255, 0.45);
   transform: scale(1.28);

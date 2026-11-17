@@ -9,7 +9,7 @@ const TangaDeckWorkbench = dynamic(() => import('@/components/TangaDeckWorkbench
     <main className="tanga-boot">
       <div>
         <span>Sakariya Mines & Minerals</span>
-        <strong>Preparing the Tanga command workspace...</strong>
+        <strong>Loading the Tanga project story…</strong>
       </div>
     </main>
   ),

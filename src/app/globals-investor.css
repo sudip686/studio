@@ -800,6 +800,16 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck__executive-tour--highlights { border-color: rgba(191,205,209,.28); background: rgba(122,151,163,.1); color: #c6d5d9; }
 .tanga-deck__executive-tour--highlights:hover { background: rgba(122,151,163,.19); }
 .tanga-deck__executive-tour:focus-visible { outline: 2px solid #f6be91; outline-offset: 3px; }
+.tanga-deck__executive-tour--kiosk { border-color: rgba(126,201,189,.34); background: rgba(56,119,112,.16); color: #c5eee4; }
+.tanga-deck__executive-tour--kiosk:hover,.tanga-deck__executive-tour--kiosk.is-active { border-color: rgba(126,201,189,.7); background: rgba(56,119,112,.3); color: #ecfff9; }
+.tanga-kiosk-cue { position:absolute; z-index:72; top:18px; left:50%; display:grid; gap:3px; max-width:min(340px,calc(100vw - 36px)); padding:9px 14px; transform:translateX(-50%); border:1px solid rgba(196,225,219,.24); border-radius:999px; background:rgba(8,17,21,.78); color:#f1f3ee; text-align:center; pointer-events:none; box-shadow:0 10px 30px rgba(0,0,0,.2); backdrop-filter:blur(12px); }
+.tanga-kiosk-cue span { color:#9fd2c7; font-size:8px; font-weight:750; letter-spacing:.14em; text-transform:uppercase; }
+.tanga-kiosk-cue strong { font-size:12px; font-weight:680; line-height:1.25; }
+.tanga-kiosk-cue small { color:rgba(241,243,238,.7); font-size:10px; line-height:1.35; }
+.tanga-deck--kiosk .tanga-deck__executive-tour--kiosk:focus-visible { outline:2px solid #b7ece1; outline-offset:3px; }
+.tanga-deck--kiosk .tanga-deck__autoplay-group > :not(.tanga-deck__executive-tour--kiosk),
+.tanga-deck--kiosk .tanga-tour-mobile { display:none!important; }
+.tanga-deck--kiosk .tanga-deck__autoplay-group > .tanga-deck__executive-tour--kiosk { display:inline-flex!important; }
 .tanga-deck--bright-room .tanga-story-panel { border-color: rgba(255,255,255,.34); background: linear-gradient(150deg,rgba(29,35,39,.98),rgba(18,24,29,.97)); box-shadow: 0 24px 70px rgba(0,0,0,.62); }
 .tanga-deck--bright-room .tanga-story-panel__intro,.tanga-deck--bright-room .tanga-story-panel__qualification { color: rgba(255,255,255,.82); }
 .tanga-deck--bright-room .tanga-story-panel__eyebrow,.tanga-deck--bright-room .tanga-story-image-caption span { color: #ffc092; }
@@ -991,7 +1001,9 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media(max-width:760px) { .tanga-evidence-sequence { display:none; } .tanga-material-entry { flex-wrap:wrap; } .tanga-material-counts { gap:7px; font-size:9px; } .tanga-material-counts strong { display:block; font-size:23px; } .tanga-material-evidence { padding:16px; } .tanga-material-evidence h2 { font-size:23px; } }
 @media(max-width:760px) { .tanga-material-evidence figure img { display:block; height:auto; max-height:42svh; } }
 .tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-three__grade-legend { top:540px!important; max-height:calc(100svh - 646px)!important; }
-.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-three__grade-legend { top:400px!important; bottom:auto!important; max-height:calc(100svh - 588px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-three__grade-legend { top:400px!important; bottom:auto!important; max-height:calc(100svh - 500px)!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three__grade-legend[open]) .tanga-surface-control { display:none!important; }
+.tanga-deck .tanga-three.is-visible.is-resource:has(.tanga-three-animation-tools[open]) .tanga-surface-control { display:none!important; }
 /* Geological documents -> registered plan -> depth, sharing the chapter HUD. */
 .tanga-geology-map-sheet{position:absolute;z-index:24;left:300px;right:440px;top:215px;bottom:185px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #ffffff24;border-radius:14px;background:#252a2f;box-shadow:0 20px 70px #0004}
 .tanga-geology-map-sheet__toolbar{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#171e23}
@@ -1411,6 +1423,17 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-surface-control>div{display:flex;justify-content:space-between;align-items:center;font-size:8px;color:#aebfc8}
 .tanga-surface-control button{border:0;padding:1px 8px;background:none;color:#d9b48d;font-size:9px;cursor:pointer}
 .tanga-surface-control :focus-visible{outline:2px solid #9fe4e0;outline-offset:3px}
+.tanga-three__grade-legend .tanga-three__resource-threshold,.tanga-three__grade-legend .tanga-three__resource-section{display:grid;width:100%;justify-content:stretch;align-items:stretch;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #a0bcc32b;font-size:inherit;color:inherit}
+.tanga-three__resource-threshold label,.tanga-three__resource-section label{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#e6edf0;font-size:10px;letter-spacing:.02em}
+.tanga-three__resource-threshold output,.tanga-three__resource-section output{color:#a9e1df;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tanga-three__resource-threshold input,.tanga-three__resource-section input{height:18px;margin:0;accent-color:#61d9d1}
+.tanga-three__resource-threshold-stats{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#bac8cc;font-size:9px;font-variant-numeric:tabular-nums}
+.tanga-three__resource-threshold-stats strong{color:#e8f6f3;font-weight:600;white-space:nowrap}
+.tanga-three__resource-threshold small,.tanga-three__resource-section small{color:#aebfc8;font-size:9px;line-height:1.35}
+.tanga-three__resource-basis{justify-self:start;border:1px solid #d9b48d55;border-radius:4px;padding:4px 8px;color:#f0c89c;background:#d9b48d0d;font-size:10px}
+.tanga-three__resource-section>button{justify-self:start;min-height:30px;white-space:nowrap;border:1px solid #a9e1df55;border-radius:4px;padding:4px 8px;color:#d7f4ef;background:#a9e1df0d;font-size:10px}
+.tanga-three__resource-section>button[aria-pressed=true]{border-color:#6fe0d2;background:#4ac5b422;color:#eafffb}
+.tanga-three__resource-section input:disabled{opacity:.45;cursor:not-allowed}
 .tanga-deck:has(.tanga-geology-map-sheet) .tanga-surface-control{display:none}
 .tanga-deck .tanga-three__grade-legend{max-height:calc(100svh - 600px)!important}
 /* One instrument, one question, one result card. */
@@ -2193,6 +2216,88 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   font-weight: 700;
   letter-spacing: .17em;
   line-height: 1.4;
+}
+
+/* Separate the conceptual process animation from the report-backed test
+   results, and let the particle split read at a glance. */
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-separation,
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-sizing {
+  display: grid;
+  gap: 6px;
+  padding: 8px 9px;
+  border: 1px solid rgba(129, 160, 151, .26);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .035);
+  color: #dce7e4;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.tanga-factory-separation>span { display: flex; align-items: center; gap: 8px; }
+.tanga-factory-separation i { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: #66716f; }
+.tanga-factory-separation i.is-graphite { background: #66d9d2; box-shadow: 0 0 10px #66d9d288; }
+.tanga-factory-separation i.is-gangue { background: #d6a174; }
+.tanga-factory-separation small,.tanga-factory-sizing>small { color: #9aaba8; font-size: 10px; line-height: 1.4; }
+.tanga-factory-sizing>span { color: #9dc6d1; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.tanga-factory-sizing>div { display: grid; grid-template-columns: 62px 1fr; align-items: baseline; gap: 8px; }
+.tanga-factory-sizing>div strong { color: #8ce3d7; font-size: 16px; font-variant-numeric: tabular-nums; }
+.tanga-factory-sizing>div:nth-of-type(2) strong { color: #9cc6e9; }
+.tanga-factory-sizing>div small { color: #c1cfcc; font-size: 10px; }
+
+/* One consistent slider card for the mine's explicitly conceptual sequence. */
+.tanga-deck .tanga-mine-story .tanga-mine-sequence {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid rgba(220, 163, 108, .32);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(42, 50, 48, .94), rgba(20, 31, 36, .96));
+}
+.tanga-mine-sequence__heading,.tanga-mine-sequence__phase { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tanga-deck .tanga-mine-sequence__heading span { color: #f0d4b7; font-size: 11px; font-weight: 700; letter-spacing: .025em; }
+.tanga-deck .tanga-mine-sequence__heading strong { color: #f2bd84; font-variant-numeric: tabular-nums; }
+.tanga-deck .tanga-mine-sequence input[type="range"] { width: 100%; accent-color: #e4a76f; cursor: ew-resize; }
+.tanga-deck .tanga-mine-sequence__phase { color: #b7c4c4; font-size: 9px; }
+.tanga-deck .tanga-mine-sequence__phase strong { color: #88d5cf; font-size: 10px; font-weight: 650; }
+.tanga-deck .tanga-mine-sequence small { margin: 0; color: #c3c5bb; font-size: 9px; line-height: 1.45; }
+.tanga-deck .tanga-mine-sequence p { margin: 2px 0; color: #edf3ee; font-size: 11px; line-height: 1.45; }
+.tanga-deck .tanga-mine-story h2 { font-size: 18px; line-height: 1.2; }
+
+/* The final regional pullback closes on the actual report milestones, while
+   the direct port arc remains qualified as illustrative. */
+.tanga-story-cue__bookend { display: flex; align-items: center; gap: 12px; flex: 1.3!important; min-width: 260px!important; }
+.tanga-story-cue__orbit { position: relative; display: grid; place-items: center; flex: 0 0 60px; width: 60px; height: 60px; }
+.tanga-story-cue__orbit svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; stroke: #72d5cc; stroke-width: .8; opacity: .8; animation: tanga-orbit-turn 18s linear infinite; }
+.tanga-story-cue__orbit svg .is-flake { fill: #7de0d5; stroke: none; }
+.tanga-story-cue__orbit svg .is-flake:nth-of-type(2n) { fill: #e7ad79; }
+.tanga-story-cue__orbit svg .is-dust { fill: #b9f7ed; stroke: none; filter: drop-shadow(0 0 2px rgba(125,224,213,.8)); transform-box: fill-box; transform-origin: center; animation: tanga-hex-dust 2.8s ease-in-out infinite alternate; }
+.tanga-story-cue__orbit svg .is-dust-b { animation-delay: -.9s; }
+.tanga-story-cue__orbit>span { position: relative; z-index: 1; color: #f2eade; font-size: 7px; font-weight: 750; line-height: 1.1; letter-spacing: .08em; text-align: center; animation: tanga-closing-title 1.4s ease-out both; }
+.tanga-story-cue__milestones { min-width: 0; }
+.tanga-story-cue__milestones>strong { color: #95c9c5; font-size: 8px; letter-spacing: .13em; }
+.tanga-story-cue__milestones ol { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px 10px; margin: 4px 0; padding: 0; list-style: none; }
+.tanga-story-cue__milestones li { display: grid; grid-template-columns: auto 1fr; gap: 5px; min-width: 0; align-items: baseline; color: #e6e9e4; font-size: 8px; line-height: 1.2; }
+.tanga-story-cue__milestones time { color: #e8b381; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tanga-story-cue__milestones li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tanga-story-cue__milestones>small { color: #9eabb0; font-size: 8px; line-height: 1.3; }
+.tanga-closing-route { position: absolute; inset: 0; z-index: 16; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.tanga-closing-route__track { fill: none; stroke: rgba(193, 255, 247, .98); stroke-width: 4.5; filter: drop-shadow(0 0 4px rgba(99, 220, 216, .95)); }
+.tanga-closing-route__glow { fill: none; stroke: rgba(238, 181, 128, .42); stroke-width: 12; filter: drop-shadow(0 0 8px rgba(99, 220, 216, .75)); }
+.tanga-closing-route__beacon { fill: #65d9d1; stroke: #fff; stroke-width: 1.5; filter: drop-shadow(0 0 7px #65d9d1); animation: tanga-beacon-pulse 2s ease-out infinite; }
+.tanga-closing-route__port { fill: #e9b17d; stroke: #fff0dc; stroke-width: 1.2; }
+.tanga-closing-route__label { fill: #f4faf6; stroke: #0d1b23; stroke-width: 4px; stroke-linejoin: round; paint-order: stroke; font-size: 13px; font-weight: 700; }
+.tanga-closing-route__orbit-ring { fill: none; stroke: #a3eee2; stroke-width: 1.2; transform-box: fill-box; transform-origin: center; transform: rotate(-24deg); opacity: .75; }
+.tanga-closing-route__traveller { fill: #f7d49b; filter: drop-shadow(0 0 4px #65d9d1); }
+@keyframes tanga-beacon-pulse { 0%,100% { r:5; opacity:.95 } 50% { r:8; opacity:.48 } }
+@keyframes tanga-hex-dust { from { opacity:.35; scale:.72; } to { opacity:1; scale:1.2; } }
+@keyframes tanga-closing-title { from { opacity:0; letter-spacing:.25em; filter:blur(3px); } to { opacity:1; } }
+.tanga-deck--decision-story .tanga-story-cue { left: 300px; right: 380px; min-height: 100px; padding-block: 10px; }
+@keyframes tanga-orbit-turn { to { transform: rotate(360deg); } }
+@media (min-width:761px) and (max-width:1200px) { .tanga-deck--decision-story .tanga-story-cue { left: 270px; right: 300px; } .tanga-story-cue__bookend { min-width: 210px!important; gap: 6px; } .tanga-story-cue__orbit { flex-basis: 48px; width: 48px; height: 48px; } }
+@media (max-width:760px) { .tanga-deck--decision-story .tanga-story-cue { min-height: unset; } .tanga-story-cue__bookend { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .tanga-story-cue__orbit svg, .tanga-story-cue__orbit svg .is-dust, .tanga-story-cue__orbit>span, .tanga-closing-route__beacon { animation: none; }
+  .tanga-closing-route__traveller { display: none; }
 }
 .tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector h3 {
   margin: 0;

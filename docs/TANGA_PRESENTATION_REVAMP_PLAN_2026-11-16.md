@@ -98,6 +98,77 @@ Acceptance per chapter: the question and takeaway are understandable within five
 
 ## Work sequence
 
+### User-directed experience proposal — 16 November 2026
+
+The requested build order is **shared foundation → Metallurgy → Resource → Mine Planning → close**. Treat the following as a design checklist, not permission to invent project evidence. Reuse the existing overlay slots, view state, chapter navigation, source-qualified metrics and scene fallback before creating parallel systems.
+
+#### Step 0 — shared presentation foundation
+
+- [ ] Author one camera-rail contract for scene keyframes, destination validation, interruption, reset, and reduced-motion behavior; adapt it to Cesium/MapLibre/deck.gl and Three.js rather than forcing one engine-specific camera API across them.
+- [ ] Consolidate the HUD into shared story, instrument, evidence and navigation primitives with measured safe areas. Preserve the distinct cartographic, laboratory-results and mine-site visual grammars.
+- [ ] Centralize interface palette, spacing, typography, panel, focus and control tokens. Keep lithology/grade encodings tied to their source data; use cyan only for graphite-oriented emphasis and amber for waste/warnings where the chapter legend supports it.
+- [ ] Bind every displayed metric to its source dataset/report locator and show its unit, date/category, and qualification in the evidence path.
+- [ ] Benchmark post-processing before adopting it. Bloom, vignette or fog must not lower terrain legibility, alter categorical data colors, hide labels or make the six 3D chapters materially slower; natural daylight and stable source colors take precedence.
+
+#### View-specific story proposals
+
+- [ ] **Metallurgy — Rock to battery:** keep the eight-sample board and report results as the evidence view. Offer the connected conceptual plant as a separate explanation route, with selectable process stages, roof opening, an interior camera move, and equipment motion only where supported. Bind stage metrics to reported testwork; do not synthesize recovery/yield values. Use microscopy only as sample-linked evidence when a verified crosswalk exists and reproduction permission is established. Label EV-anode and refractory routes as illustrative downstream context unless Tanga-specific product qualification is documented.
+- [ ] **Resource — The orebody awakens:** add a cut-off/category interaction only when the labels remain tied to report definitions. Keep modeled cells, report totals and uncertainty distinct; a display threshold is not an economic cut-off. A slice plane and drillhole chronology must use recorded data and preserve gaps.
+- [ ] **Mine Planning — time scrubber:** a Year 0-to-closure scrubber needs dated mining phases with pit surfaces/bench states, material quantities, footprint progression and a sourced closure/rehabilitation state. The supplied outputs include a 20-year staged economic cash-flow file, but the checked project artifact `public/generated/orewaste-reference.json` contains one RF1 scenario with two North/South pit surfaces, not a year-by-year mine schedule. Do not bind economic years to pit growth, annual mining quantities, footprint changes or rehabilitation. Keep the current RF1 two-pit concept, blocks, natural terrain and conceptual-status labels visible unless spatial phase data is verified.
+- [ ] **Closing — pull back and decide:** return to the regional setting, then show only committed study milestones. Supply-chain arcs remain explicitly illustrative unless supported by a sourced route/offtake basis. Any replay/download/contact control must point to a real, working action.
+
+#### Source-folder audit — 16 November 2026
+
+- [x] Inventory the supplied OreWaste outputs folder and the PaulSam June 2023, SMMPL April 2025 and AMC December 2025 report extraction folders.
+- [x] Confirm a dated 20-year **staged economic cash-flow model** is available in `Tanga_Staged_Cashflow.csv`, with its assumptions in `Tanga_Staged_Assumptions.json`; the planning report describes a 0.5 Mtpa starter mine expanding to 2 Mtpa, with conditional scenario economics.
+- [x] Confirm the PaulSam report supports the lowland plant-siting rationale and a candidate Option 2 conveyor, while the current map registration and plant/site arrangement remain approximate or conceptual.
+- [x] Confirm the AMC MRE contains resource and bench-scale metallurgy evidence; the SMMPL downstream study is an indicative financial/product pathway study. Neither extracted report supplies dated spatial pit phases.
+- [ ] Before using the cash-flow file in the deck, reconcile it to the intended selected product scenario and the latest planning report, then label all values as modeled scenario outputs. Do not bind this cash-flow timeline to pit surfaces or animate mine growth from it.
+- [ ] Keep the two source scopes separate: OreWaste RF1 geometries support the current two-pit site concept; the staged cash-flow rows support modeled financial progression only. There is no verified year-by-year pit, bench, footprint or closure geometry in the inspected files.
+- [ ] Reconcile the September 2026 mine-to-market planning report with the April 2025 downstream study before displaying an investment recommendation: their product-route cases and economics differ and must not be combined as if they share one basis.
+
+#### Delivery order and gates
+
+1. Complete the Phase 0 release-truth and foreground desktop baseline below.
+2. Implement and verify the shared foundation without changing source-data color semantics.
+3. Recompose Metallurgy around evidence first and its conceptual plant second.
+4. Add Resource interactions that map directly to verified model/report fields.
+5. Reconcile the modeled cash-flow scenario before considering a labeled economic timeline. Add a Mine Planning time scrubber only after valid spatial phase data is available; otherwise continue polishing the one sourced RF1 case.
+6. Finish the evidence-linked close, then rerun the two-desktop-size chapter matrix and release checks.
+
+#### Pasted visual brief — acceptance checklist
+
+Add seven story waypoints over the existing 12 chapter IDs; retain every detailed chapter and shareable deep link. The waypoints are **Place & scale** (`project`, `tanzania`, `work_completed`, `topography`), **Geology** (`subsurface`), **Drilling** (`drillholes`), **Resource** (`resource`, `ranking`), **Metallurgy** (`metallurgy`), **Mine planning** (`mine_planning`), and **Close** (`accessibility`, `comparison`). Keep the 12-scene selector as the detailed-view picker within those seven story waypoints.
+
+- [ ] Keep the 3D/map canvas visually full-bleed. Place the headline/takeaway in the top-left safe area, optional collapsible controls at the right, and compact legend/timeline at the bottom. Measure panel bounds against the active scene focal area so scene anchors remain visible.
+- [x] Replace the noninteractive three-act ribbon and 12-dot footer with a persistent seven-waypoint rail, active label/progress fill and left/right arrow navigation. Preserve the 12 scene deep links in the All scenes picker and keep Story/Explore mode available.
+- [ ] Give every chapter a finding-led headline, concise “what am I looking at?” legend, one-shot “try this” hint, reset action and source/provenance chip. Hints disappear after the first successful interaction and remain available to keyboard users until then.
+- [ ] Use stable semantic colors, labels or patterns alongside color, and a colorblind-safe sequential grade ramp. Match lithology swatches to mapped-source categories; do not recolor the geology data for visual effect.
+- [ ] Use 400–700 ms interface transitions and 2–4 s authored camera moves only where they preserve orientation and explain scale. Respect `prefers-reduced-motion` throughout.
+- [ ] Keep touch gestures, adaptive quality and device-specific controls in the deferred phone/tablet phase. For desktop, verify keyboard focus, asset fallback, useful loading feedback and that camera interaction does not start or continue animation unexpectedly.
+- [x] Replace the intro's outward-arrow symbol with an in-app forward arrow; add clickable Place / Evidence / Next-stage entry links; add an AMC estimate provenance line and an explicit sound toggle. Keep intro poster rendering before video data arrives and preserve the visible, focusable Skip intro action.
+- [ ] Replace the generic bootstrap message with truthful loading-state feedback. A numeric percentage must be based on measured asset/data progress; do not fabricate completion percentages when the dynamic module or scene loader exposes only a status message.
+- [ ] Intro acceptance: first paint shows the supplied poster, the three deep links open their intended chapter, playback remains muted until the viewer opts in, skip works by keyboard, and the live 3D scene crossfades in without a blank screen.
+
+Chapter-specific acceptance from the pasted brief:
+
+- [ ] **Place & scale:** visible north arrow and scale; scale ladder from continent to licence; only source-supported proximity facts; readable halo/chip map labels. Draw/pulse effects remain optional and must not suggest unsupported distances.
+- [ ] **Geology:** terrain occupies the primary canvas; 6–7 or fewer mapped units in a toggle legend; unit highlight/dim behavior and a separate Surface ↔ subsurface control. Keep the geologic map evidence distinct from interpreted 3D geometry.
+- [ ] **Drilling:** show recorded holes only on the drilling chapter; select a hole to align camera and interval profile; filter only on available fields; ID labels remain decluttered; best-intercept emphasis uses sourced assays.
+- [ ] **Resource:** counters derive from the reported table at the official basis; mark that basis explicitly; any model-only threshold displays an illustrative-not-reported note. Add grade distribution/category toggles and a section plane only where they preserve the report's definitions.
+- [ ] **Metallurgy:** stage rail and detail card identify one sentence, one sourced number and reference; expose the supporting table; pause/resume and static summary are available; product/downstream visuals remain clearly illustrative where not qualified by Tanga testwork.
+- [ ] **Mine planning:** keep the sourced two-pit RF1 concept; add a time scrubber only when dated spatial mining phases exist. Show Conceptual study status, key assumptions, playback controls and pause-on-camera-input.
+- [ ] **Close:** return to the regional/orbital context; show only committed milestones and verified disclaimer; replay/download/contact/share actions each resolve to a working destination.
+
+Local review recorded 16 November 2026:
+
+- [x] At 1366 × 768, the intro poster appears behind the hero copy on first paint. The in-app arrow, source-linked AMC estimate line, sound toggle and Skip intro control are visible; the chapter waypoints are legible over the image.
+- [x] The intro's Place, Evidence and Next-stage links resolve to `#tanzania`, `#resource` and `#mine_planning`. Browser capture confirmed the Place and Next-stage headings and the Evidence model chapter; the sound control toggles its accessible state.
+- [x] Reviewed North and South pit camera frames at both desktop sizes. The selected pit is presented with terrain context, and both RF1 shells remain together in the whole-site view. This camera composition change does not alter pit geometry or source blocks.
+- [ ] The intro-to-live-scene crossfade, keyboard-only skip/waypoint navigation, sound-track audibility, and measured asset-load percentage still need explicit verification. Do not display a numeric loading percentage until the app exposes actual progress events.
+- [x] Fix a hydration mismatch on direct chapter links: initialize waypoint state identically on server and client, then read the URL hash after mount. A fresh local `#mine_planning` entry selected “Fit a concept to ground” with no hydration warning, console message or page error.
+- [x] At 1366 × 768 and 1707 × 842, the new rail shows seven nodes with exactly one current step; clicking Geology loads the mapped-geology chapter, ArrowRight from the Geology node advances to Drilling, and the existing scene index still lists all 12 chapters. Captures: `.playwright-mcp/story-waypoints-mine-1366x768.png` and `.playwright-mcp/story-waypoints-mine-1707x842.png`.
+
 ### Phase 0 — Release truth and clean baseline (P0)
 
 - [ ] Check branch, PR, stable Vercel production and anonymous Cloudflare Worker independently. Record deployed commit, public/private access, runtime target and current scene version.
@@ -199,3 +270,15 @@ The deck is ready for an investor/management presentation when the current publi
 - Current capture limitations: `TANGA_DESKTOP_CAPTURE_MATRIX_2026-10-28.md`
 - Reference review: `TANGA_POLISH_REFERENCE_REVIEW_2026-10-23.md`
 - UI guidance applied: `.agents/skills/ui-ux-pro-max/SKILL.md` (reduced motion, limited purposeful animation, lazy loading, focus and hierarchy)
+
+## 17 November 2026 — conceptual process, mine sequence, and closing bookend
+
+- [x] **Metallurgy separation concept:** add rising graphite-flake cues and a distinct sinking gangue stream in the flotation stage. The scene says the particles are illustrative and do not encode recovery or a plant mass balance.
+- [x] **Testwork-linked sizing:** use the selected composite’s reported cumulative +150 µm mass fraction for the coarse bin and show its arithmetic complement separately with an explicit caveat. This is a visual explanation of the reported size split, not a plant product distribution.
+- [x] **Mine-site concept sequence:** add an interactive 0–12 sequence with a consistent starting state, gradual pit reveal, source RF1 blocks only during the operating concept interval, conceptual facility reveal, fixed-site sun motion, fading nested pit cues, and final conceptual lake surfaces positioned from the RF1 registered pit elevations.
+- [x] **Mine-plan disclosure:** name the control “Illustrative development sequence” and state that it is not a year-by-year mine schedule or closure design. Preserve the two RF1 pit shells and source ore blocks; keep generated facility layout and sequence cues explicitly conceptual.
+- [x] **Closing orbit:** close on the globe, sourced milestone dates, a compact orbit/title emblem with animated graphite-hex dust, and a brighter animated project-to-port display arc. The arc remains illustrative; the orbital motif is explicitly not a licence boundary.
+- [x] **Desktop visual review:** inspect the metallurgy overview and flotation cutaway, the mine-planning overview, and the closing globe at 1707 × 842. The new HUD elements remain inside their reserved side/footer zones. `npm run typecheck` and `git diff --check` pass.
+- [ ] **Remaining acceptance:** inspect the product-sizing view and mine sequence at both target desktop sizes; confirm the final lake reveal in a close pit camera; run the full 12-chapter screenshot matrix and deployed-URL checks before calling the whole deck release-ready.
+
+**Evidence boundary:** the process effect is a conceptual explanation grounded by the report’s composite results; the mine sequence is an illustrative animation grounded by the supplied RF1 shells, block model, and PaulSam site-context references. The source folder does not provide a staged annual pit schedule, engineered haul-road alignment, plant mass balance, or closure design, so the visuals do not claim those designs exist.
