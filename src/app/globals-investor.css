@@ -2294,15 +2294,14 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 .tanga-recap {
   position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
+  z-index: 32;
+  left: clamp(24px, 5vw, 80px);
+  top: clamp(200px, 25vh, 245px);
+  bottom: clamp(230px, 31vh, 280px);
+  width: min(42vw, 710px);
   overflow: hidden;
-  border: 0;
+  border: 1px solid #6ebdb878;
+  border-radius: 14px;
   background: transparent;
   color: #effbf9;
 }
@@ -2316,18 +2315,18 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   position: absolute;
   top: 8%;
   left: 7%;
-  right: 25%;
+  right: 30%;
   text-shadow: 0 2px 10px #040b13;
 }
-.tanga-recap header h2 { margin: .2em 0; color: #effbf9; font-size: clamp(28px, 5vw, 70px); }
-.tanga-recap header p { color: #b5dedb; font-size: clamp(12px, 1.3vw, 18px); }
+.tanga-recap header h2 { margin: .2em 0; color: #effbf9; font-size: clamp(22px, 2.1vw, 36px); }
+.tanga-recap header p { color: #b5dedb; font-size: 12px; }
 .tanga-recap__close, .tanga-recap nav a {
-  padding: 10px 14px;
+  padding: 6px 9px;
   border: 1px solid #81bdb66e;
   border-radius: 7px;
   background: #091a25;
   color: #d5f4ef;
-  font-size: 13px;
+  font-size: 11px;
 }
 .tanga-recap__close { position: absolute; top: 5%; right: 5%; }
 .tanga-recap nav {

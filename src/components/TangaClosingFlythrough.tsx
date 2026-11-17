@@ -1,6 +1,7 @@
 'use client';
 
 import {useEffect, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
 
 const stops = [
   {label: 'Diamond drilling', detail: 'Evidence beneath the surface', href: '?v=1&view=intercepts#drillholes'},
@@ -10,18 +11,11 @@ const stops = [
 ];
 
 export default function TangaClosingFlythrough({onClose}: {onClose: () => void}) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const finish = useRef(onClose);
   const [active, setActive] = useState(0);
   const [flying, setFlying] = useState(false);
   finish.current = onClose;
-
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
 
   useEffect(() => {
     const mount = surface.current;
@@ -172,9 +166,11 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
     };
   }, []);
 
-  return <dialog ref={dialog} className="tanga-recap" aria-labelledby="tanga-recap-title" onCancel={event => {event.preventDefault(); onClose();}}>
+  return createPortal(<section className="tanga-recap" aria-label="3D project recap" onKeyDown={event => {
+    if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+  }}>
     <div className="tanga-recap__canvas" ref={surface} aria-hidden="true"/>
-    <button className="tanga-recap__close" type="button" onClick={onClose} autoFocus>Return to globe</button>
+    <button className="tanga-recap__close" type="button" onClick={onClose} autoFocus>Close recap</button>
     <header>
       <p>Tanga Graphite · Chapter recap</p>
       <h2 id="tanga-recap-title">{flying ? stops[active].label : 'Explore the project evidence'}</h2>
@@ -183,5 +179,5 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
     <nav aria-label="Recap chapters">
       {stops.map((stop, index) => <a key={stop.href} aria-current={flying && index === active ? 'step' : undefined} href={stop.href}>{stop.label}</a>)}
     </nav>
-  </dialog>;
+  </section>, document.body);
 }
