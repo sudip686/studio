@@ -15,6 +15,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
   const finish = useRef(onClose);
   const [active, setActive] = useState(0);
   const [flying, setFlying] = useState(false);
+  const [closing, setClosing] = useState(false);
   finish.current = onClose;
 
   useEffect(() => {
@@ -61,10 +62,64 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       const glass = new T.MeshStandardMaterial({color: 0x79c9cd, roughness: .22, transparent: true, opacity: .28, depthWrite: false, side: T.DoubleSide, forceSinglePass: true});
       const froth = new T.MeshBasicMaterial({color: 0xc2fff0});
       const ribbon = new T.MeshBasicMaterial({color: 0x66e5dd});
+      const beaconMaterial = new T.MeshStandardMaterial({color: 0x92fff0, emissive: 0x1b8e82, emissiveIntensity: 1.8, metalness: .28, roughness: .22});
+      const orbitMaterial = new T.MeshBasicMaterial({color: 0x71e4d7, transparent: true, opacity: .72});
+      const orbitAccent = new T.MeshBasicMaterial({color: 0xf4b775, transparent: true, opacity: .86});
       const grid = new T.GridHelper(54, 36, 0x1b3d48, 0x18303e);
       grid.position.y = -.12;
       scene.add(grid);
       scene.add(new T.Mesh(new T.TubeGeometry(rail, 96, .042, 6), ribbon));
+      const closingBeacon = new T.Group();
+      closingBeacon.position.set(0, 0, -.5);
+      closingBeacon.visible = false;
+      const beacon = new T.Mesh(new T.IcosahedronGeometry(.86, 1), beaconMaterial);
+      beacon.position.y = 1.55;
+      closingBeacon.add(beacon);
+      const orbit = new T.Mesh(new T.TorusGeometry(4.65, .035, 6, 96), orbitMaterial);
+      orbit.rotation.x = Math.PI / 2;
+      orbit.position.y = 1.55;
+      closingBeacon.add(orbit);
+      const orbit2 = new T.Mesh(new T.TorusGeometry(6.05, .018, 5, 96), orbitAccent);
+      orbit2.rotation.set(Math.PI / 2 + .23, 0, .2);
+      orbit2.position.y = 1.55;
+      closingBeacon.add(orbit2);
+      const flakes = new T.InstancedMesh(new T.CylinderGeometry(.29, .29, .11, 6), orbitAccent, 8);
+      const flakeTransform = new T.Matrix4();
+      for (let i = 0; i < flakes.count; i++) {
+        const angle = i * Math.PI / 4;
+        flakes.setMatrixAt(i, flakeTransform.makeTranslation(Math.cos(angle) * 5.35, 1.55, Math.sin(angle) * 5.35));
+        flakes.setColorAt(i, new T.Color(i % 2 ? 0x8cefe0 : 0xf4b775));
+      }
+      closingBeacon.add(flakes);
+      const titleCanvas = document.createElement('canvas');
+      titleCanvas.width = 1200;
+      titleCanvas.height = 260;
+      const titleContext = titleCanvas.getContext('2d');
+      let titleTexture: InstanceType<typeof T.CanvasTexture> | undefined;
+      let titleMaterial: InstanceType<typeof T.SpriteMaterial> | undefined;
+      if (titleContext) {
+        titleContext.textAlign = 'center';
+        titleContext.textBaseline = 'middle';
+        titleContext.shadowColor = '#65fff0';
+        titleContext.shadowBlur = 36;
+        titleContext.fillStyle = '#ffffff';
+        titleContext.font = '700 118px system-ui, sans-serif';
+        titleContext.fillText('TANGA GRAPHITE', 600, 113);
+        titleContext.shadowBlur = 0;
+        titleContext.fillStyle = '#f4b775';
+        titleContext.font = '600 30px system-ui, sans-serif';
+        titleContext.letterSpacing = '8px';
+        titleContext.fillText('EVIDENCE  ·  RESOURCE  ·  NEXT DECISIONS', 600, 218);
+        titleTexture = new T.CanvasTexture(titleCanvas);
+        titleTexture.colorSpace = T.SRGBColorSpace;
+        titleTexture.generateMipmaps = false;
+        titleMaterial = new T.SpriteMaterial({map: titleTexture, transparent: true, opacity: 0, depthWrite: false, depthTest: false, toneMapped: false});
+        const title = new T.Sprite(titleMaterial);
+        title.position.set(0, 5.2, 0);
+        title.scale.set(18.5, 3.55, 1);
+        closingBeacon.add(title);
+      }
+      scene.add(closingBeacon);
       const stationLights: InstanceType<typeof T.MeshBasicMaterial>[] = [];
       const hitTargets: InstanceType<typeof T.Mesh>[] = [];
       let bubbles: InstanceType<typeof T.InstancedMesh> | undefined;
@@ -190,7 +245,8 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         });
         geometries.forEach(geometry => geometry.dispose());
         benchEdges.forEach(geometry => geometry.dispose());
-        [cyan, amber, base, rock, pitSurface, benchEdge, glass, froth, ribbon, ...stationLights].forEach(material => material.dispose());
+        [cyan, amber, base, rock, pitSurface, benchEdge, glass, froth, ribbon, beaconMaterial, orbitMaterial, orbitAccent, titleMaterial, ...stationLights].forEach(material => material?.dispose());
+        titleTexture?.dispose();
         grid.dispose();
         renderer.dispose();
         renderer.domElement.remove();
@@ -203,13 +259,16 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       resize();
       let elapsed = 0;
       let selected = -1;
+      let closingStarted = false;
       setFlying(true);
       const render = (now: number) => {
         if (previousFrame !== null) elapsed += Math.max(0, now - previousFrame);
         previousFrame = now;
         const seconds = elapsed / 1000;
         if (seconds >= 15) { finish.current(); return; }
-        const phase = Math.min(3, Math.floor(seconds / 3.4));
+        const chapterDuration = 2.75;
+        const chapterRun = chapterDuration * stops.length;
+        const phase = Math.min(stops.length - 1, Math.floor(seconds / chapterDuration));
         if (bubbles) {
           for (let i = 0; i < bubbles.count; i++) {
             const angle = i * 2.4;
@@ -224,12 +283,30 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           setActive(phase);
           stationLights.forEach((light, index) => light.color.setHex(index === phase ? 0x9effeb : 0x285360));
         }
-        const blend = T.MathUtils.smoothstep(seconds - phase * 3.4, 1.15, 3.4);
-        const target = rail.getPoint(Math.min(1, (phase + blend) / 3));
-        const exit = T.MathUtils.smoothstep(seconds, 12.5, 15);
-        camera.position.set(target.x - 2 - exit * 10, 3.4 + exit * 7, target.z + 7.3 + exit * 18);
-        camera.lookAt(target.x + exit * 2, 1.32, target.z);
-        mount.style.opacity = String(1 - T.MathUtils.smoothstep(seconds, 13.4, 15));
+        const blend = T.MathUtils.smoothstep(seconds - phase * chapterDuration, .9, chapterDuration);
+        const target = rail.getPoint(Math.min(1, (phase + blend) / (stops.length - 1)));
+        if (seconds < chapterRun) {
+          closingBeacon.visible = false;
+          camera.position.set(target.x - 2, 3.4, target.z + 7.3);
+          camera.lookAt(target.x, 1.32, target.z);
+        } else {
+          if (!closingStarted) { closingStarted = true; setClosing(true); }
+          closingBeacon.visible = true;
+          const progress = T.MathUtils.clamp((seconds - chapterRun) / (15 - chapterRun), 0, 1);
+          const pullback = T.MathUtils.smoothstep(progress, 0, .72);
+          const orbitAngle = .32 + Math.max(0, progress - .55) * 1.25;
+          const orbitPosition = new T.Vector3(Math.sin(orbitAngle) * 35, 17 + Math.sin(progress * Math.PI) * 2, Math.cos(orbitAngle) * 35);
+          const last = rail.getPoint(1);
+          const chapterCamera = new T.Vector3(last.x - 2, 3.4, last.z + 7.3);
+          camera.position.copy(chapterCamera.lerp(orbitPosition, pullback));
+          camera.lookAt(new T.Vector3(last.x, 1.32, last.z).lerp(new T.Vector3(0, 1.8, -.5), pullback));
+          closingBeacon.rotation.y = seconds * .12;
+          stationLights.forEach((light, index) => light.color.setHex(Math.sin(seconds * 1.8 - index * .72) > -.25 ? 0x86eee0 : 0x285360));
+          beacon.scale.setScalar(1 + Math.sin(seconds * 2.4) * .07);
+          beaconMaterial.emissiveIntensity = 1.45 + (Math.sin(seconds * 2.4) + 1) * .48;
+          if (titleMaterial) titleMaterial.opacity = T.MathUtils.smoothstep(progress, .25, .65);
+        }
+        mount.style.opacity = String(1 - T.MathUtils.smoothstep(seconds, 14.65, 15));
         renderer.render(scene, camera);
         frame = requestAnimationFrame(render);
       };
@@ -251,11 +328,11 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
     <button className="tanga-recap__close" type="button" onClick={onClose} autoFocus>Close recap</button>
     <header>
       <p>Tanga Graphite · Chapter recap</p>
-      <h2 id="tanga-recap-title">{flying ? stops[active].label : 'Explore the project evidence'}</h2>
-      <p>{flying ? `${stops[active].detail} · Schematic chapters` : 'Choose a chapter to open its evidence view.'}</p>
+      <h2 id="tanga-recap-title" aria-live="polite">{closing ? 'Story in one view' : flying ? stops[active].label : 'Explore the project evidence'}</h2>
+      <p className={closing ? 'tanga-recap__detail--sr-only' : undefined}>{closing ? 'Diamond drilling · resource model · testwork · conceptual site' : flying ? `${stops[active].detail} · Schematic chapters` : 'Choose a chapter to open its evidence view.'}</p>
     </header>
     <nav aria-label="Recap chapters">
-      {stops.map((stop, index) => <a key={stop.href} aria-current={flying && index === active ? 'step' : undefined} href={stop.href}>{stop.label}</a>)}
+      {stops.map((stop, index) => <a key={stop.href} aria-current={flying && !closing && index === active ? 'step' : undefined} href={stop.href}>{stop.label}</a>)}
     </nav>
   </section>, document.body);
 }
