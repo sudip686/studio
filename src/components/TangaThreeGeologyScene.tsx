@@ -2487,8 +2487,20 @@ export default function TangaThreeGeologyScene({
   const evidenceFocusRef=useRef<((holeId:string)=>void)|null>(null);
   const [miningBeat,setMiningBeat]=useState(3);
   const [mineSequence,setMineSequence]=useState(0);
+  const [mineSequencePlaying, setMineSequencePlaying] = useState(false);
   const [mineSequenceActive,setMineSequenceActive]=useState(false);
-  useEffect(()=>{setMineSequence(0);setMineSequenceActive(false);},[mode]);
+  useEffect(()=>{setMineSequence(0);setMineSequenceActive(false);setMineSequencePlaying(false);},[mode]);
+  useEffect(() => {
+    if (!mineSequencePlaying || motionPaused) return;
+    if (mineSequence >= 12) {
+      setMineSequencePlaying(false);
+      return;
+    }
+    const step = window.setInterval(() => {
+      if (!document.hidden) setMineSequence(value => Math.min(12, value + 1));
+    }, 1600);
+    return () => window.clearInterval(step);
+  }, [mineSequencePlaying, mineSequence, motionPaused]);
   const [storyPlaying,setStoryPlaying]=useState(false);
   const [storyReplay,setStoryReplay]=useState(0);
   const [evidenceVisible,setEvidenceVisible]=useState(true);
@@ -2815,6 +2827,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const pitRamps:THREE.Mesh[]=[];
     const sequenceOutlines:THREE.LineLoop[][]=[];
     const closureLakes:THREE.Mesh[]=[];
+    const restorationColors: {attribute: THREE.BufferAttribute; rock: Float32Array; planted: Float32Array}[] = [];
+    let lastRestoration = -1;
     const revealBlocks:THREE.InstancedMesh[]=[];
     const geologyMeshes:THREE.Mesh<THREE.BufferGeometry,THREE.MeshBasicMaterial>[]=[];
     let separation=0;
@@ -4999,9 +5013,31 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               const compactRing=pit.ring.map(([x,z])=>[pit.centre[0]+(x-pit.centre[0])*.56,-(pit.centre[1]+(z-pit.centre[1])*.56)] as const);
               compactRing.forEach(([x,y],pointIndex)=>pointIndex===0?shape.moveTo(x,y):shape.lineTo(x,y));shape.closePath();
               const lake=new THREE.Mesh(new THREE.ShapeGeometry(shape),new THREE.MeshPhysicalMaterial({color:0x66bfc3,emissive:0x123f45,emissiveIntensity:.22,roughness:.22,metalness:.12,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
-              const registeredFloors=sourceSurface?sourceSurface.pitElevation.flatMap((column,i)=>column.filter((value,j)=>sourceSurface.mask[i]?.[j]&&Number.isFinite(value))).sort((a,b)=>a-b):[];
-              const registeredFloor=registeredFloors.length?registeredFloors[Math.floor((registeredFloors.length-1)*.02)]:pit.floor;
-              lake.geometry.rotateX(-Math.PI/2);lake.position.y=registeredFloor+1.3;lake.name='Illustrative closure lake surface · concept only · RF1 registered elevation';lake.visible=false;stage.add(lake);closureLakes.push(lake);
+              const positions = mesh.geometry.getAttribute('position');
+              const floor = positions.getY(positions.count - 1);
+              lake.geometry.rotateX(-Math.PI / 2);
+              lake.userData.floor = floor;
+              lake.name = 'Illustrative closure water inside the displayed pit';
+              lake.visible = false;
+              stage.add(lake);
+              closureLakes.push(lake);
+
+              const attribute = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
+              const rock = new Float32Array(attribute.array);
+              const planted = new Float32Array(rock.length);
+              const green = new THREE.Color(0x68834c);
+              const normals = mesh.geometry.getAttribute('normal');
+              for (let vertex = 0; vertex < positions.count; vertex++) {
+                const index = vertex * 3;
+                const slope = Math.abs(normals.getY(vertex));
+                const patch = .5 + .5 * Math.sin(positions.getX(vertex) * .028 + positions.getZ(vertex) * .016);
+                const coverage = THREE.MathUtils.smoothstep(slope, .55, .95) * (.28 + patch * .59);
+                planted[index] = THREE.MathUtils.lerp(rock[index], green.r, coverage);
+                planted[index + 1] = THREE.MathUtils.lerp(rock[index + 1], green.g, coverage);
+                planted[index + 2] = THREE.MathUtils.lerp(rock[index + 2], green.b, coverage);
+              }
+              restorationColors.push({attribute, rock, planted});
+              lastRestoration = -1;
             }
             // No source ramp alignment is supplied. Do not draw a synthetic
             // spiral or attach a truck path to an invented pit access road.
@@ -5850,17 +5886,27 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         host.dataset.miningBeat=String(beat);
         evidenceGroup.visible=(!facilityFocused||beat<3)&&story.holes&&layerSettingsRef.current.context.visible;
         evidenceLines.forEach(line=>{const count=line.geometry.getAttribute('position').count;line.geometry.setDrawRange(0,beat===0&&story.playing&&!reducedMotion.matches?Math.floor(Math.min(1,storyAge/2.5)*count/2)*2:count);});
-        const showOperations=mineSequenceDriven?mineSequenceProgress>=.52:beat>=3;
+        const showOperations=mineSequenceDriven?mineSequenceProgress>=.5:beat>=3;
         if(processPlant)processPlant.visible=showOperations&&layerSettingsRef.current.context.visible;
         if(developmentInfrastructure)developmentInfrastructure.visible=showOperations&&layerSettingsRef.current.context.visible;
         if(siteCampus)siteCampus.visible=showOperations&&layerSettingsRef.current.context.visible;
-        sequenceOutlines.forEach((rings,pitIndex)=>rings.forEach((ring,index)=>{
+        const restoration = mineSequenceDriven ? THREE.MathUtils.smoothstep(mineSequenceProgress, .75, 1) : 0;
+        sequenceOutlines.forEach(rings=>rings.forEach((ring,index)=>{
           const reveal=mineSequenceDriven?THREE.MathUtils.clamp((mineSequenceProgress-(.18+index*.1))/.13,0,1):0;
-          const material=ring.material as THREE.LineBasicMaterial;material.opacity=reveal*.74;ring.visible=reveal>.01&&layerSettingsRef.current.context.visible;
-          void pitIndex;
+          const material=ring.material as THREE.LineBasicMaterial;
+          material.opacity=reveal*.74*(1-restoration);
+          ring.visible=material.opacity>.01&&layerSettingsRef.current.context.visible;
         }));
+        if (restoration !== lastRestoration) {
+          for (const {attribute, rock, planted} of restorationColors) {
+            for (let i = 0; i < rock.length; i++) attribute.array[i] = THREE.MathUtils.lerp(rock[i], planted[i], restoration);
+            attribute.needsUpdate = true;
+          }
+          lastRestoration = restoration;
+        }
         closureLakes.forEach(lake=>{
-          const reveal=mineSequenceDriven?THREE.MathUtils.clamp((mineSequenceProgress-.84)/.14,0,1):0;
+          const reveal = restoration;
+          lake.position.y = lake.userData.floor + reveal * 14;
           const material=lake.material as THREE.MeshPhysicalMaterial;material.opacity=reveal*.78;lake.visible=reveal>.01&&layerSettingsRef.current.context.visible;
         });
       }
@@ -5886,7 +5932,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       // carrying the blocks into those views makes the opening site read as a
       // grade carpet. The dedicated pit shot keeps source cells in context.
       targetMeshes.forEach(mesh=>{
-        const showSequenceBlocks=mineSequenceDriven&&mineSequenceProgress>=.3&&mineSequenceProgress<.86;
+        const showSequenceBlocks=mineSequenceDriven&&mineSequenceProgress>=.25&&mineSequenceProgress<.75;
         const showPitBlocks=(mineSequenceDriven?showSequenceBlocks:beat===2)&&layerSettingsRef.current.blocks.visible&&(activePitBlockFocusRef.current===null||mesh.userData.pitIndex===activePitBlockFocusRef.current)&&(!pitGradeFocusRef.current||mesh.userData.gradeBand===pitGradeFocusRef.current);
         mesh.visible=showPitBlocks;
         mesh.material.depthTest=!presentationOptions.current.targetXray;
@@ -5916,7 +5962,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const at=routePosition(points,phase*item.length);
           item.group.position.copy(at.position).add(new THREE.Vector3(0,1.2,0));
           item.group.rotation.y=Math.atan2(at.direction.x,at.direction.z);
-          item.group.visible=beat>=3&&layerSettingsRef.current.context.visible;
+          item.group.visible=(mineSequenceDriven ? mineSequenceProgress >= .5 && mineSequenceProgress < .75 : beat >= 3) && layerSettingsRef.current.context.visible;
         }
       }
       const flyProgress = reducedMotion.matches?1:ease(Math.min(1, elapsed / cameraShot.flySeconds));
@@ -6501,7 +6547,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             revealCommand.current?.('resource');
           }}>Replay block assembly</button>}
           <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
-          {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-label={mode==='subsurface'?(inspectionOpen?'Close inspection tools':'Inspection tools'):undefined} title={mode==='subsurface'?'Geology inspection tools':'Inspection tools'} aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{mode==='subsurface'?(inspectionOpen?'Close tools':'Inspect'):(inspectionOpen ? 'Close inspection tools' : 'Inspection tools')}</button>}
+          {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-label={mode==='subsurface'?(inspectionOpen?'Close inspection tools':'Inspection tools'):undefined} title={mode==='subsurface'?'Geology inspection tools':undefined} aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{mode==='subsurface'?(inspectionOpen?'Close tools':'Inspect'):(inspectionOpen ? 'Close inspection tools' : mode==='mine_planning' ? 'Mine sequence & tools' : 'Inspection tools')}</button>}
         </div>
         {mode==='resource'&&<details className="tanga-three-animation-tools" onToggle={event=>{if(event.currentTarget.open){const legend=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three__grade-legend');if(legend?.open)legend.open=false;}}}><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);resourceDrillRevealCommandRef.current?.();}}>Replay source drillhole reveal</button><small>Actual assay intervals shown by hole ID and downhole depth for presentation; this is not drilling chronology.</small><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
@@ -6585,11 +6631,47 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <h2>{mineSequenceActive?'Mine-site concept sequence':miningBeat>=3?'Processing & site services':miningBeat===2?'Resource blocks inside pits':'Why these pits?'}</h2>
         <div className="tanga-mine-sequence">
           <div className="tanga-mine-sequence__heading"><span>Illustrative development sequence</span><strong>{String(mineSequence).padStart(2,'0')}</strong></div>
-          <input aria-label="Illustrative mine-site development sequence, not a schedule" type="range" min="0" max="12" step="1" value={mineSequence} onChange={event=>{setMineSequence(Number(event.target.value));setMineSequenceActive(true);setStoryPlaying(false);window.dispatchEvent(new Event('tanga:manual-exploration'));}} />
-          <div className="tanga-mine-sequence__phase"><span>Site context</span><strong>{mineSequence<3?'Land & evidence':mineSequence<6?'Pit concepts':mineSequence<9?'Operations concept':'Closure concept'}</strong></div>
-          <small>Concept animation only · not a year-by-year mine schedule or closure design. RF1 pit shells, source blocks and report-based site context remain distinct from this illustrative sequence.</small>
+          <input aria-label="Illustrative mine-site development sequence" type="range" min="0" max="12" step="1" disabled={!sceneReady} value={mineSequence} onChange={event=>{setMineSequence(Number(event.target.value));setMineSequenceActive(true);setMineSequencePlaying(false);setStoryPlaying(false);window.dispatchEvent(new Event('tanga:manual-exploration'));}} />
+          <div className="tanga-mine-story__steps" role="group" aria-label="Concept sequence stages">
+            {['Terrain', 'Excavation', 'Transfer', 'Closure'].map((label, index) => (
+              <button key={label} disabled={!sceneReady} aria-pressed={mineSequenceActive && Math.min(3, Math.floor(mineSequence / 3)) === index} onClick={() => {
+                setMineSequence(index === 3 ? 12 : index * 3);
+                setMineSequenceActive(true);
+                setMineSequencePlaying(false);
+                setStoryPlaying(false);
+                setMotionPaused(false);
+                window.dispatchEvent(new Event('tanga:manual-exploration'));
+              }}>{label}</button>
+            ))}
+          </div>
+          <p>{[
+            'Start with the terrain that sets the levels for the pits and lowland site.',
+            'Inspect the North and South RF1 shells with source grade cells inside both.',
+            'Follow the PaulSam conveyor concept from the uphill feed point to the lowland plant.',
+            'Explore possible bench revegetation and water in the pit floor.',
+          ][Math.min(3, Math.floor(mineSequence / 3))]}</p>
+          <small>Illustrative sequence. Excavation extents follow RF1. Transfer and closure are study concepts.</small>
+          <button disabled={!sceneReady} onClick={() => {
+            if (mineSequencePlaying && !motionPaused) {
+              setMineSequencePlaying(false);
+              return;
+            }
+            if (!mineSequenceActive || mineSequence >= 12) setMineSequence(0);
+            if (!mineSequenceActive || mineSequence >= 12) cameraCommandHandlerRef.current?.({id:Date.now(), action:'resetView'});
+            setMineSequenceActive(true);
+            setMineSequencePlaying(true);
+            setStoryPlaying(false);
+            setMotionPaused(false);
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+          }}>{mineSequencePlaying && !motionPaused ? 'Pause sequence' : 'Play concept sequence'}</button>
+          {mineSequenceActive && <button onClick={() => {
+            setMineSequenceActive(false);
+            setMineSequencePlaying(false);
+            setMineSequence(0);
+            cameraCommandHandlerRef.current?.({id:Date.now(), action:'resetView'});
+          }}>Return to site overview</button>}
         </div>
-        {(miningBeat===2||(mineSequenceActive&&mineSequence>=3&&mineSequence<11))&&<>
+        {(mineSequenceActive ? mineSequence>=3&&mineSequence<9 : miningBeat===2)&&<>
           <div className="tanga-mine-story__pit-block-action">
             <button aria-pressed={revealAction==='benches'} disabled={!sceneReady} onClick={()=>cameraCommandHandlerRef.current?.({id:Date.now(),action:'revealPitBlocks'})}>{revealAction==='benches'?'Replay staged bench reveal':'Focus resource blocks inside pits'}</button>
             <small>{pitBlocksStatus==='loading'?'Loading source block cells; the site and pit cutaway remain interactive.':pitBlocksStatus==='error'?'Source block model unavailable. The RF1 shell surfaces remain viewable.':`${targetDisplayCount.toLocaleString()} grade-selected source blocks inside the RF1 optimized pit shells. Source positions, dimensions and grades are retained.`}</small>
@@ -6606,7 +6688,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           {(['northPit','southPit','resetView'] as const).map((action,index)=><button key={action} disabled={!sceneReady} onClick={()=>{setStoryPlaying(false);setMiningBeat(index===2?3:2);setFocusedSource(null);cameraCommandHandlerRef.current?.({id:Date.now(),action});}}>{['North pit','South pit','Whole site'][index]}</button>)}
         </div>
         <div className="tanga-mine-story__steps" aria-label="Mine-site animation controls">
-          <button onClick={()=>{window.dispatchEvent(new Event('tanga:manual-exploration'));setFocusedSource(null);setMotionPaused(false);setStoryPlaying(true);setStoryReplay(v=>v+1);cameraCommandHandlerRef.current?.({id:Date.now(),action:'resetView'});}}>Play evidence → concept sequence</button>
+          <button onClick={()=>{window.dispatchEvent(new Event('tanga:manual-exploration'));setMineSequenceActive(false);setMineSequencePlaying(false);setMineSequence(0);setFocusedSource(null);setMotionPaused(false);setStoryPlaying(true);setStoryReplay(v=>v+1);cameraCommandHandlerRef.current?.({id:Date.now(),action:'resetView'});}}>Play evidence → concept sequence</button>
           <button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button>
         </div>
         {miningBeat<3&&<>

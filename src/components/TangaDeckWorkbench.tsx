@@ -3,7 +3,7 @@
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import dynamic from 'next/dynamic';
 import {DeckGL} from '@deck.gl/react';
-import {ArcLayer, BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
+import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, Copy, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
@@ -604,7 +604,7 @@ const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   resource: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.45, pitch: 68, bearing: 38},
   mine_planning: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.5, pitch: 70, bearing: 40},
   metallurgy: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 66, bearing: 42},
-  comparison: {longitude: 38.5, latitude: -8.1, zoom: 3.4, pitch: 26, bearing: -8},
+  comparison: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 11.5, pitch: 43, bearing: -8},
 };
 
 const COMMON_PROMPTS: PromptChip[] = [
@@ -899,7 +899,9 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
     {id:'campus',label:'Lowland site from above',detail:'Read the relationships across the conceptual campus',threeAction:'campusView'},
   ],
   comparison: [
-    {id: 'decisions', label: 'Next study decisions', detail: 'Revisit drill coverage, flotation testwork or the proposed site layout', view: VIEW_STATES.comparison},
+    {id: 'site', label: 'From mine site to coast', detail: 'Reorient above the Tanga project before following the connection to the port.', view: VIEW_STATES.comparison},
+    {id: 'port-link', label: 'Project to Tanga Port', detail: 'The 72 km project-to-port connection is shown as an illustrative arc.', view: {longitude: (PROJECT_CENTER.lon + ROUTE_TARGETS.port.lon) / 2, latitude: (PROJECT_CENTER.lat + ROUTE_TARGETS.port.lat) / 2, zoom: 8.2, pitch: 30, bearing: -8}},
+    {id: 'decisions', label: 'Next study decisions', detail: 'Revisit drill coverage, flotation testwork or the proposed site layout.', view: {longitude: 38.5, latitude: -8.1, zoom: 3.4, pitch: 26, bearing: -8}},
   ],
 };
 
@@ -4145,19 +4147,6 @@ export default function TangaDeckWorkbench() {
         pickable: true,
         parameters: {depthTest: false} as any,
       }),
-      activeMode === 'comparison' && !isExploreMode && new ArcLayer<any>({
-        id: 'closing-project-to-port-concept-arc',
-        data: [{source: [PROJECT_CENTER.lon, PROJECT_CENTER.lat], target: [ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat]}],
-        getSourcePosition: (item: any) => item.source,
-        getTargetPosition: (item: any) => item.target,
-        getSourceColor: [99, 220, 216, 235],
-        getTargetColor: [237, 174, 120, 225],
-        getWidth: 2.5,
-        widthMinPixels: 2,
-        getHeight: .32,
-        greatCircle: true,
-        parameters: {depthTest: false} as any,
-      }),
       showGraphitePeers && tangaRankingInserted && new TextLayer<any>({
         id: 'graphite-peer-labels',
         data: graphiteRows.filter((project) => project.isTanga),
@@ -4582,7 +4571,7 @@ export default function TangaDeckWorkbench() {
     };
   }, []);
 
-  const sceneCallouts = threeVisible || (activeMode === 'ranking' && !isExploreMode)
+  const sceneCallouts = threeVisible || (!isExploreMode && (activeMode === 'ranking' || (activeMode === 'comparison' && activeShotIndex === 1)))
     ? []
     : sceneCalloutsForMode(activeMode, routeTarget, resourceFocus, routeProfile, relief).flatMap(callout => {
       if (callout.id === 'aoi') return boundaryAnchor ? [{...callout, anchor: wgs84Anchor(boundaryAnchor)}] : [];
@@ -5016,21 +5005,15 @@ export default function TangaDeckWorkbench() {
   const isCoverScene = showCover;
   const closingArcScreen = useMemo(() => {
     if (activeMode !== 'comparison' || isExploreMode || isCoverScene) return null;
-    const map = (mapRef.current as any)?.getMap?.() ?? (mapRef.current as any);
-    if (!map?.project || !map?.getContainer) return null;
+    const map = mapInstance;
+    if (!map) return null;
     const rect = map.getContainer().getBoundingClientRect();
     const start = map.project([PROJECT_CENTER.lon, PROJECT_CENTER.lat]);
     const finish = map.project([ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat]);
     const x1=rect.left+start.x,y1=rect.top+start.y,x2=rect.left+finish.x,y2=rect.top+finish.y;
-    // At orbit scale the 72 km project-to-port separation can be only a few
-    // screen pixels. Lift the display arc enough to remain legible; endpoints
-    // still use the projected report locations and the card labels it illustrative.
-    const bend=Math.max(148,Math.min(180,Math.abs(x2-x1)*.14));
-    // Add a small screen-space bow because both real endpoints overlap at the
-    // globe's orbit scale; the path still terminates at their projected points.
-    const bow=Math.max(56,Math.min(112,Math.abs(x2-x1)*.42));
-    return {path:`M ${x1} ${y1} Q ${(x1+x2)/2+bow} ${Math.min(y1,y2)-bend} ${x2} ${y2}`,x1,y1,x2,y2};
-  }, [activeMode, isExploreMode, isCoverScene, viewState, mapLoadState]);
+    const bend = Math.min(110, Math.hypot(x2 - x1, y2 - y1) * .45);
+    return {path:`M ${x1} ${y1} Q ${(x1+x2)/2} ${Math.min(y1,y2)-bend} ${x2} ${y2}`,x1,y1,x2,y2};
+  }, [activeMode, isExploreMode, isCoverScene, mapInstance, mapCameraTick, stageSize.width, stageSize.height]);
   // Scenes without a source-data table still get a panel — key insight chips
   // from SLIDE_FACTS — so the top-left zone is never awkwardly empty.
   const insightFacts = !activeDataTable ? (SLIDE_FACTS[activeMode] ?? []) : [];
@@ -7318,12 +7301,17 @@ export default function TangaDeckWorkbench() {
       {!isExploreMode && activeMode === 'subsurface' && activeShotIndex < 3 && <TangaGeologyMapStage legendMount={geologyLegendMount} step={activeShotIndex} ready={threeLoadReport.scene === 'ready'} selectedUnit={selectedGeologyUnit} onSelectUnit={setSelectedGeologyUnit} hiddenUnits={hiddenGeologyUnits} onToggleUnit={toggleMappedGeologyUnit} onStage={index=>{setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface',index);}} onAdvance={() => {setIsAutoplay(false);setIsExecutiveTour(false);applyStoryShot('subsurface', activeShotIndex + 1);}}/>}
       {!isExploreMode && !isCoverScene && !storyHeroVisible && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaStoryCue mode={activeMode} viewLabel={activeShot?.label ?? MODE_LABELS[activeMode]} viewDetail={activeShot?.detail} viewIndex={activeShotIndex} viewCount={activeShots.length} nextView={activeShots[activeShotIndex + 1]?.label ?? STORY_STEPS[activeStoryIndex + 1]?.label ?? 'Story complete'} complete={isLastStory} closingMilestones={activeMode==='comparison'&&isLastStory?WORK_MILESTONES:undefined}/>}
       {closingArcScreen && <svg className="tanga-closing-route" aria-hidden="true">
+        {activeShotIndex === 1 && <>
         <path className="tanga-closing-route__glow" d={closingArcScreen.path}/>
         <path className="tanga-closing-route__track" d={closingArcScreen.path}/>
-        <circle className="tanga-closing-route__beacon" cx={closingArcScreen.x1} cy={closingArcScreen.y1} r="5"/>
         <circle className="tanga-closing-route__port" cx={closingArcScreen.x2} cy={closingArcScreen.y2} r="4"/>
+        <text className="tanga-closing-route__label" textAnchor="end" x={closingArcScreen.x1 - 12} y={closingArcScreen.y1 + 4}>Tanga project</text>
+        <text className="tanga-closing-route__label" x={closingArcScreen.x2 + 12} y={closingArcScreen.y2 + 4}>Tanga Port</text>
         <circle className="tanga-closing-route__traveller" r="3.5"><animateMotion dur="6.5s" repeatCount="indefinite" path={closingArcScreen.path}/></circle>
         <circle className="tanga-closing-route__traveller" r="2.3"><animateMotion dur="6.5s" begin="-3.25s" repeatCount="indefinite" path={closingArcScreen.path}/></circle>
+        </>}
+        {isLastStory && <ellipse className="tanga-closing-route__orbit-ring" cx={closingArcScreen.x1} cy={closingArcScreen.y1} rx="25" ry="13"/>}
+        <circle className="tanga-closing-route__beacon" cx={closingArcScreen.x1} cy={closingArcScreen.y1} r="5"/>
       </svg>}
 
       {activeMode === 'accessibility' && (

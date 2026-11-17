@@ -4,7 +4,7 @@ import {addPlantDetail, batchPlantMeshes, PLANT_PROCESS_STAGES} from './mine-pla
 import {SITE_EARTHWORK_OPACITY} from './stable-materials';
 
 /** Illustrative industrial campus: 400 × 280 local units, scaled to CONCEPT. */
-export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
+export function buildConcentrator(options: {deferPlantDetail?: boolean; processCutaway?: boolean} = {}) {
   const root=new THREE.Group(); root.name='conceptual-concentrator';
   root.userData.processStages=PLANT_PROCESS_STAGES;
   root.userData.plantDetailLoaded=false;
@@ -220,6 +220,9 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
   // drive train. This is an illustrative industrial form; the lab report does
   // not define production cell dimensions or a plant flowsheet.
   let flotationVesselCount=0,flotationHopperCount=0,flotationWallPanelCount=0,flotationLiquorSurfaceCount=0;
+  const inspectionGlass = options.processCutaway ? new THREE.MeshStandardMaterial({
+    color: 0x82b6b0, transparent: true, opacity: .22, depthWrite: false, roughness: .32,
+  }) : materials.steel;
   for(let row=0;row<2;row++)for(let i=0;i<5;i++){
     const x=8+i*15,z=-36+row*24;
     const hopperGeometry=new THREE.BufferGeometry();
@@ -239,9 +242,9 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean} = {}) {
     for(const sideX of [-1,1])for(const sideZ of [-1,1])box(.85,3.6,.85,x+sideX*4.65,1.85,z+sideZ*6.35,materials.steel,'Flotation cell support leg');
     // Open access sides make the contents visible from the roof cutaway.
     box(.55,7.7,15.6,x-5.7,8.25,z,materials.steel,'Flotation cell long wall');
-    box(.55,7.7,15.6,x+5.7,8.25,z,materials.steel,'Flotation cell long wall');
+    box(.55,7.7,15.6,x+5.7,8.25,z,inspectionGlass,'Flotation cell inspection side');
     box(11.8,7.7,.55,x,8.25,z-7.7,materials.steel,'Flotation cell end wall');
-    box(11.8,7.7,.55,x,8.25,z+7.7,materials.steel,'Flotation cell end wall');
+    box(11.8,7.7,.55,x,8.25,z+7.7,inspectionGlass,'Flotation cell inspection end');
     flotationWallPanelCount+=4;
     box(5.2,.75,6.8,x,.4,z,materials.roof,'Flotation cell underflow outlet');
     const liquor=mesh(new THREE.PlaneGeometry(10.7,14.7),materials.water,x,11.55,z,'Flotation cell liquor surface');
