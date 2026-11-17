@@ -18,7 +18,7 @@ export default function ServiceWorkerRegistrar() {
       if ('caches' in window) {
         window.caches.keys().then((keys) => {
           keys
-            .filter((key) => /workbox|precache|tiles-|geo-data|assets-swr|img-swr|default-nf/i.test(key))
+            .filter((key) => /workbox|precache|tiles-|geo-data|assets-swr|img-swr|default-nf|^tanga-documents-/i.test(key))
             .forEach((key) => {
               window.caches.delete(key).catch(() => undefined);
             });
@@ -29,14 +29,15 @@ export default function ServiceWorkerRegistrar() {
     }
 
     const register = () => {
-      navigator.serviceWorker.register('/service-worker.js').then(registration => {
+      navigator.serviceWorker.register('/service-worker.js', {updateViaCache: 'none'}).then(registration => {
         console.log('ServiceWorker registration successful with scope: ', registration.scope);
       }, err => {
         console.log('ServiceWorker registration failed: ', err);
       });
     };
 
-    window.addEventListener('load', register, { once: true });
+    if (document.readyState === 'complete') register();
+    else window.addEventListener('load', register, { once: true });
     return () => window.removeEventListener('load', register);
   }, []);
 
