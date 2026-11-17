@@ -111,7 +111,11 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       const observer = new ResizeObserver(resize);
       const ray = new T.Raycaster();
       const cursor = new T.Vector2();
+      let pointerStartedOnCanvas = false;
+      const beginSelection = () => { pointerStartedOnCanvas = true; };
       const selectStation = (event: MouseEvent) => {
+        if (!pointerStartedOnCanvas) return;
+        pointerStartedOnCanvas = false;
         const bounds = renderer.domElement.getBoundingClientRect();
         cursor.set((event.clientX - bounds.left) / bounds.width * 2 - 1, 1 - (event.clientY - bounds.top) / bounds.height * 2);
         ray.setFromCamera(cursor, camera);
@@ -120,6 +124,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       };
       teardown = () => {
         observer.disconnect();
+        renderer.domElement.removeEventListener('pointerdown', beginSelection);
         renderer.domElement.removeEventListener('click', selectStation);
         const geometries = new Set<MeshGeometry>();
         scene.traverse(object => {
@@ -132,6 +137,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         renderer.domElement.remove();
       };
       mount.append(renderer.domElement);
+      renderer.domElement.addEventListener('pointerdown', beginSelection);
       renderer.domElement.addEventListener('click', selectStation);
       observer.observe(mount);
       resize();
@@ -139,7 +145,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       let selected = -1;
       setFlying(true);
       const render = (now: number) => {
-        const seconds = (now - started) / 1000;
+        const seconds = Math.max(0, (now - started) / 1000);
         if (seconds >= 15 || motion.matches) { finish.current(); return; }
         const phase = Math.min(3, Math.floor(seconds / 3.4));
         if (phase !== selected) {
