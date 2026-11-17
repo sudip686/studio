@@ -2297,8 +2297,8 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 /* Conclusion chapter: a quiet instrument panel that lets the regional map and
    project beacon stay dominant while the report milestones read as a timeline. */
 .tanga-deck[data-mode="comparison"] .tanga-story-cue:has(.tanga-story-cue__bookend) {
-  left: clamp(292px, 22vw, 360px);
-  right: clamp(300px, 23vw, 390px);
+  left: clamp(292px, 22vw, 340px);
+  right: clamp(390px, 31vw, 440px);
   bottom: clamp(106px, 13vh, 132px);
   min-height: 112px;
   gap: 18px;
@@ -2334,7 +2334,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media (min-width: 761px) and (max-width: 1200px) {
   .tanga-deck[data-mode="comparison"] .tanga-story-cue:has(.tanga-story-cue__bookend) {
     left: 270px;
-    right: 300px;
+    right: 340px;
     gap: 10px;
     padding-inline: 12px;
   }
