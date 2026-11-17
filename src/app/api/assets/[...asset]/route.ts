@@ -3,7 +3,7 @@ import {getCloudflareContext} from '@opennextjs/cloudflare';
 import path from 'node:path';
 import {createReadStream, promises as fs} from 'node:fs';
 import {Readable} from 'node:stream';
-import {maybeGzipStreamResponse} from '@/lib/server/stream-compression';
+import {streamResponse} from '@/lib/server/stream-response';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -86,7 +86,7 @@ async function cloudflareR2Response(request: Request, key: string) {
       headers.set('content-length', String(object.size));
     }
     if (key.endsWith('.geojson') && request.method === 'GET' && !contentRange && object.body) {
-      return maybeGzipStreamResponse(object.body, request, {headers});
+      return streamResponse(object.body, {headers});
     }
     return new Response(request.method === 'HEAD' ? null : object.body, {
       status: contentRange ? 206 : 200,
@@ -128,7 +128,7 @@ async function assetResponse(request: Request, context: RouteContext) {
       if (!responseHeaders.has('content-type')) responseHeaders.set('content-type', contentTypeFor(key));
       responseHeaders.set('x-content-type-options', 'nosniff');
       if (isGeoJson && request.method === 'GET' && response.body) {
-        return maybeGzipStreamResponse(response.body, request, {status: response.status, statusText: response.statusText, headers: responseHeaders});
+        return streamResponse(response.body, {status: response.status, statusText: response.statusText, headers: responseHeaders});
       }
       return new Response(response.body, {status: response.status, statusText: response.statusText, headers: responseHeaders});
     } catch {
@@ -143,7 +143,7 @@ async function assetResponse(request: Request, context: RouteContext) {
       const info = await fs.stat(localFile);
       if (!info.isFile()) throw new Error('Asset not found.');
       const body = Readable.toWeb(createReadStream(localFile)) as ReadableStream<Uint8Array>;
-      return maybeGzipStreamResponse(body, request, {headers: {...headers, 'content-length': String(info.size)}});
+      return streamResponse(body, {headers: {...headers, 'content-length': String(info.size)}});
     }
     const body = await fs.readFile(localFile);
     return new Response(body, {headers: {...headers, 'content-length': String(body.byteLength)}});

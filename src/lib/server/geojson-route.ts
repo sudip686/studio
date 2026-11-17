@@ -2,23 +2,23 @@ import { createReadStream, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { NextResponse } from 'next/server';
-import { maybeGzipStreamResponse } from './stream-compression';
+import {streamResponse} from './stream-response';
 
-function geoJsonResponse(body: ReadableStream<Uint8Array>, request: Request) {
-  return maybeGzipStreamResponse(body, request, {headers: {
+function geoJsonResponse(body: ReadableStream<Uint8Array>) {
+  return streamResponse(body, {headers: {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store, max-age=0',
   }});
 }
 
-export async function serveGeoJson(filename: string, label: string, request: Request) {
+export async function serveGeoJson(filename: string, label: string) {
   const localPath = path.join(process.cwd(), 'public', filename);
 
   try {
     const info = await fs.stat(localPath);
     if (!info.isFile()) throw new Error(`${label} is not a file.`);
     const fileBody = Readable.toWeb(createReadStream(localPath)) as ReadableStream<Uint8Array>;
-    return geoJsonResponse(fileBody, request);
+    return geoJsonResponse(fileBody);
   } catch {
     // Fall through to remote fetch when the file is not available locally.
   }
@@ -44,11 +44,11 @@ export async function serveGeoJson(filename: string, label: string, request: Req
     }
 
     if (response.body) {
-      return geoJsonResponse(response.body, request);
+      return geoJsonResponse(response.body);
     }
 
     const payload = await response.text();
-    return geoJsonResponse(new Blob([payload]).stream(), request);
+    return geoJsonResponse(new Blob([payload]).stream());
   } catch (error) {
     return NextResponse.json(
       {
