@@ -1,7 +1,7 @@
 'use client';
 
 import {ArrowRight} from 'lucide-react';
-import {useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import TangaClosingFlythrough from './TangaClosingFlythrough';
 import {TANGA_STORY} from '@/data/tanga-story';
 import type {WorkbenchMode} from '@/lib/tanga-voice-command';
@@ -12,6 +12,15 @@ export default function TangaStoryCue({mode, nextView, viewLabel, viewDetail, vi
   const story = TANGA_STORY[mode];
   const [recapOpen, setRecapOpen] = useState(false);
   const recapLaunch = useRef<HTMLButtonElement>(null);
+  const canPlayRecap = Boolean(complete && closingMilestones);
+  useEffect(() => {
+    if (!canPlayRecap) setRecapOpen(false);
+  }, [canPlayRecap]);
+
+  const closeRecap = () => {
+    if (document.activeElement?.closest('#tanga-closing-recap')) recapLaunch.current?.focus();
+    setRecapOpen(false);
+  };
   return <section key={mode} className="tanga-story-cue" aria-label="Chapter purpose and next view">
     {!complete && <div><span>VIEW {String(viewIndex+1).padStart(2,'0')} / {String(Math.max(1,viewCount)).padStart(2,'0')} · {story.question}</span><h2>{viewLabel}</h2><p>{viewDetail ?? story.takeaway}</p></div>}
     {!complete && <div className="tanga-story-cue__next"><span>UP NEXT</span><strong>{nextView}</strong><ArrowRight size={17} aria-hidden="true"/></div>}
@@ -33,9 +42,9 @@ export default function TangaStoryCue({mode, nextView, viewLabel, viewDetail, vi
         <ol>{closingMilestones.map(item => (
           <li key={item.id} title={item.source}><time>{item.date}</time><span>{item.title}</span></li>
         ))}</ol>
-        <button ref={recapLaunch} className="tanga-recap-launch" type="button" aria-expanded={recapOpen} onClick={() => setRecapOpen(open => !open)}>Play 15-second recap <ArrowRight size={14} aria-hidden="true"/></button>
+        <button ref={recapLaunch} className="tanga-recap-launch" type="button" aria-expanded={recapOpen} aria-controls={recapOpen ? 'tanga-closing-recap' : undefined} onClick={() => setRecapOpen(open => !open)}>Play 15-second recap <ArrowRight size={14} aria-hidden="true"/></button>
       </div>
     </aside>}
-    {complete && closingMilestones && recapOpen && <TangaClosingFlythrough onClose={() => { setRecapOpen(false); recapLaunch.current?.focus(); }}/>}
+    {canPlayRecap && recapOpen && <TangaClosingFlythrough onClose={closeRecap}/>}
   </section>;
 }

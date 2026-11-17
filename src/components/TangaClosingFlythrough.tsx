@@ -24,9 +24,20 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
     let disposed = false;
     let frame = 0;
     let teardown: (() => void) | undefined;
+    const stopRendering = () => {
+      cancelAnimationFrame(frame);
+      const release = teardown;
+      teardown = undefined;
+      release?.();
+    };
+    const showEvidenceLinks = () => {
+      stopRendering();
+      mount.style.opacity = '';
+      if (!disposed) setFlying(false);
+    };
 
     void import('three').then(T => {
-      if (disposed) return;
+      if (disposed || motion.matches) return;
       const renderer = new T.WebGLRenderer({antialias: true, alpha: true});
       const scene = new T.Scene();
       const camera = new T.PerspectiveCamera(39, 1, .1, 110);
@@ -116,8 +127,18 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         const stop = ray.intersectObjects(hitTargets, false)[0]?.object.userData.stop;
         if (typeof stop === 'number') window.location.assign(stops[stop].href);
       };
+      let previousFrame: number | null = null;
+      const updateVisibility = () => {
+        cancelAnimationFrame(frame);
+        previousFrame = null;
+        if (!document.hidden) frame = requestAnimationFrame(render);
+      };
+      const onMotionChange = () => { if (motion.matches) showEvidenceLinks(); };
       teardown = () => {
         observer.disconnect();
+        document.removeEventListener('visibilitychange', updateVisibility);
+        motion.removeEventListener('change', onMotionChange);
+        renderer.domElement.removeEventListener('webglcontextlost', showEvidenceLinks);
         renderer.domElement.removeEventListener('pointerdown', beginSelection);
         renderer.domElement.removeEventListener('click', selectStation);
         const geometries = new Set<MeshGeometry>();
@@ -133,14 +154,17 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       mount.append(renderer.domElement);
       renderer.domElement.addEventListener('pointerdown', beginSelection);
       renderer.domElement.addEventListener('click', selectStation);
+      renderer.domElement.addEventListener('webglcontextlost', showEvidenceLinks);
       observer.observe(mount);
       resize();
-      const started = performance.now();
+      let elapsed = 0;
       let selected = -1;
       setFlying(true);
       const render = (now: number) => {
-        const seconds = Math.max(0, (now - started) / 1000);
-        if (seconds >= 15 || motion.matches) { finish.current(); return; }
+        if (previousFrame !== null) elapsed += Math.max(0, now - previousFrame);
+        previousFrame = now;
+        const seconds = elapsed / 1000;
+        if (seconds >= 15) { finish.current(); return; }
         const phase = Math.min(3, Math.floor(seconds / 3.4));
         if (phase !== selected) {
           selected = phase;
@@ -156,17 +180,18 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         renderer.render(scene, camera);
         frame = requestAnimationFrame(render);
       };
-      frame = requestAnimationFrame(render);
-    }).catch(() => { if (!disposed) setFlying(false); });
+      document.addEventListener('visibilitychange', updateVisibility);
+      motion.addEventListener('change', onMotionChange);
+      updateVisibility();
+    }).catch(showEvidenceLinks);
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(frame);
-      teardown?.();
+      stopRendering();
     };
   }, []);
 
-  return createPortal(<section className="tanga-recap" aria-label="3D project recap" onKeyDown={event => {
+  return createPortal(<section id="tanga-closing-recap" className="tanga-recap" aria-label="3D project recap" onKeyDown={event => {
     if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
   }}>
     <div className="tanga-recap__canvas" ref={surface} aria-hidden="true"/>
