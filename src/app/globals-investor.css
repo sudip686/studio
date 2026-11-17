@@ -2233,6 +2233,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   line-height: 1.4;
 }
 .tanga-factory-separation>span { display: flex; align-items: center; gap: 8px; }
+.tanga-process-exhibit--factory .tanga-process-canvas::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 70px rgba(8, 18, 27, .16); }
 .tanga-factory-separation i { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: #66716f; }
 .tanga-factory-separation i.is-graphite { background: #66d9d2; box-shadow: 0 0 10px #66d9d288; }
 .tanga-factory-separation i.is-gangue { background: #d6a174; }

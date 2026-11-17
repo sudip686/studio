@@ -13,6 +13,8 @@ export function createPlantProcessMotion(plant: THREE.Group) {
   const graphiteFlake = new THREE.MeshStandardMaterial({color: 0x66d9d2, emissive: 0x125b59, emissiveIntensity: .55, roughness: .28, metalness: .12, side: THREE.DoubleSide});
   const gangue = new THREE.MeshStandardMaterial({color: 0xb98455, emissive: 0x50301b, roughness: .94});
   const fineGraphite = new THREE.MeshStandardMaterial({color: 0x638eaf, emissive: 0x18304c, roughness: .7});
+  steel.color.set(0x697b81);
+  steel.userData.studioFinish = true;
   const flow = plant.userData.flow as THREE.Vector3[];
   const mill = plant.userData.processMill as THREE.Mesh | undefined;
   const dryer = plant.userData.processDryer as THREE.Mesh | undefined;
@@ -64,6 +66,7 @@ export function createPlantProcessMotion(plant: THREE.Group) {
     inspection.add(mesh);
   }
   const windowMaterial = new THREE.MeshStandardMaterial({color: 0x94d9d7, transparent: true, opacity: .16, depthWrite: false});
+  windowMaterial.userData.studioFinish = true;
   const pulp = new THREE.MeshStandardMaterial({color: 0x467e7a, transparent: true, opacity: .24, depthWrite: false});
   sectionBox([28, 1.3, 20], [0, 2, 0], steel);
   sectionBox([28, 15, .7], [0, 10, 10], steel);

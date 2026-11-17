@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import {DeckGL} from '@deck.gl/react';
 import {BitmapLayer, ColumnLayer, GeoJsonLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {FlyToInterpolator, LightingEffect, AmbientLight, DirectionalLight} from '@deck.gl/core';
+import {PRESENTATION_SUN as SUN_DIR} from '@/lib/deck/presentation-light';
 import {WebMercatorViewport} from '@math.gl/web-mercator';
 import {ArrowDown, ArrowUp, Box, Copy, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, FlaskConical, HelpCircle, Info, ListOrdered, Maximize2, MessageSquare, Mic, Minimize2, Mountain, NotebookText, Pause, Play, RotateCw, Route, Ship, Square, Sun, TrainFront, X, Zap, ZoomIn, ZoomOut} from 'lucide-react';
 import {setWorkerUrl} from 'maplibre-gl';
@@ -1381,8 +1382,6 @@ const TERRAIN_TINT_ALPHA = 104;
 // horizon (low = long, dramatic shading). These drive BOTH the analytical
 // hillshade baked into the terrain colours below AND the deck.gl LightingEffect
 // that lights the extruded props, so the whole scene shares one light source.
-const SUN_AZIMUTH_DEG = 315;
-const SUN_ALTITUDE_DEG = 34;
 // Vertical exaggeration applied to the DEM gradient *for shading only* — the
 // real relief here is gentle, so without this the hillshade would be a flat
 // wash. It sculpts the slopes without touching the actual cell geometry.
@@ -1393,14 +1392,6 @@ const RELIEF_SHADE_EXAG = 4.2;
 const SUN_WARM_TINT = [1.06, 1.0, 0.9];
 const SKY_COOL_TINT = [0.9, 0.96, 1.08];
 
-const SUN_DIR = (() => {
-  const az = (SUN_AZIMUTH_DEG * Math.PI) / 180;
-  const alt = (SUN_ALTITUDE_DEG * Math.PI) / 180;
-  const horiz = Math.cos(alt);
-  // x = east, y = north, z = up
-  return [horiz * Math.sin(az), horiz * Math.cos(az), Math.sin(alt)] as const;
-})();
-
 // deck.gl lighting rig matching the sun above: a warm golden-hour key light
 // (direction = the ray FROM the sun toward the ground = -SUN_DIR) over a cool
 // sky-blue ambient fill. This lights the extruded props (buildings, mine
@@ -1410,7 +1401,7 @@ const SUN_DIR = (() => {
 const TANGA_LIGHTING = new LightingEffect({
   ambient: new AmbientLight({color: [176, 202, 230], intensity: 0.95}),
   sun: new DirectionalLight({
-    color: [255, 236, 205],
+    color: [255, 241, 216],
     intensity: 1.15,
     direction: [-SUN_DIR[0], -SUN_DIR[1], -SUN_DIR[2]],
   }),

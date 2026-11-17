@@ -10,6 +10,8 @@ import {MET_GROUPS} from '@/lib/deck/metallurgy-plant';
 import {createPlantProcessMotion} from '@/lib/deck/plant-process-motion';
 import {createMetallurgyEndUseScene, type MetallurgyEndUseRoute} from '@/lib/deck/metallurgy-end-use-scene';
 import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
+import {configurePresentationRenderer, sizePresentationRenderer} from '@/lib/deck/render-foundation';
+import {loadStudioLighting} from '@/lib/deck/studio-lighting';
 
 const PROCESS = [
   {id: 'feed', title: 'Feed & crushing', short: 'Feed', point: [-44, 8, -8] as const, hasRoof: true, input: 'Mine feed', output: 'Prepared feed', description: 'Receive and crush conceptual mine feed, then carry prepared material toward milling.', motion: 'Feed advances on the receiving conveyor.', basis: 'IMO Appendix D · A.1: laboratory stage crushing and sample splitting. Conveyor, industrial equipment and layout are conceptual.'},
@@ -75,22 +77,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     let disposed = false, contextLost = false, contextWasLost = false, userOrbit = false, tween = false, dirty = true;
     let frame = 0, last = performance.now(), elapsed = recoveryView?.processTime ?? 0, journeyElapsed = recoveryView?.journeyTime ?? journeyElapsedRef.current, cameraStart = 0, cameraTour = false;
     let selected: ProcessId = stageRef.current;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.NeutralToneMapping;
-    renderer.toneMappingExposure = 1;
+    configurePresentationRenderer(renderer, 'metallurgy');
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.setAttribute('role', 'img');
     renderer.domElement.setAttribute('aria-label', 'Conceptual graphite processing facility in 3D. Drag to orbit, scroll to zoom, select a process area to inspect.');
     element.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#cbd3cf');
-    // Use the same view-independent material palette as the shared 3D deck.
-    // Room reflections shift metal and cladding highlights as the plant is
-    // orbited, which can look like the process colors are flickering.
-    scene.environment = null;
+    const exhibitSky = new THREE.Color('#a7b4b8');
+    scene.background = exhibitSky;
     const camera = new THREE.PerspectiveCamera(34, 1, .1, 4000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = .075;
@@ -129,19 +124,24 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const overviewBounds = new THREE.Box3().setFromObject(plant);
 
     const processMotion = createPlantProcessMotion(plant);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#b8b9b0', roughness: .96}));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#7d898a', roughness: .96, dithering: true}));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.8; ground.receiveShadow = true; scene.add(ground);
     stabilizeSceneMaterialAppearance(scene);
+    element.dataset.studioLight = 'loading';
+    const releaseStudioLight = loadStudioLighting(renderer, plant, status => {
+      element.dataset.studioLight = status;
+      dirty = true;
+    });
     // A brighter, neutral exhibit recipe keeps the architectural shells and
     // process equipment readable against the ground without washing out their
     // materials. These lights stay fixed in site space while the camera orbits.
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x91958b, 1.55));
-    const sun = new THREE.DirectionalLight(0xfffcf4, 1.9);
+    scene.add(new THREE.HemisphereLight(0xf1f8ff, 0x697778, 1.15));
+    const sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
     sun.position.set(-330, 520, 360); sun.castShadow = true;
     sun.shadow.mapSize.set(1536, 1536); sun.shadow.camera.left = -400; sun.shadow.camera.right = 400;
     sun.shadow.camera.top = 400; sun.shadow.camera.bottom = -400; sun.shadow.camera.far = 1500; sun.shadow.normalBias = .08;
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xf2f7f8, 1.02); fill.position.set(400, 180, -350); scene.add(fill);
+    const fill = new THREE.DirectionalLight(0xc6ddf4, .68); fill.position.set(400, 180, -350); scene.add(fill);
 
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
     // Lower the overview orbit to show more façade and spread the campus across
@@ -257,7 +257,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       if (endUseScene) endUseScene.root.visible = false;
       plant.visible = true;
       ground.visible = true;
-      scene.background = new THREE.Color('#cbd3cf');
+      scene.background = exhibitSky;
       overviewRef.current = true;
       openRoofRef.current = false;
       roofs.forEach(roof => {
@@ -302,7 +302,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       // should preserve the presenter's orbit rather than reframe the stage.
       if (width === canvasWidth && height === canvasHeight) { dirty = true; return; }
       canvasWidth = width; canvasHeight = height;
-      renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix();
+      const ratio = sizePresentationRenderer(renderer, width, height, window.devicePixelRatio || 1, 2);
+      element.dataset.renderScale = ratio.toFixed(2);
+      camera.aspect = width / height; camera.updateProjectionMatrix();
       if (endUseRouteRef.current) showEndUse(endUseRouteRef.current, false);
       else if (overviewRef.current) fitOverview(false);
       else frameStage(stageRef.current, false);
@@ -470,6 +472,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); viewCommand.current = null;
+      releaseStudioLight(!contextWasLost);
       reducedMotion.removeEventListener('change', onMotionPreference);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);

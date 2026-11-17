@@ -19,6 +19,8 @@ import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-camp
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
+import {configurePresentationRenderer, sizePresentationRenderer} from '@/lib/deck/render-foundation';
+import {PRESENTATION_SUN, PRESENTATION_SUN_COLOR} from '@/lib/deck/presentation-light';
 import {MAPPED_SURFACE_UNITS,modelRockUnit} from '@/lib/deck/geology-palette';
 import GeologyCrossSections from './GeologyCrossSections';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
@@ -2988,23 +2990,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     };
     renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
     renderer.domElement.addEventListener('webglcontextrestored', onContextRestored, false);
-    // Keep a fixed draw-buffer scale through camera gestures and settled
-    // views. Frame-time adaptation made colored blocks, pads, and fine details
-    // shimmer as the resolution changed while the presenter orbited. A 1x cap
-    // also avoids oversampling the large terrain mesh on high-DPI displays.
-    const renderPixelRatio = Math.min(1, window.devicePixelRatio || 1);
-    renderer.setPixelRatio(renderPixelRatio);
-    host.dataset.renderScale = renderPixelRatio.toFixed(2);
-    renderer.setSize(host.clientWidth, host.clientHeight);
+    configurePresentationRenderer(renderer, mode);
     host.dataset.depthBuffer = 'adaptive-perspective';
     host.dataset.depthNear = camera.near.toFixed(1);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.NeutralToneMapping;
-    // Neutral daylight keeps mapped category hues distinct.
-    renderer.toneMappingExposure = mode === 'topography' ? 1.12 : 1.15;
     renderer.shadowMap.enabled = mode === 'mine_planning';
     if(mode==='mine_planning'){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;}
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
     // Keep thematic colors stable while presenters orbit. A room environment
@@ -3583,8 +3573,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x5b6253 : 0x303d47, isTerrainView ? 0.9 : 1.12));
     // Low raking key across the mapped ridges: the land stays dimensional
     // without suggesting a different sun position or changing elevation.
-    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : 0xfff1d8, isTerrainView ? 1.5 : mode === 'mine_planning' ? 1.8 : 1.65);
-    key.position.set(isTerrainView ? 1800 : 900, isTerrainView ? 1050 : 1800, isTerrainView ? 1150 : 1200);
+    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : PRESENTATION_SUN_COLOR, isTerrainView ? 1.5 : mode === 'mine_planning' ? 1.8 : 1.65);
+    const [east, north, elevation] = PRESENTATION_SUN;
+    key.position.set(east, elevation, -north).multiplyScalar(2400);
     key.castShadow = true;
     // Cool fill from opposite side — keeps shadowed slopes readable without
     // washing out the terrain. No shadow casting on the fill (perf + softness).
@@ -3844,6 +3835,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             side: THREE.DoubleSide,
             forceSinglePass: true,
             vertexColors: mode === 'topography',
+            dithering: true,
             depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
             depthTest: true,
             polygonOffset: true,
@@ -3851,6 +3843,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           })
         );
         const texturedMaterial = texturedTerrain.material;
+        if (mode === 'topography') texturedMaterial.userData.terrainHorizon = true;
         registerTerrainSurfaceMaterial(texturedMaterial);
         texturedTerrain.receiveShadow = true;
         texturedTerrain.renderOrder = 20;
@@ -5452,13 +5445,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (!hostRef.current) return;
       const w = hostRef.current.clientWidth;
       const h = hostRef.current.clientHeight;
+      if (!w || !h) return;
       camera.aspect = w / h;
       if(mode==='metallurgy')camera.setViewOffset(w,h,Math.min(200,w*.16),0,w,h);
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      host.dataset.renderScale = sizePresentationRenderer(renderer, w, h, window.devicePixelRatio || 1, 1.25).toFixed(2);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
+    resize();
 
     let frame = 0;
     let lastControlsElapsed=0;
