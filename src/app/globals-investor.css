@@ -2297,7 +2297,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   z-index: 32;
   left: clamp(24px, 5vw, 80px);
   top: clamp(200px, 25vh, 245px);
-  bottom: clamp(230px, 31vh, 280px);
+  bottom: clamp(276px, 35vh, 300px);
   width: min(42vw, 710px);
   overflow: hidden;
   border: 1px solid #6ebdb878;

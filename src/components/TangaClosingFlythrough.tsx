@@ -151,7 +151,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         const target = rail.getPoint(Math.min(1, (phase + blend) / 3));
         const exit = T.MathUtils.smoothstep(seconds, 12.5, 15);
         camera.position.set(target.x - 2 - exit * 10, 3.4 + exit * 7, target.z + 7.3 + exit * 18);
-        camera.lookAt(target.x + exit * 2, .95, target.z);
+        camera.lookAt(target.x + exit * 2, 1.32, target.z);
         mount.style.opacity = String(1 - T.MathUtils.smoothstep(seconds, 13.4, 15));
         renderer.render(scene, camera);
         frame = requestAnimationFrame(render);
