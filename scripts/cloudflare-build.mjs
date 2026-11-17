@@ -70,7 +70,18 @@ const insideRoot = path.relative(root, assetsDirectory);
 if (insideRoot.startsWith('..') || path.isAbsolute(insideRoot)) throw new Error('Unsafe Cloudflare assets directory');
 await writeFile(
   path.join(assetsDirectory, '_headers'),
-  '/resource_blocks_v1.bin\n  Cache-Control: public, max-age=31536000, immutable\n',
+  [
+    // These terrain URLs carry a ?v= revision in the deck. Keep the revision
+    // in sync with the asset whenever its bytes change; immutable caching then
+    // avoids browser revalidation on repeat chapter visits.
+    '/terrain_hires_meta.json\n  Cache-Control: public, max-age=31536000, immutable',
+    '/terrain_context_512.bin\n  Cache-Control: public, max-age=31536000, immutable',
+    '/survey_height_hires.bin\n  Cache-Control: public, max-age=31536000, immutable',
+    '/survey_coverage_hires.bin\n  Cache-Control: public, max-age=31536000, immutable',
+    '/terrain_texture_hires.jpg\n  Cache-Control: public, max-age=31536000, immutable',
+    '/resource_blocks_v1.bin\n  Cache-Control: public, max-age=31536000, immutable',
+    '',
+  ].join('\n'),
   'utf8',
 );
 let omittedBytes = 0;
