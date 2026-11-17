@@ -55,6 +55,9 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       const amber = new T.MeshStandardMaterial({color: 0xf4b775, metalness: .45, roughness: .42});
       const base = new T.MeshStandardMaterial({color: 0x143040, metalness: .55, roughness: .48});
       const rock = new T.MeshStandardMaterial({color: 0x947665, roughness: .88, side: T.DoubleSide});
+      const pitSurface = new T.MeshStandardMaterial({vertexColors: true, flatShading: true, roughness: .89, side: T.DoubleSide});
+      const benchEdge = new T.LineBasicMaterial({color: 0xcab389, transparent: true, opacity: .66});
+      const benchEdges: InstanceType<typeof T.LineLoop>['geometry'][] = [];
       const glass = new T.MeshStandardMaterial({color: 0x79c9cd, roughness: .22, transparent: true, opacity: .28, depthWrite: false, side: T.DoubleSide, forceSinglePass: true});
       const froth = new T.MeshBasicMaterial({color: 0xc2fff0});
       const ribbon = new T.MeshBasicMaterial({color: 0x66e5dd});
@@ -120,9 +123,25 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           const benchProfile = [[0, 0], [.27, 0], [.36, .15], [.49, .15], [.58, .3], [.7, .3], [.78, .45], [.9, .45]];
           const profile = benchProfile.map(([radius, height]) => new T.Vector2(radius, height));
           const shell = new T.LatheGeometry(profile, 24);
+          const pitVertices = shell.getAttribute('position');
+          const colors = new Float32Array(pitVertices.count * 3);
+          const pitFloor = new T.Color(0x303c41);
+          const pitRim = new T.Color(0x9e845c);
+          for (let i = 0; i < pitVertices.count; i++) {
+            pitFloor.clone().lerp(pitRim, pitVertices.getY(i) / .45).toArray(colors, i * 3);
+          }
+          shell.setAttribute('color', new T.BufferAttribute(colors, 3));
+          for (const [radius, height] of [[.49, .15], [.7, .3], [.9, .45]]) {
+            const points = Array.from({length: 24}, (_, i) => {
+              const angle = i * 2 * Math.PI / 24;
+              return new T.Vector3(radius * Math.sin(angle), height + .008, radius * Math.cos(angle));
+            });
+            benchEdges.push(new T.BufferGeometry().setFromPoints(points));
+          }
           for (const offset of [-.96, .96]) {
-            const pit = add(station, shell, rock, offset, .46, 0);
+            const pit = add(station, shell, pitSurface, offset, .46, 0);
             pit.scale.z = 1.35;
+            benchEdges.forEach(edge => pit.add(new T.LineLoop(edge, benchEdge)));
             add(station, new T.BoxGeometry(.18, .08, .22), cyan, offset, .51, 0);
           }
         }
@@ -170,7 +189,8 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           if (object instanceof T.InstancedMesh) object.dispose();
         });
         geometries.forEach(geometry => geometry.dispose());
-        [cyan, amber, base, rock, glass, froth, ribbon, ...stationLights].forEach(material => material.dispose());
+        benchEdges.forEach(geometry => geometry.dispose());
+        [cyan, amber, base, rock, pitSurface, benchEdge, glass, froth, ribbon, ...stationLights].forEach(material => material.dispose());
         grid.dispose();
         renderer.dispose();
         renderer.domElement.remove();
