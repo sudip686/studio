@@ -2243,6 +2243,20 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-factory-sizing>div strong { color: #8ce3d7; font-size: 16px; font-variant-numeric: tabular-nums; }
 .tanga-factory-sizing>div:nth-of-type(2) strong { color: #9cc6e9; }
 .tanga-factory-sizing>div small { color: #c1cfcc; font-size: 10px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] { gap: 2px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] h3 { margin: 0; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-process-explanation { font-size: 11px; line-height: 1.25; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-flow { gap: 4px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-flow div { padding: 4px 6px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-motion-note { margin: 0; font-size: 11px; line-height: 1.25; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-operation-basis { margin: 0; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-sizing { gap: 3px; padding: 5px 7px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-sizing>div { gap: 5px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-sizing>div small { font-size: 9px; line-height: 1.25; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result--link { gap: 2px; margin: 0; padding: 6px 8px; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result--link span { grid-column: 1 / -1; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-result--link i { margin-top: 0; }
+.tanga-deck .tanga-process-exhibit--factory .tanga-factory-inspector[data-stage="product"] .tanga-factory-disclosure { margin-top: 0; padding-top: 4px; font-size: 9px; line-height: 1.2; }
 
 /* One consistent slider card for the mine's explicitly conceptual sequence. */
 .tanga-deck .tanga-mine-story .tanga-mine-sequence {

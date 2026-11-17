@@ -19,7 +19,7 @@ const PROCESS = [
   {id: 'milling', title: 'Milling & classification', short: 'Milling', point: [-15, 7.5, -9] as const, hasRoof: true, input: 'Prepared feed', output: 'Ground material', description: 'Grinding prepares the material for separation; industrial equipment is illustrative.', motion: 'The drum rotates on mounted bearings.', basis: 'IMO Appendix D · A.2 and B.3: laboratory rod milling, screening and regrinding. The industrial drum and cyclone cluster are illustrative.'},
   {id: 'flotation', title: 'Flotation', short: 'Flotation', point: [20, 7.5, -18] as const, hasRoof: true, input: 'Ground material', output: 'Concentrate', description: 'Air and agitation separate concentrate in this conceptual flow.', motion: 'Agitators turn; froth moves to the launders.', basis: 'IMO Appendix D · B.1–B.2: laboratory agitation, air addition and froth collection. Table 2 contains the reported final cleaner results; the plant arrangement is illustrative.'},
   {id: 'dewatering', title: 'Concentrate dewatering', short: 'Dewatering', point: [41.5, 6.5, 22] as const, hasRoof: true, input: 'Wet concentrate', output: 'Dried material', description: 'Filter and dry concentrate before handling; industrial equipment remains illustrative.', motion: 'The dryer rotates; filter plates remain still.', basis: 'IMO Appendix D · B.9: laboratory concentrate filtration, drying and sizing. Industrial filtration and rotary drying equipment remain design concepts.'},
-  {id: 'product', title: 'Product handling', short: 'Product', point: [50, 8, 55] as const, hasRoof: true, input: 'Dried material', output: 'Storage / loadout', description: 'Convey dried material into storage and loadout; the arrangement remains conceptual.', motion: 'Transfer connects dewatering to storage.', basis: 'Concept only: the reviewed laboratory procedures do not specify an industrial storage or loadout arrangement. No product grade, capacity or commercial qualification is established.'},
+  {id: 'product', title: 'Product handling', short: 'Product', point: [50, 8, 55] as const, hasRoof: true, input: 'Dried material', output: 'Storage / loadout', description: 'Conceptual transfer from dewatering to storage.', motion: 'Transfer connects dewatering to storage.', basis: 'Concept only: the reviewed laboratory procedures do not specify an industrial storage or loadout arrangement. No product grade, capacity or commercial qualification is established.'},
 ] as const;
 const IMO_PROCESS_REPORT='/6798-%20Sakariya%20Tanzanian%20Graphite%20-%20Final%20Report%20-%20Rev0%20(1).pdf';
 
@@ -627,7 +627,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
         <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : selected.id === 'flotation' ? 'Flotation cell · illustrative section' : selected.id === 'product' ? 'Sizing screen · illustrative split' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
       </div>
-      <aside className="tanga-factory-inspector" aria-live="polite">
+      <aside className="tanga-factory-inspector" data-stage={overview ? 'overview' : selected.id} aria-live="polite">
         {endUseRoute ? <>
           <small className="tanga-process-kicker">ILLUSTRATIVE DOWNSTREAM PATHWAY</small>
           <h3>{routeTitle}</h3>
@@ -639,7 +639,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           <h3>{overview ? 'A single connected campus' : selected.title}</h3>
           <p className="tanga-process-explanation">{overview ? 'Concept route: feed receiving, preparation, flotation, dewatering and product handling. Layout and equipment are illustrative.' : selected.description}</p>
           {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
-          {!overview&&<><p className="tanga-factory-motion-note">{selected.motion}</p><details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
+          {!overview&&<>{selected.id!=='product'&&<p className="tanga-factory-motion-note">{selected.motion}</p>}<details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
           {!overview && selected.id==='flotation' && <>
             <div className="tanga-factory-separation" aria-label="Conceptual graphite and gangue separation"><span><i className="is-graphite"/>Froth carries graphite into the launder</span><span><i className="is-gangue"/>The lower outlet carries the tailings stream</span><small>Illustrative flow. See the composite results below for measured recovery.</small></div>
             <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>
@@ -651,12 +651,12 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
               <div><strong>{(100-Number.parseFloat(result.coarse)).toFixed(1)}%</strong><small>Passing 150 µm · calculated remainder</small></div>
               <small>Particles and bins are conceptual. No industrial sizing circuit or product specification is established.</small>
             </div>
-            <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO / AMC LAB · {result.id}</span><strong>{result.coarse}</strong><small>Reported cumulative +150 µm graphite mass fraction</small></button>
+            <button className="tanga-factory-result tanga-factory-result--link" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>LABORATORY EVIDENCE · {result.id}</span><i>Compare all eight test composites ↗</i></button>
           </>}
-          {!overview && selected.id!=='flotation' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
+          {!overview && selected.id!=='flotation' && selected.id!=='product' && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><i>Compare all eight test composites ↗</i></button>}
           {overview && <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)}><span>LABORATORY EVIDENCE</span><strong>8 composites</strong><small>TC, recovery and coarse fraction are separate measures.</small><i>Open comparison board ↗</i></button>}
           {overview && <button className="tanga-factory-pathway-cta" type="button" onClick={openEndUse}><span>NEXT</span><strong>Explore end-use pathways ↗</strong></button>}
-          <small className="tanga-factory-disclosure">Concept layout only · no approved location, flowsheet or residue design.</small>
+          <small className="tanga-factory-disclosure">{selected.id==='product'?'Concept layout · no industrial product specification.':'Concept layout only · no approved location, flowsheet or residue design.'}</small>
         </>}
       </aside>
     </div>
