@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import {createSignalGlow} from './signal-glow';
 
 export type PlantProcessArea = 'feed' | 'milling' | 'flotation' | 'dewatering' | 'product';
 
 /** Display motion for the conceptual campus. Speeds and particle counts have
  * no engineering meaning. Detailed equipment is created only for metallurgy. */
-export function createPlantProcessMotion(plant: THREE.Group) {
+export function createPlantProcessMotion(plant: THREE.Group, glowEnabled = false) {
   const root = new THREE.Group(); root.name = 'Illustrative process activity'; plant.add(root);
   const rock = new THREE.MeshStandardMaterial({color: 0x353c3b, roughness: .95});
   const concentrate = new THREE.MeshStandardMaterial({color: 0x67685b, roughness: .85});
@@ -79,6 +80,8 @@ export function createPlantProcessMotion(plant: THREE.Group) {
   sectionBox([13, 1.4, 5], [-18, 2.8, -5], gangue);
   sectionBox([2, 8, 2], [0, 17, 0], steel);
   const rising = new THREE.InstancedMesh(new THREE.CylinderGeometry(.68, .68, .15, 6), graphiteFlake, 32);
+  const flakeGlow = glowEnabled ? createSignalGlow(rising.count, 0x69f5e5, 22) : null;
+  if (flakeGlow) inspection.add(flakeGlow.points);
   const air = new THREE.InstancedMesh(new THREE.SphereGeometry(.7, 8, 6), windowMaterial, 32);
   const sinking = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.62, 0), gangue, 32);
   for (const stream of [rising, air, sinking]) {
@@ -181,6 +184,7 @@ export function createPlantProcessMotion(plant: THREE.Group) {
         position.set(THREE.MathUtils.lerp(lane, 24, outlet), Math.min(15.4, 7 + phase * 14), THREE.MathUtils.lerp(Math.cos(index * 4) * 8, -5, outlet));
         matrix.compose(position, quaternion, scale);
         rising.setMatrixAt(index, matrix);
+        flakeGlow?.positions.setXYZ(index, position.x, position.y + .05, position.z);
         position.y -= .63;
         scale.setScalar(Math.max(.001, 1 - outlet));
         matrix.compose(position, quaternion, scale);
@@ -191,6 +195,7 @@ export function createPlantProcessMotion(plant: THREE.Group) {
         sinking.setMatrixAt(index, matrix);
       }
       rising.instanceMatrix.needsUpdate = air.instanceMatrix.needsUpdate = sinking.instanceMatrix.needsUpdate = true;
+      if (flakeGlow) flakeGlow.positions.needsUpdate = true;
       cells.forEach((cell, index) => {
         const angle = clocks.flotation * .8 + index * .25;
         position.set(cell.x, 12.65, cell.z); quaternion.setFromAxisAngle(yAxis, angle); scale.set(1, 1, 1);

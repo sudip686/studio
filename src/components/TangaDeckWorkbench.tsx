@@ -30,6 +30,7 @@ import TangaInfoSlide, {type InfoSlideId} from './TangaInfoSlide';
 import {TangaChapterStoryPanel, TangaEvidenceDrawer, TangaMilestoneStage} from './TangaStoryPanels';
 import TangaPeerBenchmark from './TangaPeerBenchmark';
 import TangaStoryCue from './TangaStoryCue';
+import TangaCinematicChrome from './TangaCinematicChrome';
 import TangaGeologyMapStage, {type GeologyUnitSelection} from './TangaGeologyMapStage';
 import type {DevelopmentView} from '@/data/tanga-development';
 import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
@@ -5949,6 +5950,7 @@ export default function TangaDeckWorkbench() {
       }}
       data-testid="tanga-deck-workbench"
     >
+      {!isCoverScene && !storyHeroVisible && <TangaCinematicChrome key={activeMode} root={stageRef} mode={activeMode} view={`${activeMode}/${activeShotIndex}`}/>}
       <DeckHoverGuide mode={activeMode}/>
       <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>

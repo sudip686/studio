@@ -12,6 +12,7 @@ import {createMetallurgyEndUseScene, type MetallurgyEndUseRoute} from '@/lib/dec
 import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
 import {configurePresentationRenderer, sizePresentationRenderer} from '@/lib/deck/render-foundation';
 import {loadStudioLighting} from '@/lib/deck/studio-lighting';
+import {lowPowerPresentation} from '@/lib/deck/cinematic-style';
 
 const PROCESS = [
   {id: 'feed', title: 'Feed & crushing', short: 'Feed', point: [-44, 8, -8] as const, hasRoof: true, input: 'Mine feed', output: 'Prepared feed', description: 'Receive and crush conceptual mine feed, then carry prepared material toward milling.', motion: 'Feed advances on the receiving conveyor.', basis: 'IMO Appendix D · A.1: laboratory stage crushing and sample splitting. Conveyor, industrial equipment and layout are conceptual.'},
@@ -123,7 +124,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     // moving markers. Reset must recover one stable whole-plant composition.
     const overviewBounds = new THREE.Box3().setFromObject(plant);
 
-    const processMotion = createPlantProcessMotion(plant);
+    const lowPower = lowPowerPresentation();
+    const processMotion = createPlantProcessMotion(plant, !lowPower);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#7d898a', roughness: .96, dithering: true}));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.8; ground.receiveShadow = true; scene.add(ground);
     stabilizeSceneMaterialAppearance(scene);
@@ -302,7 +304,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       // should preserve the presenter's orbit rather than reframe the stage.
       if (width === canvasWidth && height === canvasHeight) { dirty = true; return; }
       canvasWidth = width; canvasHeight = height;
-      const ratio = sizePresentationRenderer(renderer, width, height, window.devicePixelRatio || 1, 2);
+      const ratio = sizePresentationRenderer(renderer, width, height, window.devicePixelRatio || 1, lowPower ? 1 : 2);
       element.dataset.renderScale = ratio.toFixed(2);
       camera.aspect = width / height; camera.updateProjectionMatrix();
       if (endUseRouteRef.current) showEndUse(endUseRouteRef.current, false);
@@ -483,7 +485,15 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       // collected in that case; keep normal disposal for ordinary unmounts.
       if (!contextWasLost) {
         const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
-        scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(entry => materials.add(entry)); } });
+        scene.traverse(object => {
+          if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
+            geometries.add(object.geometry);
+            for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+              materials.add(material);
+              if (material instanceof THREE.PointsMaterial) material.map?.dispose();
+            }
+          }
+        });
         geometries.forEach(geometry => geometry.dispose()); materials.forEach(entry => entry.dispose());
         sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss();
       }
@@ -611,7 +621,9 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       {PROCESS.map((item, index) => <button type="button" key={item.id} aria-pressed={!overview && stage === item.id} aria-current={plantTourActive && plantTourStep === index ? 'step' : undefined} data-tour-step={plantTourActive && plantTourStep === index ? 'active' : undefined} onClick={() => { stopPlantTour(); showPlantTourStep(index); setPlantTourComplete(false); window.dispatchEvent(new Event('tanga:manual-exploration')); }}><b>0{index + 1}</b><span>{item.title}</span></button>)}
     </nav>}
     <div className="tanga-factory-body">
-      <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage} />
+      <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage}>
+        <span key={endUseRoute ? `${endUseRoute}-${journeyStep}` : overview ? 'overview' : stage} className="tanga-cinematic-scan" aria-hidden="true"/>
+      </div>
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
         <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : selected.id === 'flotation' ? 'Flotation cell · illustrative section' : selected.id === 'product' ? 'Sizing screen · illustrative split' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
       </div>
