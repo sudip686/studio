@@ -2293,6 +2293,56 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @keyframes tanga-hex-dust { from { opacity:.35; scale:.72; } to { opacity:1; scale:1.2; } }
 @keyframes tanga-closing-title { from { opacity:0; letter-spacing:.25em; filter:blur(3px); } to { opacity:1; } }
 .tanga-deck--decision-story .tanga-story-cue { left: 300px; right: 380px; min-height: 100px; padding-block: 10px; }
+
+/* Conclusion chapter: a quiet instrument panel that lets the regional map and
+   project beacon stay dominant while the report milestones read as a timeline. */
+.tanga-deck[data-mode="comparison"] .tanga-story-cue:has(.tanga-story-cue__bookend) {
+  left: clamp(292px, 22vw, 360px);
+  right: clamp(300px, 23vw, 390px);
+  bottom: clamp(106px, 13vh, 132px);
+  min-height: 112px;
+  gap: 18px;
+  padding: 13px 18px;
+  border: 1px solid rgba(125, 224, 213, .22);
+  border-left: 2px solid #7de0d5;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 2% 50%, rgba(42, 174, 168, .12), transparent 42%),
+    linear-gradient(105deg, rgba(6, 17, 26, .96), rgba(8, 18, 26, .88) 62%, rgba(9, 18, 27, .78));
+  box-shadow: 0 18px 52px rgba(0, 0, 0, .32), inset 0 1px rgba(235, 255, 251, .04);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+.tanga-deck[data-mode="comparison"] .tanga-story-cue:has(.tanga-story-cue__bookend)::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(221, 239, 238, .055);
+  border-radius: 8px;
+  pointer-events: none;
+}
+.tanga-deck[data-mode="comparison"] .tanga-story-cue__bookend { gap: 15px; }
+.tanga-deck[data-mode="comparison"] .tanga-story-cue__orbit {
+  flex-basis: 72px;
+  width: 72px;
+  height: 72px;
+  filter: drop-shadow(0 0 12px rgba(90, 218, 207, .16));
+}
+.tanga-deck[data-mode="comparison"] .tanga-story-cue__milestones > strong { color: #9be4db; }
+.tanga-deck[data-mode="comparison"] .tanga-story-cue__milestones ol { gap: 5px 14px; }
+.tanga-deck[data-mode="comparison"] .tanga-story-cue__milestones li { font-size: 9px; line-height: 1.35; }
+.tanga-deck[data-mode="comparison"] .tanga-story-cue__milestones time { color: #efbd8c; }
+@media (min-width: 761px) and (max-width: 1200px) {
+  .tanga-deck[data-mode="comparison"] .tanga-story-cue:has(.tanga-story-cue__bookend) {
+    left: 270px;
+    right: 300px;
+    gap: 10px;
+    padding-inline: 12px;
+  }
+  .tanga-deck[data-mode="comparison"] .tanga-story-cue__orbit { flex-basis: 54px; width: 54px; height: 54px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tanga-deck[data-mode="comparison"] .tanga-story-cue__orbit svg { animation: none; }
+}
 @keyframes tanga-orbit-turn { to { transform: rotate(360deg); } }
 @media (min-width:761px) and (max-width:1200px) { .tanga-deck--decision-story .tanga-story-cue { left: 270px; right: 300px; } .tanga-story-cue__bookend { min-width: 210px!important; gap: 6px; } .tanga-story-cue__orbit { flex-basis: 48px; width: 48px; height: 48px; } }
 @media (max-width:760px) { .tanga-deck--decision-story .tanga-story-cue { min-height: unset; } .tanga-story-cue__bookend { display: none; } }
