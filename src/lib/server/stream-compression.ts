@@ -14,12 +14,16 @@ export function maybeGzipStreamResponse(
     return Number.isFinite(quality) && quality > 0 && quality <= 1;
   });
   const cloudflareWorkerBuild = process.env.NEXT_PUBLIC_PRESENTATION_BUILD_TARGET?.startsWith('Cloudflare Workers');
+  const nextDevelopmentServer = process.env.NODE_ENV === 'development';
   const canCompress = acceptsGzip
     // The OpenNext response adapter discards Workers' non-standard
     // `encodeBody: 'manual'` flag. Return ordinary JSON from the Worker build
     // and let Cloudflare's edge Compression Rules negotiate gzip/Brotli.
-    // This also keeps local OpenNext preview responses parseable.
+    // This also keeps local OpenNext preview responses parseable. Next's
+    // development server compresses route responses itself, so avoid adding a
+    // second gzip layer there that would leave JSON consumers with gzip bytes.
     && !cloudflareWorkerBuild
+    && !nextDevelopmentServer
     && !request.headers.has('range')
     && init.status !== 206
     && !headers.has('content-encoding')

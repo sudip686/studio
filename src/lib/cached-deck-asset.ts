@@ -1,5 +1,5 @@
 /** Bounded, best-effort persistent cache for public geology assets only. */
-export const DECK_ASSET_CACHE='tanga-public-3d-v2';
+export const DECK_ASSET_CACHE='tanga-public-3d-v3';
 const TTL=24*60*60*1000;
 const ALLOWED=/\/(geologicalModel\.glb|height_hires\.bin|terrain_context_512\.bin|survey_(height|coverage|slope)_hires\.bin|height_preview_1024\.bin|assay_data\.geojson|lithology_data\.geojson|BlockModel\.geojson|resource_blocks_v1\.bin|api\/block-model|terrain_(hires|preview)_meta\.json|terrain_texture_hires\.jpg)$/;
 type PendingAsset={controller:AbortController;promise:Promise<Response>;consumers:number;settled:boolean;cancelled:boolean};

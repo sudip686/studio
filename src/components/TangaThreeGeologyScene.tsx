@@ -6403,8 +6403,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
       {mode === 'mine_planning' && terrainCompare.enabled && <div className="tanga-three__comparison-wipe" style={{left:`${THREE.MathUtils.clamp(terrainCompare.split,8,92)}%`}} title="Drag to compare original terrain and concept site" onPointerDown={event=>{event.currentTarget.setPointerCapture(event.pointerId);const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} onPointerMove={event=>{if(!event.currentTarget.hasPointerCapture(event.pointerId))return;const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} aria-hidden="true"><span>ORIGINAL TERRAIN</span><i/><span>CONCEPT SITE</span></div>}
-      {mode!=='metallurgy' && mode!=='subsurface' && surfaceControl}
-      {!sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
+      {visible && mode!=='metallurgy' && mode!=='subsurface' && surfaceControl}
+      {visible && !sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
       {!minimalViewerChrome && (
         <>
           {/* Scene title removed. It rendered bottom-centre, directly under
