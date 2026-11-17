@@ -2944,6 +2944,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       return;
     }
     const sceneMemoryDiagnostics = new URLSearchParams(window.location.search).get('scene-memory') === '1';
+    let sceneGpuCaptured = false;
     if (sceneMemoryDiagnostics) {
       delete host.dataset.sceneGpuResources;
       delete host.dataset.sceneGpuResourcesAtUnmount;
@@ -2951,12 +2952,25 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const captureSceneGpuResources = (destination: 'live' | 'unmount') => {
       if (!sceneMemoryDiagnostics) return;
       const memory = renderer.info.memory;
+      const meshTriangles: Array<{name: string; triangles: number; visible: boolean}> = [];
+      if (destination === 'unmount' || !sceneGpuCaptured) {
+        scene.traverse(object => {
+          const mesh = object as THREE.Mesh;
+          if (!mesh.isMesh || !mesh.geometry) return;
+          const geometry = mesh.geometry;
+          const count = geometry.index?.count ?? geometry.getAttribute('position')?.count ?? 0;
+          if (count >= 3) meshTriangles.push({name: mesh.name || mesh.type, triangles: Math.floor(count / 3), visible: mesh.visible});
+        });
+        meshTriangles.sort((a, b) => b.triangles - a.triangles);
+        sceneGpuCaptured = true;
+      }
       const snapshot = JSON.stringify({
         geometries: memory.geometries,
         textures: memory.textures,
         programs: renderer.info.programs?.length ?? 0,
         drawCalls: renderer.info.render.calls,
         triangles: renderer.info.render.triangles,
+        ...(meshTriangles.length ? {meshTriangles: meshTriangles.slice(0, 30)} : {}),
         contextLost: renderer.getContext().isContextLost(),
       });
       host.dataset[destination === 'live' ? 'sceneGpuResources' : 'sceneGpuResourcesAtUnmount'] = snapshot;
