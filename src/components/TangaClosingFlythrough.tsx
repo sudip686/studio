@@ -54,10 +54,18 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       const cyan = new T.MeshStandardMaterial({color: 0x80e0dc, metalness: .55, roughness: .32, emissive: 0x15695d});
       const amber = new T.MeshStandardMaterial({color: 0xf4b775, metalness: .45, roughness: .42});
       const base = new T.MeshStandardMaterial({color: 0x143040, metalness: .55, roughness: .48});
+      const rock = new T.MeshStandardMaterial({color: 0x947665, roughness: .88, side: T.DoubleSide});
+      const glass = new T.MeshStandardMaterial({color: 0x79c9cd, roughness: .22, transparent: true, opacity: .28, depthWrite: false, side: T.DoubleSide, forceSinglePass: true});
+      const froth = new T.MeshBasicMaterial({color: 0xc2fff0});
       const ribbon = new T.MeshBasicMaterial({color: 0x66e5dd});
+      const grid = new T.GridHelper(54, 36, 0x1b3d48, 0x18303e);
+      grid.position.y = -.12;
+      scene.add(grid);
       scene.add(new T.Mesh(new T.TubeGeometry(rail, 96, .042, 6), ribbon));
       const stationLights: InstanceType<typeof T.MeshBasicMaterial>[] = [];
       const hitTargets: InstanceType<typeof T.Mesh>[] = [];
+      let bubbles: InstanceType<typeof T.InstancedMesh> | undefined;
+      const bubbleTransform = new T.Matrix4();
       type MeshGeometry = InstanceType<typeof T.Mesh>['geometry'];
       const add = (group: InstanceType<typeof T.Group>, geometry: MeshGeometry, material: InstanceType<typeof T.Material>, x: number, y: number, z: number) => {
         const mesh = new T.Mesh(geometry, material);
@@ -77,30 +85,45 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         stationLights.push(light);
         add(station, new T.TorusGeometry(2.05, .033, 5, 48), light, 0, .45, 0).rotation.x = -Math.PI / 2;
         if (index === 0) {
+          add(station, new T.BoxGeometry(2.55, .2, 2.28), rock, 0, 1.84, 0);
           for (let i = 0; i < 9; i++) {
-            add(station, new T.CylinderGeometry(.045, .045, 1.7 + i % 3 * .34, 6), i % 4 === 0 ? amber : cyan, (i % 3 - 1) * .71, 1.55, (Math.floor(i / 3) - 1) * .65).rotation.z = -.37;
+            const collarX = (i % 3 - 1) * .71;
+            const north = (Math.floor(i / 3) - 1) * .65;
+            const depth = 1.02 + i % 3 * .23;
+            add(station, new T.CylinderGeometry(.045, .045, depth, 6), i % 4 === 0 ? amber : cyan, collarX - Math.sin(.37) * depth / 2, 1.86 - Math.cos(.37) * depth / 2, north).rotation.z = -.37;
+            add(station, new T.CylinderGeometry(.095, .095, .085, 8), amber, collarX, 1.96, north);
           }
         } else if (index === 1) {
           const cells = new T.BoxGeometry(.38, .3, .36);
           const mesh = new T.InstancedMesh(cells, cyan, 28);
           const transform = new T.Matrix4();
-          for (let i = 0; i < 28; i++) mesh.setMatrixAt(i, transform.makeTranslation(i % 7 * .42 - 1.25, .76 + i % 7 * .19 + Math.floor(i / 14) * .33, Math.floor(i / 7) % 2 * .47 - .23));
+          for (let i = 0; i < 28; i++) {
+            mesh.setMatrixAt(i, transform.makeTranslation(i % 7 * .42 - 1.25, .76 + i % 7 * .19 + Math.floor(i / 14) * .33, Math.floor(i / 7) % 2 * .47 - .23));
+            mesh.setColorAt(i, new T.Color(i % 5 === 0 ? 0xc3fff2 : 0x83aebd));
+          }
           station.add(mesh);
           mesh.userData.stop = index;
           hitTargets.push(mesh);
         } else if (index === 2) {
           for (const offset of [-.85, .85]) {
-            add(station, new T.CylinderGeometry(.66, .58, 1.05, 20, 1, true), amber, offset, .98, 0);
-            add(station, new T.CylinderGeometry(.6, .6, .58, 20), cyan, offset, .87, 0);
+            add(station, new T.CylinderGeometry(.66, .58, 1.05, 24, 1, true), glass, offset, .98, 0);
+            add(station, new T.CylinderGeometry(.6, .6, .32, 24), cyan, offset, .64, 0);
+            add(station, new T.TorusGeometry(.66, .042, 6, 24), amber, offset, 1.5, 0).rotation.x = -Math.PI / 2;
             add(station, new T.CylinderGeometry(.065, .065, 1.48, 8), base, offset, 1.34, 0);
           }
+          bubbles = new T.InstancedMesh(new T.IcosahedronGeometry(.044, 0), froth, 32);
+          bubbles.frustumCulled = false;
+          bubbles.instanceMatrix.setUsage(T.DynamicDrawUsage);
+          station.add(bubbles);
           add(station, new T.BoxGeometry(2.45, .14, .2), amber, 0, 1.98, 0);
         } else {
-          for (const offset of [-.83, .83]) {
-            add(station, new T.CylinderGeometry(.25, .3, .12, 16), cyan, offset, .5, 0);
-            for (let i = 0; i < 4; i++) {
-              add(station, new T.TorusGeometry(.31 + i * .13, .06, 6, 24), amber, offset, .56 + i * .14, 0).rotation.x = -Math.PI / 2;
-            }
+          const benchProfile = [[0, 0], [.27, 0], [.36, .15], [.49, .15], [.58, .3], [.7, .3], [.78, .45], [.9, .45]];
+          const profile = benchProfile.map(([radius, height]) => new T.Vector2(radius, height));
+          const shell = new T.LatheGeometry(profile, 24);
+          for (const offset of [-.96, .96]) {
+            const pit = add(station, shell, rock, offset, .46, 0);
+            pit.scale.z = 1.35;
+            add(station, new T.BoxGeometry(.18, .08, .22), cyan, offset, .51, 0);
           }
         }
       });
@@ -147,7 +170,8 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           if (object instanceof T.InstancedMesh) object.dispose();
         });
         geometries.forEach(geometry => geometry.dispose());
-        [cyan, amber, base, ribbon, ...stationLights].forEach(material => material.dispose());
+        [cyan, amber, base, rock, glass, froth, ribbon, ...stationLights].forEach(material => material.dispose());
+        grid.dispose();
         renderer.dispose();
         renderer.domElement.remove();
       };
@@ -166,6 +190,15 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         const seconds = elapsed / 1000;
         if (seconds >= 15) { finish.current(); return; }
         const phase = Math.min(3, Math.floor(seconds / 3.4));
+        if (bubbles) {
+          for (let i = 0; i < bubbles.count; i++) {
+            const angle = i * 2.4;
+            const radius = .17 + (i % 5) * .072;
+            const rise = (seconds * .72 + i * .173) % 1;
+            bubbles.setMatrixAt(i, bubbleTransform.makeTranslation((i < 16 ? -.85 : .85) + Math.cos(angle) * radius, .83 + rise * .64, Math.sin(angle) * radius));
+          }
+          bubbles.instanceMatrix.needsUpdate = true;
+        }
         if (phase !== selected) {
           selected = phase;
           setActive(phase);
