@@ -4,10 +4,9 @@
 // Load Workbox from CDN
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
 
-// Check if workbox is loaded
-if (workbox) {
-  console.log(`Yay! Workbox is loaded 🎉`);
+const DOCUMENT_CACHE = 'tanga-documents-v1';
 
+if (typeof workbox !== 'undefined') {
   const { core, precaching, routing, strategies, expiration, cacheableResponse, navigationPreload } = workbox;
 
   core.clientsClaim();
@@ -20,7 +19,19 @@ if (workbox) {
   // runtime cache groups it owns.
   precaching.cleanupOutdatedCaches();
 
-
+  // A slow live navigation must still reach the current deployment. Keep the
+  // last successful document for network failures, in its own cache so older
+  // HTML in the generic runtime cache cannot win the navigation race.
+  routing.registerRoute(
+    ({request, sameOrigin}) => sameOrigin && request.mode === 'navigate',
+    new strategies.NetworkFirst({
+      cacheName: DOCUMENT_CACHE,
+      plugins: [
+        new cacheableResponse.CacheableResponsePlugin({statuses: [200]}),
+        new expiration.ExpirationPlugin({maxEntries: 8, purgeOnQuotaError: true}),
+      ],
+    })
+  );
 
   // --- Static JS/CSS ---
   routing.registerRoute(
@@ -80,27 +91,7 @@ if (workbox) {
     })
   );
 
-} else {
-  console.log(`Boo! Workbox didn't load 😬`);
 }
-
-// --- INSTALL-TIME WARMUP (disabled to prevent runtime errors) ---
-// Keep lightweight stubs so the SW remains valid JS.
-const WARM_CACHE_NAME = 'tiles-swr-v2';
-function buildWarmUrls() { return []; }
-// self.addEventListener('install', (event) => {
-//   const warmUrls = buildWarmUrls();
-//   event.waitUntil(
-//     (async () => {
-//       const cache = await caches.open(WARM_CACHE_NAME);
-//       try {
-//         await cache.addAll(warmUrls);
-//       } catch {
-//         // Ignore failures
-//       }
-//     })()
-//   );
-// });
 
 self.addEventListener('activate', (event) => {
   const CURRENT_CACHES = new Set([
@@ -108,6 +99,7 @@ self.addEventListener('activate', (event) => {
     'tiles-swr-v2',
     'img-swr-v2',
     'default-nf-v2',
+    DOCUMENT_CACHE,
   ]);
   event.waitUntil(
     (async () => {

@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import {createSignalGlow} from './signal-glow';
 
 export type PlantProcessArea = 'feed' | 'milling' | 'flotation' | 'dewatering' | 'product';
 
 /** Display motion for the conceptual campus. Speeds and particle counts have
  * no engineering meaning. Detailed equipment is created only for metallurgy. */
-export function createPlantProcessMotion(plant: THREE.Group) {
+export function createPlantProcessMotion(plant: THREE.Group, glowEnabled = false) {
   const root = new THREE.Group(); root.name = 'Illustrative process activity'; plant.add(root);
   const rock = new THREE.MeshStandardMaterial({color: 0x353c3b, roughness: .95});
   const concentrate = new THREE.MeshStandardMaterial({color: 0x67685b, roughness: .85});
@@ -13,6 +14,8 @@ export function createPlantProcessMotion(plant: THREE.Group) {
   const graphiteFlake = new THREE.MeshStandardMaterial({color: 0x66d9d2, emissive: 0x125b59, emissiveIntensity: .55, roughness: .28, metalness: .12, side: THREE.DoubleSide});
   const gangue = new THREE.MeshStandardMaterial({color: 0xb98455, emissive: 0x50301b, roughness: .94});
   const fineGraphite = new THREE.MeshStandardMaterial({color: 0x638eaf, emissive: 0x18304c, roughness: .7});
+  steel.color.set(0x697b81);
+  steel.userData.studioFinish = true;
   const flow = plant.userData.flow as THREE.Vector3[];
   const mill = plant.userData.processMill as THREE.Mesh | undefined;
   const dryer = plant.userData.processDryer as THREE.Mesh | undefined;
@@ -64,6 +67,7 @@ export function createPlantProcessMotion(plant: THREE.Group) {
     inspection.add(mesh);
   }
   const windowMaterial = new THREE.MeshStandardMaterial({color: 0x94d9d7, transparent: true, opacity: .16, depthWrite: false});
+  windowMaterial.userData.studioFinish = true;
   const pulp = new THREE.MeshStandardMaterial({color: 0x467e7a, transparent: true, opacity: .24, depthWrite: false});
   sectionBox([28, 1.3, 20], [0, 2, 0], steel);
   sectionBox([28, 15, .7], [0, 10, 10], steel);
@@ -76,6 +80,8 @@ export function createPlantProcessMotion(plant: THREE.Group) {
   sectionBox([13, 1.4, 5], [-18, 2.8, -5], gangue);
   sectionBox([2, 8, 2], [0, 17, 0], steel);
   const rising = new THREE.InstancedMesh(new THREE.CylinderGeometry(.68, .68, .15, 6), graphiteFlake, 32);
+  const flakeGlow = glowEnabled ? createSignalGlow(rising.count, 0x69f5e5, 22) : null;
+  if (flakeGlow) inspection.add(flakeGlow.points);
   const air = new THREE.InstancedMesh(new THREE.SphereGeometry(.7, 8, 6), windowMaterial, 32);
   const sinking = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.62, 0), gangue, 32);
   for (const stream of [rising, air, sinking]) {
@@ -178,6 +184,7 @@ export function createPlantProcessMotion(plant: THREE.Group) {
         position.set(THREE.MathUtils.lerp(lane, 24, outlet), Math.min(15.4, 7 + phase * 14), THREE.MathUtils.lerp(Math.cos(index * 4) * 8, -5, outlet));
         matrix.compose(position, quaternion, scale);
         rising.setMatrixAt(index, matrix);
+        flakeGlow?.positions.setXYZ(index, position.x, position.y + .05, position.z);
         position.y -= .63;
         scale.setScalar(Math.max(.001, 1 - outlet));
         matrix.compose(position, quaternion, scale);
@@ -188,6 +195,7 @@ export function createPlantProcessMotion(plant: THREE.Group) {
         sinking.setMatrixAt(index, matrix);
       }
       rising.instanceMatrix.needsUpdate = air.instanceMatrix.needsUpdate = sinking.instanceMatrix.needsUpdate = true;
+      if (flakeGlow) flakeGlow.positions.needsUpdate = true;
       cells.forEach((cell, index) => {
         const angle = clocks.flotation * .8 + index * .25;
         position.set(cell.x, 12.65, cell.z); quaternion.setFromAxisAngle(yAxis, angle); scale.set(1, 1, 1);

@@ -1,5 +1,26 @@
 # Tanga desktop viewer performance baseline — 2026-10-24
 
+## 17 November headed camera run
+
+The production Next.js build contained the service-worker changes in `e2bc0cf`. The built UI reported `4b8db94eb7bf+dirty` because it was packaged before the service-worker commit. This run used headed Chrome 157.0.8103.79 at 1366 × 768 on the Dell G16 7630. The same-browser blank control identified Intel UHD Graphics via Direct3D 11 and delivered 701 RAF intervals over 3.004 s (median 4.2 ms, p95 4.3 ms).
+
+```powershell
+node scripts/measure-presentation.mjs --base http://127.0.0.1:3026 --chapters topography,drillholes,subsurface,resource,mine_planning,metallurgy --frame-ms 0 --interaction-ms 30000 --output .playwright-mcp/tanga-2026-11-17-desktop-orbit.json
+```
+
+Each chapter opened in a new context, reloaded once, then received 30 seconds of bounded drag and alternating wheel events. Service workers were blocked to keep cache conditions comparable. Subsurface started in interpreted depth. All six runs stayed visible and ready, registered camera movement and seven wheel events each, and recorded zero page exceptions and failed requests.
+
+| Chapter | Median (ms) | p95 (ms) | Frames >33.33 ms |
+|---|---:|---:|---:|
+| Topography | 8.2 | 12.6 | 5 |
+| Drillholes | 8.2 | 12.9 | 0 |
+| Subsurface | 11.5 | 19.3 | 0 |
+| Resource | 10.3 | 13.1 | 1 |
+| Mine planning | 7.6 | 14.2 | 0 |
+| Metallurgy | 11.0 | 12.8 | 0 |
+
+These are browser callback intervals on the reference laptop with real camera input, rather than GPU presentation timestamps. The local run met the desktop median and p95 targets. It does not establish hosted performance, throttled startup, phone or tablet performance, or behavior across every shot.
+
 ## Scope and method
 
 This diagnostic baseline covers the local **standard Next.js production build**, at 1366 × 768 CSS pixels in Chrome 155 on Windows 11. Chapters were opened on separate loopback origins to isolate the browser's origin cache. The machine is a Dell G16 7630 with an Intel Core i9-13900HX, 31.7 GiB RAM, Intel UHD Graphics and NVIDIA RTX 4070 Laptop GPU.

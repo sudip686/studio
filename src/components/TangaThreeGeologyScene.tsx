@@ -19,6 +19,10 @@ import {buildMineSiteCampus,type CampusFacility} from '@/lib/deck/mine-site-camp
 import {buildDevelopmentInfrastructure,proposeFeedApron} from '@/lib/deck/mine-development';
 import {DEVELOPMENT_SITE, DEVELOPMENT_SOURCE} from '@/data/tanga-development';
 import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
+import {configurePresentationRenderer, sizePresentationRenderer} from '@/lib/deck/render-foundation';
+import {PRESENTATION_SUN, PRESENTATION_SUN_COLOR} from '@/lib/deck/presentation-light';
+import {lowPowerPresentation} from '@/lib/deck/cinematic-style';
+import {createSignalGlow} from '@/lib/deck/signal-glow';
 import {MAPPED_SURFACE_UNITS,modelRockUnit} from '@/lib/deck/geology-palette';
 import GeologyCrossSections from './GeologyCrossSections';
 import {cachedDeckAsset} from '@/lib/cached-deck-asset';
@@ -2415,6 +2419,7 @@ export default function TangaThreeGeologyScene({
   useEffect(()=>{if(surfaceOpacity===null)resetSurfaceRef.current?.();},[surfaceOpacity]);
   const surfaceOpacityRef=useRef<number|null>(null);surfaceOpacityRef.current=surfaceOpacity;
   const [resourceCutoff, setResourceCutoff] = useState(3);
+  const [resourceCutoffMax, setResourceCutoffMax] = useState(12);
   const [resourceCutoffSummary, setResourceCutoffSummary] = useState<ResourceCutoffSummary|null>(null);
   const resourceCutoffRef=useRef(resourceCutoff);resourceCutoffRef.current=resourceCutoff;
   const resourceCutoffMeshesRef=useRef<ResourceCutoffMeshGroup[]>([]);
@@ -2640,6 +2645,11 @@ export default function TangaThreeGeologyScene({
     setHoverTooltip(null);
     setSelectedBlockTooltip(null);
     const host = hostRef.current;
+    const lowPower = lowPowerPresentation();
+    delete host.dataset.loadedDrillholes;
+    delete host.dataset.loadedResourceCells;
+    let resourceTargetGrade: number | undefined;
+    setResourceCutoffMax(12);
     // This chapter is a dedicated product/evidence composition, not a second
     // mine viewer. Avoid loading and rendering an invisible industrial campus.
     if(['metallurgy'].includes(mode)){
@@ -2988,23 +2998,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     };
     renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
     renderer.domElement.addEventListener('webglcontextrestored', onContextRestored, false);
-    // Keep a fixed draw-buffer scale through camera gestures and settled
-    // views. Frame-time adaptation made colored blocks, pads, and fine details
-    // shimmer as the resolution changed while the presenter orbited. A 1x cap
-    // also avoids oversampling the large terrain mesh on high-DPI displays.
-    const renderPixelRatio = Math.min(1, window.devicePixelRatio || 1);
-    renderer.setPixelRatio(renderPixelRatio);
-    host.dataset.renderScale = renderPixelRatio.toFixed(2);
-    renderer.setSize(host.clientWidth, host.clientHeight);
+    configurePresentationRenderer(renderer, mode);
     host.dataset.depthBuffer = 'adaptive-perspective';
     host.dataset.depthNear = camera.near.toFixed(1);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.NeutralToneMapping;
-    // Neutral daylight keeps mapped category hues distinct.
-    renderer.toneMappingExposure = mode === 'topography' ? 1.12 : 1.15;
     renderer.shadowMap.enabled = mode === 'mine_planning';
     if(mode==='mine_planning'){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;}
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
     // Keep thematic colors stable while presenters orbit. A room environment
@@ -3583,8 +3581,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x5b6253 : 0x303d47, isTerrainView ? 0.9 : 1.12));
     // Low raking key across the mapped ridges: the land stays dimensional
     // without suggesting a different sun position or changing elevation.
-    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : 0xfff1d8, isTerrainView ? 1.5 : mode === 'mine_planning' ? 1.8 : 1.65);
-    key.position.set(isTerrainView ? 1800 : 900, isTerrainView ? 1050 : 1800, isTerrainView ? 1150 : 1200);
+    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : PRESENTATION_SUN_COLOR, isTerrainView ? 1.5 : mode === 'mine_planning' ? 1.8 : 1.65);
+    const [east, north, elevation] = PRESENTATION_SUN;
+    key.position.set(east, elevation, -north).multiplyScalar(2400);
     key.castShadow = true;
     // Cool fill from opposite side — keeps shadowed slopes readable without
     // washing out the terrain. No shadow casting on the fill (perf + softness).
@@ -3844,6 +3843,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             side: THREE.DoubleSide,
             forceSinglePass: true,
             vertexColors: mode === 'topography',
+            dithering: true,
             depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
             depthTest: true,
             polygonOffset: true,
@@ -3851,6 +3851,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           })
         );
         const texturedMaterial = texturedTerrain.material;
+        if (mode === 'topography') texturedMaterial.userData.terrainHorizon = true;
         registerTerrainSurfaceMaterial(texturedMaterial);
         texturedTerrain.receiveShadow = true;
         texturedTerrain.renderOrder = 20;
@@ -4288,6 +4289,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         disposeObject(gltf.scene);
       }
       const shownHoleCount = drillholeCount(shownDrillholes);
+      host.dataset.loadedDrillholes = String(shownHoleCount);
       const drillSurfaceOffsets = drillSurfaceOffsetByHole(shownDrillholes, terrainResources);
       if(mode==='drillholes'){
         const ids=[...new Set(shownDrillholes.map(d=>d.holeId))].sort();setJourneyHoles(ids);setJourneyHole(ids[0]??'');setJourneyReadout('Choose a hole, then play its recorded intervals.');
@@ -4374,6 +4376,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const highEnd = registeredDrillPoint(highCarbonSegment, 'to', terrainResources, drillSurfaceOffsets);
         const fraction = matchingBest && midDepth !== null ? clamp((midDepth - matchingBest.depthFrom) / Math.max(.001, matchingBest.depthTo - matchingBest.depthFrom), 0, 1) : .5;
         const assayAnchor = highStart.clone().lerp(highEnd, fraction);
+        if (mode === 'drillholes' && !lowPower) {
+          const halo = createSignalGlow(1, 0x79efe2, 54);
+          // Halo marks the registered intercept, rather than introducing a collar post.
+          halo.positions.setXYZ(0, assayAnchor.x, assayAnchor.y, assayAnchor.z);
+          halo.positions.needsUpdate = true;
+          tagDeckLayer(halo.points, 'drilling');
+          stage.add(halo.points);
+        }
         if (!bestIntercept || matchingBest) calloutAnchorOverrides.set('assays', threeOwnerLocalAnchor(assayAnchor));
         calloutAnchorOverrides.set('volume', threeOwnerLocalAnchor(assayAnchor.clone()));
       }
@@ -4709,8 +4719,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const representative = sampled[Math.floor(sampled.length / 2)];
           const blockAnchor = new THREE.Vector3(representative.x, representative.y, representative.z);
           const gradeAnchorBlock = sampled.reduce((best, block) => block.carbon > best.carbon ? block : best, sampled[0]);
+          if (mode === 'resource') {
+            resourceTargetGrade = gradeAnchorBlock.carbon;
+            const maximum = Math.max(12, (Math.floor(gradeAnchorBlock.carbon * 10) + 1) / 10);
+            setResourceCutoffMax(maximum);
+            setResourceCutoff(current => Math.min(current, maximum));
+          }
           if (mode === 'resource') calloutsForProjection = calloutsForProjection.map(callout => callout.id === 'grade'
-            ? {...callout, label: `${gradeAnchorBlock.carbon.toFixed(2)}% TGC model cell`, detail: 'Highest displayed block grade · model estimate'}
+            ? {...callout, label: `${gradeAnchorBlock.carbon.toFixed(2)}% TGC`, detail: 'Highest grade in the loaded model selection', tone: '#8bf4e8'}
             : callout.id === 'blocks' ? {...callout, detail: `${sampled.length.toLocaleString()} displayed source cells`} : callout);
           calloutAnchorOverrides.set('blocks', threeOwnerLocalAnchor(blockAnchor));
           calloutAnchorOverrides.set('grade', threeOwnerLocalAnchor(new THREE.Vector3(
@@ -4809,6 +4825,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         });
 
         if(mode==='resource'){
+          host.dataset.loadedResourceCells = String(sampled.length);
           applyResourceCutoffRef.current?.(resourceCutoffRef.current);
           resourceDrillRevealCommandRef.current?.();
         }
@@ -5452,13 +5469,15 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (!hostRef.current) return;
       const w = hostRef.current.clientWidth;
       const h = hostRef.current.clientHeight;
+      if (!w || !h) return;
       camera.aspect = w / h;
       if(mode==='metallurgy')camera.setViewOffset(w,h,Math.min(200,w*.16),0,w,h);
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      host.dataset.renderScale = sizePresentationRenderer(renderer, w, h, window.devicePixelRatio || 1, lowPower ? 1 : 1.25).toFixed(2);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
+    resize();
 
     let frame = 0;
     let lastControlsElapsed=0;
@@ -5500,6 +5519,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       let interceptsTaken = 0;
       let keyLabelsTaken = 0;
       const visible = calloutsForProjection.filter((callout) => {
+        if (mode === 'resource' && callout.id === 'grade') {
+          const blocks = layerSettingsRef.current.blocks;
+          if (resourceTargetGrade === undefined || resourceCutoffRef.current > resourceTargetGrade || !blocks.visible || blocks.opacity <= .01) return false;
+        }
         if(callout.id.startsWith('section-end-')&&!inspectionActiveRef.current&&!detailOptions.current.sectionEnabled)return false;
         // In key mode, story labels explain the model; detailed intercepts
         // remain available in the explicit All labels tier.
@@ -5547,6 +5570,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         if(!anchorOwner)return;
         const anchorWorld = new THREE.Vector3(...anchor.coordinates);
         anchorOwner.localToWorld(anchorWorld);
+        if (mode === 'resource' && callout.id === 'grade' && renderer.clippingPlanes.some(plane => plane.distanceToPoint(anchorWorld) < 0)) return;
         // A point behind a perspective camera can still project to an in-range
         // depth value with inverted screen coordinates. Reject it in world
         // space before NDC clipping so labels never jump across the canvas.
@@ -5627,6 +5651,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const stageBounds = visibleStage(hostRef.current, width, height);
 
       const keepOutRects=chromeKeepOutRects(hostRef.current,width,height);
+      const lockedGrade = mode === 'resource' ? byId.get('grade') : undefined;
+      if (lockedGrade) {
+        keepOutRects.push({x: lockedGrade.anchorPixelX - 14, y: lockedGrade.anchorPixelY - 14, width: 28, height: 28});
+      }
       if(mode==='mine_planning'&&facilityFocused&&processPlant&&density==='key'){
         // Keep the actual process equipment readable. Leaders retain their
         // projected anchors while boxes fan onto the surrounding free space.
@@ -6430,6 +6458,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                     r="3.5"
                     style={{color: callout.tone, fill: callout.tone, stroke: '#ffffff'}}
                   />
+                  {mode === 'resource' && callout.id === 'grade' && <>
+                    <circle className="tanga-resource-lock__ring" cx={callout.anchorPixelX} cy={callout.anchorPixelY} r="9"/>
+                    <circle className="tanga-resource-lock__pulse" cx={callout.anchorPixelX} cy={callout.anchorPixelY} r="12"/>
+                  </>}
                 </g>
               ))}
             </svg>
@@ -6724,7 +6756,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           </div>
           <div className="tanga-three__resource-threshold">
             <label htmlFor="tanga-resource-threshold"><span>Show blocks ≥</span><output>{resourceCutoff.toFixed(1)}% TGC</output></label>
-            <input id="tanga-resource-threshold" aria-label="Resource block display threshold in percent TGC" type="range" min="0" max="12" step="0.1" value={resourceCutoff} onChange={event=>{setResourceCutoff(Number(event.target.value));window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
+            <input id="tanga-resource-threshold" aria-label="Resource block display threshold in percent TGC" type="range" min="0" max={resourceCutoffMax} step="0.1" value={resourceCutoff} onChange={event=>{setResourceCutoff(Number(event.target.value));window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
             <div className="tanga-three__resource-threshold-stats" aria-live="polite">
               <span>{resourceCutoffSummary?`${resourceCutoffSummary.visibleCells.toLocaleString()} / ${resourceCutoffSummary.availableCells.toLocaleString()} cells`:sceneReady?'Preparing model counts':'Loading source cells'}</span>
               {resourceCutoffSummary?.visibleCells?<strong>{resourceCutoffSummary.meanTgc.toFixed(2)}% mean cell TGC</strong>:null}

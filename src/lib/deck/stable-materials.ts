@@ -58,12 +58,17 @@ export function stabilizeSceneMaterialAppearance(root: THREE.Object3D) {
     }
 
     for (const material of entries) {
-      if ('fog' in material && material.fog) {
+      if ('fog' in material && material.fog && !material.userData.terrainHorizon) {
         material.fog = false;
         material.needsUpdate = true;
       }
 
       if (material instanceof THREE.MeshStandardMaterial) {
+        // Only the dedicated process exhibit opts in to reflective finishes.
+        if (material.userData.studioFinish && !fixedColorLayer) {
+          material.dithering = true;
+          continue;
+        }
         material.envMap = null;
         material.envMapIntensity = 0;
         if (!material.transparent) {

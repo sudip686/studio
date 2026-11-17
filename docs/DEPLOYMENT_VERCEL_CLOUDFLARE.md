@@ -10,7 +10,7 @@ Dashboard check (21 October 2026): the Studio project already has `NEXT_PUBLIC_A
 
 ## Cloudflare Workers
 
-The Cloudflare target uses OpenNext for Cloudflare Workers. The adapter requires Next.js `>=16.4.1`; this project is pinned by its lockfile to Next.js `16.4.2`. The `wrangler.jsonc` target is Workers, not Pages. It uses the Node.js compatibility flag required by Next's Node runtime route handlers.
+The Cloudflare target uses OpenNext for Cloudflare Workers. The adapter requires Next.js `>=16.4.1`. The project uses Next.js `16.4.6`, which includes the [16.4.5 security fixes](https://github.com/vercel/next.js/releases/tag/v16.4.5). The `wrangler.jsonc` target is Workers and uses the Node.js compatibility flag required by the app's route handlers.
 
 Before a Cloudflare build, make `NEXT_PUBLIC_ASSET_BASE_URL` available to the build process. The script reads it from the process environment or `.env.production` / `.env.local`; do not commit those local environment files. `wrangler.jsonc` also sets the account's current public R2 development URL for Worker requests. Replace it with a bucket custom domain when one is assigned; Cloudflare marks the development URL as rate-limited and not recommended for production workloads.
 
