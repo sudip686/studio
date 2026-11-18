@@ -5,6 +5,8 @@ Status: desktop implementation and QA pass completed for this revision. All 12 c
 Primary audience: investors, senior management and technical reviewers.
 Priority: desktop presentation quality and release reliability; phone/tablet work remains deferred as requested.
 
+**Conclusion scope:** improve the existing conclusion view only. Keep the recap/flythrough inside that slide and link its chapter nodes back to existing chapters. Do not add a new slide, route, or chapter for the recap, orbital pull-back, or bookend.
+
 ## Direction
 
 ### Creative concept: **Tanga — From Ground to Graphite**
@@ -283,6 +285,9 @@ The deck is ready for an investor/management presentation when the current publi
 - [x] **Product sizing and mine closure acceptance:** at 1366 × 768 and 1707 × 842, the Product inspector fits the reported 34.6% coarse fraction, calculated 65.4% remainder, conceptual sizing caveat, TDM001 identity and evidence-board action without an inner scrollbar. The mine sequence reaches Closure at both sizes, and the North Pit close view retains the conceptual lake inside the shell. Evidence is recorded in the slide-by-slide checklist.
 - [x] **Fresh geology deep links:** mapped surface, terrain relief and interpreted depth returned HTTP 200 at both target desktop sizes with a ready Three.js canvas, 0 rendered drill segments, no page overflow and no browser errors.
 - [x] **Build gate:** `npm run typecheck` and `npm run cf:build` pass after the conclusion and product-sizing changes. OpenNext routes the large terrain/model assets through the configured R2 base; Wrangler authentication is available for deployment verification.
-- [ ] **Remaining release acceptance:** rerun the full 12-chapter screenshot matrix against the current commit and verify the pushed branch on deployed URLs before calling the whole deck release-ready.
+- [x] **Cloudflare live verification:** deployed the pushed Worker as version `4d2e9052-1645-4f46-8dda-6d9fc2fa14ca`. On the public URL, the product-sizing route returned HTTP 200 and fit without scrolling at both target sizes; the conclusion recap rendered full-screen with all four links, no overflow and no browser errors.
+- [ ] **Vercel preview verification:** the pushed branch alias redirects anonymous requests to Vercel SSO (`302`); `vercel whoami` reports the local CLI is logged out. The current Vercel deployment revision therefore remains unverified in this session; no Vercel settings were changed.
+- [x] **Current Cloudflare chapter matrix:** all 12 direct chapter links returned HTTP 200 at 1366 × 768 and 1707 × 842, with expected route state, no horizontal overflow and no page errors. Fresh-page checks confirmed all six Three.js chapters reached `data-ready=true` at both sizes. On the live run, scene readiness ranged from 4.1–11.3 s at 1366 × 768 and 2.8–5.6 s at 1707 × 842. These are warm-edge/headless browser observations, not cold-cache or physical-device benchmarks.
+- [ ] **Remaining release acceptance:** verify the Vercel preview after an authenticated session is available, and complete cold-cache, longer camera-frame, and renderer recovery measurements before calling the whole deck release-ready.
 
 **Evidence boundary:** the process effect is a conceptual explanation grounded by the report’s composite results; the mine sequence is an illustrative animation grounded by the supplied RF1 shells, block model, and PaulSam site-context references. The source folder does not provide a staged annual pit schedule, engineered haul-road alignment, plant mass balance, or closure design, so the visuals do not claim those designs exist.
