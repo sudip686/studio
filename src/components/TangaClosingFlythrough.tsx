@@ -12,6 +12,7 @@ const stops = [
 
 export default function TangaClosingFlythrough({onClose}: {onClose: () => void}) {
   const surface = useRef<HTMLDivElement>(null);
+  const progressLine = useRef<HTMLSpanElement>(null);
   const finish = useRef(onClose);
   const [active, setActive] = useState(0);
   const [flying, setFlying] = useState(false);
@@ -121,6 +122,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       }
       scene.add(closingBeacon);
       const stationLights: InstanceType<typeof T.MeshBasicMaterial>[] = [];
+      const stationGroups: InstanceType<typeof T.Group>[] = [];
       const hitTargets: InstanceType<typeof T.Mesh>[] = [];
       let bubbles: InstanceType<typeof T.InstancedMesh> | undefined;
       const bubbleTransform = new T.Matrix4();
@@ -138,6 +140,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         station.userData.stop = index;
         station.position.set(x, y, z);
         scene.add(station);
+        stationGroups.push(station);
         add(station, new T.CylinderGeometry(2.15, 2.3, .34, 6), base, 0, .24, 0);
         const light = new T.MeshBasicMaterial({color: 0x285360});
         stationLights.push(light);
@@ -266,6 +269,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         previousFrame = now;
         const seconds = elapsed / 1000;
         if (seconds >= 15) { finish.current(); return; }
+        progressLine.current?.style.setProperty('--recap-progress', `${Math.min(100, seconds / 15 * 100)}%`);
         const chapterDuration = 2.75;
         const chapterRun = chapterDuration * stops.length;
         const phase = Math.min(stops.length - 1, Math.floor(seconds / chapterDuration));
@@ -281,16 +285,17 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         if (phase !== selected) {
           selected = phase;
           setActive(phase);
+          stationGroups.forEach((station, index) => { station.visible = index === phase; });
           stationLights.forEach((light, index) => light.color.setHex(index === phase ? 0x9effeb : 0x285360));
         }
-        const blend = T.MathUtils.smoothstep(seconds - phase * chapterDuration, .9, chapterDuration);
-        const target = rail.getPoint(Math.min(1, (phase + blend) / (stops.length - 1)));
+        const target = rail.getPoint(phase / (stops.length - 1));
         if (seconds < chapterRun) {
           closingBeacon.visible = false;
-          camera.position.set(target.x - 2, 3.4, target.z + 7.3);
+          camera.position.set(target.x - 2 + Math.sin(seconds * .42) * .34, 3.4 + Math.sin(seconds * .31) * .08, target.z + 7.3 + Math.cos(seconds * .42) * .22);
           camera.lookAt(target.x, 1.32, target.z);
         } else {
           if (!closingStarted) { closingStarted = true; setClosing(true); }
+          stationGroups.forEach(station => { station.visible = true; });
           closingBeacon.visible = true;
           const progress = T.MathUtils.clamp((seconds - chapterRun) / (15 - chapterRun), 0, 1);
           const pullback = T.MathUtils.smoothstep(progress, 0, .72);
@@ -325,14 +330,26 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
     if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
   }}>
     <div className="tanga-recap__canvas" ref={surface} aria-hidden="true"/>
+    <div className="tanga-recap__frame" aria-hidden="true"><span/><span/><span/><span/></div>
     <button className="tanga-recap__close" type="button" onClick={onClose} autoFocus>Close recap</button>
     <header>
-      <p>Tanga Graphite · Chapter recap</p>
+      <p className="tanga-recap__eyebrow"><span className="tanga-recap__beacon"/>Tanga Graphite <span> / </span> Project recap</p>
       <h2 id="tanga-recap-title" aria-live="polite">{closing ? 'Story in one view' : flying ? stops[active].label : 'Explore the project evidence'}</h2>
-      <p className={closing ? 'tanga-recap__detail--sr-only' : undefined}>{closing ? 'Diamond drilling · resource model · testwork · conceptual site' : flying ? `${stops[active].detail} · Schematic chapters` : 'Choose a chapter to open its evidence view.'}</p>
+      <p className="tanga-recap__detail">{closing ? 'From drilling evidence to a conceptual site plan.' : flying ? stops[active].detail : 'Four connected views. Select any chapter to open its existing evidence view.'}</p>
+      <span className="tanga-recap__concept">SCHEMATIC CHAPTER RECAP</span>
     </header>
+    <div className="tanga-recap__readout" aria-hidden="true">
+      <span>PROJECT STORY</span>
+      <strong>{closing ? '04' : String(active + 1).padStart(2, '0')} <i>/</i> 04</strong>
+      <small>{closing ? 'OVERVIEW' : 'CHAPTER'}</small>
+    </div>
+    <div className="tanga-recap__progress" aria-hidden="true"><span ref={progressLine}/></div>
     <nav aria-label="Recap chapters">
-      {stops.map((stop, index) => <a key={stop.href} aria-current={flying && !closing && index === active ? 'step' : undefined} href={stop.href}>{stop.label}</a>)}
+      {stops.map((stop, index) => <a key={stop.href} aria-current={flying && !closing && index === active ? 'step' : undefined} href={stop.href}>
+        <span className="tanga-recap__step">0{index + 1}</span>
+        <span className="tanga-recap__chapter"><strong>{stop.label}</strong><small>{stop.detail}</small></span>
+        <span className="tanga-recap__arrow" aria-hidden="true">↗</span>
+      </a>)}
     </nav>
   </section>, document.body);
 }
