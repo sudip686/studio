@@ -98,6 +98,10 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       const titleContext = titleCanvas.getContext('2d');
       let titleTexture: InstanceType<typeof T.CanvasTexture> | undefined;
       let titleMaterial: InstanceType<typeof T.SpriteMaterial> | undefined;
+      let titleFlakes: InstanceType<typeof T.InstancedMesh> | undefined;
+      let titleFlakeMaterial: InstanceType<typeof T.MeshStandardMaterial> | undefined;
+      const titleFlakeStarts: InstanceType<typeof T.Vector3>[] = [];
+      const titleFlakeTargets: InstanceType<typeof T.Vector3>[] = [];
       if (titleContext) {
         titleContext.textAlign = 'center';
         titleContext.textBaseline = 'middle';
@@ -119,6 +123,27 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         title.position.set(0, 5.2, 0);
         title.scale.set(18.5, 3.55, 1);
         closingBeacon.add(title);
+
+        // Sample the existing wordmark into a deterministic hex-particle reveal.
+        const pixels = titleContext.getImageData(0, 48, titleCanvas.width, 128).data;
+        for (let y = 0; y < 128; y += 9) {
+          for (let x = 0; x < titleCanvas.width; x += 9) {
+            if (pixels[(y * titleCanvas.width + x) * 4 + 3] < 110) continue;
+            titleFlakeTargets.push(new T.Vector3((x / titleCanvas.width - .5) * 18.5, 5.2 + (.5 - (y + 48) / titleCanvas.height) * 3.55, .08));
+          }
+        }
+        titleFlakeMaterial = new T.MeshStandardMaterial({color: 0xb8fff2, emissive: 0x31a897, emissiveIntensity: 1.45, metalness: .18, roughness: .34, transparent: true, opacity: .92, depthWrite: false});
+        titleFlakes = new T.InstancedMesh(new T.CylinderGeometry(.055, .055, .052, 6), titleFlakeMaterial, titleFlakeTargets.length);
+        titleFlakes.instanceMatrix.setUsage(T.DynamicDrawUsage);
+        const initial = new T.Vector3();
+        for (let i = 0; i < titleFlakeTargets.length; i++) {
+          const angle = i * 2.399963229728653;
+          const radius = 7.1 + (i % 11) * .19;
+          initial.set(Math.cos(angle) * radius, 4.8 + Math.sin(i * 1.71) * 3.2, Math.sin(angle) * radius);
+          titleFlakeStarts.push(initial.clone());
+          titleFlakes.setColorAt(i, new T.Color(i % 7 === 0 ? 0xf4b775 : 0x9af8e8));
+        }
+        closingBeacon.add(titleFlakes);
       }
       scene.add(closingBeacon);
       const stationLights: InstanceType<typeof T.MeshBasicMaterial>[] = [];
@@ -248,7 +273,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         });
         geometries.forEach(geometry => geometry.dispose());
         benchEdges.forEach(geometry => geometry.dispose());
-        [cyan, amber, base, rock, pitSurface, benchEdge, glass, froth, ribbon, beaconMaterial, orbitMaterial, orbitAccent, titleMaterial, ...stationLights].forEach(material => material?.dispose());
+        [cyan, amber, base, rock, pitSurface, benchEdge, glass, froth, ribbon, beaconMaterial, orbitMaterial, orbitAccent, titleMaterial, titleFlakeMaterial, ...stationLights].forEach(material => material?.dispose());
         titleTexture?.dispose();
         grid.dispose();
         renderer.dispose();
@@ -263,6 +288,11 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       let elapsed = 0;
       let selected = -1;
       let closingStarted = false;
+      const titleFlakeTransform = new T.Matrix4();
+      const titleFlakeRotation = new T.Quaternion();
+      const titleFlakeScale = new T.Vector3();
+      const titleFlakePosition = new T.Vector3();
+      const titleFlakeAxis = new T.Vector3(0, 1, 0);
       setFlying(true);
       const render = (now: number) => {
         if (previousFrame !== null) elapsed += Math.max(0, now - previousFrame);
@@ -309,7 +339,19 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           stationLights.forEach((light, index) => light.color.setHex(Math.sin(seconds * 1.8 - index * .72) > -.25 ? 0x86eee0 : 0x285360));
           beacon.scale.setScalar(1 + Math.sin(seconds * 2.4) * .07);
           beaconMaterial.emissiveIntensity = 1.45 + (Math.sin(seconds * 2.4) + 1) * .48;
-          if (titleMaterial) titleMaterial.opacity = T.MathUtils.smoothstep(progress, .25, .65);
+          if (titleMaterial && titleFlakes && titleFlakeMaterial) {
+            const assemble = T.MathUtils.smoothstep(progress, .05, .72);
+            for (let i = 0; i < titleFlakes.count; i++) {
+              titleFlakePosition.copy(titleFlakeStarts[i]).lerp(titleFlakeTargets[i], assemble);
+              titleFlakeScale.setScalar(.72 + assemble * .28);
+              titleFlakeRotation.setFromAxisAngle(titleFlakeAxis, (1 - assemble) * (i % 2 ? 1 : -1) * .65);
+              titleFlakes.setMatrixAt(i, titleFlakeTransform.compose(titleFlakePosition, titleFlakeRotation, titleFlakeScale));
+            }
+            titleFlakes.instanceMatrix.needsUpdate = true;
+            const titleReveal = T.MathUtils.smoothstep(progress, .52, .78);
+            titleMaterial.opacity = titleReveal;
+            titleFlakeMaterial.opacity = .94 - titleReveal * .24;
+          }
         }
         mount.style.opacity = String(1 - T.MathUtils.smoothstep(seconds, 14.65, 15));
         renderer.render(scene, camera);
