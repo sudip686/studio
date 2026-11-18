@@ -73,6 +73,10 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
       const closingBeacon = new T.Group();
       closingBeacon.position.set(0, 0, -.5);
       closingBeacon.visible = false;
+      const titleAssembly = new T.Group();
+      titleAssembly.position.copy(closingBeacon.position);
+      titleAssembly.visible = false;
+      scene.add(titleAssembly);
       const beacon = new T.Mesh(new T.IcosahedronGeometry(.86, 1), beaconMaterial);
       beacon.position.y = 1.55;
       closingBeacon.add(beacon);
@@ -122,7 +126,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         const title = new T.Sprite(titleMaterial);
         title.position.set(0, 5.2, 0);
         title.scale.set(18.5, 3.55, 1);
-        closingBeacon.add(title);
+        titleAssembly.add(title);
 
         // Sample the existing wordmark into a deterministic hex-particle reveal.
         const pixels = titleContext.getImageData(0, 48, titleCanvas.width, 128).data;
@@ -143,7 +147,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           titleFlakeStarts.push(initial.clone());
           titleFlakes.setColorAt(i, new T.Color(i % 7 === 0 ? 0xf4b775 : 0x9af8e8));
         }
-        closingBeacon.add(titleFlakes);
+        titleAssembly.add(titleFlakes);
       }
       scene.add(closingBeacon);
       const stationLights: InstanceType<typeof T.MeshBasicMaterial>[] = [];
@@ -300,7 +304,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
         const seconds = elapsed / 1000;
         if (seconds >= 15) { finish.current(); return; }
         progressLine.current?.style.setProperty('--recap-progress', `${Math.min(100, seconds / 15 * 100)}%`);
-        const chapterDuration = 2.75;
+        const chapterDuration = 2.25;
         const chapterRun = chapterDuration * stops.length;
         const phase = Math.min(stops.length - 1, Math.floor(seconds / chapterDuration));
         if (bubbles) {
@@ -327,6 +331,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           if (!closingStarted) { closingStarted = true; setClosing(true); }
           stationGroups.forEach(station => { station.visible = true; });
           closingBeacon.visible = true;
+          titleAssembly.visible = true;
           const progress = T.MathUtils.clamp((seconds - chapterRun) / (15 - chapterRun), 0, 1);
           const pullback = T.MathUtils.smoothstep(progress, 0, .72);
           const orbitAngle = .32 + Math.max(0, progress - .55) * 1.25;
@@ -335,12 +340,13 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
           const chapterCamera = new T.Vector3(last.x - 2, 3.4, last.z + 7.3);
           camera.position.copy(chapterCamera.lerp(orbitPosition, pullback));
           camera.lookAt(new T.Vector3(last.x, 1.32, last.z).lerp(new T.Vector3(0, 1.8, -.5), pullback));
+          titleAssembly.quaternion.copy(camera.quaternion);
           closingBeacon.rotation.y = seconds * .12;
           stationLights.forEach((light, index) => light.color.setHex(Math.sin(seconds * 1.8 - index * .72) > -.25 ? 0x86eee0 : 0x285360));
           beacon.scale.setScalar(1 + Math.sin(seconds * 2.4) * .07);
           beaconMaterial.emissiveIntensity = 1.45 + (Math.sin(seconds * 2.4) + 1) * .48;
           if (titleMaterial && titleFlakes && titleFlakeMaterial) {
-            const assemble = T.MathUtils.smoothstep(progress, .05, .72);
+            const assemble = T.MathUtils.smoothstep(progress, .04, .48);
             for (let i = 0; i < titleFlakes.count; i++) {
               titleFlakePosition.copy(titleFlakeStarts[i]).lerp(titleFlakeTargets[i], assemble);
               titleFlakeScale.setScalar(.72 + assemble * .28);
@@ -348,7 +354,7 @@ export default function TangaClosingFlythrough({onClose}: {onClose: () => void})
               titleFlakes.setMatrixAt(i, titleFlakeTransform.compose(titleFlakePosition, titleFlakeRotation, titleFlakeScale));
             }
             titleFlakes.instanceMatrix.needsUpdate = true;
-            const titleReveal = T.MathUtils.smoothstep(progress, .52, .78);
+            const titleReveal = T.MathUtils.smoothstep(progress, .3, .5);
             titleMaterial.opacity = titleReveal;
             titleFlakeMaterial.opacity = .94 - titleReveal * .24;
           }
