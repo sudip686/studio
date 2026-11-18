@@ -6295,11 +6295,17 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.removeEventListener('start', onControlStart);
       controls.removeEventListener('end', onControlEnd);
       controls.dispose();
-      disposeObject(scene);
-      key.shadow.map?.dispose();
-      key.shadow.mapPass?.dispose();
-      renderer.dispose();
-      renderer.forceContextLoss();
+      if (!wasContextLost && !renderer.getContext().isContextLost()) {
+        disposeObject(scene);
+        key.shadow.map?.dispose();
+        key.shadow.mapPass?.dispose();
+        renderer.dispose();
+        renderer.forceContextLoss();
+      }
+      // A lost WebGL context has already invalidated its GPU handles. Calling
+      // dispose() after a restore event makes Three.js delete those stale
+      // handles from the replacement context, producing INVALID_OPERATION
+      // warnings. The browser frees the lost context's GPU resources itself.
       renderer.domElement.remove();
       controlsRef.current = null;
       groupRef.current = null;
