@@ -115,7 +115,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'project') return <aside className="tanga-story-panel tanga-story-panel--project" aria-label="Tanga project introduction">
     <div className="tanga-story-panel__eyebrow">TANGA REGION · TANZANIA</div>
-    <h2>Tanga Graphite, on the ground</h2>
+    <h2>The Tanga project area</h2>
     <p className="tanga-story-panel__intro">A graphite project in the Maramba area of Mkinga District, framed by the August 2025 topographical survey.</p>
     <img className="tanga-story-project-image" src="/presentation-assets/survey-site-aerial.jpg" alt="Aerial photographs of the forested Tanga project landscape"/>
     <div className="tanga-story-image-caption"><span>Survey report · site photographs</span><small>Context imagery · not a georeferenced orthophoto</small></div>
@@ -123,7 +123,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'topography') return <aside className="tanga-story-panel tanga-story-panel--terrain" aria-label="Surveyed terrain basis">
     <div className="tanga-story-panel__eyebrow">SURVEY SURFACE · AUGUST 2025</div>
-    <h2>Read the ground before the concept</h2>
+    <h2>Ridges and valleys</h2>
     <p className="tanga-story-panel__intro">The ridges and valleys provide a measured surface reference for drilling, geology and the proposed site.</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-terrain-scale"><strong>1×</strong><span>True vertical scale<br/>Relief is not exaggerated</span></div>
@@ -133,20 +133,25 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'drillholes') return <aside className="tanga-story-panel tanga-story-panel--drill" aria-label="Drilling evidence">
     <div className="tanga-story-panel__eyebrow">OBSERVATION · DRILL CORE</div>
-    <h2>Start with what was sampled</h2>
-    <p className="tanga-story-panel__intro">Core records provide direct observations at discrete intervals. The interpretation between holes carries a different level of certainty.</p>
+    <h2>Inside the drill core</h2>
+    <p className="tanga-story-panel__intro">Each coloured interval records a sample along a drill trace. Use Below ground to follow the holes beneath the terrain.</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
-    <img className="tanga-story-project-image" src="/presentation-assets/verified-core-example.jpg" alt="Photograph of labelled Tanga graphite drill core with a cut line and sampling intervals"/>
-    <div className="tanga-story-image-caption"><span>AMC MRE · Figure 3.9</span><small>Report image · not the selected 3D hole</small></div>
     <div className="tanga-compact-grade-key" aria-label="Recorded interval TGC legend"><span>RECORDED INTERVAL TGC</span><div>{ASSAY_INTERVAL_BINS.map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.label}</span>)}</div></div>
     <div className="tanga-story-inline-note">100 diamond drillholes described in AMC MRE §3.2</div>
-    <div className="tanga-story-datum-note">Collar symbols mark the DTM surface; drill traces retain recorded elevations. Their vertical datum agreement requires verification. Use Below ground to inspect the traces from underneath.</div>
+    <p className="tanga-story-datum-note">Collars sit on the displayed terrain. The traces use recorded elevations. Their vertical datum still needs verification.</p>
+    <details className="tanga-drill-source">
+      <summary>View core photograph</summary>
+      <figure>
+        <img className="tanga-story-project-image" loading="lazy" src="/presentation-assets/verified-core-example.jpg" alt="Labelled Tanga graphite drill core with a cut line and sample intervals"/>
+        <figcaption>AMC MRE, Figure 3.9. Report example independent of the selected hole.</figcaption>
+      </figure>
+    </details>
   </aside>;
 
   if (chapter === 'subsurface') return <aside className="tanga-story-panel tanga-story-panel--geology" aria-label="Petrography sample evidence">
     <header className="tanga-geology-story__header">
     <div className="tanga-story-panel__eyebrow">SAMPLE TRACE · TGF002</div>
-    <h2>Connect the observations</h2>
+    <h2>From core to thin section</h2>
     </header>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-geology-story__body">
@@ -160,7 +165,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'resource') return <aside className="tanga-story-panel tanga-story-panel--resource" aria-label="Reported resource estimate explained">
     <div className="tanga-story-panel__eyebrow">REPORTED MRE · AMC · DECEMBER 2025</div>
-    <h2>Scale, grade and location</h2>
+    <h2>The reported estimate</h2>
     <p className="tanga-story-panel__intro">The report describes the estimate. The 3D cells show where modelled grades sit within the deposit.</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-story-resource-number"><strong>148<span>Mt</span></strong><small>Indicated mineral resource</small></div>

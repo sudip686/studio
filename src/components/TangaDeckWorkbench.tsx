@@ -6029,7 +6029,7 @@ export default function TangaDeckWorkbench() {
         />
       )}
 
-      {threeVisible && (threeLoadReport.scene === 'loading' || threeLoadReport.scene === 'error') && STATIC_SCENE_FALLBACKS[activeMode] && (
+      {threeVisible && !(activeMode === 'drillholes' && threeLoadReport.terrain === 'ready') && (threeLoadReport.scene === 'loading' || threeLoadReport.scene === 'error') && STATIC_SCENE_FALLBACKS[activeMode] && (
         <figure className={`tanga-deck__static-scene-fallback${threeLoadReport.scene === 'loading' ? ' is-loading' : ''}`} aria-label={`${MODE_LABELS[activeMode]} static scene preview`} aria-live="polite">
           <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
           <figcaption>
@@ -6618,17 +6618,37 @@ export default function TangaDeckWorkbench() {
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
-          <button
-            type="button"
-            className={classNames('tanga-deck__executive-tour', 'tanga-deck__executive-tour--kiosk', isKioskMode && 'is-active')}
-            onClick={isKioskMode ? exitKioskMode : enterKioskMode}
-            aria-label={isKioskMode ? 'Exit booth presentation mode' : 'Start booth presentation mode'}
-            title={isKioskMode ? 'Exit booth mode · Escape' : 'Loop the authored investor highlights; interaction pauses for exploration'}
-          >
-            {isKioskMode ? 'Exit booth' : 'Booth mode'}
-          </button>
-          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
-          <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
+          <details className="tanga-tour-picker" onBlur={event => {
+            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+          }} onKeyDown={event => {
+            if (event.key === 'Escape' && event.currentTarget.open) {
+              event.stopPropagation();
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector('summary')?.focus();
+            }
+          }}>
+            <summary>Tours</summary>
+            <div className="tanga-tour-picker__options" onClick={event => {
+              if (!(event.target as Element).closest('button')) return;
+              const menu = event.currentTarget.closest('details');
+              if (menu) {
+                menu.open = false;
+                menu.querySelector('summary')?.focus();
+              }
+            }}>
+              <button
+                type="button"
+                className={classNames('tanga-deck__executive-tour', 'tanga-deck__executive-tour--kiosk', isKioskMode && 'is-active')}
+                onClick={isKioskMode ? exitKioskMode : enterKioskMode}
+                aria-label={isKioskMode ? 'Exit booth presentation mode' : 'Start booth presentation mode'}
+                title={isKioskMode ? 'Exit booth mode · Escape' : 'Loop the authored investor highlights; interaction pauses for exploration'}
+              >
+                {isKioskMode ? 'Exit booth' : 'Booth mode'}
+              </button>
+              <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
+              <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
+            </div>
+          </details>
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', activeChapterTourName && !isExecutiveTour && 'tanga-deck__pager-play--named', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}

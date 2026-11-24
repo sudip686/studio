@@ -21,8 +21,8 @@ export default function TangaStoryCue({mode, nextView, viewLabel, viewDetail, vi
     if (document.activeElement?.closest('#tanga-closing-recap')) recapLaunch.current?.focus();
     setRecapOpen(false);
   };
-  return <section key={mode} className="tanga-story-cue" aria-label="Chapter purpose and next view">
-    {!complete && <div><span>VIEW {String(viewIndex+1).padStart(2,'0')} / {String(Math.max(1,viewCount)).padStart(2,'0')} · {story.question}</span><h2>{viewLabel}</h2><p>{viewDetail ?? story.takeaway}</p></div>}
+  return <section key={mode} className="tanga-story-cue" aria-label={complete ? "Project conclusion" : `View ${viewIndex + 1} of ${viewCount}. Chapter purpose and next view`}>
+    {!complete && <div><span>{story.question}</span><h2>{viewLabel}</h2><p>{viewDetail ?? story.takeaway}</p></div>}
     {!complete && <div className="tanga-story-cue__next"><span>UP NEXT</span><strong>{nextView}</strong><ArrowRight size={17} aria-hidden="true"/></div>}
     {complete && closingMilestones && <aside className="tanga-story-cue__bookend" aria-label="Project story bookend and sourced milestones">
       <div className="tanga-story-cue__orbit" aria-hidden="true">

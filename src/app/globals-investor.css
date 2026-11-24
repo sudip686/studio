@@ -2780,3 +2780,110 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-cinematic-scan, .tanga-resource-lock__pulse { display: none; }
   .tanga-cinematic-boot li { animation: none; }
 }
+
+/* Presentation HUD: keep the scene visible between the title, inspector and transport. */
+.tanga-drill-source { margin-top: 12px; border-top: 1px solid var(--story-line); }
+.tanga-drill-source summary { padding-block: 12px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.tanga-drill-source figure { margin: 0; }
+.tanga-drill-source figcaption { margin-top: 5px; font-size: 12px; line-height: 1.5; color: var(--story-muted); }
+
+@media (min-width: 1051px) {
+  .tanga-deck--present {
+    --story-text: #faf6ee;
+    --story-ink: #faf6ee;
+    --story-muted: #c3cece;
+    --story-line: #acbec330;
+    --story-surface: #111a20f5;
+    --story-selection: #9ce7dc;
+  }
+  .tanga-deck--present .tanga-deck__chapter-title {
+    padding: 3px 18px 3px 12px;
+    line-height: 1;
+    border-inline-start: 2px solid var(--story-selection);
+    background: linear-gradient(90deg, #0c151bea 45%, #0c151b00);
+  }
+  .tanga-deck--present .tanga-deck__chapter-title small,
+  .tanga-deck--present .tanga-story-panel__eyebrow {
+    color: var(--story-selection);
+    font: 600 10px/1.35 ui-monospace, monospace;
+    letter-spacing: .13em;
+  }
+  .tanga-deck--present .tanga-deck__chapter-title h1 {
+    color: var(--story-text);
+    font-size: clamp(26px, 2vw, 34px);
+    font-weight: 600;
+    letter-spacing: -.045em;
+    line-height: 1.03;
+  }
+  .tanga-deck--present .tanga-story-panel,
+  .tanga-deck--present .tanga-process-exhibit--factory .tanga-factory-inspector {
+    background: var(--story-surface);
+    border-color: var(--story-line);
+    border-top: 2px solid #a3c8c3;
+    border-radius: 3px;
+    box-shadow: 0 8px 22px #0003;
+    backdrop-filter: none;
+  }
+  .tanga-deck--present .tanga-story-panel__intro {
+    font-size: clamp(13px, .91vw, 16px);
+    line-height: 1.48;
+  }
+  .tanga-deck--present .tanga-story-panel h2 {
+    margin-block: 7px 10px;
+    color: var(--story-text);
+    font-size: clamp(22px, 1.62vw, 29px);
+    font-weight: 550;
+    letter-spacing: -.045em;
+  }
+  .tanga-deck--present .tanga-story-cue:not(:has(.tanga-story-cue__bookend)) {
+    border-inline-start-color: var(--story-selection);
+    background: var(--story-surface);
+    border-radius: 0 3px 3px 0;
+    backdrop-filter: none;
+  }
+  .tanga-deck--present .tanga-story-cue > div > span { color: var(--story-muted); letter-spacing: .04em; }
+  .tanga-deck--present .tanga-story-cue h2 { color: var(--story-text); font-size: 17px; }
+  .tanga-deck--present .tanga-story-cue__next { color: var(--story-selection); }
+  .tanga-deck.tanga-deck--present .tanga-deck__pager {
+    background: #0c151bf5;
+    border: 1px solid var(--story-line);
+    border-radius: 7px;
+    box-shadow: 0 5px 20px #0004;
+    backdrop-filter: none;
+  }
+  .tanga-deck--present .tanga-deck__pager .tanga-deck__pager-btn--next:not(:disabled) {
+    background: var(--story-selection);
+    color: #0d2426;
+    border-color: transparent;
+  }
+  .tanga-deck--present :is(.tanga-story-panel, .tanga-deck__pager, .tanga-factory-inspector) :focus-visible {
+    outline: 2px solid var(--story-selection);
+    outline-offset: 2px;
+  }
+}
+.tanga-tour-picker { position: relative; align-self: center; }
+.tanga-tour-picker summary {
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px;
+  cursor: pointer; border: 1px solid #80939b66; border-radius: 5px;
+  color: #f6f3eb; background: #162128; font-size: 13px; font-weight: 600; list-style: none;
+}
+.tanga-tour-picker summary::-webkit-details-marker { display: none; }
+.tanga-tour-picker summary::after { content: ''; width: 6px; height: 6px; transform: rotate(45deg); border-top: 1px solid; border-left: 1px solid; }
+.tanga-tour-picker[open] summary::after { transform: rotate(225deg); }
+.tanga-tour-picker__options {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+  display: grid; gap: 4px; min-width: 190px; padding: 6px; border: 1px solid #708087;
+  border-radius: 5px; background: #101a20; box-shadow: 0 4px 16px #0005;
+}
+.tanga-deck .tanga-deck__pager .tanga-tour-picker__options button {
+  display: flex !important; justify-content: flex-start; min-height: 40px; margin: 0;
+  padding-inline: 12px; border-radius: 3px; text-align: left;
+}
+.tanga-deck .tanga-three .tanga-drill-interval-readout {
+  display: block; grid-column: 1 / -1; width: 100%; max-width: 100%; overflow-wrap: anywhere;
+  padding: 8px 9px; border-inline-start: 2px solid #9ce7dc; border-radius: 2px;
+  background: #111b22f5; color: #f4f3ed; font: 500 12px/1.4 ui-monospace, monospace;
+}
+@media (max-width: 760px) {
+  .tanga-tour-picker__options { right: 0; left: auto; transform: none; }
+}
