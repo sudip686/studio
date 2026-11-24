@@ -7296,7 +7296,7 @@ export default function TangaDeckWorkbench() {
         siteContextVisible={layerSettings.context.visible}
         onShowSiteContext={activeMode === 'mine_planning' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setLayerSettings(current=>({...current,context:{...current.context,visible:true}}));} : undefined}
         onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }}
-        onOpenGeology={activeMode === 'drillholes' ? () => { const index = STORY_STEPS.findIndex(step => step.mode === 'subsurface'); if (index >= 0) goToStoryIndex(index); } : undefined}
+        onOpenGeology={activeMode === 'drillholes' ? () => { setIsAutoplay(false); setIsExecutiveTour(false); void activateMode('subsurface').then(() => applyStoryShot('subsurface', 3)); } : undefined}
         onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined}
         surfaceConceptView={surfaceConceptView}
         surfaceCompareSplit={surfaceCompareSplit}
