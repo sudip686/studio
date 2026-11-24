@@ -4076,7 +4076,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         setPitBlocksStatus('loading');
       }
       const [drillholes, blocks] = await Promise.all([
-        earlyDrills.then(result=>{if(result.error)throw result.error;return result.data!;}),
+        earlyDrills.then(result => {
+          if (result.error) throw result.error;
+          return result.data!;
+        }),
         // Resource needs its full population for the chapter. Mine Planning
         // loads it alongside site construction but does not await it here.
         mode === 'resource' ? loadBlocks() : Promise.resolve([]),
@@ -5361,7 +5364,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if (!cancelled) {
         const message = error instanceof Error ? error.message : 'Could not load geology scene';
         setStatus(message);
-        reportLoadState('error', 'error', assetQuality, message);
+        reportLoadState('error', terrainResources ? 'ready' : 'error', assetQuality, message);
       }
     });
 
