@@ -2296,7 +2296,6 @@ function buildingHeight(feature: any) {
 
 export default function TangaDeckWorkbench() {
   const [activeMode, setActiveMode] = useState<WorkbenchMode>(DEFAULT_MODE);
-  const [cinema, setCinema] = useState(false);
   const [isExploreMode, setExploreMode] = useState(false);
   const [activeShotIndex, setActiveShotIndex] = useState(0);
   const [layerSettings, setLayerSettings] = useState<DeckLayerSettings>(DEFAULT_LAYER_SETTINGS);
@@ -5912,7 +5911,6 @@ export default function TangaDeckWorkbench() {
       ref={stageRef}
       className={classNames(
         'tanga-deck',
-        cinema && !isExploreMode && !isCoverScene && 'tanga-deck--cinema',
         !isExploreMode && 'tanga-deck--present',
         threeVisible && 'tanga-deck--three-active',
         sceneTransition.active && 'tanga-deck--transitioning',
@@ -6538,7 +6536,7 @@ export default function TangaDeckWorkbench() {
         {isExploreMode ? 'Return to story' : 'Explore evidence'}
       </button>
       {!isCoverScene && !isClosingScene && (
-        <header className="tanga-deck__chapter-title">
+        <header key={activeMode} className="tanga-deck__chapter-title">
           <small>CHAPTER {String(activeStoryIndex + 1).padStart(2, '0')}</small>
           <h1>{STORY_STEPS[activeStoryIndex]?.label}</h1>
         </header>
@@ -6546,24 +6544,10 @@ export default function TangaDeckWorkbench() {
       {(activeMode === 'mine_planning' || activeMode === 'metallurgy') && (
         <p className="tanga-deck__planning-note">Conceptual study visual · not an engineered or permitted design</p>
       )}
-      {cinema && !isCoverScene && !isExploreMode && <section className="tanga-cinema-caption" aria-label="Cinematic shot selection">
-        <div key={activeMode + activeShotIndex} className="tanga-cinema-caption__copy">
-          <small>{STORY_STEPS[activeStoryIndex]?.label}{(activeMode === 'mine_planning' || activeMode === 'metallurgy') && ' · Conceptual study visual'}</small>
-          <h2>{activeShot?.label ?? currentHeadline}</h2>
-          <p>{activeShot?.detail ?? currentSummary}</p>
-        </div>
-        {activeShots.length > 1 && <label>
-          <span>Camera shot</span>
-          <select aria-label="Camera shot" value={activeShotIndex} onChange={event => {
-            setIsAutoplay(false);
-            setIsExecutiveTour(false);
-            applyStoryShot(activeMode, Number(event.target.value));
-          }}>
-            {activeShots.map((shot,index) => <option key={shot.id} value={index}>{shot.label}</option>)}
-          </select>
-        </label>}
-      </section>}
       <nav className="tanga-deck__pager" aria-label="Deck navigation">
+        {!isExploreMode && !isCoverScene && (
+          <progress className="tanga-deck__chapter-progress" value={activeStoryIndex + 1} max={STORY_STEPS.length} aria-label="Chapter progress" />
+        )}
         <button
           type="button"
           className="tanga-deck__pager-btn"
@@ -6636,7 +6620,6 @@ export default function TangaDeckWorkbench() {
           <ChevronRight size={20} strokeWidth={2.4} />
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
-        {!isCoverScene && !isExploreMode && <button className="tanga-cinema-switch" type="button" aria-pressed={cinema} onClick={() => setCinema(value => !value)}>{cinema ? 'Exit cinema' : 'Cinema'}</button>}
         <div className="tanga-deck__autoplay-group">
           <details className="tanga-tour-picker" onBlur={event => {
             if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
