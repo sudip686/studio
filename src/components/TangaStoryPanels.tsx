@@ -3,7 +3,7 @@
 import './TangaChapterArt.css';
 import surveyProfile from '@/data/tanga-survey-transect.json';
 import {useEffect, useRef, useState} from 'react';
-import {ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, X} from 'lucide-react';
+import {ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Factory, Mountain, Ship, X} from 'lucide-react';
 import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
 import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-development';
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
@@ -264,7 +264,11 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       <div><span>DISPLAYED ROAD GEOMETRY</span><strong>{portDistanceInfo.mappedRoute}</strong><small>{portDistanceInfo.mappedRouteSource==='osrm'?`${portDistanceInfo.mappedDuration} · mapped road network`:'Indicative mapped path · route not verified'}</small></div>
       <p>The supplied project distance and mapped road route use different bases. The route is a geographic visualisation, not a confirmed haulage or travel-time study.</p>
     </section>}
-    <ol className="tanga-development-chain">{[['Mine to feed point','Local ore haulage · route requires survey'],['Feed point to lowlands','Candidate conveyor · planning option 2'],['Processing to stuffing yard','Concentrate haulage · road upgrades assessed'],['Stuffing and storage','Mabokweni / Kwa Songoro alternatives'],['Port of exit','Tanga preferred in the 2023 study']].map(([title,detail],i)=><li key={title}><span>{String(i+1).padStart(2,'0')}</span><div><strong>{title}</strong><small>{detail}</small></div></li>)}</ol>
+    <ol className="tanga-material-flow" aria-label="Material journey from mine to port">
+      <li><Mountain aria-hidden="true"/><div><small>01 / ORE</small><strong>Hillside to lowlands</strong><p>Local haulage to the feed point, then a candidate conveyor. The alignment requires survey.</p></div></li>
+      <li><Factory aria-hidden="true"/><div><small>02 / CONCENTRATE</small><strong>Plant to storage yard</strong><p>Road haulage after processing. The study considers yards at Mabokweni and Kwa Songoro.</p></div></li>
+      <li><Ship aria-hidden="true"/><div><small>03 / EXPORT CARGO</small><strong>Storage yard to port</strong><p>Tanga was the preferred port in the 2023 study.</p></div></li>
+    </ol>
     <p className="tanga-story-panel__qualification">Study §§3.3, 5.3 and 6. A stuffing yard plot is not georeferenced in the supplied report. Map infrastructure and the displayed route do not establish a project connection or current capacity.</p>
   </aside>;
 

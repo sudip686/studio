@@ -51,3 +51,38 @@
   .tanga-deck .tanga-development-chain::before { transform-origin:top; animation:tanga-transport-trace .8s ease-out both; }
 }
 @keyframes tanga-transport-trace { from { transform:scaleY(0) } to { transform:scaleY(1) } }
+
+.tanga-material-flow {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+}
+.tanga-material-flow li {
+  --material-color: #e6bd87;
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: start;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+.tanga-material-flow li:nth-child(2) { --material-color: #9fe4df; }
+.tanga-material-flow li:last-child { --material-color: #a8c8e5; padding-bottom: 0; }
+.tanga-material-flow li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  inset: 32px auto 0 15px;
+  border-left: 1px dashed #779398;
+}
+.tanga-material-flow svg {
+  color: var(--material-color);
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+}
+.tanga-material-flow small { display: block; font: 600 10px/1.4 monospace; letter-spacing: .08em; color: var(--material-color); }
+.tanga-material-flow strong { display: block; color: #edf2f1; font-size: 14px; }
+.tanga-material-flow li p { margin: 3px 0 0; font-size: 12px; line-height: 1.4; color: #bccbd1; }
