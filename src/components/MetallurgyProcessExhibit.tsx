@@ -139,7 +139,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     // materials. These lights stay fixed in site space while the camera orbits.
     scene.add(new THREE.HemisphereLight(0xf1f8ff, 0x697778, 1.15));
     const sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
-    sun.position.set(-330, 520, 360); sun.castShadow = true;
+    sun.position.set(-460, 440, 290); sun.castShadow = true;
     sun.shadow.mapSize.set(1536, 1536); sun.shadow.camera.left = -400; sun.shadow.camera.right = 400;
     sun.shadow.camera.top = 400; sun.shadow.camera.bottom = -400; sun.shadow.camera.far = 1500; sun.shadow.normalBias = .08;
     scene.add(sun);
@@ -148,7 +148,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
     // Lower the overview orbit to show more façade and spread the campus across
     // the widescreen canvas; fitOverview still frames the complete boundary.
-    const direction = new THREE.Vector3(1.1, .58, 1.25).normalize();
+    const direction = new THREE.Vector3(1.1, .68, 1.25).normalize();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); if (reducedMotion.matches) stopPlantTour(); dirty = true; };
     onMotionPreference();
@@ -198,7 +198,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const distance=distanceByStage[next];
       // Keep the camera above the wall line while showing the equipment from a
       // lower three-quarter angle, instead of looking nearly straight down.
-      const localDirection = next === 'flotation' ? new THREE.Vector3(.13, .43, -1).normalize() : new THREE.Vector3(.72, .86, 1.05).normalize();
+      const localDirection = next === 'flotation' ? new THREE.Vector3(.29, .36, -1).normalize() : new THREE.Vector3(.72, .86, 1.05).normalize();
       destination.copy(target).addScaledVector(localDirection, distance);
       moveCamera(animate, true);
     }

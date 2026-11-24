@@ -1112,7 +1112,7 @@ function cameraShotForMode(mode: GeologyMode, lowCamera: boolean): CameraShot {
   if (mode === 'topography') {
     return makeCameraShot(
       new THREE.Vector3(-6200, 4700, 8100),
-      new THREE.Vector3(-4550, 3250, 5900),
+      new THREE.Vector3(-4140, 2420, 5620),
       new THREE.Vector3(0, -30, 0),
       {fov: 42, lift: 170, drift: new THREE.Vector3(36, 8, 28), yawDrift: 0.006, flySeconds: 3.6}
     );
@@ -1172,7 +1172,7 @@ function cameraShotForMode(mode: GeologyMode, lowCamera: boolean): CameraShot {
     // opening at the near-horizon angle used by the earlier low oblique shot.
     return makeCameraShot(
       new THREE.Vector3(-4200, 5100, 5700),
-      new THREE.Vector3(-2100, 3100, 3400),
+      new THREE.Vector3(-1750, 2800, 3020),
       new THREE.Vector3(100, -125, -90),
       {fov: 42, lift: 240, drift: new THREE.Vector3(18, 5, 14), yawDrift: 0.005, flySeconds: 3.6}
     );
@@ -3326,18 +3326,43 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         return;
       }
 
+      const frameMineOverview = () => {
+        if (!sitePlan?.pits.length) return false;
+        stage.updateMatrixWorld(true);
+        const bounds = new THREE.Box3();
+        for (const pit of sitePlan.pits) {
+          for (const [x,z] of pit.ring) bounds.expandByPoint(stage.localToWorld(new THREE.Vector3(x,pit.surface,z)));
+        }
+        if (processPlant) bounds.expandByObject(processPlant);
+        if (feedAnchor) bounds.expandByPoint(stage.localToWorld(feedAnchor.clone()));
+        const centre = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
+        const verticalFov = THREE.MathUtils.degToRad(40);
+        const fitTangent = Math.tan(verticalFov / 2) * Math.min(1, camera.aspect);
+        const distance = Math.max(900, size.length() * .66 / fitTangent);
+        const direction = new THREE.Vector3(.67, .68, 1).normalize();
+        const position = centre.clone().addScaledVector(direction, distance);
+        // Offset the whole composition left, away from the evidence panel.
+        const right = new THREE.Vector3(direction.z, 0, -direction.x).normalize();
+        const offset = right.multiplyScalar(distance * Math.tan(verticalFov / 2) * Math.min(camera.aspect,1.8) * .12);
+        scheduleCameraTween(position.add(offset),centre.add(offset),1.5,40);
+        return true;
+      };
+
       if (command.action === 'siteOblique' && mode === 'mine_planning') {
         sitePlanView=false;
         updateMineOrientation('oblique');
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI-0.04;
         facilityFocused=false;calloutsForProjection=siteOverviewCallouts;
         setMiningBeat(3);
-        scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);
+        if (!frameMineOverview()) scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),1.5,cameraShot.fov);
         setStatus('Oblique site overview · terrain and proposed facilities');
         return;
       }
 
       if (command.action === 'resetView') {
+        if (mode === 'drillholes') journeyCommand.current?.(null);
+        if (mode === 'topography') setTerrainProfileSweeping(false);
         if(mode==='mine_planning')sitePlanView=false;
         if(mode==='mine_planning')updateMineOrientation('oblique');
         facilityFocused=false;
@@ -3354,15 +3379,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         surfaceCameraView = 'default';
         applyTerrainSurfaceView();
         const profileTarget = new THREE.Vector3(360, -30, -300);
-        const profilePosition = profileTarget.clone().add(new THREE.Vector3(5550, 3400, 5200));
+        const profilePosition = profileTarget.clone().add(new THREE.Vector3(4650, 2500, 4700));
         scheduleCameraTween(profilePosition, profileTarget, 2.2, 43);
+        terrainSweepProgressRef.current = 0;
+        setTerrainProfilePosition(0);
+        setTerrainProfileSweeping(true);
         setStatus('Camera following the project terrain from a raking angle');
         return;
       }
 
       if (command.action === 'revealSection' || command.action === 'restoreSection') {
         const showSection = command.action === 'revealSection';
-        setSectionEnabled(showSection);
+        if (mode === 'resource') setResourceSectionEnabled(showSection);
+        else setSectionEnabled(showSection);
         if (showSection) {
           const sectionTarget = new THREE.Vector3(0, mode === 'resource' ? -160 : -80, -20);
           const sectionPosition = new THREE.Vector3(1380, mode === 'resource' ? 560 : 420, 420);
@@ -3603,10 +3632,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // geology and grade colours close to their source legend colours.
     const isTerrainView = mode === 'topography';
     const isModelView = mode === 'resource' || mode === 'subsurface';
-    scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x5b6253 : 0x303d47, isTerrainView ? 0.9 : 1.12));
+    scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x5b6253 : 0x303d47, isTerrainView ? 0.82 : isModelView ? 1.26 : 1.04));
     // Low raking key across the mapped ridges: the land stays dimensional
     // without suggesting a different sun position or changing elevation.
-    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : PRESENTATION_SUN_COLOR, isTerrainView ? 1.5 : mode === 'mine_planning' ? 1.8 : 1.65);
+    const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : PRESENTATION_SUN_COLOR, isTerrainView ? 1.7 : mode === 'mine_planning' ? 1.9 : 1.52);
     const [east, north, elevation] = PRESENTATION_SUN;
     key.position.set(east, elevation, -north).multiplyScalar(2400);
     key.castShadow = true;
@@ -3655,6 +3684,21 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const stage = new THREE.Group();
     const displayReveal=createSceneReveal(stage,revealBlocks,pitSurfaces);
     revealCommand.current=action=>{displayReveal.start(action);revealActionRef.current=action;setRevealAction(action);};
+    const drillCoverage = new THREE.Group();
+    if (mode === 'drillholes') stage.add(drillCoverage);
+    const drillStage = mode === 'drillholes' ? drillCoverage : stage;
+    const drillCutPlane = new THREE.Plane();
+    const drillCutPlanes = [drillCutPlane];
+    const setDrillCutaway = (enabled: boolean) => {
+      drillCoverage.visible = !enabled;
+      for (const mesh of [...terrainMeshes, ...terrainOccluders]) {
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          material.clippingPlanes = enabled ? drillCutPlanes : null;
+        }
+      }
+      if (enabled) host.dataset.drillCutaway = 'open';
+      else delete host.dataset.drillCutaway;
+    };
     let journeyUpdate:((time:number)=>void)|null=null;
     groupRef.current = stage;
     stageRef.current = stage;
@@ -3943,6 +3987,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           terrainLayer.add(terrainProfileMarker);
         }
         terrainMeshes.push(texturedTerrain);
+        if (host.dataset.drillCutaway === 'open') setDrillCutaway(true);
         applyTerrainSurfaceView();
         stabilizeSceneMaterialAppearance(scene);
         reportLoadState('loading', 'ready', quality, `${quality} terrain ready`);
@@ -4322,20 +4367,57 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(mode==='drillholes'){
         const ids=[...new Set(shownDrillholes.map(d=>d.holeId))].sort();setJourneyHoles(ids);setJourneyHole(ids[0]??'');setJourneyReadout('Choose a hole, then play its recorded intervals.');
         const marker=new THREE.Mesh(new THREE.SphereGeometry(7,16,10),new THREE.MeshBasicMaterial({color:0xffe7a0,depthTest:false}));marker.renderOrder=100;marker.visible=false;stage.add(marker);
-        const trace=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x6fffe4,depthTest:false}));trace.renderOrder=99;trace.visible=false;stage.add(trace);
+        const trace=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({vertexColors:true,depthTest:false,toneMapped:false}));trace.renderOrder=99;trace.visible=false;stage.add(trace);
+        const collarMarker = new THREE.Mesh(
+          new THREE.RingGeometry(4, 6, 24),
+          new THREE.MeshBasicMaterial({color: 0x9ff5de, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide})
+        );
+        collarMarker.rotation.x = -Math.PI / 2;
+        collarMarker.renderOrder = 101;
+        collarMarker.visible = false;
+        stage.add(collarMarker);
         journeyCommand.current=id=>{
-          journeyUpdate=null;marker.visible=false;trace.visible=false;
+          journeyUpdate=null;marker.visible=false;trace.visible=false;collarMarker.visible=false;
+          setDrillCutaway(false);
           if(!id){setJourneyReadout('Drillhole journey stopped. Source data unchanged.');return;}
           const intervals=drillholes.filter(d=>d.holeId===id).sort((a,b)=>a.depthFrom-b.depthFrom);if(!intervals.length)return;
           const points=intervals.flatMap(d=>[registeredDrillPoint(d,'from',terrainResources,drillSurfaceOffsets),registeredDrillPoint(d,'to',terrainResources,drillSurfaceOffsets)]);
-          trace.geometry.dispose();trace.geometry=new THREE.BufferGeometry().setFromPoints(points);trace.visible=true;
-          const bounds=new THREE.Box3().setFromPoints(points),centre=bounds.getCenter(new THREE.Vector3());stage.updateMatrixWorld(true);const target=stage.localToWorld(centre);const distance=Math.max(180,bounds.getSize(new THREE.Vector3()).length()*2);
-          const collar=stage.localToWorld(points[0].clone());
-          scheduleCameraTween(collar.clone().add(new THREE.Vector3(120,90,180)),collar,1.2,42);
-          const from=intervals[0].depthFrom,to=Math.max(...intervals.map(d=>d.depthTo)),started=motionTime;let tick=-1,openedTrace=false;
+          const colors = new Float32Array(points.length * 3);
+          intervals.forEach((interval, index) => {
+            const color = new THREE.Color(assayIntervalBin(interval.carbon)?.color ?? '#96a9ae');
+            color.toArray(colors, index * 6);
+            color.toArray(colors, index * 6 + 3);
+          });
+          trace.geometry.dispose();
+          trace.geometry = new THREE.BufferGeometry().setFromPoints(points);
+          trace.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+          trace.visible = true;
+          const bounds=new THREE.Box3().setFromPoints(points),centre=bounds.getCenter(new THREE.Vector3());stage.updateMatrixWorld(true);const target=stage.localToWorld(centre);const distance=Math.max(215,bounds.getSize(new THREE.Vector3()).length()*2.5);
+          const collarPoint = collarSurfacePoint(intervals[0], terrainResources, 3);
+          const collar = stage.localToWorld(collarPoint.clone());
+          collarMarker.position.copy(collarPoint);
+          collarMarker.visible = true;
+          const cutView = new THREE.Vector3(.52, 0, 1).normalize();
+          const cutNormal = cutView.clone().negate();
+          // Keep the surveyed trace and remove only the terrain on the near side.
+          const nearEdge = Math.max(...points.map(point => stage.localToWorld(point.clone()).dot(cutView)));
+          const sectionTarget = target.clone().lerp(collar, .18);
+          if (!reducedMotion.matches) {
+            scheduleCameraTween(collar.clone().add(new THREE.Vector3(120,90,180)),collar,1.2,42);
+          }
+          const from=intervals[0].depthFrom,to=Math.max(...intervals.map(d=>d.depthTo)),started=motionTime;
+          const featured = intervals.reduce((best, interval) => interval.carbon > best.carbon ? interval : best);
+          let tick=-1,openedTrace=false;
           journeyUpdate=time=>{
-            const progress=reducedMotion.matches?1:Math.min(1,(time-started)/12),depth=from+(to-from)*progress;
-            if(progress>=.2&&!openedTrace){openedTrace=true;scheduleCameraTween(target.clone().add(new THREE.Vector3(distance*.5,distance*.3,distance)),target,1.35,42);}
+            const progress=reducedMotion.matches?1:Math.min(1,(time-started)/12),depth=reducedMotion.matches ? (featured.depthFrom + featured.depthTo) / 2 : from+(to-from)*progress;
+            if(progress>=.2&&!openedTrace){
+              openedTrace=true;
+              drillCutPlane.set(cutNormal, nearEdge + 8);
+              setDrillCutaway(true);
+              const eye = sectionTarget.clone().addScaledVector(cutView, distance);
+              eye.y += distance * .13;
+              scheduleCameraTween(eye, sectionTarget, 1.35, 42);
+            }
             const sample=intervals.find(d=>depth>=d.depthFrom&&depth<=d.depthTo);marker.visible=Boolean(sample);
             if(sample){const fraction=(depth-sample.depthFrom)/Math.max(.001,sample.depthTo-sample.depthFrom);marker.position.copy(registeredDrillPoint(sample,'from',terrainResources,drillSurfaceOffsets)).lerp(registeredDrillPoint(sample,'to',terrainResources,drillSurfaceOffsets),fraction);}
             const next=Math.floor((time-started)*5);if(next!==tick){tick=next;setJourneyReadout(`${id} · ${depth.toFixed(1)} m${progress===1?' · complete':''} · ${sample?`${sample.lithology||'Lithology not supplied'} · ${Number.isFinite(sample.carbon)?sample.carbon.toFixed(2)+'% TGC':'Assay unavailable'}`:'No recorded interval here'}`);}
@@ -4410,7 +4492,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           halo.positions.setXYZ(0, assayAnchor.x, assayAnchor.y, assayAnchor.z);
           halo.positions.needsUpdate = true;
           tagDeckLayer(halo.points, 'drilling');
-          stage.add(halo.points);
+          drillStage.add(halo.points);
         }
         if (!bestIntercept || matchingBest) calloutAnchorOverrides.set('assays', threeOwnerLocalAnchor(assayAnchor));
         calloutAnchorOverrides.set('volume', threeOwnerLocalAnchor(assayAnchor.clone()));
@@ -4443,7 +4525,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       traceMesh.renderOrder = 2;
       traceMesh.userData.tooltipItems = shownDrillholes.map((segment) => drillTooltip(segment, 'Drill trace', '#f8fafc'));
       tagDeckLayer(traceMesh, 'drilling');
-      stage.add(traceMesh);
+      drillStage.add(traceMesh);
       if(mode==='resource')resourceDrillRevealMeshesRef.current.push({mesh:traceMesh,revealRanks:resourceDrillOrder.map((_,index)=>index)});
       registerReveal(traceMesh, mode === 'metallurgy' ? 0.32 : 0.18, 1.05, 0.98);
       pickables.push(traceMesh);
@@ -4480,7 +4562,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         mesh.instanceMatrix.needsUpdate = true;
         mesh.userData.tooltipItems = segments.map((segment) => drillTooltip(segment, lithologyLabel(segment.lithology), baseColor.getStyle()));
         tagDeckLayer(mesh, 'drilling');
-        stage.add(mesh);
+        drillStage.add(mesh);
         registerReveal(mesh, mode === 'metallurgy' ? 0.78 : 0.48, 1.15, 0.96);
         pickables.push(mesh);
       });
@@ -4523,7 +4605,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         }
         mesh.userData.tooltipItems = segments.map((segment) => drillTooltip(segment, bin.label, bin.color, [bin.detail]));
         tagDeckLayer(mesh, 'drilling');
-        stage.add(mesh);
+        drillStage.add(mesh);
         registerReveal(mesh, mode === 'metallurgy' ? 1.05 : 0.74, 1.22, 0.94);
         pickables.push(mesh);
       });
@@ -4588,7 +4670,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         ],
       }));
       tagDeckLayer(collars, 'drilling');
-      stage.add(collars);
+      drillStage.add(collars);
       registerReveal(collars, 0.08, 0.9, 0.72, 18);
       pickables.push(collars);
 
@@ -4619,7 +4701,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         collarRings.instanceMatrix.needsUpdate = true;
         collarRings.renderOrder = 7;
         tagDeckLayer(collarRings, 'drilling');
-        stage.add(collarRings);
+        drillStage.add(collarRings);
         registerReveal(collarRings, 0.2, 0.95, 0.74, 15);
 
         if (drillingSlide) {
@@ -4642,7 +4724,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           innerRings.instanceMatrix.needsUpdate = true;
           innerRings.renderOrder = 8;
           tagDeckLayer(innerRings, 'drilling');
-          stage.add(innerRings);
+          drillStage.add(innerRings);
           registerReveal(innerRings, 0.2, 0.95, 0.74, 15);
         }
 
@@ -5287,6 +5369,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         mineCampusReady=true;
         const pending=cameraCommandRef.current;
         if(pending&&!recoveryView&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit','revealPitBlocks'].includes(pending.action))consumeCameraCommand(pending);
+        else if (!pending && !recoveryView && !userTookControl) consumeCameraCommand({id: -1, action: 'siteOblique'});
         if(recoveryView){
           const {pitBlockFocus, miningBeat: recoveredBeat} = recoveryView;
           if (pitBlockFocus !== undefined) activePitBlockFocusRef.current = pitBlockFocus;
@@ -5565,6 +5648,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // remain available in the explicit All labels tier.
         if(density==='key'&&mode==='mine_planning'&&!facilityFocused){
           if(!['pit-0','pit-1','development-feed','development-plant'].includes(callout.id))return false;
+        }
+        if(density==='key'&&mode==='drillholes'){
+          return host.dataset.drillCutaway !== 'open' && callout.id === 'collars';
         }
         if(density==='key'&&mode==='resource'){
           if(callout.kind==='intercept'||keyLabelsTaken>=2)return false;
@@ -6628,7 +6714,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         {mode==='resource'&&<details className="tanga-three-animation-tools" onToggle={event=>{if(event.currentTarget.open){const legend=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three__grade-legend');if(legend?.open)legend.open=false;}}}><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);resourceDrillRevealCommandRef.current?.();}}>Replay source drillhole reveal</button><small>Actual assay intervals shown by hole ID and downhole depth for presentation; this is not drilling chronology.</small><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
           <>
-          {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>Recorded intervals only; gaps are not interpolated into new assays. Highlight is visible through the terrain.</small></details>}
+          {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>The display cuts away foreground terrain. The trace follows recorded intervals, with gaps left unfilled.</small></details>}
           <div className="tanga-three__drill-legend" aria-label="Drillhole legend">
             <div className="tanga-three__drill-legend-head">
               <span>{mode === 'topography' ? 'Surface Legend' : 'Drillhole Legend'}</span>
