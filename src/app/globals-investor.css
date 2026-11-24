@@ -949,9 +949,10 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-deck .tanga-three.is-visible.is-resource .tanga-three__grade-legend { display:block!important; top:400px!important; max-height:calc(100svh - 506px)!important; padding:12px; }
 .tanga-three__grade-legend>summary { color:#e3bb98; font-size:11px; cursor:pointer; }
 .tanga-three__grade-legend[open]>.tanga-three__grade-head { margin-top:14px; }
-.tanga-evidence-sequence { position:absolute; z-index:31; top:164px; left:300px; display:flex; gap:3px; padding:4px; border:1px solid #d1d9df24; border-radius:7px; background:#101a20da; backdrop-filter:blur(12px); }
-.tanga-evidence-sequence button { border:0; border-radius:4px; background:transparent; color:#b2c1c9; padding:8px 11px; font-size:10px; cursor:pointer; }
-.tanga-evidence-sequence button[aria-current=step] { color:#f4d4b8; background:#81502c66; }
+.tanga-evidence-sequence { position:absolute; z-index:31; top:164px; left:300px; display:flex; gap:3px; padding:5px; border:1px solid #d1d9df30; border-radius:999px; background:linear-gradient(135deg,#101a20ee,#17252be8); box-shadow:0 8px 28px #0005,inset 0 1px #ffffff0a; backdrop-filter:blur(14px); }
+.tanga-evidence-sequence button { min-width:88px; border:0; border-radius:999px; background:transparent; color:#b8c6cc; padding:8px 12px; font-size:10px; font-weight:600; letter-spacing:.025em; cursor:pointer; transition:background .2s ease,color .2s ease,transform .2s ease; }
+.tanga-evidence-sequence button:hover { color:#eef3f1; background:#ffffff0d; }
+.tanga-evidence-sequence button[aria-current=step] { color:#10201f; background:#a7e0d3; box-shadow:0 2px 10px #a7e0d344; }
 .tanga-evidence-sequence button:focus-visible { outline:2px solid #e6b081; outline-offset:2px; }
 .tanga-three:is(.is-drillholes,.is-subsurface,.is-resource) .tanga-three__callout { border:1px solid #cbd5dd29; border-radius:5px; padding:10px 12px; background:linear-gradient(#1a232bf2,#0c141bf0); box-shadow:0 4px 18px #0003; }
 .tanga-three:is(.is-drillholes,.is-subsurface,.is-resource) .tanga-three__callout strong { font-size:11px; line-height:1.45; }
