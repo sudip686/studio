@@ -1767,16 +1767,19 @@ function drapeLine(
   });
 }
 
+let retryDrillAssets = false;
 function loadDrillholes() {
   if (!drillPromise) {
+    const cache = retryDrillAssets ? 'reload' : 'force-cache';
+    retryDrillAssets = false;
     let lithologyRequestFailed = false;
     drillPromise = Promise.all([
-      fetchAsset('/assay_data.geojson', {cache: 'force-cache'})
+      fetchAsset('/assay_data.geojson', {cache})
         .then((response) => {
           if (!response.ok) throw new Error(`Drillholes failed with ${response.status}`);
           return response.json();
-        }),
-      fetchAsset('/lithology_data.geojson', {cache: 'force-cache'})
+        }).catch(() => { throw new Error('The assay intervals could not be loaded. Retry to show the drill traces.'); }),
+      fetchAsset('/lithology_data.geojson', {cache})
         .then((response) => {
           if (!response.ok) { lithologyRequestFailed = true; return null; }
           return response.json();
@@ -1814,6 +1817,7 @@ function loadDrillholes() {
       // Keep the shared in-flight request deduplicated, but allow a later chapter
       // revisit to retry after a transient failure rather than reusing a rejection.
       drillPromise = null;
+      retryDrillAssets = true;
       throw error;
     });
   }
@@ -4440,7 +4444,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const lithologyGroups = new Map<string, DrillSegment[]>();
       lithologySource.forEach((segment) => {
         const key = LITHOLOGY_PRIORITY.includes(segment.lithology) ? segment.lithology : 'UNKNOWN';
-        lithologyGroups.set(key, [...(lithologyGroups.get(key) ?? []), segment]);
+        const group = lithologyGroups.get(key);
+        if (group) group.push(segment);
+        else lithologyGroups.set(key, [segment]);
       });
       Array.from(lithologyGroups.entries()).forEach(([lithology, segments]) => {
         const baseColor = new THREE.Color(lithology==='UNKNOWN'?'#9da9ae':modelRockUnit(lithology).color);
@@ -4561,6 +4567,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         resourceDrillRevealMeshesRef.current.push({mesh:collars,revealRanks:collarSegments.map(segment=>resourceDrillRanks.get(segment)??0)});
       }
       collars.renderOrder = 8;
+      collars.userData.isDrillCollar = true;
       collars.userData.tooltipItems = collarSegments.map((segment) => ({
         title: segment.holeId,
         tone: subsurfaceView ? '#180b65' : mode === 'drillholes' ? '#ff704f' : '#eaffff',
@@ -5410,6 +5417,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       }
 
       renderer.domElement.classList.add('is-picking');
+      if (select && mode === 'drillholes' && hit.object.userData.isDrillCollar) {
+        setJourneyHole(tooltip.title);
+        setMotionPaused(false);
+        journeyCommand.current?.(tooltip.title);
+        window.dispatchEvent(new Event('tanga:manual-exploration'));
+      }
       if (select && mode === 'subsurface' && geologySurface?.children.includes(hit.object) && tooltip) {
         onSelectGeologyUnitRef.current?.(tooltip);
         window.dispatchEvent(new Event('tanga:manual-exploration'));
@@ -6586,6 +6599,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             setMotionPaused(false);
             journeyCommand.current?.(journeyHole);
           }}>Follow recorded hole</button>}
+          {mode === 'drillholes' && journeyReadout.includes(' m') && <output className="tanga-drill-interval-readout" aria-live="off">{journeyReadout}</output>}
           {mode === 'subsurface' && !mappedSurfaceStage && <button type="button" disabled={!sceneReady} aria-pressed={exploded} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
             setMotionPaused(false);
@@ -6822,7 +6836,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       )}
     </section>
     {visible && /failed|unavailable|exceeded|could not|no contained/i.test(status) && typeof document !== 'undefined' && createPortal(
-      <div role="alert" className="tanga-three__load-error"><span>{status}</span><button type="button" onClick={onRetry}>Retry this scene</button></div>,
+      <div role="alert" className="tanga-three__load-error"><span>{status}</span><button type="button" onClick={onRetry}>{mode === 'drillholes' ? 'Retry drilling data' : 'Retry this scene'}</button></div>,
       document.body
     )}
     </>

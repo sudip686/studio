@@ -21,5 +21,8 @@ export function assetUrl(path: string) {
     : R2_STREAM_ASSETS.has(pathname)
       ? `/api/assets${pathname}`
       : pathname;
+  if (pathname === '/assay_data.geojson' || pathname === '/lithology_data.geojson') {
+    return base + '?' + (query ? query + '&' : '') + 'delivery=decoded-v2';
+  }
   return query ? `${base}?${query}` : base;
 }

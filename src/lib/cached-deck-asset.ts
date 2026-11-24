@@ -78,12 +78,12 @@ export async function cachedDeckAsset(url:string,init?:RequestInit):Promise<Resp
         // persistent write is finishing. Let that write settle before deciding
         // whether this caller needs another large transfer.
         await cacheWrites.get(key);
-        const hit=await cache.match(key);
+        const hit=init?.cache==='reload'?undefined:await cache.match(key);
         if(controller.signal.aborted)throw abortError();
         if(hit&&Date.now()-Number(hit.headers.get('x-tanga-stored-at'))<cacheTtlFor(key))return hit;
       }catch(error){if(controller.signal.aborted)throw error;/* Private browsing/quota restrictions must not block viewing. */}
     }
-    const response=await fetch(url,{...init,cache:'no-cache',signal:controller.signal});
+    const response=await fetch(url,{...init,cache:init?.cache==='reload'?'reload':'no-cache',signal:controller.signal});
     const type=response.headers.get('content-type')||'',length=Number(response.headers.get('content-length'));
     const invalid=type.includes('text/html')||(key.endsWith('.glb')&&length>0&&length<1024);
     if(response.ok&&response.status===200&&!invalid&&cache){

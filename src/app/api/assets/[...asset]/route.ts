@@ -127,7 +127,7 @@ async function assetResponse(request: Request, context: RouteContext) {
       }
       if (!responseHeaders.has('content-type')) responseHeaders.set('content-type', contentTypeFor(key));
       responseHeaders.set('x-content-type-options', 'nosniff');
-      if (isGeoJson && request.method === 'GET' && response.body) {
+      if (isGeoJson && request.method === 'GET' && response.status === 200 && response.body) {
         return streamResponse(response.body, {status: response.status, statusText: response.statusText, headers: responseHeaders});
       }
       return new Response(response.body, {status: response.status, statusText: response.statusText, headers: responseHeaders});
