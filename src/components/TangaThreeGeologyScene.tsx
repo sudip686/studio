@@ -4367,7 +4367,23 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       if(mode==='drillholes'){
         const ids=[...new Set(shownDrillholes.map(d=>d.holeId))].sort();setJourneyHoles(ids);setJourneyHole(ids[0]??'');setJourneyReadout('Choose a hole, then play its recorded intervals.');
         const marker=new THREE.Mesh(new THREE.SphereGeometry(7,16,10),new THREE.MeshBasicMaterial({color:0xffe7a0,depthTest:false}));marker.renderOrder=100;marker.visible=false;stage.add(marker);
-        const trace=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({vertexColors:true,depthTest:false,toneMapped:false}));trace.renderOrder=99;trace.visible=false;stage.add(trace);
+        const intervalsByHole = new Map<string, DrillSegment[]>();
+        for (const interval of drillholes) {
+          const intervals = intervalsByHole.get(interval.holeId);
+          if (intervals) intervals.push(interval);
+          else intervalsByHole.set(interval.holeId, [interval]);
+        }
+        const trace = new THREE.InstancedMesh(
+          new THREE.CylinderGeometry(1, 1, 1, 8),
+          new THREE.MeshBasicMaterial({depthTest:false, depthWrite:false, toneMapped:false}),
+          Math.max(1, ...Array.from(intervalsByHole.values(), intervals => intervals.length))
+        );
+        const traceMatrix = new THREE.Matrix4();
+        trace.count = 0;
+        trace.frustumCulled = false;
+        trace.renderOrder = 99;
+        trace.visible = false;
+        stage.add(trace);
         const collarMarker = new THREE.Mesh(
           new THREE.RingGeometry(4, 6, 24),
           new THREE.MeshBasicMaterial({color: 0x9ff5de, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide})
@@ -4380,17 +4396,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           journeyUpdate=null;marker.visible=false;trace.visible=false;collarMarker.visible=false;
           setDrillCutaway(false);
           if(!id){setJourneyReadout('Drillhole journey stopped. Source data unchanged.');return;}
-          const intervals=drillholes.filter(d=>d.holeId===id).sort((a,b)=>a.depthFrom-b.depthFrom);if(!intervals.length)return;
-          const points=intervals.flatMap(d=>[registeredDrillPoint(d,'from',terrainResources,drillSurfaceOffsets),registeredDrillPoint(d,'to',terrainResources,drillSurfaceOffsets)]);
-          const colors = new Float32Array(points.length * 3);
+          const intervals = intervalsByHole.get(id)?.slice().sort((a,b) => a.depthFrom-b.depthFrom);
+          if (!intervals?.length) return;
+          const points = intervals.flatMap(interval => [
+            registeredDrillPoint(interval,'from',terrainResources,drillSurfaceOffsets),
+            registeredDrillPoint(interval,'to',terrainResources,drillSurfaceOffsets),
+          ]);
+          trace.count = intervals.length;
           intervals.forEach((interval, index) => {
-            const color = new THREE.Color(assayIntervalBin(interval.carbon)?.color ?? '#96a9ae');
-            color.toArray(colors, index * 6);
-            color.toArray(colors, index * 6 + 3);
+            makeDrillTubeMatrix(points[index * 2], points[index * 2 + 1], traceMatrix, 1.6);
+            trace.setMatrixAt(index, traceMatrix);
+            trace.setColorAt(index, new THREE.Color(assayIntervalBin(interval.carbon)?.color ?? '#96a9ae'));
           });
-          trace.geometry.dispose();
-          trace.geometry = new THREE.BufferGeometry().setFromPoints(points);
-          trace.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+          trace.instanceMatrix.needsUpdate = true;
+          if (trace.instanceColor) trace.instanceColor.needsUpdate = true;
           trace.visible = true;
           const bounds=new THREE.Box3().setFromPoints(points),centre=bounds.getCenter(new THREE.Vector3());stage.updateMatrixWorld(true);const target=stage.localToWorld(centre);const distance=Math.max(215,bounds.getSize(new THREE.Vector3()).length()*2.5);
           const collarPoint = collarSurfacePoint(intervals[0], terrainResources, 3);
