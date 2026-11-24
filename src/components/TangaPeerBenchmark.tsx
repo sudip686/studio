@@ -23,10 +23,10 @@ export default function TangaPeerBenchmark({revealed, onReveal, onReset, selecte
   return <section className="tanga-peer-benchmark" aria-label="Global graphite benchmark and Tanga MRE reveal" data-revealed={revealed}>
     <div className="tanga-peer-benchmark__narrative">
       <span className="tanga-peer-benchmark__eyebrow">PUBLISHED PEER COMPARISON</span>
-      <h2>{revealed?<>Tanga enters<br/>{' '}at <em>#{rank}.</em></>:<>Ten graphite<br/>projects</>}</h2>
-      <p>{revealed?'Tanga ranks fifth within this selected set of reported estimates.':'Select a deposit to locate it on the globe. Introduce Tanga to compare its reported estimate.'}</p>
+      <h2>{revealed?<>Tanga enters<br/>{' '}at <em>#{rank}.</em></>:<>Graphite on a<br/>global scale</>}</h2>
+      <p>{revealed?'Tanga’s 2025 estimate places it fifth alongside the ten projects in the 2023 benchmark.':'Select a deposit to locate it on the globe. Introduce Tanga to compare its reported estimate.'}</p>
       {(!selectedRow||selectedRow.isTanga)&&<div className="tanga-peer-benchmark__measure"><span>{revealed?'TANGA · INDICATED':'COMPARISON MEASURE'}</span><strong>{revealed?'7.31':'Mt'} <small>{revealed?'Mt contained graphite':'million tonnes of contained graphite'}</small></strong><p>{revealed?'148 Mt × 4.94% TGC':'Source estimate dates and reported categories vary.'}</p>{revealed&&<a href="/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf" target="_blank" rel="noreferrer">Open Tanga MRE ↗</a>}</div>}
-      {selectedRow&&!selectedRow.isTanga&&selectedEvidence&&<div className="tanga-peer-benchmark__selection" aria-live="polite">
+      {selectedRow&&!selectedRow.isTanga&&selectedEvidence&&<div key={selectedRow.project} className="tanga-peer-benchmark__selection" aria-live="polite">
         <strong>#{selectedRow.displayRank} · {selectedRow.project}</strong>
         <span>{selectedRow.country} · {selectedRow.company}</span>
         <div className="tanga-peer-benchmark__row-context"><span>Published benchmark row</span><p>{selectedRow.reportedContainedBasis??selectedRow.resource}</p><small>{selectedEvidence.benchmarkDateLabel} · category {selectedEvidence.benchmarkCategoryLabel.toLowerCase()}</small></div>
