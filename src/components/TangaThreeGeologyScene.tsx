@@ -1767,6 +1767,17 @@ function drapeLine(
   });
 }
 
+async function readDrillIntervals(path: string, cache: RequestCache) {
+  try {
+    return await (await fetchAsset(path, {cache})).json();
+  } catch {
+    // A transfer can fail after it has returned a successful status.
+    const response = await fetch('/api/assets' + path + '?delivery=decoded-v2', {cache: 'reload'});
+    if (!response.ok) throw new Error('Interval delivery failed');
+    return response.json();
+  }
+}
+
 let retryDrillAssets = false;
 function loadDrillholes() {
   if (!drillPromise) {
@@ -1774,17 +1785,13 @@ function loadDrillholes() {
     retryDrillAssets = false;
     let lithologyRequestFailed = false;
     drillPromise = Promise.all([
-      fetchAsset('/assay_data.geojson', {cache})
-        .then((response) => {
-          if (!response.ok) throw new Error(`Drillholes failed with ${response.status}`);
-          return response.json();
-        }).catch(() => { throw new Error('The assay intervals could not be loaded. Retry to show the drill traces.'); }),
-      fetchAsset('/lithology_data.geojson', {cache})
-        .then((response) => {
-          if (!response.ok) { lithologyRequestFailed = true; return null; }
-          return response.json();
-        })
-        .catch(() => { lithologyRequestFailed = true; return null; }),
+      readDrillIntervals('/assay_data.geojson', cache).catch(() => {
+        throw new Error('The assay intervals could not be loaded. Retry to show the drill traces.');
+      }),
+      readDrillIntervals('/lithology_data.geojson', cache).catch(() => {
+        lithologyRequestFailed = true;
+        return null;
+      }),
     ]).then(([assayPayload, lithologyPayload]) => {
       const lithologyFeatures = Array.isArray(lithologyPayload?.features) ? lithologyPayload.features : [];
       const lithologyByInterval = new Map<string, string>();
