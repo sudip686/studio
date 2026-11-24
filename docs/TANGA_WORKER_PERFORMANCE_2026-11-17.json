@@ -1,0 +1,932 @@
+{
+  "base": "https://tanga-graphite-presentation.sudipta2407.workers.dev",
+  "browser": "157.0.8103.79",
+  "viewport": {
+    "width": 1366,
+    "height": 768
+  },
+  "headless": false,
+  "control": {
+    "renderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A788) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "elapsedMs": 3002,
+    "requestedMs": 3000,
+    "visibleThroughout": true,
+    "frames": 688,
+    "medianMs": 4.2,
+    "p95Ms": 4.3,
+    "above33ms": 1,
+    "pointerMoves": 0,
+    "wheelEvents": 0,
+    "cameraTravel": 0,
+    "maxCameraDisplacement": 0,
+    "sceneReadyAtEnd": null
+  },
+  "results": [
+    {
+      "chapter": "project",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#project",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 1157,
+      "firstContentfulPaintMs": 1752,
+      "readyObservedMs": 8654,
+      "mapFirstIdleMs": "6508",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 1694110,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1749,
+        "count": 6,
+        "medianMs": 274.9,
+        "p95Ms": 366.6
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "project",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?layers=blocks%3A1%3A100%2Cgeology%3A1%3A100%2Cdrilling%3A0%3A100%2Cterrain%3A1%3A100%2Ccontext%3A1%3A100&v=1#project",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 204,
+      "firstContentfulPaintMs": 1980,
+      "readyObservedMs": 6372,
+      "mapFirstIdleMs": "4973",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 13200,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1747,
+        "count": 8,
+        "medianMs": 200,
+        "p95Ms": 337.3
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "tanzania",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#tanzania",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 1187,
+      "firstContentfulPaintMs": 1932,
+      "readyObservedMs": 7650,
+      "mapFirstIdleMs": "5218",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 1695234,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1840,
+        "count": 5,
+        "medianMs": 345.6,
+        "p95Ms": 366.7
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "tanzania",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?layers=blocks%3A1%3A100%2Cgeology%3A1%3A100%2Cdrilling%3A0%3A100%2Cterrain%3A1%3A100%2Ccontext%3A1%3A100&v=1#tanzania",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 185,
+      "firstContentfulPaintMs": 1888,
+      "readyObservedMs": 5615,
+      "mapFirstIdleMs": "4143",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 13197,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1742,
+        "count": 7,
+        "medianMs": 187.4,
+        "p95Ms": 765.9
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "work_completed",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#work_completed",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 648,
+      "firstContentfulPaintMs": 1448,
+      "readyObservedMs": 5361,
+      "mapFirstIdleMs": "5069",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 3523544,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1644,
+        "count": 5,
+        "medianMs": 75,
+        "p95Ms": 1466.2
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "work_completed",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?layers=blocks%3A1%3A100%2Cgeology%3A1%3A100%2Cdrilling%3A0%3A100%2Cterrain%3A1%3A100%2Ccontext%3A1%3A100&v=1#work_completed",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 120,
+      "firstContentfulPaintMs": 1152,
+      "readyObservedMs": 4331,
+      "mapFirstIdleMs": "2921",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 14700,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1502,
+        "count": 201,
+        "medianMs": 4.2,
+        "p95Ms": 8.4
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "topography",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#topography",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 422,
+      "firstContentfulPaintMs": 7980,
+      "readyObservedMs": 11800,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "3321",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 10483390,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1511,
+        "count": 8,
+        "medianMs": 83.3,
+        "p95Ms": 405.1
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "topography",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?layers=blocks%3A1%3A100%2Cgeology%3A1%3A100%2Cdrilling%3A0%3A100%2Cterrain%3A1%3A100%2Ccontext%3A1%3A100&v=1#topography",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 419,
+      "firstContentfulPaintMs": 1560,
+      "readyObservedMs": 5671,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "945",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 14700,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1522,
+        "count": 8,
+        "medianMs": 182.4,
+        "p95Ms": 479.1
+      },
+      "cameraInteraction": {
+        "elapsedMs": 3270,
+        "requestedMs": 3000,
+        "visibleThroughout": true,
+        "frames": 13,
+        "medianMs": 261.5,
+        "p95Ms": 457.7,
+        "above33ms": 13,
+        "pointerMoves": 14,
+        "wheelEvents": 0,
+        "cameraTravel": 11816.5,
+        "maxCameraDisplacement": 3422.6,
+        "sceneReadyAtEnd": true,
+        "verified": true
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "drillholes",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#drillholes",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 296,
+      "firstContentfulPaintMs": 876,
+      "readyObservedMs": 7341,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "2237",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 30412281,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1639,
+        "count": 9,
+        "medianMs": 154.2,
+        "p95Ms": 495.7
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "drillholes",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#drillholes",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 123,
+      "firstContentfulPaintMs": 1560,
+      "readyObservedMs": 6580,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "1390",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 15207,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1651,
+        "count": 8,
+        "medianMs": 183.3,
+        "p95Ms": 566.6
+      },
+      "cameraInteraction": {
+        "elapsedMs": 3200,
+        "requestedMs": 3000,
+        "visibleThroughout": true,
+        "frames": 12,
+        "medianMs": 237.3,
+        "p95Ms": 441.9,
+        "above33ms": 12,
+        "pointerMoves": 12,
+        "wheelEvents": 0,
+        "cameraTravel": 6576.2,
+        "maxCameraDisplacement": 1947.7,
+        "sceneReadyAtEnd": true,
+        "verified": true
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "subsurface",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?v=1&view=framework#subsurface",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 294,
+      "firstContentfulPaintMs": 1064,
+      "readyObservedMs": 8666,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "4142",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 37503549,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1933,
+        "count": 7,
+        "medianMs": 212.5,
+        "p95Ms": 749.8
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "subsurface",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?view=framework&v=1#subsurface",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 246,
+      "firstContentfulPaintMs": 1416,
+      "readyObservedMs": 6982,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "2431",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 17338,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1840,
+        "count": 6,
+        "medianMs": 333,
+        "p95Ms": 562.4
+      },
+      "cameraInteraction": {
+        "elapsedMs": 3009,
+        "requestedMs": 3000,
+        "visibleThroughout": true,
+        "frames": 10,
+        "medianMs": 249.5,
+        "p95Ms": 467.6,
+        "above33ms": 10,
+        "pointerMoves": 11,
+        "wheelEvents": 0,
+        "cameraTravel": 9168.8,
+        "maxCameraDisplacement": 2769.8,
+        "sceneReadyAtEnd": true,
+        "verified": true
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "resource",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#resource",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 808,
+      "firstContentfulPaintMs": 1488,
+      "readyObservedMs": 8784,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "3353",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 24635505,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1554,
+        "count": 6,
+        "medianMs": 179.1,
+        "p95Ms": 653.9
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "resource",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#resource",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 189,
+      "firstContentfulPaintMs": 1432,
+      "readyObservedMs": 6148,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "1821",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 15210,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1864,
+        "count": 8,
+        "medianMs": 241.1,
+        "p95Ms": 458.3
+      },
+      "cameraInteraction": {
+        "elapsedMs": 3147,
+        "requestedMs": 3000,
+        "visibleThroughout": true,
+        "frames": 9,
+        "medianMs": 323.1,
+        "p95Ms": 477.2,
+        "above33ms": 9,
+        "pointerMoves": 10,
+        "wheelEvents": 0,
+        "cameraTravel": 8035.7,
+        "maxCameraDisplacement": 2507.3,
+        "sceneReadyAtEnd": true,
+        "verified": true
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "ranking",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#ranking",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 371,
+      "firstContentfulPaintMs": 1216,
+      "readyObservedMs": 6636,
+      "mapFirstIdleMs": "5377",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 1947539,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1512,
+        "count": 7,
+        "medianMs": 191.5,
+        "p95Ms": 309.1
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "ranking",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?layers=blocks%3A1%3A100%2Cgeology%3A1%3A100%2Cdrilling%3A0%3A100%2Cterrain%3A1%3A100%2Ccontext%3A1%3A100&v=1#ranking",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 148,
+      "firstContentfulPaintMs": 1272,
+      "readyObservedMs": 5184,
+      "mapFirstIdleMs": "3997",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 14397,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1838,
+        "count": 7,
+        "medianMs": 245.8,
+        "p95Ms": 370.7
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "mine_planning",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#mine_planning",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 288,
+      "firstContentfulPaintMs": 1040,
+      "readyObservedMs": 9485,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "3817",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 18111704,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1698,
+        "count": 2,
+        "medianMs": 20.8,
+        "p95Ms": 383.2
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "mine_planning",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#mine_planning",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 135,
+      "firstContentfulPaintMs": 1748,
+      "readyObservedMs": 7999,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "2698",
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 14610,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1978,
+        "count": 2,
+        "medianMs": 37.4,
+        "p95Ms": 341.5
+      },
+      "cameraInteraction": {
+        "elapsedMs": 3071,
+        "requestedMs": 3000,
+        "visibleThroughout": true,
+        "frames": 11,
+        "medianMs": 265,
+        "p95Ms": 417,
+        "above33ms": 11,
+        "pointerMoves": 12,
+        "wheelEvents": 0,
+        "cameraTravel": 13467.5,
+        "maxCameraDisplacement": 3931.1,
+        "sceneReadyAtEnd": true,
+        "verified": true
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "metallurgy",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#metallurgy",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 1342,
+      "firstContentfulPaintMs": 2472,
+      "readyObservedMs": 16631,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "0",
+      "canvases": [
+        {
+          "width": 939,
+          "height": 286,
+          "cssWidth": 939,
+          "cssHeight": 286
+        }
+      ],
+      "sameOriginTransferBytes": 1821249,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1569,
+        "count": 8,
+        "medianMs": 183.5,
+        "p95Ms": 354.1
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "metallurgy",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#metallurgy",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 620,
+      "firstContentfulPaintMs": 1740,
+      "readyObservedMs": 6895,
+      "mapFirstIdleMs": null,
+      "threeLoadMs": "0",
+      "canvases": [
+        {
+          "width": 939,
+          "height": 286,
+          "cssWidth": 939,
+          "cssHeight": 286
+        }
+      ],
+      "sameOriginTransferBytes": 14608,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1660,
+        "count": 7,
+        "medianMs": 195.7,
+        "p95Ms": 683.3
+      },
+      "cameraInteraction": {
+        "elapsedMs": 3031,
+        "requestedMs": 3000,
+        "visibleThroughout": true,
+        "frames": 11,
+        "medianMs": 293.2,
+        "p95Ms": 348.5,
+        "above33ms": 10,
+        "pointerMoves": 10,
+        "wheelEvents": 0,
+        "cameraTravel": 347.7,
+        "maxCameraDisplacement": 130.4,
+        "sceneReadyAtEnd": true,
+        "verified": true
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "accessibility",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#accessibility",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 595,
+      "firstContentfulPaintMs": 1256,
+      "readyObservedMs": 6442,
+      "mapFirstIdleMs": "5009",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 1956035,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1533,
+        "count": 6,
+        "medianMs": 187.4,
+        "p95Ms": 412.5
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "accessibility",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?layers=blocks%3A1%3A100%2Cgeology%3A1%3A100%2Cdrilling%3A0%3A100%2Cterrain%3A1%3A100%2Ccontext%3A1%3A100&v=1#accessibility",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 151,
+      "firstContentfulPaintMs": 2148,
+      "readyObservedMs": 5532,
+      "mapFirstIdleMs": "4320",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 23035,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1740,
+        "count": 7,
+        "medianMs": 262.5,
+        "p95Ms": 829
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "comparison",
+      "cache": "cold",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/#comparison",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 696,
+      "firstContentfulPaintMs": 1204,
+      "readyObservedMs": 6868,
+      "mapFirstIdleMs": "5417",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 1947806,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1732,
+        "count": 6,
+        "medianMs": 245.5,
+        "p95Ms": 341.7
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "chapter": "comparison",
+      "cache": "warm",
+      "status": 200,
+      "finalUrl": "https://tanga-graphite-presentation.sudipta2407.workers.dev/?layers=blocks%3A1%3A100%2Cgeology%3A1%3A100%2Cdrilling%3A0%3A100%2Cterrain%3A1%3A100%2Ccontext%3A1%3A100&v=1#comparison",
+      "revision": "9d3384114627",
+      "documentTtfbMs": 143,
+      "firstContentfulPaintMs": 1868,
+      "readyObservedMs": 5584,
+      "mapFirstIdleMs": "4155",
+      "threeLoadMs": null,
+      "canvases": [
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        },
+        {
+          "width": 1366,
+          "height": 768,
+          "cssWidth": 1366,
+          "cssHeight": 768
+        }
+      ],
+      "sameOriginTransferBytes": 14400,
+      "frameSample": {
+        "visibleThroughout": true,
+        "requestedMs": 1500,
+        "elapsedMs": 1608,
+        "count": 6,
+        "medianMs": 228.4,
+        "p95Ms": 353.9
+      },
+      "pageErrors": [],
+      "failedRequests": []
+    }
+  ]
+}

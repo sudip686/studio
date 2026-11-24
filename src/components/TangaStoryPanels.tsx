@@ -1,7 +1,9 @@
 'use client';
 
+import './TangaChapterArt.css';
+import surveyProfile from '@/data/tanga-survey-transect.json';
 import {useEffect, useRef, useState} from 'react';
-import {ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, X} from 'lucide-react';
+import {ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Factory, Mountain, Ship, X} from 'lucide-react';
 import {TGC_GRADE_BINS, ASSAY_INTERVAL_BINS} from '@/lib/deck/grade-legend';
 import {DEVELOPMENT_FACILITIES,type DevelopmentView} from '@/data/tanga-development';
 import {CHAPTER_SOURCES, NEXT_DECISIONS, WORK_MILESTONES, type TangaChapterId} from '@/data/tanga-evidence';
@@ -104,8 +106,8 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
         <span>{item.date}</span><strong>{item.title}</strong>
       </button>)}
     </nav>
-    <div className="tanga-story-feature">
-      <img src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
+    <div key={milestone.id} className="tanga-story-feature">
+      <img key={milestone.image} src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
       <div><span>{milestone.source}</span><p>{milestone.detail}</p></div>
     </div>
     {milestone.id === 'survey' && onOpenSurvey && <button type="button" className="tanga-story-panel__link" onClick={onOpenSurvey}>Open the measured terrain chapter <ArrowRight size={14}/></button>}
@@ -115,7 +117,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'project') return <aside className="tanga-story-panel tanga-story-panel--project" aria-label="Tanga project introduction">
     <div className="tanga-story-panel__eyebrow">TANGA REGION · TANZANIA</div>
-    <h2>Tanga Graphite, on the ground</h2>
+    <h2>The Tanga project area</h2>
     <p className="tanga-story-panel__intro">A graphite project in the Maramba area of Mkinga District, framed by the August 2025 topographical survey.</p>
     <img className="tanga-story-project-image" src="/presentation-assets/survey-site-aerial.jpg" alt="Aerial photographs of the forested Tanga project landscape"/>
     <div className="tanga-story-image-caption"><span>Survey report · site photographs</span><small>Context imagery · not a georeferenced orthophoto</small></div>
@@ -123,30 +125,45 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'topography') return <aside className="tanga-story-panel tanga-story-panel--terrain" aria-label="Surveyed terrain basis">
     <div className="tanga-story-panel__eyebrow">SURVEY SURFACE · AUGUST 2025</div>
-    <h2>Read the ground before the concept</h2>
-    <p className="tanga-story-panel__intro">The ridges and valleys provide a measured surface reference for drilling, geology and the proposed site.</p>
+    <h2>Ridges and valleys</h2>
+    <p className="tanga-story-panel__intro">The measured surface anchors the drill collars and proposed site.</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
-    <div className="tanga-terrain-scale"><strong>1×</strong><span>True vertical scale<br/>Relief is not exaggerated</span></div>
-    <ol className="tanga-terrain-reading"><li><b>01</b><span>Orient to the full surveyed surface.</span></li><li><b>02</b><span>Advance to the ridge profile for a lower, raking view.</span></li><li><b>03</b><span>Follow the recorded drilling beneath this surface.</span></li></ol>
-    <p className="tanga-story-panel__qualification">The displayed mesh is resampled for interaction. Terrain context does not establish drainage design, ground conditions or buildability.</p>
+    <div className="tanga-terrain-scale"><strong>1×</strong><span>3D terrain · true vertical scale</span></div>
+    <figure className="tanga-survey-profile">
+      <figcaption>West–east survey profile <span>{(surveyProfile.length / 1000).toFixed(2)} km</span></figcaption>
+      <div className="tanga-survey-profile__plot">
+        <svg viewBox="0 0 240 70" role="img" aria-label={`Survey elevations from ${surveyProfile.minimum} to ${surveyProfile.maximum} metres`}>
+          <polygon points={`0,70 ${surveyProfile.points} 240,70`} fill="currentColor" opacity=".16"/>
+          <polyline points={surveyProfile.points} pathLength="1" fill="none" stroke="currentColor" strokeWidth="1.6"/>
+        </svg>
+        <div><span>{surveyProfile.maximum} m</span><span>{surveyProfile.minimum} m</span></div>
+      </div>
+      <small>DTM transect · {surveyProfile.northing.toLocaleString('en-US')} m N · UTM 37S</small>
+    </figure>
+    <p className="tanga-story-panel__qualification">The interactive mesh is resampled. Drainage and buildability require engineering studies.</p>
   </aside>;
 
   if (chapter === 'drillholes') return <aside className="tanga-story-panel tanga-story-panel--drill" aria-label="Drilling evidence">
     <div className="tanga-story-panel__eyebrow">OBSERVATION · DRILL CORE</div>
-    <h2>Start with what was sampled</h2>
-    <p className="tanga-story-panel__intro">Core records provide direct observations at discrete intervals. The interpretation between holes carries a different level of certainty.</p>
+    <h2>Inside the drill core</h2>
+    <p className="tanga-story-panel__intro">Each coloured interval records a sample along a drill trace. Use Below ground to follow the holes beneath the terrain.</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
-    <img className="tanga-story-project-image" src="/presentation-assets/verified-core-example.jpg" alt="Photograph of labelled Tanga graphite drill core with a cut line and sampling intervals"/>
-    <div className="tanga-story-image-caption"><span>AMC MRE · Figure 3.9</span><small>Report image · not the selected 3D hole</small></div>
     <div className="tanga-compact-grade-key" aria-label="Recorded interval TGC legend"><span>RECORDED INTERVAL TGC</span><div>{ASSAY_INTERVAL_BINS.map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.label}</span>)}</div></div>
     <div className="tanga-story-inline-note">100 diamond drillholes described in AMC MRE §3.2</div>
-    <div className="tanga-story-datum-note">Collar symbols mark the DTM surface; drill traces retain recorded elevations. Their vertical datum agreement requires verification. Use Below ground to inspect the traces from underneath.</div>
+    <p className="tanga-story-datum-note">Collars sit on the displayed terrain. The traces use recorded elevations. Their vertical datum still needs verification.</p>
+    <details className="tanga-drill-source">
+      <summary>View core photograph</summary>
+      <figure>
+        <img className="tanga-story-project-image" loading="lazy" src="/presentation-assets/verified-core-example.jpg" alt="Labelled Tanga graphite drill core with a cut line and sample intervals"/>
+        <figcaption>AMC MRE, Figure 3.9. Report example independent of the selected hole.</figcaption>
+      </figure>
+    </details>
   </aside>;
 
   if (chapter === 'subsurface') return <aside className="tanga-story-panel tanga-story-panel--geology" aria-label="Petrography sample evidence">
     <header className="tanga-geology-story__header">
     <div className="tanga-story-panel__eyebrow">SAMPLE TRACE · TGF002</div>
-    <h2>Connect the observations</h2>
+    <h2>From core to thin section</h2>
     </header>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-geology-story__body">
@@ -160,11 +177,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'resource') return <aside className="tanga-story-panel tanga-story-panel--resource" aria-label="Reported resource estimate explained">
     <div className="tanga-story-panel__eyebrow">REPORTED MRE · AMC · DECEMBER 2025</div>
-    <h2>Scale, grade and location</h2>
-    <p className="tanga-story-panel__intro">The report describes the estimate. The 3D cells show where modelled grades sit within the deposit.</p>
+    <h2>The reported estimate</h2>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-story-resource-number"><strong>148<span>Mt</span></strong><small>Indicated mineral resource</small></div>
-    <dl className="tanga-story-resource-facts"><div><dt>Reported grade</dt><dd>4.94% TGC</dd></div><div><dt>Contained graphite</dt><dd>≈7.31 Mt</dd></div></dl>
+    <dl className="tanga-story-resource-facts"><div><dt>Reported grade</dt><dd>4.94% TGC</dd><i className="tanga-grade-fraction" aria-hidden="true"/></div><div><dt>Contained graphite</dt><dd>≈7.31 Mt</dd></div></dl>
     <div className="tanga-compact-grade-key" aria-label="Displayed block TGC legend"><span>DISPLAYED BLOCK TGC</span><div>{TGC_GRADE_BINS.map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.range}</span>)}</div></div>
     <p className="tanga-story-panel__intro">Rotate the model to see its extent. Use the grade legend to isolate a displayed grade band.</p>
     <p className="tanga-story-panel__qualification">Indicated portion of the supplied AMC MRE. Displayed blocks and filters do not constitute a new resource estimate or an ore reserve.</p>
@@ -172,8 +188,8 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
 
   if (chapter === 'mine_planning') return <aside ref={panelRef} className="tanga-story-panel tanga-story-panel--concept" aria-label={blockInspectorActive?'Mine plan information: pit-block controls':'Concept and terrain comparison'}>
     <div className="tanga-story-panel__eyebrow">CONCEPT · REGISTERED TO TERRAIN</div>
-    <h2>{blockInspectorActive?'Pit-block controls':developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
-    <p className="tanga-story-panel__intro">{blockInspectorActive?'Focus a pit or filter the source cells by displayed TGC band.':developmentViewId==='plant'?'Explore six process areas. Equipment and roof cutaways are illustrative.':developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
+    <h2>{blockInspectorActive?'Inside the two pits':developmentView?.title ?? 'From the ridge to the lowlands'}</h2>
+    <p className="tanga-story-panel__intro">{blockInspectorActive?'Select a shell to inspect its registered ore cells.':developmentViewId==='plant'?'Explore six process areas. Equipment and roof cutaways are illustrative.':developmentView?.explanation ?? 'Trace the report-based feed candidate to the lowland plant, then inspect illustrative site services.'}</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     {!siteContextVisible&&<div className="tanga-site-context-hidden" role="status">
       <div><strong>Site concept layers are hidden</strong><span>The terrain remains visible. Turn site context back on to see the pits, plant and connected facilities.</span></div>
@@ -214,11 +230,11 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       {pitBlocksStatus!=='ready'&&<small className="tanga-pit-grade-state tanga-pit-block-status" data-state={pitBlocksStatus} role="status">{pitBlocksStatus==='loading'?'Source cells are loading. You can still explore the pit cutaway.':'Source block data failed to load. Choose Inspect to retry.'}</small>}
       <button type="button" className="tanga-story-panel__compare tanga-story-panel__pit-block-reveal" aria-label={pitBlocksStatus==='error'?'Retry RF1 ore blocks and frame both pit shells':'Frame RF1 ore blocks in both source pit shells'} aria-pressed={pitBlockFocusIndex===null} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.()}>{pitBlocksStatus==='error'?'Retry RF1 blocks & frame pits':'Frame both RF1 pit shells'} <ArrowRight size={14}/></button>
       <div className="tanga-pit-focus-actions" role="group" aria-label="Focus source blocks inside pit shells">
-        <button type="button" aria-pressed={pitBlockFocusIndex===0} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(0)}>North pit · inspect blocks</button>
-        <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}>South pit · inspect blocks</button>
+        <button type="button" aria-pressed={pitBlockFocusIndex===0} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(0)}><img src="/presentation-assets/rf1-north-benches.svg" alt="" width="22" height="64"/><span>North pit<br/><small>Inspect blocks</small></span></button>
+        <button type="button" aria-pressed={pitBlockFocusIndex===1} disabled={!onRevealPitBlocks} onClick={()=>onRevealPitBlocks?.(1)}><img src="/presentation-assets/rf1-south-benches.svg" alt="" width="22" height="64"/><span>South pit<br/><small>Inspect blocks</small></span></button>
       </div>
       <div className="tanga-compact-grade-key tanga-pit-grade-key" aria-label="Filter resource blocks by TGC grade band"><span>RESOURCE BLOCKS · TGC</span><div role="group" aria-label="Show resource blocks by grade band">{PIT_RESOURCE_GRADE_BANDS.map(bin=><button key={bin.key} type="button" className="tanga-pit-grade-filter" aria-pressed={pitGradeFocus===bin.key} disabled={!onPitGradeFocusChange} onClick={()=>onPitGradeFocusChange?.(pitGradeFocus===bin.key?null:bin.key)}><i style={{background:bin.color}}/>{bin.displayRange}</button>)}</div><small className="tanga-pit-grade-state" role="status">{pitGradeFocus ? `Showing ${PIT_RESOURCE_GRADE_BANDS.find(bin=>bin.key===pitGradeFocus)?.displayRange ?? 'selected'} TGC blocks` : 'All displayed grade bands'}</small></div>
-      <p className="tanga-story-panel__qualification">Showing RF1 source ore cells at ≥3% TGC inside the two continuous optimized shell surfaces. Grade colours are not economic cutoffs or reserve classifications.</p>
+      <p className="tanga-story-panel__qualification">RF1 source cells ≥3% TGC inside the optimized shells. Grade colours describe displayed cells.</p>
     </div>}
     {minePanelSection==='sources'&&<div className="tanga-site-panel-content">
       <div className="tanga-site-panel-subtitle">REPORT BASIS &amp; LIMITS</div>
@@ -248,7 +264,11 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onToggleSurfaceCo
       <div><span>DISPLAYED ROAD GEOMETRY</span><strong>{portDistanceInfo.mappedRoute}</strong><small>{portDistanceInfo.mappedRouteSource==='osrm'?`${portDistanceInfo.mappedDuration} · mapped road network`:'Indicative mapped path · route not verified'}</small></div>
       <p>The supplied project distance and mapped road route use different bases. The route is a geographic visualisation, not a confirmed haulage or travel-time study.</p>
     </section>}
-    <ol className="tanga-development-chain">{[['Mine to feed point','Local ore haulage · route requires survey'],['Feed point to lowlands','Candidate conveyor · planning option 2'],['Processing to stuffing yard','Concentrate haulage · road upgrades assessed'],['Stuffing and storage','Mabokweni / Kwa Songoro alternatives'],['Port of exit','Tanga preferred in the 2023 study']].map(([title,detail],i)=><li key={title}><span>{String(i+1).padStart(2,'0')}</span><div><strong>{title}</strong><small>{detail}</small></div></li>)}</ol>
+    <ol className="tanga-material-flow" aria-label="Material journey from mine to port">
+      <li><Mountain aria-hidden="true"/><div><small>01 / ORE</small><strong>Hillside to lowlands</strong><p>Local haulage to the feed point, then a candidate conveyor. The alignment requires survey.</p></div></li>
+      <li><Factory aria-hidden="true"/><div><small>02 / CONCENTRATE</small><strong>Plant to storage yard</strong><p>Road haulage after processing. The study considers yards at Mabokweni and Kwa Songoro.</p></div></li>
+      <li><Ship aria-hidden="true"/><div><small>03 / EXPORT CARGO</small><strong>Storage yard to port</strong><p>Tanga was the preferred port in the 2023 study.</p></div></li>
+    </ol>
     <p className="tanga-story-panel__qualification">Study §§3.3, 5.3 and 6. A stuffing yard plot is not georeferenced in the supplied report. Map infrastructure and the displayed route do not establish a project connection or current capacity.</p>
   </aside>;
 
@@ -274,7 +294,7 @@ export function TangaMilestoneStage({milestoneId}: {milestoneId: string}) {
   const milestone = WORK_MILESTONES.find((item) => item.id === milestoneId) ?? WORK_MILESTONES[1];
   const isFigure = milestone.id === 'resource';
   return <section className={`tanga-milestone-stage${isFigure ? ' is-figure' : ''}`} aria-label={`${milestone.title} source evidence`}>
-    <img src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
+    <img key={milestone.image} src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
     <div className="tanga-milestone-stage__shade"/>
     <div className="tanga-milestone-stage__caption"><span>{milestone.date} · {milestone.source}</span><h2>{milestone.title}</h2><p>{milestone.detail}</p></div>
     <span className="tanga-milestone-stage__tag">Source evidence</span>

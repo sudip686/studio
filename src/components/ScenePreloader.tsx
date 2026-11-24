@@ -57,7 +57,7 @@ export default function ScenePreloader() {
           warmFirstAvailable(candidates, opts);
         });
 
-        const textureCandidates = ['/terrain_texture_hires.jpg', '/terrain_texture_8k.jpg'].map(assetUrl);
+        const textureCandidates = ['/terrain_texture_hires.jpg?v=survey-2026-10-21', '/terrain_texture_8k.jpg'].map(assetUrl);
 
         textureCandidates.forEach((src) => {
           const img = new Image();

@@ -22,11 +22,11 @@ export default function TangaPeerBenchmark({revealed, onReveal, onReset, selecte
   const maximum=Math.max(...rows.map(row=>row.containedGraphiteMt));
   return <section className="tanga-peer-benchmark" aria-label="Global graphite benchmark and Tanga MRE reveal" data-revealed={revealed}>
     <div className="tanga-peer-benchmark__narrative">
-      <span className="tanga-peer-benchmark__eyebrow">PUT THE RESOURCE IN CONTEXT</span>
-      <h2>{revealed?<>Tanga enters<br/>{' '}at <em>#{rank}.</em></>:<>One measure.<br/>{' '}Ten projects.</>}</h2>
-      <p>{revealed?'7.31 Mt contained graphite from the reported 148 Mt Indicated MRE at 4.94% TGC; fifth within this selected peer set.':'Explore the dated published peer field, then add Tanga using the reported contained-graphite measure.'}</p>
-      {(!selectedRow||selectedRow.isTanga)&&<div className="tanga-peer-benchmark__measure"><span>{revealed?'TANGA · INDICATED':'COMPARISON MEASURE'}</span><strong>{revealed?'7.31':'Reported'} <small>{revealed?'Mt contained graphite':'contained graphite · Mt'}</small></strong><p>{revealed?'148 Mt × 4.94% TGC':'Source estimate dates and reported categories vary.'}</p>{revealed&&<a href="/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf" target="_blank" rel="noreferrer">Open Tanga MRE ↗</a>}</div>}
-      {selectedRow&&!selectedRow.isTanga&&selectedEvidence&&<div className="tanga-peer-benchmark__selection" aria-live="polite">
+      <span className="tanga-peer-benchmark__eyebrow">PUBLISHED PEER COMPARISON</span>
+      <h2>{revealed?<>Tanga enters<br/>{' '}at <em>#{rank}.</em></>:<>Graphite on a<br/>global scale</>}</h2>
+      <p>{revealed?'Tanga’s 2025 estimate places it fifth alongside the ten projects in the 2023 benchmark.':'Select a deposit to locate it on the globe. Introduce Tanga to compare its reported estimate.'}</p>
+      {(!selectedRow||selectedRow.isTanga)&&<div className="tanga-peer-benchmark__measure"><span>{revealed?'TANGA · INDICATED':'COMPARISON MEASURE'}</span><strong>{revealed?'7.31':'Mt'} <small>{revealed?'Mt contained graphite':'million tonnes of contained graphite'}</small></strong><p>{revealed?'148 Mt × 4.94% TGC':'Source estimate dates and reported categories vary.'}</p>{revealed&&<a href="/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf" target="_blank" rel="noreferrer">Open Tanga MRE ↗</a>}</div>}
+      {selectedRow&&!selectedRow.isTanga&&selectedEvidence&&<div key={selectedRow.project} className="tanga-peer-benchmark__selection" aria-live="polite">
         <strong>#{selectedRow.displayRank} · {selectedRow.project}</strong>
         <span>{selectedRow.country} · {selectedRow.company}</span>
         <div className="tanga-peer-benchmark__row-context"><span>Published benchmark row</span><p>{selectedRow.reportedContainedBasis??selectedRow.resource}</p><small>{selectedEvidence.benchmarkDateLabel} · category {selectedEvidence.benchmarkCategoryLabel.toLowerCase()}</small></div>

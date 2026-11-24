@@ -591,16 +591,20 @@ const CHAPTER_GUIDANCE: Record<WorkbenchMode, {focus: string; bridge: string}> =
   comparison: {focus: 'Close on the evidence gaps that matter: dataset reconciliation, study confidence and development constraints. Invite discussion around those next decisions.', bridge: 'Open Sources & basis or switch to Explore for detailed inspection.'},
 };
 
+const COVER_COAST_VIEW: DeckViewState = {
+  longitude: 35.9, latitude: -6.1, zoom: 2.75, pitch: 27, bearing: -8,
+};
+
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   work_completed: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   ranking: {longitude: 30, latitude: 12, zoom: 1.55, pitch: 0, bearing: 0},
-  tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.35, pitch: 32, bearing: -12},
+  tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.15, pitch: 28, bearing: -8},
   project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
   topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
   // Framed on the story: project (38.79,-4.81) -> Tanga Port (39.105,-5.064).
   // The old 8.3 zoom sat NW of the corridor and left it as a small cluster in a
   // frame of irrelevant inland Tanzania.
-  accessibility: {longitude: 38.95, latitude: -4.98, zoom: 9.55, pitch: 44, bearing: -16},
+  accessibility: {longitude: 38.95, latitude: -4.98, zoom: 9.65, pitch: 19, bearing: -8},
   drillholes: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.35, pitch: 62, bearing: 24},
   subsurface: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.55, pitch: 74, bearing: 38},
   resource: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.45, pitch: 68, bearing: 38},
@@ -883,7 +887,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
   resource: [
     {id: 'resource', label: 'Model overview', detail: 'Hold on the reported model and its source legend', threeAction: 'resetView'},
     {id: 'grade', label: 'Model detail', detail: 'Inspect the displayed block population', threeAction: 'zoomIn'},
-    {id: 'section', label: 'Model section', detail: 'Use the section controls to inspect vertical relationships', threeAction: 'projectAngle'},
+    {id: 'section', label: 'Model section', detail: 'Open a vertical slice through the source blocks and terrain', threeAction: 'revealSection'},
   ],
   metallurgy: [
     {id: 'samples', label: 'Metallurgy overview', detail: 'Carbon, recovery and flake-size evidence', threeAction: 'resetView'},
@@ -903,7 +907,7 @@ const STORY_SHOTS: Record<WorkbenchMode, StoryShot[]> = {
   comparison: [
     {id: 'site', label: 'From mine site to coast', detail: 'Reorient above the Tanga project before following the connection to the port.', view: VIEW_STATES.comparison},
     {id: 'port-link', label: 'Project to Tanga Port', detail: 'The 72 km project-to-port connection is shown as an illustrative arc.', view: {longitude: (PROJECT_CENTER.lon + ROUTE_TARGETS.port.lon) / 2, latitude: (PROJECT_CENTER.lat + ROUTE_TARGETS.port.lat) / 2, zoom: 8.2, pitch: 30, bearing: -8}},
-    {id: 'decisions', label: 'Next study decisions', detail: 'Revisit drill coverage, flotation testwork or the proposed site layout.', view: {longitude: 38.5, latitude: -8.1, zoom: 3.4, pitch: 26, bearing: -8}},
+    {id: 'decisions', label: 'Next study decisions', detail: 'Revisit drill coverage, flotation testwork or the proposed site layout.', view: VIEW_STATES.tanzania},
   ],
 };
 
@@ -1247,6 +1251,13 @@ const SENTINEL_MAP_STYLE = {
   light: MAP_LIGHT,
 };
 
+const ACCESS_MAP_STYLE = {
+  ...BASE_MAP_STYLE,
+  layers: BASE_MAP_STYLE.layers.map(layer => layer.type === 'raster'
+    ? {...layer, paint: {...layer.paint, 'raster-brightness-min': .18, 'raster-saturation': -.48, 'raster-contrast': -.08}}
+    : layer),
+};
+
 const PEER_MAP_STYLE = {
   version: 8,
   projection: {type: 'globe'},
@@ -1278,27 +1289,16 @@ const PEER_MAP_STYLE = {
       type: 'raster',
       source: 'countryBase',
       paint: {
-        'raster-brightness-min': 0.02,
-        'raster-brightness-max': 0.96,
-        'raster-contrast': 0.12,
-        'raster-saturation': 0.08,
+        'raster-brightness-min': 0.12,
+        'raster-brightness-max': 0.8,
+        'raster-contrast': -0.12,
+        'raster-saturation': -0.72,
       },
     },
   ],
   sky: {
     ...SKY_HAZE,
-    // Full atmosphere halo on the globe overview (geolibre-style planet glow).
-    'atmosphere-blend': [
-      'interpolate',
-      ['linear'],
-      ['zoom'],
-      0,
-      1,
-      4,
-      0.9,
-      7,
-      0,
-    ],
+    'atmosphere-blend': 0.2,
   },
   light: {
     anchor: 'map',
@@ -3326,6 +3326,7 @@ export default function TangaDeckWorkbench() {
   // the DeckGL elevated project mesh over a lightweight globe basemap.
   const mapStyle = useMemo(() => {
     if (activeMode === 'ranking') return PEER_MAP_STYLE;
+    if (activeMode === 'accessibility' && !isExploreMode) return ACCESS_MAP_STYLE;
     // Wide regional / closing views get the clean uniform Sentinel-2 mosaic;
     // the zoomed-in project scenes keep Esri sub-metre imagery.
     if (activeMode === 'tanzania' || activeMode === 'comparison') return SENTINEL_MAP_STYLE;
@@ -4983,8 +4984,7 @@ export default function TangaDeckWorkbench() {
     };
   }, [activeMode, relief]);
   const isClosingScene = activeStoryIndex === STORY_STEPS.length - 1;
-  // The cover is a clean curtain over scene 1. "Begin" dismisses it to reveal
-  // the ranking underneath (it does NOT advance — scene 1 is the peer field).
+  // The cover establishes the coastline before the camera approaches the project.
   const [coverDismissed, setCoverDismissed] = useState(false);
   useEffect(() => {
     const enter = () => setCoverDismissed(true);
@@ -4993,6 +4993,10 @@ export default function TangaDeckWorkbench() {
     return () => window.removeEventListener('tanga:intro-complete', enter);
   }, []);
   const [actCard, setActCard] = useState<StoryAct | null>(null);
+  const beginProjectStory = useCallback(() => {
+    setCoverDismissed(true);
+    flyTo('project');
+  }, [flyTo]);
   const showCover = activeStoryIndex === 0 && !coverDismissed && storyHeroState !== 'complete' && storyHeroState !== 'dismissed';
   const isCoverScene = showCover;
   const closingArcScreen = useMemo(() => {
@@ -5807,7 +5811,7 @@ export default function TangaDeckWorkbench() {
       // Navigation
       if (key === 'ArrowRight' || key === 'PageDown') {
         event.preventDefault();
-        if (activeStoryIndex === 0 && !coverDismissed) { setCoverDismissed(true); return; }
+        if (activeStoryIndex === 0 && !coverDismissed) { beginProjectStory(); return; }
         handleManualNext();
         return;
       }
@@ -5843,7 +5847,7 @@ export default function TangaDeckWorkbench() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, isCommandPaletteOpen, isKioskMode, exitKioskMode, activeStoryIndex, coverDismissed]);
+  }, [handleManualNext, handleManualPrev, goToStoryIndex, toggleFullscreen, toggleBlackout, toggleNotes, toggleAutoplay, toggleShortcuts, cycleAnnotations, toggleInspector, toggleLayers, toggleIndex, isIndexOpen, isShortcutsOpen, isNotesOpen, isBlackout, isDisclaimerOpen, isCommandPaletteOpen, isKioskMode, exitKioskMode, activeStoryIndex, coverDismissed, beginProjectStory]);
 
 
   const getTooltip = useCallback(({object, layer}: any) => {
@@ -5955,7 +5959,7 @@ export default function TangaDeckWorkbench() {
       <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
-          viewState={viewState as any}
+          viewState={(isCoverScene ? COVER_COAST_VIEW : viewState) as any}
           controller={!threeVisible}
           layers={threeVisible ? [] : layers}
           effects={threeVisible ? [] : [TANGA_LIGHTING]}
@@ -6029,7 +6033,7 @@ export default function TangaDeckWorkbench() {
         />
       )}
 
-      {threeVisible && (threeLoadReport.scene === 'loading' || threeLoadReport.scene === 'error') && STATIC_SCENE_FALLBACKS[activeMode] && (
+      {threeVisible && !(activeMode === 'drillholes' && threeLoadReport.terrain === 'ready') && (threeLoadReport.scene === 'loading' || threeLoadReport.scene === 'error') && STATIC_SCENE_FALLBACKS[activeMode] && (
         <figure className={`tanga-deck__static-scene-fallback${threeLoadReport.scene === 'loading' ? ' is-loading' : ''}`} aria-label={`${MODE_LABELS[activeMode]} static scene preview`} aria-live="polite">
           <img src={STATIC_SCENE_FALLBACKS[activeMode]!.src} alt={STATIC_SCENE_FALLBACKS[activeMode]!.alt} />
           <figcaption>
@@ -6464,7 +6468,7 @@ export default function TangaDeckWorkbench() {
             <span className="tanga-deck__cover-eyebrow">Sakariya Mines &amp; Minerals · Investor Presentation</span>
             <h1 className="tanga-deck__cover-title">Tanga Graphite</h1>
             <p className="tanga-deck__cover-sub">Explore the Tanga project through its surveyed terrain, drilling, geological interpretation, reported resource, testwork and the questions that shape the next study stage.</p>
-            <button type="button" className="tanga-deck__cover-cta" onClick={() => setCoverDismissed(true)}>
+            <button type="button" className="tanga-deck__cover-cta" onClick={beginProjectStory}>
               Begin the story <ChevronRight size={18} strokeWidth={2.4} />
             </button>
             <span className="tanga-deck__cover-hint">Press &rarr; or click to begin</span>
@@ -6536,7 +6540,7 @@ export default function TangaDeckWorkbench() {
         {isExploreMode ? 'Return to story' : 'Explore evidence'}
       </button>
       {!isCoverScene && !isClosingScene && (
-        <header className="tanga-deck__chapter-title">
+        <header key={activeMode} className="tanga-deck__chapter-title">
           <small>CHAPTER {String(activeStoryIndex + 1).padStart(2, '0')}</small>
           <h1>{STORY_STEPS[activeStoryIndex]?.label}</h1>
         </header>
@@ -6545,6 +6549,9 @@ export default function TangaDeckWorkbench() {
         <p className="tanga-deck__planning-note">Conceptual study visual · not an engineered or permitted design</p>
       )}
       <nav className="tanga-deck__pager" aria-label="Deck navigation">
+        {!isExploreMode && !isCoverScene && (
+          <progress className="tanga-deck__chapter-progress" value={activeStoryIndex + 1} max={STORY_STEPS.length} aria-label="Chapter progress" />
+        )}
         <button
           type="button"
           className="tanga-deck__pager-btn"
@@ -6618,17 +6625,37 @@ export default function TangaDeckWorkbench() {
         </button>
         <span className="tanga-deck__pager-divider" aria-hidden="true" />
         <div className="tanga-deck__autoplay-group">
-          <button
-            type="button"
-            className={classNames('tanga-deck__executive-tour', 'tanga-deck__executive-tour--kiosk', isKioskMode && 'is-active')}
-            onClick={isKioskMode ? exitKioskMode : enterKioskMode}
-            aria-label={isKioskMode ? 'Exit booth presentation mode' : 'Start booth presentation mode'}
-            title={isKioskMode ? 'Exit booth mode · Escape' : 'Loop the authored investor highlights; interaction pauses for exploration'}
-          >
-            {isKioskMode ? 'Exit booth' : 'Booth mode'}
-          </button>
-          <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
-          <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
+          <details className="tanga-tour-picker" onBlur={event => {
+            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+          }} onKeyDown={event => {
+            if (event.key === 'Escape' && event.currentTarget.open) {
+              event.stopPropagation();
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector('summary')?.focus();
+            }
+          }}>
+            <summary>Tours</summary>
+            <div className="tanga-tour-picker__options" onClick={event => {
+              if (!(event.target as Element).closest('button')) return;
+              const menu = event.currentTarget.closest('details');
+              if (menu) {
+                menu.open = false;
+                menu.querySelector('summary')?.focus();
+              }
+            }}>
+              <button
+                type="button"
+                className={classNames('tanga-deck__executive-tour', 'tanga-deck__executive-tour--kiosk', isKioskMode && 'is-active')}
+                onClick={isKioskMode ? exitKioskMode : enterKioskMode}
+                aria-label={isKioskMode ? 'Exit booth presentation mode' : 'Start booth presentation mode'}
+                title={isKioskMode ? 'Exit booth mode · Escape' : 'Loop the authored investor highlights; interaction pauses for exploration'}
+              >
+                {isKioskMode ? 'Exit booth' : 'Booth mode'}
+              </button>
+              <button type="button" className="tanga-deck__executive-tour" onClick={startExecutiveTour} aria-label="Start the complete guided project story" title={`Full guided story · ${Math.floor(EXECUTIVE_STORY_SECONDS / 60)} min ${EXECUTIVE_STORY_SECONDS % 60} sec · 12 chapters`}>Full story · {Math.floor(EXECUTIVE_STORY_SECONDS / 60)}m {EXECUTIVE_STORY_SECONDS % 60}s</button>
+              <button type="button" className="tanga-deck__executive-tour tanga-deck__executive-tour--highlights" onClick={startExecutiveHighlights} aria-label="Start the six scene executive highlights" title="Six authored investor views · about 90 seconds after scenes load">Highlights · 90s</button>
+            </div>
+          </details>
           <button
             type="button"
             className={classNames('tanga-deck__pager-btn tanga-deck__pager-btn--tool tanga-deck__pager-play', activeChapterTourName && !isExecutiveTour && 'tanga-deck__pager-play--named', isAutoplay && 'is-active', isAutoplay && 'is-ticking')}
@@ -7254,7 +7281,7 @@ export default function TangaDeckWorkbench() {
         )}
       </section>
 
-      {!isExploreMode && !isCoverScene && ['topography','drillholes','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 Surface'],['drillholes','02 Drilling'],['subsurface','03 Geology'],['resource','04 Estimate']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
+      {!isExploreMode && !isCoverScene && ['topography','drillholes','subsurface','resource'].includes(activeMode) && <nav className="tanga-evidence-sequence" aria-label="Surface to resource evidence sequence">{[['topography','01 · Surface'],['drillholes','02 · Drill'],['subsurface','03 · Geology'],['resource','04 · Resource']].map(([mode,label]) => <button key={mode} type="button" aria-current={activeMode===mode?'step':undefined} onClick={()=>{setIsAutoplay(false);setIsExecutiveTour(false);goToStoryIndex(STORY_STEPS.findIndex(step=>step.mode===mode));}}>{label}</button>)}</nav>}
       <TangaEvidenceDrawer chapter={activeMode as TangaChapterId}/>
       {!isExploreMode && !(activeMode === 'subsurface' && activeShotIndex < 3) && <TangaChapterStoryPanel
         chapter={activeMode as TangaChapterId}

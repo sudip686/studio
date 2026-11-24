@@ -1,5 +1,5 @@
 import {assetUrl} from './asset-url';
-import {cachedDeckAsset} from './cached-deck-asset';
+import {cachedDeckAsset, DECK_ASSET_CACHE} from './cached-deck-asset';
 
 export type DeckPreloadStage = 'topography' | 'drillholes' | 'subsurface' | 'resource';
 export type DeckAssetPreparationStatus = 'not-prepared' | 'preparing' | 'cached' | 'loaded-not-cached' | 'failed' | 'cancelled';
@@ -44,7 +44,7 @@ export const DECK_PRELOAD_ASSET_LABELS: Record<string, string> = {
 export async function isDeckAssetCached(path: string) {
   if (typeof window === 'undefined' || !('caches' in window)) return false;
   try {
-    const cache = await caches.open('tanga-public-3d-v2');
+    const cache = await caches.open(DECK_ASSET_CACHE);
     const cached = await cache.match(new URL(assetUrl(path), window.location.href).href);
     const storedAt = Number(cached?.headers.get('x-tanga-stored-at'));
     return Boolean(cached && Number.isFinite(storedAt) && Date.now() - storedAt < 24 * 60 * 60 * 1000);

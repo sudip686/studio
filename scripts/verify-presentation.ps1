@@ -11,6 +11,8 @@ $ErrorActionPreference = 'Stop'
 $browserCli = Join-Path $PSScriptRoot '../node_modules/.bin/agent-browser.cmd'
 $auditSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'audit-presentation-layout.js') -Raw
 $auditEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($auditSource))
+$dismissCoachEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("document.querySelector('.tanga-deck__coach')?.click()"))
+$openIndexEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("document.querySelector('.tanga-deck__pager-count')?.click()"))
 $titles = @(
   'Meet Tanga',
   'Place it on the map',
@@ -60,19 +62,28 @@ if ($LASTEXITCODE -ne 0) { throw "Could not open $BaseUrl/#project" }
 $navigationReady = $false
 for ($attempt = 0; $attempt -lt 20; $attempt++) {
   $navigationSnapshot = (& $browserCli --session $BrowserSession snapshot -i) -join "`n"
-  if ($LASTEXITCODE -eq 0 -and $navigationSnapshot.Contains('tab "Scene 1: Meet Tanga"')) {
+  if ($LASTEXITCODE -eq 0 -and $navigationSnapshot.Contains('Jump to a scene')) {
     $navigationReady = $true
     break
   }
   Start-Sleep -Milliseconds 500
 }
 if (-not $navigationReady) { throw 'The presentation chapter navigation did not mount.' }
+& $browserCli --session $BrowserSession eval -b $dismissCoachEncoded | Out-Null
 
 for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
   $title = $titles[$slideIndex - 1]
   $mode = $modes[$slideIndex - 1]
-  & $browserCli --session $BrowserSession find role tab click --name "Scene ${slideIndex}: $title"
-  if ($LASTEXITCODE -ne 0) { throw "Navigation failed for chapter $slideIndex ($title)." }
+  if ($slideIndex -gt 1) {
+    & $browserCli --session $BrowserSession eval -b $openIndexEncoded | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not open the scene index.' }
+    & $browserCli --session $BrowserSession wait --fn "document.querySelectorAll('.tanga-deck__index li button').length >= $slideIndex"
+    if ($LASTEXITCODE -ne 0) { throw "Scene index did not expose chapter $slideIndex ($title)." }
+    $selectStorySource = "document.querySelectorAll('.tanga-deck__index li button')[$($slideIndex - 1)]?.click()"
+    $selectStoryEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($selectStorySource))
+    & $browserCli --session $BrowserSession eval -b $selectStoryEncoded | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Navigation failed for chapter $slideIndex ($title)." }
+  }
 
   & $browserCli --session $BrowserSession wait --fn "document.querySelector('.tanga-deck')?.dataset.mode === '$mode'"
   if ($LASTEXITCODE -ne 0) { throw "Wrong mode for chapter $slideIndex ($mode)." }
@@ -105,6 +116,8 @@ for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
     ready = $true
     overlapCount = $auditObject.overlaps.Count
     outsideCount = $auditObject.outside.Count
+    controlsOutsideCount = $auditObject.controlsOutside.Count
+    pageOverflow = $auditObject.pageOverflow
     screenshot = $capturePath
     overlaps = $auditObject.overlaps
     outside = $auditObject.outside

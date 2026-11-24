@@ -14,6 +14,7 @@ const {values: options} = parseArgs({options: {
   height: {type: 'string', default: '768'},
   'frame-ms': {type: 'string', default: '1500'},
   'interaction-ms': {type: 'string', default: '0'},
+  'ready-timeout-ms': {type: 'string', default: '120000'},
   headless: {type: 'boolean'},
 }});
 const chapters = options.chapters.split(',');
@@ -21,9 +22,10 @@ if (chapters.some(chapter => !chapterOrder.includes(chapter))) throw new Error('
 const viewport = {width: Number(options.width), height: Number(options.height)};
 const frameMs = Number(options['frame-ms']);
 const interactionMs = Number(options['interaction-ms']);
-if (![viewport.width, viewport.height, frameMs, interactionMs].every(Number.isSafeInteger) ||
+const readyTimeoutMs = Number(options['ready-timeout-ms']);
+if (![viewport.width, viewport.height, frameMs, interactionMs, readyTimeoutMs].every(Number.isSafeInteger) ||
     viewport.width < 1 || viewport.height < 1 || frameMs < 0 || frameMs > 60_000 ||
-    interactionMs < 0 || interactionMs > 60_000) {
+    interactionMs < 0 || interactionMs > 60_000 || readyTimeoutMs < 1000 || readyTimeoutMs > 300_000) {
   throw new Error('Invalid viewport or frame sample duration');
 }
 
@@ -60,8 +62,8 @@ try {
         const result = {chapter, cache};
         try {
           const response = cache === 'cold'
-            ? await page.goto(url.href, {waitUntil: 'domcontentloaded', timeout: 45_000})
-            : await page.reload({waitUntil: 'domcontentloaded', timeout: 45_000});
+            ? await page.goto(url.href, {waitUntil: 'domcontentloaded', timeout: readyTimeoutMs})
+            : await page.reload({waitUntil: 'domcontentloaded', timeout: readyTimeoutMs});
           result.status = response?.status();
           result.finalUrl = page.url();
           await page.waitForFunction(({chapter, map}) => {
@@ -69,7 +71,7 @@ try {
             if (deck?.dataset.mode !== chapter) return false;
             if (chapter === 'metallurgy') return deck.querySelector('.tanga-process-canvas')?.dataset.ready === 'true';
             return deck.dataset[map ? 'mapState' : 'threeState'] === 'ready';
-          }, {chapter, map: mapChapters.includes(chapter)}, {timeout: 45_000});
+          }, {chapter, map: mapChapters.includes(chapter)}, {timeout: readyTimeoutMs});
 
           Object.assign(result, await page.evaluate(async duration => {
             const deck = document.querySelector('main[data-mode]');
