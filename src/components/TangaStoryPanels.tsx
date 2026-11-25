@@ -102,7 +102,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
     <h2>Work completed</h2>
     <p className="tanga-story-panel__intro">Four distinct evidence milestones. Select one to inspect what it adds to the project picture.</p>
     <nav className="tanga-story-timeline" aria-label="Select a project milestone">
-      {WORK_MILESTONES.map((item, index) => <button type="button" key={item.id} className={index === milestoneIndex ? 'is-active' : ''} onClick={() => onMilestoneChange?.(item.id)} aria-current={index === milestoneIndex ? 'step' : undefined}>
+      {WORK_MILESTONES.map((item, index) => <button type="button" key={item.id} className={index === milestoneIndex ? 'is-active' : ''} style={{'--milestone-image': `url("${item.image}")`} as React.CSSProperties} onClick={() => onMilestoneChange?.(item.id)} aria-current={index === milestoneIndex ? 'step' : undefined}>
         <span>{item.date}</span><strong>{item.title}</strong>
       </button>)}
     </nav>

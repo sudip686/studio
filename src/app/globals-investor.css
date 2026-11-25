@@ -795,6 +795,11 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-pit-focus-actions button:disabled{opacity:.5;cursor:not-allowed}
 .tanga-story-panel__link:focus-visible,.tanga-story-panel__compare:focus-visible { outline: 2px solid #f6be91; outline-offset: 3px; }
 .tanga-story-panel--concept { width: min(390px, calc(100vw - 36px)); }
+.tanga-story-panel--timeline .tanga-story-timeline { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.tanga-story-panel--timeline .tanga-story-timeline button { position:relative; min-height:76px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; gap:3px; padding:9px; border:1px solid #d7dfd833; border-radius:6px; text-align:left; color:#f2eee4; background:linear-gradient(0deg,#101a20f2,#101a2070),var(--milestone-image) center/cover; }
+.tanga-story-panel--timeline .tanga-story-timeline button.is-active { border-color:#a7e0d3; box-shadow:inset 0 -2px #a7e0d3; }
+.tanga-story-panel--timeline .tanga-story-timeline button span { font:10px ui-monospace,monospace; color:#a7e0d3; }
+.tanga-story-panel--timeline .tanga-story-timeline button strong { font-size:11px; line-height:1.2; }
 .tanga-deck__executive-tour { min-height: 36px; padding: 0 13px; border: 1px solid rgba(230,151,96,.32); border-radius: 999px; background: rgba(230,151,96,.11); color: #f4b184; font: inherit; font-size: 10px; font-weight: 680; white-space: nowrap; cursor: pointer; }
 .tanga-deck__executive-tour:hover { background: rgba(230,151,96,.19); }
 .tanga-deck__executive-tour--highlights { border-color: rgba(191,205,209,.28); background: rgba(122,151,163,.1); color: #c6d5d9; }
