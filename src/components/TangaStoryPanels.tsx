@@ -117,7 +117,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
 
   if (chapter === 'project') return <aside className="tanga-story-panel tanga-story-panel--project" aria-label="Tanga project introduction">
     <div className="tanga-story-panel__eyebrow">TANGA REGION · TANZANIA</div>
-    <h2>The Tanga project area</h2>
+    <h2>Tanga Graphite</h2>
     <p className="tanga-story-panel__intro">A graphite project in the Maramba area of Mkinga District, framed by the August 2025 topographical survey.</p>
     <img className="tanga-story-project-image" src="/presentation-assets/survey-site-aerial.jpg" alt="Aerial photographs of the forested Tanga project landscape"/>
     <div className="tanga-story-image-caption"><span>Survey report · site photographs</span><small>Context imagery · not a georeferenced orthophoto</small></div>

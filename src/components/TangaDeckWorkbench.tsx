@@ -598,7 +598,7 @@ const COVER_COAST_VIEW: DeckViewState = {
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   work_completed: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   ranking: {longitude: 30, latitude: 12, zoom: 1.55, pitch: 0, bearing: 0},
-  tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.15, pitch: 28, bearing: -8},
+  tanzania: {longitude: 37.8, latitude: -5.25, zoom: 5.05, pitch: 24, bearing: -10},
   project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
   topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
   // Framed on the story: project (38.79,-4.81) -> Tanga Port (39.105,-5.064).
