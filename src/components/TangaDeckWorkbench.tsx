@@ -4707,6 +4707,8 @@ export default function TangaDeckWorkbench() {
     }
     if (activeMode === 'tanzania') {
       push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
+      push('lbl-tanga-port', 'Tanga Port', ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat, 320, '#a7e0d3');
+      push('lbl-indian-ocean', 'Indian Ocean', 40.65, -5.45, 0, '#a7c0d8');
     }
     if (activeMode === 'accessibility') {
       // Only the two ends of the corridor. The power nodes are already covered by
