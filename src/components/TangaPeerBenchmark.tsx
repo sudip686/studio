@@ -19,7 +19,7 @@ export default function TangaPeerBenchmark({revealed, onReveal, onReset, selecte
   const selectedRow=rows.find(row=>row.project===selected?.project)??null;
   const selectedEvidence=selectedRow?graphitePeerEvidence(selectedRow):null;
   const rank=graphitePeerRows(true).find(row=>row.isTanga)!.displayRank;
-  const maximum=Math.max(...rows.map(row=>row.containedGraphiteMt));
+  const maximum=Math.max(...graphitePeerRows(true).map(row=>row.containedGraphiteMt));
   return <section className="tanga-peer-benchmark" aria-label="Global graphite benchmark and Tanga MRE reveal" data-revealed={revealed}>
     <div className="tanga-peer-benchmark__narrative">
       <span className="tanga-peer-benchmark__eyebrow">PUBLISHED PEER COMPARISON</span>

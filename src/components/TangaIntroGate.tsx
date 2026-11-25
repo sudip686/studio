@@ -6,10 +6,9 @@ import {assetUrl} from '@/lib/asset-url';
 // Large media lives on Cloudflare R2 (NEXT_PUBLIC_ASSET_BASE_URL) in
 // production and /public locally. Videos are gitignored — never in the bundle.
 const VIDEO_KEY = '/media/tanga-google-earth-intro-corrected-preview.mp4';
-const POSTER_KEY = '/media/tanga-first-slide-story-poster.jpg';
 const INTRO_VIDEO_SRC = assetUrl(VIDEO_KEY) + '?v=intro-opt-1080-20260819';
 const INTRO_VIDEO_SRC_LOCAL = VIDEO_KEY + '?v=intro-opt-1080-20260819';
-const INTRO_POSTER_SRC = assetUrl(POSTER_KEY) + '?v=full-bleed-bright-20260625';
+const INTRO_POSTER_SRC = '/presentation-assets/survey-site-aerial.jpg';
 const ERROR_FALLBACK_MS = 2000;
 
 type IntroState = 'checking' | 'playing' | 'blocked' | 'finishing' | 'done';
