@@ -5957,7 +5957,7 @@ export default function TangaDeckWorkbench() {
       data-testid="tanga-deck-workbench"
     >
       {activeMode === 'comparison' && isLastStory && !isExploreMode && <img className="tanga-closing-photo" src="/presentation-assets/survey-site-aerial.jpg" alt="Forested hills in the Tanga survey area"/>}
-      {!isCoverScene && !storyHeroVisible && <TangaCinematicChrome key={activeMode} root={stageRef} mode={activeMode} view={`${activeMode}/${activeShotIndex}`}/>}
+      {!isCoverScene && !storyHeroVisible && <TangaCinematicChrome key={`chrome-${activeMode}`} root={stageRef} mode={activeMode} view={`${activeMode}/${activeShotIndex}`}/>}
       <DeckHoverGuide mode={activeMode}/>
       <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
@@ -6544,7 +6544,7 @@ export default function TangaDeckWorkbench() {
         {isExploreMode ? 'Return to story' : 'Explore evidence'}
       </button>
       {!isCoverScene && !isClosingScene && (
-        <header key={activeMode} className="tanga-deck__chapter-title">
+        <header key={`heading-${activeMode}`} className="tanga-deck__chapter-title">
           <small>CHAPTER {String(activeStoryIndex + 1).padStart(2, '0')}</small>
           <h1>{STORY_STEPS[activeStoryIndex]?.label}</h1>
         </header>

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {createSignalGlow} from './signal-glow';
 
+export const FLOTATION_SECTION_ORIGIN = [104, 0, -103] as const;
+
 export type PlantProcessArea = 'feed' | 'milling' | 'flotation' | 'dewatering' | 'product';
 
 /** Display motion for the conceptual campus. Speeds and particle counts have
@@ -55,11 +57,10 @@ export function createPlantProcessMotion(plant: THREE.Group, glowEnabled = false
   root.add(residueLine);
 
   const cells = Array.from({length: 10}, (_, index) => ({x: 8 + index % 5 * 15, z: -36 + Math.floor(index / 5) * 24}));
-  // The cutaway sits beside the operating campus so neighbouring roofs cannot
-  // cover the pulp, froth or discharge path in the presentation camera.
+  // The inspection vessel extends the uncovered secondary bank at its east end.
   const inspection = new THREE.Group();
   inspection.name = 'Illustrative flotation cell section';
-  inspection.position.set(200, 0, -160);
+  inspection.position.set(...FLOTATION_SECTION_ORIGIN);
   root.add(inspection);
   function sectionBox(size: [number, number, number], center: [number, number, number], material: THREE.Material) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
@@ -78,7 +79,29 @@ export function createPlantProcessMotion(plant: THREE.Group, glowEnabled = false
   sectionBox([26, .6, 18], [0, 14.7, 0], windowMaterial);
   sectionBox([12, 1.4, 6], [18, 14.2, -5], graphiteFlake);
   sectionBox([13, 1.4, 5], [-18, 2.8, -5], gangue);
-  sectionBox([2, 8, 2], [0, 17, 0], steel);
+  // Keep the front half open for the section view. The drive sits on a bridge
+  // spanning the cell; its shaft and impeller reach into the aerated pulp.
+  const safetyPaint = new THREE.MeshStandardMaterial({color: 0xd8a642, roughness: .77});
+  for (const z of [-2, 2]) sectionBox([29, .8, .5], [0, 18, z], steel);
+  sectionBox([30, .3, 5], [0, 18.5, 0], steel);
+  for (const x of [-12, -6, 0, 6, 12]) sectionBox([.18, 2.6, .18], [x, 19.9, 2.3], safetyPaint);
+  for (const y of [19.8, 21]) sectionBox([28, .18, .18], [0, y, 2.3], safetyPaint);
+  const motor = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.65, 3.5, 16), steel);
+  motor.position.y = 20.4; inspection.add(motor);
+  for (const y of [19.2, 19.8, 20.4, 21, 21.6]) {
+    const fin = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.75, .17, 16), steel);
+    fin.position.y = y; inspection.add(fin);
+  }
+  const impeller = new THREE.Group();
+  impeller.position.y = 8;
+  inspection.add(impeller);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.34, .34, 10.6, 12), steel);
+  shaft.position.y = 5.3; impeller.add(shaft);
+  for (let index = 0; index < 3; index++) {
+    const vane = new THREE.Mesh(new THREE.BoxGeometry(5.5, .85, .36), steel);
+    vane.rotation.y = index * Math.PI / 3;
+    impeller.add(vane);
+  }
   const rising = new THREE.InstancedMesh(new THREE.CylinderGeometry(.68, .68, .15, 6), graphiteFlake, 32);
   const flakeGlow = glowEnabled ? createSignalGlow(rising.count, 0x69f5e5, 22) : null;
   if (flakeGlow) inspection.add(flakeGlow.points);
@@ -173,6 +196,7 @@ export function createPlantProcessMotion(plant: THREE.Group, glowEnabled = false
     if (mill && millMount) mill.quaternion.copy(millMount).multiply(rotation.setFromAxisAngle(yAxis, clocks.milling * .42));
     if (dryer && dryerMount) dryer.quaternion.copy(dryerMount).multiply(rotation.setFromAxisAngle(yAxis, clocks.dewatering * .2));
     if (area === 'flotation') {
+      impeller.rotation.y = clocks.flotation * 1.8;
       placeTransfer(slurry, clocks.flotation, 5);
       placeTransfer(residue, clocks.flotation, 4);
       for (let index = 0; index < rising.count; index++) {
