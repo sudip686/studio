@@ -208,7 +208,8 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   mesh(new THREE.CylinderGeometry(12,5,12,4),materials.copper,-104,21,-16,'Receiving hopper').rotation.y=Math.PI/4;
   shed('ROM & crushing',-88,-16,72,58,30,'feed');
   shed('Milling',-30,-18,48,45,27,'milling');
-  const mill=cylinder(8,23,-30,12,-18);mill.rotation.z=Math.PI/2;mill.name='Milling process drum';mill.userData.preserveAnimation=true;root.userData.processMill=mill;
+  const millFinish = new THREE.MeshStandardMaterial({color: 0x386d84, metalness: .22, roughness: .57});
+  const mill=cylinder(8,23,-30,12,-18,millFinish);mill.rotation.z=Math.PI/2;mill.name='Milling process drum';mill.userData.preserveAnimation=true;root.userData.processMill=mill;
   // Longitudinal shell ribs provide scale and make rotation legible. Instances
   // stay attached to the drum and share its local cylinder axis.
   const millRibs=new THREE.InstancedMesh(new THREE.BoxGeometry(.55,23,.55),materials.roof,12);

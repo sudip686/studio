@@ -3093,6 +3093,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       toTarget: THREE.Vector3;
       fromFov: number;
       toFov: number;
+      flightPath?: THREE.QuadraticBezierCurve3;
     };
     type RotationTween = {
       start: number;
@@ -3117,7 +3118,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       host.dataset.geologyProjection = 'perspective';
       if (!quiet) window.dispatchEvent(new Event('tanga:geology-perspective'));
     };
-    const scheduleCameraTween = (toPosition: THREE.Vector3, toTarget: THREE.Vector3, duration = 1.35, toFov = camera.fov) => {
+    const scheduleCameraTween = (toPosition: THREE.Vector3, toTarget: THREE.Vector3, duration = 1.35, toFov = camera.fov, flyover = false) => {
       leaveGeologyPlan();
       userTookControl = true;
       if((mode==='subsurface'||mode==='resource')&&camera.aspect<1)toPosition=toTarget.clone().add(toPosition.clone().sub(toTarget).multiplyScalar(1.2/camera.aspect));
@@ -3129,15 +3130,27 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const shift=screenUp.multiplyScalar(-toPosition.distanceTo(toTarget)*Math.tan(THREE.MathUtils.degToRad(toFov/2))*.11);
         toPosition=toPosition.clone().add(shift);toTarget=toTarget.clone().add(shift);
       }
+      const fromPosition = camera.position.clone();
+      const travel = fromPosition.distanceTo(toPosition);
+      const flightPath = flyover && travel > 80
+        ? new THREE.QuadraticBezierCurve3(
+          fromPosition,
+          fromPosition.clone().lerp(toPosition, .5).setY(
+            Math.max(fromPosition.y, toPosition.y) + Math.min(350, travel * .2)
+          ),
+          toPosition
+        )
+        : undefined;
       cameraTween = {
         start: clock.getElapsedTime(),
         duration,
-        fromPosition: camera.position.clone(),
+        fromPosition,
         toPosition,
         fromTarget: controls.target.clone(),
         toTarget,
         fromFov: camera.fov,
         toFov,
+        flightPath,
       };
     };
 
@@ -3474,9 +3487,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:({feed:'01 · Feed & crushing',milling:'02 · Milling',flotation:'03 · Flotation',thickening:'04 · Thickening',dewatering:'05 · Dewatering',product:'06 · Product handling'} as Record<string,string>)[item.id]??item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:threeOwnerLocalAnchor(item.point,'process-plant'),kind:'story' as const,occlusion:'xray' as const}));
         for(const callout of calloutsForProjection)calloutObjects.set(callout.id,processPlant);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
-        const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
-        scheduleCameraTween(position,centre,1.3,42);
-        setStatus(selected?`${selected.label} · conceptual process area`:'Processing plant · conceptual facility detail');return;
+        const position = centre.clone().add((selected
+          ? new THREE.Vector3(84, 54, 108)
+          : new THREE.Vector3(310, 200, 405)).multiplyScalar(Math.max(1, .85 / camera.aspect)));
+        // Leave room for the right-hand evidence panel while keeping the
+        // process area and camera aligned through the approach.
+        if (camera.aspect >= 1.3) {
+          const right = position.clone().sub(centre).cross(camera.up).negate().normalize();
+          const shift = position.distanceTo(centre) * (selected ? .13 : .17);
+          centre.addScaledVector(right, shift);
+          position.addScaledVector(right, shift);
+        }
+        scheduleCameraTween(position, centre, selected ? 1.7 : 3.6, 42, true);
+        setStatus(selected ? `${selected.label} · conceptual process area` : 'Processing plant flyover · conceptual facility');
+        return;
       }
       if(command.action==='revealPitBlocks'&&mode==='mine_planning'){
         if(!sitePlan?.pits.length)return;
@@ -6173,7 +6197,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const flyProgress = reducedMotion.matches?1:ease(Math.min(1, elapsed / cameraShot.flySeconds));
       if (cameraTween) {
         const tweenProgress = reducedMotion.matches ? 1 : ease(Math.min(1, (elapsed - cameraTween.start) / cameraTween.duration));
-        camera.position.lerpVectors(cameraTween.fromPosition, cameraTween.toPosition, tweenProgress);
+        if (cameraTween.flightPath) cameraTween.flightPath.getPoint(tweenProgress, camera.position);
+        else camera.position.lerpVectors(cameraTween.fromPosition, cameraTween.toPosition, tweenProgress);
         controls.target.lerpVectors(cameraTween.fromTarget, cameraTween.toTarget, tweenProgress);
         camera.fov = THREE.MathUtils.lerp(cameraTween.fromFov, cameraTween.toFov, tweenProgress);
         camera.updateProjectionMatrix();

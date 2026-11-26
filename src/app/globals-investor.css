@@ -770,6 +770,10 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-milestone-stage { position: fixed; z-index: 18; top: 49%; left: clamp(240px, 19vw, 320px); right: clamp(500px, 31vw, 540px); height: min(58vh, 590px); min-height: 360px; overflow: hidden; transform: translateY(-47%); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; background: #11171b; box-shadow: 0 28px 90px rgba(0,0,0,.4); }
 .tanga-milestone-stage img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .tanga-milestone-stage.is-figure img { padding: 24px; object-fit: contain; background: #13191d; }
+@media (min-width: 1201px) {
+  .tanga-milestone-stage[data-milestone="survey"] img { object-position: center 28%; }
+  .tanga-milestone-stage[data-milestone="survey"] .tanga-milestone-stage__shade { background: none; }
+}
 .tanga-milestone-stage__shade { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(3,7,10,.24),transparent 30%,rgba(3,7,10,.12) 54%,rgba(3,7,10,.86)); pointer-events: none; }
 .tanga-milestone-stage.is-figure .tanga-milestone-stage__shade { background: linear-gradient(180deg,rgba(3,7,10,.14),transparent 34%,rgba(3,7,10,.72)); }
 .tanga-milestone-stage__caption { position: absolute; right: clamp(18px,3vw,42px); bottom: clamp(20px,4vh,42px); left: clamp(18px,3vw,42px); max-width: 60ch; color: #fff; text-shadow: 0 2px 18px rgba(0,0,0,.65); }

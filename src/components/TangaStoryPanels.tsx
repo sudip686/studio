@@ -213,7 +213,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
         <button type="button" aria-pressed={siteOrientation==='oblique'} disabled={!onSiteOrientation} onClick={()=>{setSiteOrientation('oblique');onSiteOrientation?.('oblique');}}>Oblique view</button>
       </div>
       {developmentViewId!=='plant'&&<div className="tanga-site-panel-actions">
-        <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Processing plant <ArrowRight size={14}/></button>
+        <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Fly to processing plant <ArrowRight size={14}/></button>
         {onToggleSurfaceConcept&&<button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView?'Close terrain comparison':'Compare terrain'} <ArrowRight size={14}/></button>}
       </div>}
       {developmentViewId==='plant'&&<section className="tanga-site-plant-controls" aria-label="Processing plant roof cutaway">
@@ -298,8 +298,8 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
 
 export function TangaMilestoneStage({milestoneId}: {milestoneId: string}) {
   const milestone = WORK_MILESTONES.find((item) => item.id === milestoneId) ?? WORK_MILESTONES[1];
-  const isFigure = milestone.id === 'resource';
-  return <section className={`tanga-milestone-stage${isFigure ? ' is-figure' : ''}`} aria-label={`${milestone.title} source evidence`}>
+  const isFigure = milestone.id === 'resource' || milestone.id === 'survey';
+  return <section className={`tanga-milestone-stage${isFigure ? ' is-figure' : ''}`} data-milestone={milestone.id} aria-label={`${milestone.title} source evidence`}>
     <img key={milestone.image} src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
     <div className="tanga-milestone-stage__shade"/>
     <div className="tanga-milestone-stage__caption"><span>{milestone.date} · {milestone.source}</span><h2>{milestone.title}</h2><p>{milestone.detail}</p></div>
