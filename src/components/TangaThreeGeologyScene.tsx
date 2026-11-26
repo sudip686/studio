@@ -2480,7 +2480,7 @@ export default function TangaThreeGeologyScene({
   terrainProfilePositionRef.current = terrainProfilePosition;
   const [terrainProfileSweeping, setTerrainProfileSweeping] = useState(false);
   const terrainSweepProgressRef = useRef(0);
-  const journeyCommand=useRef<((id:string|null)=>void)|null>(null);
+  const journeyCommand=useRef<((id:string|null, stopDepth?:number)=>void)|null>(null);
   const [plantCutaway,setPlantCutaway]=useState(false);
   const [plantProcess,setPlantProcess]=useState('all');
   const [mappedSurfaceStage,setMappedSurfaceStage]=useState(false);
@@ -2827,6 +2827,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const developmentMarkers:{group:THREE.Group;offset:number;length:number}[]=[];
     let feedAnchor: THREE.Vector3 | null = null;
     let facilityFocused = false;
+    let inspectedPit: 0 | 1 | null = null;
     let geologyPlan = false;
     let geologyOblique = false;
     let sitePlanView = false;
@@ -3092,6 +3093,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       toTarget: THREE.Vector3;
       fromFov: number;
       toFov: number;
+      flightPath?: THREE.QuadraticBezierCurve3;
     };
     type RotationTween = {
       start: number;
@@ -3116,7 +3118,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       host.dataset.geologyProjection = 'perspective';
       if (!quiet) window.dispatchEvent(new Event('tanga:geology-perspective'));
     };
-    const scheduleCameraTween = (toPosition: THREE.Vector3, toTarget: THREE.Vector3, duration = 1.35, toFov = camera.fov) => {
+    const scheduleCameraTween = (toPosition: THREE.Vector3, toTarget: THREE.Vector3, duration = 1.35, toFov = camera.fov, flyover = false) => {
       leaveGeologyPlan();
       userTookControl = true;
       if((mode==='subsurface'||mode==='resource')&&camera.aspect<1)toPosition=toTarget.clone().add(toPosition.clone().sub(toTarget).multiplyScalar(1.2/camera.aspect));
@@ -3128,15 +3130,27 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const shift=screenUp.multiplyScalar(-toPosition.distanceTo(toTarget)*Math.tan(THREE.MathUtils.degToRad(toFov/2))*.11);
         toPosition=toPosition.clone().add(shift);toTarget=toTarget.clone().add(shift);
       }
+      const fromPosition = camera.position.clone();
+      const travel = fromPosition.distanceTo(toPosition);
+      const flightPath = flyover && travel > 80
+        ? new THREE.QuadraticBezierCurve3(
+          fromPosition,
+          fromPosition.clone().lerp(toPosition, .5).setY(
+            Math.max(fromPosition.y, toPosition.y) + Math.min(350, travel * .2)
+          ),
+          toPosition
+        )
+        : undefined;
       cameraTween = {
         start: clock.getElapsedTime(),
         duration,
-        fromPosition: camera.position.clone(),
+        fromPosition,
         toPosition,
         fromTarget: controls.target.clone(),
         toTarget,
         fromFov: camera.fov,
         toFov,
+        flightPath,
       };
     };
 
@@ -3151,6 +3165,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       controls.update();
     };
 
+    let mappedReliefAnchor: THREE.Vector3 | null = null;
     const consumeCameraCommand = (command: ThreeCameraCommand) => {
       if (['geologyPlan','geologyTilt','geologyDepth'].includes(command.action) && mode === 'subsurface' && !geologyModelReady) return;
       if(mode==='mine_planning'&&!mineCampusReady&&['tailingsView','wasteView','campusView','plantDetail','siteServices','feedPoint','developmentOverview','sitePlan','siteOblique','northPit','southPit','revealPitBlocks'].includes(command.action))return;
@@ -3242,12 +3257,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         reliefDirection.y = 0;
         if (reliefDirection.lengthSq() < 1) reliefDirection.set(.7, 0, .85);
         reliefDirection.normalize();
-        const reliefPosition = geologyPlanTarget.clone()
+        const reliefAnchor = mappedReliefAnchor ?? geologyPlanTarget;
+        const reliefPosition = reliefAnchor.clone()
           .addScaledVector(reliefDirection, reliefDistance * Math.cos(reliefPitch))
           .add(new THREE.Vector3(0, reliefDistance * Math.sin(reliefPitch), 0));
-        const reliefTarget = geologyPlanTarget.clone();
+        const reliefTarget = reliefAnchor.clone();
         let safeAreaShift = 0;
-        if (desktopReliefFrame) {
+        if (desktopReliefFrame && !mappedReliefAnchor) {
           const reliefForward = reliefTarget.clone().sub(reliefPosition).normalize();
           const reliefRight = reliefForward.clone().cross(camera.up).normalize();
           const reliefScreenUp = reliefRight.clone().cross(reliefForward).normalize();
@@ -3338,9 +3354,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const centre = bounds.getCenter(new THREE.Vector3());
         const size = bounds.getSize(new THREE.Vector3());
         const verticalFov = THREE.MathUtils.degToRad(40);
-        const fitTangent = Math.tan(verticalFov / 2) * Math.min(1, camera.aspect);
+        const fitTangent = Math.tan(verticalFov / 2) * Math.min(1, camera.aspect * .66);
         const distance = Math.max(900, size.length() * .66 / fitTangent);
-        const direction = new THREE.Vector3(.67, .68, 1).normalize();
+        const direction = new THREE.Vector3(1, .86, .62).normalize();
         const position = centre.clone().addScaledVector(direction, distance);
         // Offset the whole composition left, away from the evidence panel.
         const right = new THREE.Vector3(direction.z, 0, -direction.x).normalize();
@@ -3350,6 +3366,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       };
 
       if (command.action === 'siteOblique' && mode === 'mine_planning') {
+        inspectedPit = null;
         sitePlanView=false;
         updateMineOrientation('oblique');
         camera.up.set(0,1,0);controls.enableRotate=true;controls.minPolarAngle=0;controls.maxPolarAngle=Math.PI-0.04;
@@ -3413,7 +3430,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         facilityFocused=true;
         setStoryPlaying(false);setMiningBeat(3);
         const centre=stage.localToWorld(feedAnchor.clone());
-        scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,1.5,42);
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,2.8,42,true);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed').map(item=>({...item,occlusion:'xray' as const}));
         setStatus('Uphill feed station · conceptual route into processing');return;
       }
@@ -3429,7 +3446,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const offset=command.action==='campusView'?new THREE.Vector3(0,span*2.4,span*.12):new THREE.Vector3(span*.85,span*.8,span*.95);
         if(command.action==='tailingsView'||command.action==='wasteView')offset.multiplyScalar(1.35);
         offset.multiplyScalar(Math.max(1,.65/camera.aspect));
-        scheduleCameraTween(centre.clone().add(offset),centre,1.8,42);
+        scheduleCameraTween(centre.clone().add(offset),centre,2.8,42,true);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id.startsWith('facility-')&&(command.action==='wasteView'?item.id==='facility-waste':command.action==='tailingsView'?item.id==='facility-tailings':item.id!=='facility-waste')||(command.action==='campusView'&&item.id==='development-plant')).map(item=>({...item,occlusion:'xray' as const}));
         setStatus(command.action==='tailingsView'?'Tailings and water concept detail':command.action==='wasteView'?'Waste-rock landform concept detail':'Lowland campus concept detail');
         return;
@@ -3439,7 +3456,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         facilityFocused=true;
         setStoryPlaying(false);setMiningBeat(3);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(processPlant.userData.siteServices as [number,number,number])));
-        scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,1.5,42);
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,2.5,42,true);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant').map(item=>({...item,occlusion:'xray' as const}));
         setStatus('Site services · workshop, laboratory and water provision');return;
       }
@@ -3470,9 +3487,20 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         calloutsForProjection=(selected?[selected]:stages??[]).map(item=>({id:`plant-${item.id}`,label:({feed:'01 · Feed & crushing',milling:'02 · Milling',flotation:'03 · Flotation',thickening:'04 · Thickening',dewatering:'05 · Dewatering',product:'06 · Product handling'} as Record<string,string>)[item.id]??item.label,detail:item.detail,x:30,y:30,tone:'#dca06b',anchor:threeOwnerLocalAnchor(item.point,'process-plant'),kind:'story' as const,occlusion:'xray' as const}));
         for(const callout of calloutsForProjection)calloutObjects.set(callout.id,processPlant);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(selected?.point??[0,20,0])));
-        const position=centre.clone().add((selected?new THREE.Vector3(105,85,115):new THREE.Vector3(330,280,350)).multiplyScalar(Math.max(1,.65/camera.aspect)));
-        scheduleCameraTween(position,centre,1.3,42);
-        setStatus(selected?`${selected.label} · conceptual process area`:'Processing plant · conceptual facility detail');return;
+        const position = centre.clone().add((selected
+          ? new THREE.Vector3(84, 54, 108)
+          : new THREE.Vector3(310, 200, 405)).multiplyScalar(Math.max(1, .85 / camera.aspect)));
+        // Leave room for the right-hand evidence panel while keeping the
+        // process area and camera aligned through the approach.
+        if (camera.aspect >= 1.3) {
+          const right = position.clone().sub(centre).cross(camera.up).negate().normalize();
+          const shift = position.distanceTo(centre) * (selected ? .13 : .17);
+          centre.addScaledVector(right, shift);
+          position.addScaledVector(right, shift);
+        }
+        scheduleCameraTween(position, centre, selected ? 1.7 : 3.6, 42, true);
+        setStatus(selected ? `${selected.label} · conceptual process area` : 'Processing plant flyover · conceptual facility');
+        return;
       }
       if(command.action==='revealPitBlocks'&&mode==='mine_planning'){
         if(!sitePlan?.pits.length)return;
@@ -3491,6 +3519,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         revealCommand.current?.('none');
         pitBlockRetryRef.current?.();
         stage.updateMatrixWorld(true);
+        if (inspectedPit !== null && inspectedPit === command.pitIndex) {
+          setStatus('Resource cells revealed at the current inspection angle');
+          return;
+        }
         const orderedPits=[...sitePlan.pits].sort((a,b)=>a.centre[1]-b.centre[1]);
         const focusPit=activePitBlockFocusRef.current===null?null:orderedPits[activePitBlockFocusRef.current];
         const bounds=new THREE.Box3();
@@ -3525,6 +3557,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         // isolate its resource cells as well as moving the camera. Requiring a
         // separate "both pits" action first made these detail controls appear
         // broken from the initial mine-planning view.
+        inspectedPit = pitIndex;
         activePitBlockFocusRef.current=pitIndex;
         setTargetXray(false);
         revealCommand.current?.('none');
@@ -3979,6 +4012,23 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           }
         }
         if (mode === 'topography' && surveyProfile.length > 1) {
+          const profileLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(surveyProfile.map(point =>
+              new THREE.Vector3(point.x, point.elevation - LOCAL_VERTICAL_DATUM + 12, -point.north)
+            )),
+            new THREE.LineBasicMaterial({color: '#a7e0d3', depthTest: false, depthWrite: false})
+          );
+          profileLine.renderOrder = 41;
+          terrainLayer.add(profileLine);
+          for (const point of [surveyProfile[0], surveyProfile[surveyProfile.length - 1]]) {
+            const endpoint = new THREE.Mesh(
+              new THREE.SphereGeometry(12, 12, 8),
+              new THREE.MeshBasicMaterial({color: '#a7e0d3', depthTest: false, depthWrite: false})
+            );
+            endpoint.position.set(point.x, point.elevation - LOCAL_VERTICAL_DATUM + 12, -point.north);
+            endpoint.renderOrder = 41;
+            terrainLayer.add(endpoint);
+          }
           terrainProfileMarker = new THREE.Mesh(
             new THREE.SphereGeometry(22, 16, 12),
             new THREE.MeshBasicMaterial({color: '#c7551b', depthTest: false, toneMapped: false})
@@ -4392,7 +4442,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         collarMarker.renderOrder = 101;
         collarMarker.visible = false;
         stage.add(collarMarker);
-        journeyCommand.current=id=>{
+        journeyCommand.current=(id, stopDepth)=>{
           journeyUpdate=null;marker.visible=false;trace.visible=false;collarMarker.visible=false;
           setDrillCutaway(false);
           if(!id){setJourneyReadout('Drillhole journey stopped. Source data unchanged.');return;}
@@ -4420,21 +4470,29 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           const cutNormal = cutView.clone().negate();
           // Keep the surveyed trace and remove only the terrain on the near side.
           const nearEdge = Math.max(...points.map(point => stage.localToWorld(point.clone()).dot(cutView)));
-          const sectionTarget = target.clone().lerp(collar, .18);
+          const targetInterval = stopDepth === undefined ? undefined : intervals.find(segment =>
+            stopDepth >= segment.depthFrom && stopDepth <= segment.depthTo
+          );
+          const sectionTarget = targetInterval && stopDepth !== undefined
+            ? stage.localToWorld(registeredDrillPoint(targetInterval, 'from', terrainResources, drillSurfaceOffsets)
+              .lerp(registeredDrillPoint(targetInterval, 'to', terrainResources, drillSurfaceOffsets),
+                (stopDepth - targetInterval.depthFrom) / Math.max(.001, targetInterval.depthTo - targetInterval.depthFrom)))
+            : target.clone().lerp(collar, .18);
+          const inspectionDistance = targetInterval ? 110 : distance;
           if (!reducedMotion.matches) {
             scheduleCameraTween(collar.clone().add(new THREE.Vector3(120,90,180)),collar,1.2,42);
           }
-          const from=intervals[0].depthFrom,to=Math.max(...intervals.map(d=>d.depthTo)),started=motionTime;
+          const from=intervals[0].depthFrom,to=stopDepth ?? Math.max(...intervals.map(d=>d.depthTo)),started=motionTime;
           const featured = intervals.reduce((best, interval) => interval.carbon > best.carbon ? interval : best);
           let tick=-1,openedTrace=false;
           journeyUpdate=time=>{
-            const progress=reducedMotion.matches?1:Math.min(1,(time-started)/12),depth=reducedMotion.matches ? (featured.depthFrom + featured.depthTo) / 2 : from+(to-from)*progress;
+            const progress=reducedMotion.matches?1:Math.min(1,(time-started)/12),depth=reducedMotion.matches ? (stopDepth ?? (featured.depthFrom + featured.depthTo) / 2) : from+(to-from)*progress;
             if(progress>=.2&&!openedTrace){
               openedTrace=true;
               drillCutPlane.set(cutNormal, nearEdge + 8);
               setDrillCutaway(true);
-              const eye = sectionTarget.clone().addScaledVector(cutView, distance);
-              eye.y += distance * .13;
+              const eye = sectionTarget.clone().addScaledVector(cutView, inspectionDistance);
+              eye.y += inspectionDistance * .13;
               scheduleCameraTween(eye, sectionTarget, 1.35, 42);
             }
             const sample=intervals.find(d=>depth>=d.depthFrom&&depth<=d.depthTo);marker.visible=Boolean(sample);
@@ -5536,6 +5594,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         window.dispatchEvent(new Event('tanga:manual-exploration'));
       }
       if (select && mode === 'subsurface' && geologySurface?.children.includes(hit.object) && tooltip) {
+        mappedReliefAnchor = hit.point.clone();
         onSelectGeologyUnitRef.current?.(tooltip);
         window.dispatchEvent(new Event('tanga:manual-exploration'));
       }
@@ -5986,8 +6045,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       plantRoofMeshes.forEach(roof=>{
         const open=detail.plantCutaway&&plantRoofMatchesFocus(detail.plantProcess,roof.userData.plantStage)?plantRoofProgress:0;
         const slideSign=Number(roof.userData.roofSlideSign??0);
-        roof.position.y=Number(roof.userData.roofBaseY??roof.position.y);
-        roof.position.z=Number(roof.userData.roofBaseZ??roof.position.z)+slideSign*18*open;
+        roof.position.y=Number(roof.userData.roofBaseY??roof.position.y)+Math.abs(slideSign)*4*open;
+        roof.position.z=Number(roof.userData.roofBaseZ??roof.position.z)+slideSign*22*open;
         if(!roof.userData.roofMaterialClones){
           const materials=Array.isArray(roof.material)?roof.material:[roof.material];
           roof.userData.roofBaseOpacities=materials.map(material=>material.opacity);
@@ -6003,7 +6062,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const materials=Array.isArray(roof.material)?roof.material:[roof.material];
         const baseOpacities=roof.userData.roofBaseOpacities as number[];
         materials.forEach((material,index)=>{
-          material.opacity=THREE.MathUtils.lerp(baseOpacities[index]??1,slideSign===0?.14:1,open);
+          material.opacity=THREE.MathUtils.lerp(baseOpacities[index]??1,slideSign===0?.14:.35,open);
           const transparent=material.opacity<.999;
           if(material.transparent!==transparent){material.transparent=transparent;material.needsUpdate=true;}
           material.depthWrite=material.opacity>.55;
@@ -6138,7 +6197,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       const flyProgress = reducedMotion.matches?1:ease(Math.min(1, elapsed / cameraShot.flySeconds));
       if (cameraTween) {
         const tweenProgress = reducedMotion.matches ? 1 : ease(Math.min(1, (elapsed - cameraTween.start) / cameraTween.duration));
-        camera.position.lerpVectors(cameraTween.fromPosition, cameraTween.toPosition, tweenProgress);
+        if (cameraTween.flightPath) cameraTween.flightPath.getPoint(tweenProgress, camera.position);
+        else camera.position.lerpVectors(cameraTween.fromPosition, cameraTween.toPosition, tweenProgress);
         controls.target.lerpVectors(cameraTween.fromTarget, cameraTween.toTarget, tweenProgress);
         camera.fov = THREE.MathUtils.lerp(cameraTween.fromFov, cameraTween.toFov, tweenProgress);
         camera.updateProjectionMatrix();
@@ -6733,7 +6793,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         {mode==='resource'&&<details className="tanga-three-animation-tools" onToggle={event=>{if(event.currentTarget.open){const legend=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three__grade-legend');if(legend?.open)legend.open=false;}}}><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);resourceDrillRevealCommandRef.current?.();}}>Replay source drillhole reveal</button><small>Actual assay intervals shown by hole ID and downhole depth for presentation; this is not drilling chronology.</small><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
           <>
-          {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>The display cuts away foreground terrain. The trace follows recorded intervals, with gaps left unfilled.</small></details>}
+          {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary>{journeyHoles.includes('TGDD1009') && <button type="button" onClick={() => {
+            setJourneyHole('TGDD1009');
+            setMotionPaused(false);
+            journeyCommand.current?.('TGDD1009', (18.25 + 18.38) / 2);
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+          }}>Follow TGDD1009 to sample TGF002</button>}<label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>The display cuts away foreground terrain. The trace follows recorded intervals, with gaps left unfilled.</small></details>}
           <div className="tanga-three__drill-legend" aria-label="Drillhole legend">
             <div className="tanga-three__drill-legend-head">
               <span>{mode === 'topography' ? 'Surface Legend' : 'Drillhole Legend'}</span>
@@ -6791,12 +6856,14 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               <>
                 <svg className="tanga-three__terrain-profile" viewBox="0 0 240 64" role="img" aria-label="Terrain elevation profile across a valid surveyed east-west transect">
                   <path d="M8 54H232" />
+                  <text x="8" y="63" className="tanga-profile-endpoint">A</text>
+                  <text x="224" y="63" className="tanga-profile-endpoint">B</text>
                   <polyline points={terrainProfilePath} />
                   <line x1={10 + terrainProfilePosition * 2.2} y1="8" x2={10 + terrainProfilePosition * 2.2} y2="56" />
                   <circle cx={10 + terrainProfilePosition * 2.2} cy={52 - (((selectedProfileElevation ?? terrainProfileMin) - terrainProfileMin) / terrainProfileRange) * 38} r="3" />
                 </svg>
                 <label className="tanga-three__terrain-profile-control">
-                  <span>Profile cursor</span>
+                  <span>A · West → B · East</span>
                   <strong>{selectedProfileElevation?.toFixed(0)} m</strong>
                   <input aria-label="Terrain profile cursor" type="range" min="0" max="100" value={terrainProfilePosition} onChange={(event) => {setTerrainProfileSweeping(false);setTerrainProfilePosition(Number(event.target.value));}} />
                 </label>
@@ -6917,6 +6984,10 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             <button type="button" aria-pressed={resourceSectionEnabled} disabled={!sceneReady} onClick={()=>{setExploded(false);setResourceSectionEnabled(value=>!value);window.dispatchEvent(new Event('tanga:manual-exploration'));}}>{resourceSectionEnabled?'Close model cutaway':'Open model cutaway'}</button>
             <label htmlFor="tanga-resource-section-position"><span>Section sweep</span><output>{resourceSectionPosition}%</output></label>
             <input id="tanga-resource-section-position" aria-label="Sweep the resource model cutaway" type="range" min="0" max="100" step="1" value={resourceSectionPosition} disabled={!resourceSectionEnabled} onChange={event=>setResourceSectionPosition(Number(event.target.value))}/>
+            {resourceSectionEnabled && <div className="tanga-section-locator" aria-label={`Section position ${resourceSectionPosition}% along the sweep`}>
+              <div className="tanga-section-locator__extent" aria-hidden="true"><i style={{left: `${resourceSectionPosition}%`}}/></div>
+              <span>Schematic section position · {resourceSectionPosition}%</span>
+            </div>}
             <small>Clips the displayed model and terrain together; it is not a new geological interpretation.</small>
           </div>
           <div className="tanga-three__grade-ramp" aria-hidden="true" />

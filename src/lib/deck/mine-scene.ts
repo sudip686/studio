@@ -21,9 +21,14 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.94+0.06*smoothstep(-0.5,0.5,sin(vRoofPoint.x*4.0));');
   };
   cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
+  const processCladding = cladding.clone();
+  processCladding.color.setHex(0x456a7c);
+  processCladding.onBeforeCompile = cladding.onBeforeCompile;
+  processCladding.customProgramCacheKey = cladding.customProgramCacheKey;
   const wallCladding=new THREE.MeshStandardMaterial({color:0xa2aca5,roughness:.92,metalness:.01});
   const wallRib=new THREE.MeshStandardMaterial({color:0x818d86,roughness:.82,metalness:.05});
   const roofSeam=new THREE.MeshStandardMaterial({color:0x929d96,roughness:.86,metalness:.03});
+  const roofLight = new THREE.MeshStandardMaterial({color: 0x9fb9bf, roughness: .62, metalness: .05});
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m:THREE.Material=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
@@ -94,12 +99,20 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   box(392,.15,7,0,serviceRoadY,135,materials.serviceRoad,'Conceptual perimeter service lane');
   box(392,.15,5,0,serviceRoadY,-135,materials.serviceRoad,'Conceptual service lane');
   for(const x of [-195,195])box(4,.15,268,x,serviceRoadY,0,materials.serviceRoad,'Conceptual perimeter service lane');
+  // Route through the southern gate opening between the lab and the water yard.
+  // Start at the edge of the service loop to avoid coplanar road overlaps.
+  const gateLaneStart = 138.5;
+  const gateLaneEnd = 246;
+  box(12,.15,gateLaneEnd-gateLaneStart,30,serviceRoadY,(gateLaneStart+gateLaneEnd)/2,
+    materials.serviceRoad,'Conceptual gate approach service lane');
   const serviceRoadTopY=serviceRoadY+.075;
   const serviceRoadMarkY=serviceRoadTopY+.011;
   for(let x=-185;x<=185;x+=14)box(5,.02,.5,x,serviceRoadMarkY,135,materials.roadMarking,'Illustrative service-lane marking');
+  for(let z=147;z<=238;z+=13)box(.4,.02,4,30,serviceRoadMarkY,z,materials.roadMarking,'Illustrative service-lane marking');
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
+    const roofFinish = stage ? processCladding : cladding;
     const bayCount=Math.max(3,Math.min(7,Math.round(w/16)));
     const bayWidth=w/bayCount;
     // A narrow, raised concrete footing gives the wall line a readable base
@@ -107,7 +120,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
     box(w+1.5,.45,d+1.5,x,.225,z,materials.concrete,`${name} concrete footing`);
     for(const sign of [-1,1]){
       const slope=sign*Math.atan2(rise,d/2);
-      const roof=box(w+1,.55,roofLength+.9,x,h+rise/2,z+sign*d/4,cladding,name);
+      const roof=box(w+1,.55,roofLength+.9,x,h+rise/2,z+sign*d/4,roofFinish,name);
       roof.rotation.x=slope;
       roof.userData.plantRoof=true;
       roof.userData.roofSlideSign=sign;
@@ -126,6 +139,16 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
       seams.instanceMatrix.needsUpdate=true;seams.name=`${name} standing-seam roof ribs`;seams.castShadow=true;seams.userData.plantRoof=true;seams.userData.roofSlideSign=sign;
       if(stage)seams.userData.plantStage=stage;
       root.add(seams);
+      if (stage) {
+        // Banded roof lights give the enclosed process halls a readable scale
+        // from the flyover. They follow the same roof panel in cutaway mode.
+        const light = box(w * .76, .22, 1.8, x, h + rise / 2 + .39, z + sign * d / 4,
+          roofLight, `${name} continuous roof light`);
+        light.rotation.x = slope;
+        light.userData.plantRoof = true;
+        light.userData.roofSlideSign = sign;
+        light.userData.plantStage = stage;
+      }
       // Repeated portal rafters and eave members make the process halls read
       // as steel-framed buildings at whole-campus scale, not smooth toy boxes.
       for(let bay=0;bay<=bayCount;bay++){
@@ -189,14 +212,15 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
     const ridge=box(w+1,.75,1.5,x,h+rise+.2,z,materials.roof,`${name} roof ridge cap`);
     ridge.userData.plantRoof=true;ridge.userData.roofSlideSign=0;if(stage)ridge.userData.plantStage=stage;
     for(const sign of [-1,1]){
-      const rooflight=box(w*.68,.18,d*.075,x,h+rise*.6,sign*d*.2,materials.water,`${name} rooflight`);
+      const rooflight=box(w*.68,.18,d*.075,x,h+rise*.6+.42,z+sign*d*.2,roofLight,`${name} rooflight`);
       rooflight.rotation.x=sign*Math.atan2(rise,d/2);
       rooflight.userData.plantRoof=true;rooflight.userData.roofSlideSign=sign;if(stage)rooflight.userData.plantStage=stage;
     }
     if(w>=60){
       for(const sign of [-1,1]){
-        const ventBase=box(5,1.2,5,x+w*.28,h+rise+1.1,sign*3,materials.roof,`${name} roof ventilator base`);
-        const vent=mesh(new THREE.CylinderGeometry(1.7,2.5,3.2,12),materials.steel,x+w*.28,h+rise+3.3,sign*3,`${name} roof ventilator`);
+        const seatHeight=h+rise-3*rise/(d/2);
+        const ventBase=box(5,1.6,5,x+w*.28,seatHeight+.55,z+sign*3,materials.roof,`${name} roof ventilator base`);
+        const vent=mesh(new THREE.CylinderGeometry(1.7,2.5,3.2,12),materials.steel,x+w*.28,seatHeight+2.95,z+sign*3,`${name} roof ventilator`);
         for(const feature of [ventBase,vent]){feature.userData.plantRoof=true;feature.userData.roofSlideSign=sign;if(stage)feature.userData.plantStage=stage;}
       }
     }
@@ -208,7 +232,8 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   mesh(new THREE.CylinderGeometry(12,5,12,4),materials.copper,-104,21,-16,'Receiving hopper').rotation.y=Math.PI/4;
   shed('ROM & crushing',-88,-16,72,58,30,'feed');
   shed('Milling',-30,-18,48,45,27,'milling');
-  const mill=cylinder(8,23,-30,12,-18);mill.rotation.z=Math.PI/2;mill.name='Milling process drum';mill.userData.preserveAnimation=true;root.userData.processMill=mill;
+  const millFinish = new THREE.MeshStandardMaterial({color: 0x386d84, metalness: .22, roughness: .57});
+  const mill=cylinder(8,23,-30,12,-18,millFinish);mill.rotation.z=Math.PI/2;mill.name='Milling process drum';mill.userData.preserveAnimation=true;root.userData.processMill=mill;
   // Longitudinal shell ribs provide scale and make rotation legible. Instances
   // stay attached to the drum and share its local cylinder axis.
   const millRibs=new THREE.InstancedMesh(new THREE.BoxGeometry(.55,23,.55),materials.roof,12);
@@ -305,13 +330,50 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   cylinder(23,11,164,7,-84);cylinder(22,.4,164,12.7,-84,materials.water);
   box(46,1.2,3,164,14,-84,materials.copper,'Reclaim thickener bridge');
   for(let i=0;i<4;i++)box(8,5,18,144+i*12,4,47,materials.roof,'Product shipping container');
-  // Pipe-rack corridors and covered conveyors link the new operating areas.
+  // Steel galleries and service racks share the existing process alignments.
+  const galvanised=new THREE.MeshStandardMaterial({color:0x97a5a8,roughness:.7,metalness:.32});
+  function member(a:THREE.Vector3,b:THREE.Vector3,radius:number,material:THREE.Material){
+    const axis=b.clone().sub(a);
+    const part=mesh(new THREE.CylinderGeometry(radius,radius,axis.length(),8),material,0,0,0,'Process gallery steelwork');
+    part.position.copy(a).lerp(b,.5);
+    part.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),axis.normalize());
+  }
   const campusLinks=[[-85,22,-89,-30,22,-40],[80,15,-103,142,15,-84],[164,15,-61,103,15,-31],[100,19,67,100,19,90]];
-  for(const [ax,ay,az,bx,by,bz] of campusLinks){
-    const a=new THREE.Vector3(ax,ay,az),b=new THREE.Vector3(bx,by,bz),v=b.clone().sub(a);
-    const belt=box(4,v.length(),2,0,0,0,materials.copper,'Campus conveyor / pipe rack');
-    belt.position.copy(a).add(b).multiplyScalar(.5);belt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());
-    for(let t=.2;t<1;t+=.3){const p=a.clone().lerp(b,t);box(1,p.y,1,p.x,p.y/2,p.z,materials.steel);}
+  for(const [index,[ax,ay,az,bx,by,bz]] of campusLinks.entries()){
+    const a=new THREE.Vector3(ax,ay,az),b=new THREE.Vector3(bx,by,bz);
+    const side=new THREE.Vector3(bz-az,0,ax-bx).normalize();
+    const point=(t:number,offset:number,height:number)=>{
+      const p=a.clone().lerp(b,t).addScaledVector(side,offset);
+      p.y+=height;
+      return p;
+    };
+    const bays=Math.ceil(a.distanceTo(b)/8);
+    for(const edge of [-2.4,2.4]){
+      for(const height of [0,2.6])member(point(0,edge,height),point(1,edge,height),.27,galvanised);
+      for(let bay=0;bay<bays;bay++){
+        member(point(bay/bays,edge,bay%2*2.6),point((bay+1)/bays,edge,(1-bay%2)*2.6),.21,galvanised);
+      }
+    }
+    for(let bay=0;bay<=bays;bay++){
+      const t=bay/bays;
+      member(point(t,-2.4,0),point(t,2.4,0),.32,materials.steel);
+      if(bay%3!==0||bay===0||bay===bays)continue;
+      for(const edge of [-2.4,2.4]){
+        const top=point(t,edge,0);
+        box(.95,top.y,.95,top.x,top.y/2,top.z,materials.steel,'Gallery trestle leg');
+        box(2.6,1,2.6,top.x,.5,top.z,materials.concrete,'Gallery footing');
+      }
+    }
+    if(index===1||index===2){
+      for(const offset of [-1,1])member(point(0,offset,.9),point(1,offset,.9),.57,materials.steel);
+    }else{
+      const belt=box(3.8,.7,a.distanceTo(b),0,0,0,materials.roof,'Enclosed transfer belt');
+      belt.position.copy(a).lerp(b,.5);
+      belt.position.y+=.75;
+      const forward=b.clone().sub(a).normalize();
+      const up=new THREE.Vector3().crossVectors(forward,side);
+      belt.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side,up,forward));
+    }
   }
   // Connected conveyors and pipe racks. Flow points are exposed for animation.
   const flow=[new THREE.Vector3(-106,10,44),new THREE.Vector3(-104,21,-16),new THREE.Vector3(-73,16,-16),new THREE.Vector3(-30,16,-18),new THREE.Vector3(8,16,-36),new THREE.Vector3(68,16,-36),new THREE.Vector3(103,14,-31),new THREE.Vector3(104,14,44),new THREE.Vector3(104,14,78),new THREE.Vector3(100,14,78),new THREE.Vector3(100,14,110)];
@@ -331,8 +393,34 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   for(let i=0;i<6;i++)box(9,5,.4,-51+i*12,12,216.3,materials.water,'Administration glazing');
   for(const x of [50,100,150])box(23,21,.4,x,10.5,130.3,materials.steel,'Product warehouse loading door');
   for(let i=0;i<5;i++)box(4,.2,32,-190+i*15,1.5,194,materials.concrete,'Workshop service bay markings');
-  box(90,2,65,144,1,193,materials.roof,'Lined site-water provision · illustrative');
-  box(80,.4,55,144,2.2,193,materials.water,'Site water / reclaim allowance · not a TSF design');
+  // The conceptual water yard has a sloping earth bund, a crest and exposed
+  // liner above the waterline. All four rings share the same clipped corners.
+  const basinCenter=new THREE.Vector2(144,193);
+  function basinRing(w:number,d:number,y:number){
+    const rx=w/2,rz=d/2,c=6;
+    return [[-rx+c,-rz],[-rx,-rz+c],[-rx,rz-c],[-rx+c,rz],[rx-c,rz],[rx,rz-c],[rx,-rz+c],[rx-c,-rz]]
+      .map(([x,z])=>new THREE.Vector3(basinCenter.x+x,y,basinCenter.y+z));
+  }
+  function basinStrip(outer:THREE.Vector3[],inner:THREE.Vector3[],material:THREE.Material,name:string){
+    const vertices=[...outer,...inner],indices:number[]=[];
+    for(let i=0;i<outer.length;i++){
+      const next=(i+1)%outer.length;
+      indices.push(i,next,outer.length+i,next,outer.length+next,outer.length+i);
+    }
+    const geometry=new THREE.BufferGeometry().setFromPoints(vertices);
+    geometry.setIndex(indices);geometry.computeVertexNormals();
+    // Match the standard position/normal/uv layout used by the static mesh batch.
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap(v=>[v.x,v.z]),2));
+    mesh(geometry,material,0,0,0,name);
+  }
+  const toe=basinRing(90,65,.25),crest=basinRing(80,55,4.4);
+  const innerCrest=basinRing(76,51,4.4),shore=basinRing(69,44,2.2);
+  const earth=new THREE.MeshStandardMaterial({color:0x827761,roughness:1});
+  basinStrip(toe,crest,earth,'Site water earth embankment');
+  basinStrip(crest,innerCrest,earth,'Site water bund crest');
+  basinStrip(innerCrest,shore,materials.roof,'Site water exposed liner');
+  const pool=new THREE.Shape(shore.map(v=>new THREE.Vector2(v.x,-v.z)));
+  mesh(new THREE.ShapeGeometry(pool),materials.water,0,2.2,0,'Site water / reclaim allowance · illustrative').rotation.x=-Math.PI/2;
   for(const x of [-246,246]){
     for(let z=-246;z<=246;z+=24)box(.7,5,.7,x,2.5,z,materials.steel,'Perimeter fence post');
     for(const y of [2,4.5])box(.4,.4,492,x,y,0,materials.steel,'Perimeter fence rail');
@@ -341,7 +429,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
     for(let x=-246;x<=246;x+=24)if(z<0||Math.abs(x)>40)box(.7,5,.7,x,2.5,z,materials.steel,'Perimeter fence post');
     for(const y of [2,4.5])for(const sign of [-1,1])box(206,.4,.4,sign*143,y,z,materials.steel,'Perimeter fence rail and gate opening');
   }
-  for(let i=0;i<7;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
+  for(let i=0;i<4;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
   // Measure structural bases against the pad before batching removes their
   // individual source names. The pad top intentionally overlaps each footing
   // so buildings meet the graded platform without a visible gap.

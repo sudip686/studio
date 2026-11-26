@@ -7,11 +7,12 @@ import {cameraEase} from '@/lib/deck/presentation-motion';
 import {buildConcentrator} from '@/lib/deck/mine-scene';
 import MetallurgyEvidenceBoard from './MetallurgyEvidenceBoard';
 import {MET_GROUPS} from '@/lib/deck/metallurgy-plant';
-import {createPlantProcessMotion} from '@/lib/deck/plant-process-motion';
+import {FLOTATION_SECTION_ORIGIN, createPlantProcessMotion} from '@/lib/deck/plant-process-motion';
 import {createMetallurgyEndUseScene, type MetallurgyEndUseRoute} from '@/lib/deck/metallurgy-end-use-scene';
 import {stabilizeSceneMaterialAppearance} from '@/lib/deck/stable-materials';
 import {configurePresentationRenderer, sizePresentationRenderer} from '@/lib/deck/render-foundation';
 import {loadStudioLighting} from '@/lib/deck/studio-lighting';
+import {createMetallurgyLandscape} from '@/lib/deck/metallurgy-landscape';
 import {lowPowerPresentation} from '@/lib/deck/cinematic-style';
 
 const PROCESS = [
@@ -85,8 +86,10 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     element.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    const exhibitSky = new THREE.Color('#a7b4b8');
+    const exhibitSky = new THREE.Color('#c5d8de');
     scene.background = exhibitSky;
+    const landscapeHaze = new THREE.Fog(exhibitSky, 300, 1050);
+    scene.fog = landscapeHaze;
     const camera = new THREE.PerspectiveCamera(34, 1, .1, 4000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = .075;
@@ -126,8 +129,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
     const lowPower = lowPowerPresentation();
     const processMotion = createPlantProcessMotion(plant, !lowPower);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(680, 680), new THREE.MeshStandardMaterial({color: '#7d898a', roughness: .96, dithering: true}));
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -1.8; ground.receiveShadow = true; scene.add(ground);
+    const ground = createMetallurgyLandscape(plant.scale);
+    scene.add(ground);
     stabilizeSceneMaterialAppearance(scene);
     element.dataset.studioLight = 'loading';
     const releaseStudioLight = loadStudioLighting(renderer, plant, status => {
@@ -140,15 +143,17 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     scene.add(new THREE.HemisphereLight(0xf1f8ff, 0x697778, 1.15));
     const sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
     sun.position.set(-460, 440, 290); sun.castShadow = true;
-    sun.shadow.mapSize.set(1536, 1536); sun.shadow.camera.left = -400; sun.shadow.camera.right = 400;
-    sun.shadow.camera.top = 400; sun.shadow.camera.bottom = -400; sun.shadow.camera.far = 1500; sun.shadow.normalBias = .08;
+    sun.shadow.mapSize.set(lowPower ? 1024 : 2048, lowPower ? 1024 : 2048);
+    sun.shadow.camera.left = -185; sun.shadow.camera.right = 185;
+    sun.shadow.camera.top = 185; sun.shadow.camera.bottom = -185; sun.shadow.camera.far = 1500; sun.shadow.normalBias = .06;
     scene.add(sun);
     const fill = new THREE.DirectionalLight(0xc6ddf4, .68); fill.position.set(400, 180, -350); scene.add(fill);
 
     const target = new THREE.Vector3(), fromTarget = new THREE.Vector3(), destination = new THREE.Vector3(), fromPosition = new THREE.Vector3(), approachPosition = new THREE.Vector3();
     // Lower the overview orbit to show more façade and spread the campus across
     // the widescreen canvas; fitOverview still frames the complete boundary.
-    const direction = new THREE.Vector3(1.1, .68, 1.25).normalize();
+    const overviewDirection = new THREE.Vector3(1.1, .68, 1.25).normalize();
+    const direction = overviewDirection.clone();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const onMotionPreference = () => { setReduceMotion(reducedMotion.matches); if (reducedMotion.matches) stopPlantTour(); dirty = true; };
     onMotionPreference();
@@ -158,6 +163,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
 
     function fitOverview(animate: boolean) {
       selected = stageRef.current;
+      direction.copy(overviewDirection);
       target.set(0, 0, 0);
       const bounds = overviewBounds;
       const size = bounds.getSize(new THREE.Vector3());
@@ -180,7 +186,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       // Keep the full campus, fence, yard and near-side water allowance in
       // frame while using more of the canvas for the plant itself. Keep enough
       // clearance for the near-side water allowance and perimeter at 1366 px.
-      distance = Math.max(125, distance * .56);
+      distance = Math.max(125, distance * .68);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
     }
@@ -188,7 +194,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       selected = next;
       const item = PROCESS.find(candidate => candidate.id === next) ?? PROCESS[0];
       target.set(item.point[0], item.point[1], item.point[2]);
-      if (next === 'flotation') plant.localToWorld(target.set(200, 10, -160));
+      if (next === 'flotation') plant.localToWorld(target.set(...FLOTATION_SECTION_ORIGIN).setY(10));
       if (next === 'product') plant.localToWorld(target.set(184, 7, 77));
       // Frame the whole working bay, not a close crop of its roof/floor. The
       // flotation hall is the widest stage; product handling spans the longest
@@ -203,6 +209,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       moveCamera(animate, true);
     }
     function showEndUse(route: MetallurgyEndUseRoute, animate: boolean) {
+      scene.fog = null;
       const downstream = getEndUseScene();
       downstream.setRoute(route);
       const heroActive = journeyHeroRevealRef.current && endUseRouteRef.current === route;
@@ -260,6 +267,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       plant.visible = true;
       ground.visible = true;
       scene.background = exhibitSky;
+      scene.fog = landscapeHaze;
       overviewRef.current = true;
       openRoofRef.current = false;
       roofs.forEach(roof => {
@@ -273,8 +281,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const damping = controls.enableDamping;
       controls.enableDamping = false; controls.update(); controls.enableDamping = damping;
       fromPosition.copy(camera.position); fromTarget.copy(controls.target);
-      approachPosition.copy(target).addScaledVector(direction, throughRoof ? 155 : 0);
-      if (throughRoof) approachPosition.y += 24;
+      approachPosition.copy(fromPosition).lerp(destination, .5);
+      approachPosition.y += Math.min(36, fromPosition.distanceTo(destination) * .22);
       cameraStart = performance.now(); userOrbit = false; dirty = true; cameraTour = throughRoof;
       tween = animate && !reducedMotion.matches;
       if (!tween) { camera.position.copy(destination); controls.target.copy(target); controls.update(); }
@@ -336,6 +344,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         plant.visible = false;
         ground.visible = false;
         scene.background = new THREE.Color(END_USE_BACKGROUND);
+        scene.fog = null;
         journeyElapsed = recoveryView.journeyTime ?? 0;
         journeyElapsedRef.current = journeyElapsed;
       }
@@ -438,8 +447,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         dirty ||= roofMoving;
         if (tween && !userOrbit) {
           const progress = reducedMotion.matches ? 1 : cameraEase((now - cameraStart) / (cameraTour ? 2100 : 900));
-          if (cameraTour && progress < .4) camera.position.lerpVectors(fromPosition, approachPosition, progress / .4);
-          else if (cameraTour) camera.position.lerpVectors(approachPosition, destination, (progress - .4) / .6);
+          if (cameraTour) camera.position.copy(fromPosition).multiplyScalar((1-progress)**2)
+            .addScaledVector(approachPosition, 2*progress*(1-progress)).addScaledVector(destination, progress**2);
           else camera.position.lerpVectors(fromPosition, destination, progress);
           controls.target.lerpVectors(fromTarget, target, progress);
           if (progress >= 1) { tween = false; cameraTour = false; }

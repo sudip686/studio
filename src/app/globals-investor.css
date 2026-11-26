@@ -770,6 +770,10 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-milestone-stage { position: fixed; z-index: 18; top: 49%; left: clamp(240px, 19vw, 320px); right: clamp(500px, 31vw, 540px); height: min(58vh, 590px); min-height: 360px; overflow: hidden; transform: translateY(-47%); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; background: #11171b; box-shadow: 0 28px 90px rgba(0,0,0,.4); }
 .tanga-milestone-stage img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .tanga-milestone-stage.is-figure img { padding: 24px; object-fit: contain; background: #13191d; }
+@media (min-width: 1201px) {
+  .tanga-milestone-stage[data-milestone="survey"] img { object-position: center 28%; }
+  .tanga-milestone-stage[data-milestone="survey"] .tanga-milestone-stage__shade { background: none; }
+}
 .tanga-milestone-stage__shade { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(3,7,10,.24),transparent 30%,rgba(3,7,10,.12) 54%,rgba(3,7,10,.86)); pointer-events: none; }
 .tanga-milestone-stage.is-figure .tanga-milestone-stage__shade { background: linear-gradient(180deg,rgba(3,7,10,.14),transparent 34%,rgba(3,7,10,.72)); }
 .tanga-milestone-stage__caption { position: absolute; right: clamp(18px,3vw,42px); bottom: clamp(20px,4vh,42px); left: clamp(18px,3vw,42px); max-width: 60ch; color: #fff; text-shadow: 0 2px 18px rgba(0,0,0,.65); }
@@ -795,6 +799,11 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-pit-focus-actions button:disabled{opacity:.5;cursor:not-allowed}
 .tanga-story-panel__link:focus-visible,.tanga-story-panel__compare:focus-visible { outline: 2px solid #f6be91; outline-offset: 3px; }
 .tanga-story-panel--concept { width: min(390px, calc(100vw - 36px)); }
+.tanga-story-panel--timeline .tanga-story-timeline { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.tanga-story-panel--timeline .tanga-story-timeline button { position:relative; min-height:76px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; gap:3px; padding:9px; border:1px solid #d7dfd833; border-radius:6px; text-align:left; color:#f2eee4; background:linear-gradient(0deg,#101a20f2,#101a2070),var(--milestone-image) center/cover; }
+.tanga-story-panel--timeline .tanga-story-timeline button.is-active { border-color:#a7e0d3; box-shadow:inset 0 -2px #a7e0d3; }
+.tanga-story-panel--timeline .tanga-story-timeline button span { font:10px ui-monospace,monospace; color:#a7e0d3; }
+.tanga-story-panel--timeline .tanga-story-timeline button strong { font-size:11px; line-height:1.2; }
 .tanga-deck__executive-tour { min-height: 36px; padding: 0 13px; border: 1px solid rgba(230,151,96,.32); border-radius: 999px; background: rgba(230,151,96,.11); color: #f4b184; font: inherit; font-size: 10px; font-weight: 680; white-space: nowrap; cursor: pointer; }
 .tanga-deck__executive-tour:hover { background: rgba(230,151,96,.19); }
 .tanga-deck__executive-tour--highlights { border-color: rgba(191,205,209,.28); background: rgba(122,151,163,.1); color: #c6d5d9; }
@@ -3023,4 +3032,85 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck--present .tanga-three__camera-tools button {
     border-radius: 5px;
   }
+}
+
+/* Desktop storyboard compositions */
+.tanga-deck .tanga-opening-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: brightness(.55);
+  pointer-events: none;
+}
+
+.tanga-deck .tanga-deck__cover-inner { position: relative; }
+.tanga-deck .tanga-milestone-stage__tag { display: inline-flex; pointer-events: auto; }
+.tanga-profile-endpoint { fill: #e4eee9; stroke: none; font: 8px system-ui, sans-serif; }
+.tanga-section-locator { display: grid; gap: 4px; margin: 6px 0; }
+.tanga-section-locator span { color: #a7e0d3; font-size: 11px; }
+.tanga-decision-links a img { width: 32px; height: 24px; object-fit: cover; border-radius: 3px; }
+
+@media (min-width: 1121px) {
+  .tanga-deck.tanga-deck--present .tanga-peer-benchmark {
+    grid-template-columns: 190px minmax(0, 1fr) clamp(360px, 34vw, 580px);
+    gap: 18px;
+  }
+
+  .tanga-deck.tanga-deck--present .tanga-process-exhibit--factory {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .tanga-deck.tanga-deck--present .tanga-process-exhibit--factory .tanga-factory-body {
+    grid-template-columns: minmax(0, 1fr) clamp(245px, 22vw, 305px);
+    gap: 8px;
+  }
+
+  .tanga-deck.tanga-deck--present .tanga-process-exhibit--factory .tanga-factory-header {
+    min-height: 36px;
+  }
+
+  .tanga-deck.tanga-deck--present .tanga-process-exhibit--factory .tanga-factory-stages button {
+    min-height: 34px;
+    padding-block: 4px;
+  }
+}
+
+.tanga-deck .tanga-closing-photo {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(.5);
+  pointer-events: none;
+}
+.tanga-section-locator__extent {
+  position: relative;
+  height: 16px;
+  margin-inline: 2px;
+  border: 1px solid #81958f70;
+  border-radius: 3px;
+  background: #213b3b;
+}
+.tanga-section-locator__extent i {
+  position: absolute;
+  inset-block: 0;
+  width: 2px;
+  background: #a7e0d3;
+}
+.tanga-material-flow strong button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }

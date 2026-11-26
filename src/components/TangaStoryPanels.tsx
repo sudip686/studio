@@ -58,7 +58,7 @@ function SceneMotionControl({paused,onToggle}:{paused:boolean;onToggle:()=>void}
   </div>;
 }
 
-export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion, portDistanceInfo}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onOpenGeology?:()=>void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void; portDistanceInfo?:{projectStated:string;mappedRoute:string;mappedDuration:string;mappedRouteSource:'osrm'|'fallback'}}) {
+export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, onFramePort, onToggleSurfaceConcept, surfaceConceptView = false, surfaceCompareSplit = 50, onSurfaceCompareSplit, onRevealGeology, geologySectionShown = false, milestoneId = 'survey', onMilestoneChange, onInspectPlant, onPlantProcessFocus, onInspectDevelopment, onSiteOrientation, onRevealPitBlocks, pitBlockFocusIndex = null, pitBlocksStatus = 'ready', pitGradeFocus = null, onPitGradeFocusChange, developmentViewId, availableDevelopment = [], siteContextVisible = true, onShowSiteContext, sceneMotionPaused = false, onToggleSceneMotion, portDistanceInfo}: {developmentViewId?:string;availableDevelopment?:string[];chapter: TangaChapterId; onOpenSurvey?: () => void; onOpenGeology?:()=>void; onFramePort?:(stage:'ore'|'concentrate'|'cargo')=>void; onToggleSurfaceConcept?: () => void; surfaceConceptView?: boolean; surfaceCompareSplit?: number; onSurfaceCompareSplit?: (split:number)=>void; onRevealGeology?: () => void; geologySectionShown?: boolean; milestoneId?: string; onMilestoneChange?: (id: string) => void; onInspectPlant?: () => void; onPlantProcessFocus?:(stage:string,roofOpen:boolean)=>void; onInspectDevelopment?: (view:DevelopmentView)=>void; onSiteOrientation?: (orientation:'plan'|'oblique')=>void; onRevealPitBlocks?:(pitIndex?:number)=>void; pitBlockFocusIndex?:number|null; pitBlocksStatus?:'loading'|'ready'|'error'; pitGradeFocus?:string|null; onPitGradeFocusChange?:(grade:string|null)=>void; siteContextVisible?:boolean; onShowSiteContext?:()=>void; sceneMotionPaused?:boolean; onToggleSceneMotion?:()=>void; portDistanceInfo?:{projectStated:string;mappedRoute:string;mappedDuration:string;mappedRouteSource:'osrm'|'fallback'}}) {
   const panelRef=useRef<HTMLElement|null>(null);
   const [minePanelSection,setMinePanelSection]=useState<'site'|'blocks'|'sources'>(()=>['pit-blocks','north-pit','south-pit'].includes(developmentViewId??'')?'blocks':'site');
   const [siteOrientation,setSiteOrientation]=useState<'plan'|'oblique'>('oblique');
@@ -102,7 +102,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
     <h2>Work completed</h2>
     <p className="tanga-story-panel__intro">Four distinct evidence milestones. Select one to inspect what it adds to the project picture.</p>
     <nav className="tanga-story-timeline" aria-label="Select a project milestone">
-      {WORK_MILESTONES.map((item, index) => <button type="button" key={item.id} className={index === milestoneIndex ? 'is-active' : ''} onClick={() => onMilestoneChange?.(item.id)} aria-current={index === milestoneIndex ? 'step' : undefined}>
+      {WORK_MILESTONES.map((item, index) => <button type="button" key={item.id} className={index === milestoneIndex ? 'is-active' : ''} style={{'--milestone-image': `url("${item.image}")`} as React.CSSProperties} onClick={() => onMilestoneChange?.(item.id)} aria-current={index === milestoneIndex ? 'step' : undefined}>
         <span>{item.date}</span><strong>{item.title}</strong>
       </button>)}
     </nav>
@@ -117,7 +117,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
 
   if (chapter === 'project') return <aside className="tanga-story-panel tanga-story-panel--project" aria-label="Tanga project introduction">
     <div className="tanga-story-panel__eyebrow">TANGA REGION · TANZANIA</div>
-    <h2>The Tanga project area</h2>
+    <h2>Tanga Graphite</h2>
     <p className="tanga-story-panel__intro">A graphite project in the Maramba area of Mkinga District, framed by the August 2025 topographical survey.</p>
     <img className="tanga-story-project-image" src="/presentation-assets/survey-site-aerial.jpg" alt="Aerial photographs of the forested Tanga project landscape"/>
     <div className="tanga-story-image-caption"><span>Survey report · site photographs</span><small>Context imagery · not a georeferenced orthophoto</small></div>
@@ -213,7 +213,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
         <button type="button" aria-pressed={siteOrientation==='oblique'} disabled={!onSiteOrientation} onClick={()=>{setSiteOrientation('oblique');onSiteOrientation?.('oblique');}}>Oblique view</button>
       </div>
       {developmentViewId!=='plant'&&<div className="tanga-site-panel-actions">
-        <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Processing plant <ArrowRight size={14}/></button>
+        <button type="button" className="tanga-story-panel__link" disabled={!onInspectPlant} onClick={onInspectPlant}>Fly to processing plant <ArrowRight size={14}/></button>
         {onToggleSurfaceConcept&&<button type="button" className="tanga-story-panel__compare" aria-pressed={surfaceConceptView} onClick={onToggleSurfaceConcept}>{surfaceConceptView?'Close terrain comparison':'Compare terrain'} <ArrowRight size={14}/></button>}
       </div>}
       {developmentViewId==='plant'&&<section className="tanga-site-plant-controls" aria-label="Processing plant roof cutaway">
@@ -268,9 +268,9 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
       <p>The supplied project distance and mapped road route use different bases. The route is a geographic visualisation, not a confirmed haulage or travel-time study.</p>
     </section>}
     <ol className="tanga-material-flow" aria-label="Material journey from mine to port">
-      <li><Mountain aria-hidden="true"/><div><small>01 / ORE</small><strong>Hillside to lowlands</strong><p>Local haulage to the feed point, then a candidate conveyor. The alignment requires survey.</p></div></li>
-      <li><Factory aria-hidden="true"/><div><small>02 / CONCENTRATE</small><strong>Plant to storage yard</strong><p>Road haulage after processing. The study considers yards at Mabokweni and Kwa Songoro.</p></div></li>
-      <li><Ship aria-hidden="true"/><div><small>03 / EXPORT CARGO</small><strong>Storage yard to port</strong><p>Tanga was the preferred port in the 2023 study.</p></div></li>
+      <li><Mountain aria-hidden="true"/><div><small>01 / ORE</small><strong>{onFramePort ? <button type="button" onClick={() => onFramePort('ore')}>Hillside to lowlands</button> : 'Hillside to lowlands'}</strong><p>Local haulage to the feed point, then a candidate conveyor. The alignment requires survey.</p></div></li>
+      <li><Factory aria-hidden="true"/><div><small>02 / CONCENTRATE</small><strong>{onFramePort ? <button type="button" onClick={() => onFramePort('concentrate')}>Plant to storage yard</button> : 'Plant to storage yard'}</strong><p>Road haulage after processing. The study considers yards at Mabokweni and Kwa Songoro.</p></div></li>
+      <li><Ship aria-hidden="true"/><div><small>03 / EXPORT CARGO</small><strong>{onFramePort ? <button type="button" onClick={() => onFramePort('cargo')}>Storage yard to port</button> : 'Storage yard to port'}</strong><p>Tanga was the preferred port in the 2023 study.</p></div></li>
     </ol>
     <p className="tanga-story-panel__qualification">Study §§3.3, 5.3 and 6. A stuffing yard plot is not georeferenced in the supplied report. Map infrastructure and the displayed route do not establish a project connection or current capacity.</p>
   </aside>;
@@ -282,7 +282,10 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
         <strong>{decision.title}</strong>
         <p>{decision.detail}</p>
         <nav className="tanga-decision-links" aria-label={`${decision.title} supporting evidence`}>
-          <a href={`/?v=1&view=${decision.view}#${decision.chapter}`} target="_blank" rel="noreferrer">{decision.chapterLabel}<ArrowRight size={13} aria-hidden="true"/></a>
+          <a href={`/?v=1&view=${decision.view}#${decision.chapter}`} target="_blank" rel="noreferrer">
+            <img alt="" loading="lazy" src={decision.thumbnail}/>
+            {decision.chapterLabel}<ArrowRight size={13} aria-hidden="true"/>
+          </a>
           <a href={decision.evidenceHref} target="_blank" rel="noreferrer">{decision.evidenceLabel}<ArrowRight size={13} aria-hidden="true"/></a>
         </nav>
       </div>
@@ -295,11 +298,11 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onOpenGeology, on
 
 export function TangaMilestoneStage({milestoneId}: {milestoneId: string}) {
   const milestone = WORK_MILESTONES.find((item) => item.id === milestoneId) ?? WORK_MILESTONES[1];
-  const isFigure = milestone.id === 'resource';
-  return <section className={`tanga-milestone-stage${isFigure ? ' is-figure' : ''}`} aria-label={`${milestone.title} source evidence`}>
+  const isFigure = milestone.id === 'resource' || milestone.id === 'survey';
+  return <section className={`tanga-milestone-stage${isFigure ? ' is-figure' : ''}`} data-milestone={milestone.id} aria-label={`${milestone.title} source evidence`}>
     <img key={milestone.image} src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
     <div className="tanga-milestone-stage__shade"/>
     <div className="tanga-milestone-stage__caption"><span>{milestone.date} · {milestone.source}</span><h2>{milestone.title}</h2><p>{milestone.detail}</p></div>
-    <span className="tanga-milestone-stage__tag">Source evidence</span>
+    <a className="tanga-milestone-stage__tag" href={milestone.image} target="_blank" rel="noreferrer">Open full source image ↗</a>
   </section>;
 }

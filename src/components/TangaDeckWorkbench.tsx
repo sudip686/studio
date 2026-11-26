@@ -32,7 +32,7 @@ import TangaPeerBenchmark from './TangaPeerBenchmark';
 import TangaStoryCue from './TangaStoryCue';
 import TangaCinematicChrome from './TangaCinematicChrome';
 import TangaGeologyMapStage, {type GeologyUnitSelection} from './TangaGeologyMapStage';
-import type {DevelopmentView} from '@/data/tanga-development';
+import {DEVELOPMENT_SITE, type DevelopmentView} from '@/data/tanga-development';
 import {TANGA_STORY, EXECUTIVE_STORY_SECONDS} from '@/data/tanga-story';
 import {type TangaChapterId, WORK_MILESTONES} from '@/data/tanga-evidence';
 import {DECK_LAYERS, DEFAULT_LAYER_SETTINGS, type DeckLayerId, type DeckLayerSettings} from '@/lib/deck/layers';
@@ -598,7 +598,7 @@ const COVER_COAST_VIEW: DeckViewState = {
 const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   work_completed: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   ranking: {longitude: 30, latitude: 12, zoom: 1.55, pitch: 0, bearing: 0},
-  tanzania: {longitude: 36.4, latitude: -6.5, zoom: 4.15, pitch: 28, bearing: -8},
+  tanzania: {longitude: 37.8, latitude: -5.25, zoom: 5.05, pitch: 0, bearing: 0},
   project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.6, pitch: 46, bearing: 20},
   topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
   // Framed on the story: project (38.79,-4.81) -> Tanga Port (39.105,-5.064).
@@ -4707,6 +4707,8 @@ export default function TangaDeckWorkbench() {
     }
     if (activeMode === 'tanzania') {
       push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
+      push('lbl-tanga-port', 'Tanga Port', ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat, 320, '#a7e0d3');
+      push('lbl-indian-ocean', 'Indian Ocean', 40.65, -5.45, 0, '#a7c0d8');
     }
     if (activeMode === 'accessibility') {
       // Only the two ends of the corridor. The power nodes are already covered by
@@ -5954,7 +5956,8 @@ export default function TangaDeckWorkbench() {
       }}
       data-testid="tanga-deck-workbench"
     >
-      {!isCoverScene && !storyHeroVisible && <TangaCinematicChrome key={activeMode} root={stageRef} mode={activeMode} view={`${activeMode}/${activeShotIndex}`}/>}
+      {activeMode === 'comparison' && isLastStory && !isExploreMode && <img className="tanga-closing-photo" src="/presentation-assets/survey-site-aerial.jpg" alt="Forested hills in the Tanga survey area"/>}
+      {!isCoverScene && !storyHeroVisible && <TangaCinematicChrome key={`chrome-${activeMode}`} root={stageRef} mode={activeMode} view={`${activeMode}/${activeShotIndex}`}/>}
       <DeckHoverGuide mode={activeMode}/>
       <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
@@ -6464,12 +6467,13 @@ export default function TangaDeckWorkbench() {
       {/* Cover card — animated brand intro on the first scene. */}
       {isCoverScene && (
         <div className="tanga-deck__cover" role="dialog" aria-label="Presentation cover">
+          <img className="tanga-opening-photo" src="/presentation-assets/survey-site-aerial.jpg" alt="Forested hills in the Tanga survey area" fetchPriority="high"/>
           <div className="tanga-deck__cover-inner">
             <span className="tanga-deck__cover-eyebrow">Sakariya Mines &amp; Minerals · Investor Presentation</span>
             <h1 className="tanga-deck__cover-title">Tanga Graphite</h1>
             <p className="tanga-deck__cover-sub">Explore the Tanga project through its surveyed terrain, drilling, geological interpretation, reported resource, testwork and the questions that shape the next study stage.</p>
             <button type="button" className="tanga-deck__cover-cta" onClick={beginProjectStory}>
-              Begin the story <ChevronRight size={18} strokeWidth={2.4} />
+              Locate the project <ChevronRight size={18} strokeWidth={2.4} />
             </button>
             <span className="tanga-deck__cover-hint">Press &rarr; or click to begin</span>
           </div>
@@ -6540,7 +6544,7 @@ export default function TangaDeckWorkbench() {
         {isExploreMode ? 'Return to story' : 'Explore evidence'}
       </button>
       {!isCoverScene && !isClosingScene && (
-        <header key={activeMode} className="tanga-deck__chapter-title">
+        <header key={`heading-${activeMode}`} className="tanga-deck__chapter-title">
           <small>CHAPTER {String(activeStoryIndex + 1).padStart(2, '0')}</small>
           <h1>{STORY_STEPS[activeStoryIndex]?.label}</h1>
         </header>
@@ -7295,6 +7299,17 @@ export default function TangaDeckWorkbench() {
         availableDevelopment={availableMineFacilities}
         siteContextVisible={layerSettings.context.visible}
         onShowSiteContext={activeMode === 'mine_planning' ? () => {setIsAutoplay(false);setIsExecutiveTour(false);setLayerSettings(current=>({...current,context:{...current.context,visible:true}}));} : undefined}
+        onFramePort={activeMode === 'accessibility' && routeTarget === 'port' ? stage => {
+          setIsAutoplay(false);
+          setIsExecutiveTour(false);
+          if (stage === 'cargo') {
+            applyStoryShot('accessibility', 0);
+            return;
+          }
+          const [longitude, latitude] = proj4('EPSG:32737', 'WGS84', stage === 'ore' ? DEVELOPMENT_SITE.feedUtm : DEVELOPMENT_SITE.dischargeUtm);
+          setViewState({...VIEW_STATES.accessibility, longitude, latitude, zoom: stage === 'ore' ? 12.2 : 11.4,
+            transitionDuration: mapFlightDuration(1200), transitionInterpolator: CINEMATIC_FLY(), transitionEasing: cinematicEase});
+        } : undefined}
         onOpenSurvey={() => { const index = STORY_STEPS.findIndex((step) => step.mode === 'topography'); if (index >= 0) goToStoryIndex(index); }}
         onOpenGeology={activeMode === 'drillholes' ? () => { setIsAutoplay(false); setIsExecutiveTour(false); void activateMode('subsurface').then(() => applyStoryShot('subsurface', 3)); } : undefined}
         onToggleSurfaceConcept={activeMode === 'mine_planning' ? toggleSurfaceConceptView : undefined}

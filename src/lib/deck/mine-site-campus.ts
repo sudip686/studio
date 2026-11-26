@@ -46,11 +46,11 @@ export function buildMineSiteCampus(options:Options) {
     fresh:new THREE.MeshStandardMaterial({color:0x548388,roughness:.72,metalness:0,side:THREE.DoubleSide}),
     steel:new THREE.MeshStandardMaterial({color:0x53636a,roughness:.6,metalness:.35}),
     concrete:new THREE.MeshBasicMaterial({color:0xb1aa96,toneMapped:false}),
-    access:new THREE.MeshBasicMaterial({color:0x535853,side:THREE.DoubleSide,toneMapped:false}),
-    shoulder:new THREE.MeshBasicMaterial({color:0x887f6c,side:THREE.DoubleSide,toneMapped:false}),
+    access:new THREE.MeshStandardMaterial({color:0x525552,roughness:.94,side:THREE.DoubleSide}),
+    shoulder:new THREE.MeshStandardMaterial({color:0x9a8a73,roughness:1,side:THREE.DoubleSide}),
     swaleBank:new THREE.MeshBasicMaterial({color:0x756f60,side:THREE.DoubleSide,toneMapped:false}),
     swaleBed:new THREE.MeshBasicMaterial({color:0x4d554c,side:THREE.DoubleSide,toneMapped:false}),
-    centreline:new THREE.LineBasicMaterial({color:0xc5b99b,toneMapped:false}),
+    centreline:new THREE.MeshBasicMaterial({color:0xd9ceab,side:THREE.DoubleSide,toneMapped:false}),
   };
   // Keep earthwork palettes spatially fixed. Procedural sub-metre noise here
   // produced screen-space aliasing on wide pads as the camera orbited, which
@@ -239,13 +239,25 @@ export function buildMineSiteCampus(options:Options) {
       count=Math.ceil(count*longest/maximumRoadSampleSpacingM*1.01);
     }
   }
-  function ribbon(points:Point2[],width:number,offset:number,material:THREE.Material,name:string){
+  function ribbon(points:Point2[],width:number,offset:number,material:THREE.Material,name:string,dashed=false){
     const positions:number[]=[];
-    for(let i=0;i<points.length-1;i++){
-      const [ax,az]=points[i],[bx,bz]=points[i+1],dx=bx-ax,dz=bz-az,length=Math.max(.001,Math.hypot(dx,dz)),nx=-dz/length*width/2,nz=dx/length*width/2;
-      const y=(x:number,z:number)=>height(x,z)+offset;
-      const a:[number,number,number]=[ax+nx,y(ax+nx,az+nz),az+nz],b:[number,number,number]=[ax-nx,y(ax-nx,az-nz),az-nz];
-      const c:[number,number,number]=[bx+nx,y(bx+nx,bz+nz),bz+nz],d:[number,number,number]=[bx-nx,y(bx-nx,bz-nz),bz-nz];
+    // Both adjoining segments share the same cross-section at each bend.
+    const sections = points.map(([x,z], index) => {
+      const before = points[Math.max(0,index-1)], after = points[Math.min(points.length-1,index+1)];
+      const dx = after[0]-before[0], dz = after[1]-before[1];
+      const scale = width / (2 * Math.max(.001, Math.hypot(dx,dz)));
+      return [1,-1].map(side => {
+        const px = x - side*dz*scale, pz = z + side*dx*scale;
+        return [px, height(px,pz)+offset, pz];
+      });
+    });
+    let travelled = 0;
+    for(let i=0;i<sections.length-1;i++){
+      const step = Math.hypot(points[i+1][0]-points[i][0],points[i+1][1]-points[i][1]);
+      const draw = !dashed || (travelled + step*.5) % 24 < 9;
+      travelled += step;
+      if (!draw) continue;
+      const [a,b]=sections[i], [c,d]=sections[i+1];
       positions.push(...a,...c,...b,...b,...c,...d);
     }
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();
@@ -317,9 +329,8 @@ export function buildMineSiteCampus(options:Options) {
       let maximumSegmentM=0;for(let i=1;i<swalePath.length;i++)maximumSegmentM=Math.max(maximumSegmentM,Math.hypot(swalePath[i][0]-swalePath[i-1][0],swalePath[i][1]-swalePath[i-1][1]));
       swaleDrapeAudit.push({facilityId:facility.id,sampleCount:swalePath.length,maximumSegmentM:Number(maximumSegmentM.toFixed(2))});
     }else swaleOmissions.push(`${facility.id}: no obstacle-clear conceptual swale side`);
-    const centerPoints:THREE.Vector3[]=[];
-    for(let i=0;i<chosen.length;i+=Math.max(1,Math.floor(chosen.length/28))){const [x,z]=chosen[i];centerPoints.push(new THREE.Vector3(x,height(x,z)+1.35,z));}
-    if(centerPoints.length>1){const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(centerPoints),materials.centreline);line.name=`Display-only road center cue · ${facility.id}`;line.userData.accessFacility=facility.id;root.add(line);}
+    const marking = ribbon(chosen,.32,1.34,materials.centreline,`Illustrative dashed road centre marking · ${facility.id}`,true);
+    marking.userData.accessFacility=facility.id;
     surface.userData.tooltipItems=[{title:`Illustrative access · ${facility.title}`,rows:['Display corridor only; no georeferenced road centerline or civil design supplied.','Terrain sampled from the current presentation surface; alignment is not a surveyed route.'],tone:'#c9ad7d'}];
     accessRoadCount++;
   }
