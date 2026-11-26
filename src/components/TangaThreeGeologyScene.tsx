@@ -3430,7 +3430,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         facilityFocused=true;
         setStoryPlaying(false);setMiningBeat(3);
         const centre=stage.localToWorld(feedAnchor.clone());
-        scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,1.5,42);
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(250,210,280)),centre,2.8,42,true);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-feed').map(item=>({...item,occlusion:'xray' as const}));
         setStatus('Uphill feed station · conceptual route into processing');return;
       }
@@ -3446,7 +3446,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const offset=command.action==='campusView'?new THREE.Vector3(0,span*2.4,span*.12):new THREE.Vector3(span*.85,span*.8,span*.95);
         if(command.action==='tailingsView'||command.action==='wasteView')offset.multiplyScalar(1.35);
         offset.multiplyScalar(Math.max(1,.65/camera.aspect));
-        scheduleCameraTween(centre.clone().add(offset),centre,1.8,42);
+        scheduleCameraTween(centre.clone().add(offset),centre,2.8,42,true);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id.startsWith('facility-')&&(command.action==='wasteView'?item.id==='facility-waste':command.action==='tailingsView'?item.id==='facility-tailings':item.id!=='facility-waste')||(command.action==='campusView'&&item.id==='development-plant')).map(item=>({...item,occlusion:'xray' as const}));
         setStatus(command.action==='tailingsView'?'Tailings and water concept detail':command.action==='wasteView'?'Waste-rock landform concept detail':'Lowland campus concept detail');
         return;
@@ -3456,7 +3456,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         facilityFocused=true;
         setStoryPlaying(false);setMiningBeat(3);
         const centre=processPlant.localToWorld(new THREE.Vector3(...(processPlant.userData.siteServices as [number,number,number])));
-        scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,1.5,42);
+        scheduleCameraTween(centre.clone().add(new THREE.Vector3(160,130,190)),centre,2.5,42,true);
         calloutsForProjection=siteOverviewCallouts.filter(item=>item.id==='development-plant').map(item=>({...item,occlusion:'xray' as const}));
         setStatus('Site services · workshop, laboratory and water provision');return;
       }

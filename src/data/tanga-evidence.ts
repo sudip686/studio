@@ -90,9 +90,9 @@ export const WORK_MILESTONES = [
     date: 'August 2025',
     title: 'Aerial topographic survey',
     detail: 'A WGS 84 / UTM zone 37S terrain model, contours and survey control were delivered.',
-    image: '/presentation-assets/tanga-survey-relief.jpg',
-    imageAlt: 'Shaded relief of the Tanga survey terrain, with north at right and regional context in muted grey',
-    source: 'Survey DTM hillshade · north at right · regional DEM context',
+    image: '/presentation-assets/tanga-survey-figure-3-aerial.jpg',
+    imageAlt: 'Aerial survey photograph looking across the Tanga hills toward more open lowlands',
+    source: 'Tanga survey report · Figure 3 · lower aerial photograph',
   },
   {
     id: 'resource',

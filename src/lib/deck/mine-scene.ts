@@ -21,6 +21,10 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRoofPoint;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=0.94+0.06*smoothstep(-0.5,0.5,sin(vRoofPoint.x*4.0));');
   };
   cladding.customProgramCacheKey=()=> 'tanga-corrugated-roof-v1';
+  const processCladding = cladding.clone();
+  processCladding.color.setHex(0x456a7c);
+  processCladding.onBeforeCompile = cladding.onBeforeCompile;
+  processCladding.customProgramCacheKey = cladding.customProgramCacheKey;
   const wallCladding=new THREE.MeshStandardMaterial({color:0xa2aca5,roughness:.92,metalness:.01});
   const wallRib=new THREE.MeshStandardMaterial({color:0x818d86,roughness:.82,metalness:.05});
   const roofSeam=new THREE.MeshStandardMaterial({color:0x929d96,roughness:.86,metalness:.03});
@@ -100,6 +104,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
+    const roofFinish = stage ? processCladding : cladding;
     const bayCount=Math.max(3,Math.min(7,Math.round(w/16)));
     const bayWidth=w/bayCount;
     // A narrow, raised concrete footing gives the wall line a readable base
@@ -107,7 +112,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
     box(w+1.5,.45,d+1.5,x,.225,z,materials.concrete,`${name} concrete footing`);
     for(const sign of [-1,1]){
       const slope=sign*Math.atan2(rise,d/2);
-      const roof=box(w+1,.55,roofLength+.9,x,h+rise/2,z+sign*d/4,cladding,name);
+      const roof=box(w+1,.55,roofLength+.9,x,h+rise/2,z+sign*d/4,roofFinish,name);
       roof.rotation.x=slope;
       roof.userData.plantRoof=true;
       roof.userData.roofSlideSign=sign;
