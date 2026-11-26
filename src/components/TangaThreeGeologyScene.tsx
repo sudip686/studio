@@ -329,6 +329,8 @@ type TangaThreeGeologySceneProps = {
   selectedGeologyUnit?: string | null;
   hiddenGeologyUnits?: string[];
   onSelectGeologyUnit?: (unit: DrillPickInfo) => void;
+  resourceToolsMount?: HTMLDivElement | null;
+  terrainToolsMount?: HTMLDivElement | null;
   onGeologyLegendMount?: (element: HTMLDivElement | null) => void;
   onSiteFacilities?: (ids:string[])=>void;
   motionPaused?: boolean;
@@ -2357,6 +2359,8 @@ export default function TangaThreeGeologyScene({
   selectedGeologyUnit = null,
   hiddenGeologyUnits = [],
   onSelectGeologyUnit,
+  resourceToolsMount,
+  terrainToolsMount,
   onGeologyLegendMount,
   onSiteFacilities,
   onAssayFacts,
@@ -4415,7 +4419,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       host.dataset.loadedDrillholes = String(shownHoleCount);
       const drillSurfaceOffsets = drillSurfaceOffsetByHole(shownDrillholes, terrainResources);
       if(mode==='drillholes'){
-        const ids=[...new Set(shownDrillholes.map(d=>d.holeId))].sort();setJourneyHoles(ids);setJourneyHole(ids[0]??'');setJourneyReadout('Choose a hole, then play its recorded intervals.');
+        const ids=[...new Set(shownDrillholes.map(d=>d.holeId))].sort();setJourneyHoles(ids);setJourneyHole(ids.find(id=>id==='TGDD1009')??ids[0]??'');setJourneyReadout('Choose a hole, then play its recorded intervals.');
         const marker=new THREE.Mesh(new THREE.SphereGeometry(7,16,10),new THREE.MeshBasicMaterial({color:0xffe7a0,depthTest:false}));marker.renderOrder=100;marker.visible=false;stage.add(marker);
         const intervalsByHole = new Map<string, DrillSegment[]>();
         for (const interval of drillholes) {
@@ -6606,12 +6610,115 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         <small>The moving section clips the registered model and scene together. Open surfaces are unfilled; not a new geological interpretation. Use Layers to compare terrain and drilling.</small>
       </section>;
 
+  const resourceTools = (
+        <details className="tanga-three__grade-legend" aria-label="TGC grade legend" onToggle={event=>{if(event.currentTarget.open){event.currentTarget.scrollTop=0;const tools=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three-animation-tools');if(tools?.open)tools.open=false;}}}>
+          <summary>Grade filter · cutaway</summary>
+          {projectedCallouts.find(callout=>callout.id==='grade') && <p className="tanga-resource-max">Highest displayed model grade · {projectedCallouts.find(callout=>callout.id==='grade')?.label}</p>}
+          <div className="tanga-three__grade-head">
+            <span>TGC Grade</span>
+            <strong>{resourceFocusLabel(resourceFocus)} view</strong>
+          </div>
+          <div className="tanga-three__resource-threshold">
+            <label htmlFor="tanga-resource-threshold"><span>Show blocks ≥</span><output>{resourceCutoff.toFixed(1)}% TGC</output></label>
+            <input id="tanga-resource-threshold" aria-label="Resource block display threshold in percent TGC" type="range" min="0" max={resourceCutoffMax} step="0.1" value={resourceCutoff} onChange={event=>{setResourceCutoff(Number(event.target.value));window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
+            <div className="tanga-three__resource-threshold-stats" aria-live="polite">
+              <span>{resourceCutoffSummary?`${resourceCutoffSummary.visibleCells.toLocaleString()} / ${resourceCutoffSummary.availableCells.toLocaleString()} cells`:sceneReady?'Preparing model counts':'Loading source cells'}</span>
+              {resourceCutoffSummary?.visibleCells?<strong>{resourceCutoffSummary.meanTgc.toFixed(2)}% mean cell TGC</strong>:null}
+            </div>
+            <button className="tanga-three__resource-basis" type="button" onClick={()=>{setResourceCutoff(3);window.dispatchEvent(new Event('tanga:manual-exploration'));}}>Use 3% MRE cut-off</button>
+            <small>Source-cell view filter only. It does not recalculate reported tonnes, grade or contained graphite, and is not an economic cutoff.</small>
+          </div>
+          <div className="tanga-three__resource-section">
+            <button type="button" aria-pressed={resourceSectionEnabled} disabled={!sceneReady} onClick={()=>{setExploded(false);setResourceSectionEnabled(value=>!value);window.dispatchEvent(new Event('tanga:manual-exploration'));}}>{resourceSectionEnabled?'Close model cutaway':'Open model cutaway'}</button>
+            <label htmlFor="tanga-resource-section-position"><span>Section sweep</span><output>{resourceSectionPosition}%</output></label>
+            <input id="tanga-resource-section-position" aria-label="Sweep the resource model cutaway" type="range" min="0" max="100" step="1" value={resourceSectionPosition} disabled={!resourceSectionEnabled} onChange={event=>setResourceSectionPosition(Number(event.target.value))}/>
+            {resourceSectionEnabled && <div className="tanga-section-locator" aria-label={`Section position ${resourceSectionPosition}% along the sweep`}>
+              <div className="tanga-section-locator__extent" aria-hidden="true"><i style={{left: `${resourceSectionPosition}%`}}/></div>
+              <span>Schematic section position · {resourceSectionPosition}%</span>
+            </div>}
+            <small>Clips the displayed model and terrain together; it is not a new geological interpretation.</small>
+          </div>
+          <div className="tanga-three__grade-ramp" aria-hidden="true" />
+          <ol className="tanga-three__grade-list">
+            {TGC_GRADE_BINS.map((bin) => (
+              <li
+                key={bin.label}
+                role="button"
+                tabIndex={0}
+                aria-pressed={lockedGrade === bin.key}
+                onKeyDown={event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); setLockedGrade(current => current === bin.key ? null : bin.key);}}}
+                className={classNames(
+                  'tanga-three__grade-item',
+                  activeGrade === bin.key && 'is-hovered',
+                  lockedGrade === bin.key && 'is-locked',
+                  activeGrade && activeGrade !== bin.key && 'is-dim'
+                )}
+                title="Click to lock this grade"
+                onPointerEnter={() => setHoveredGrade(bin.key)}
+                onPointerLeave={() => setHoveredGrade((current) => (current === bin.key ? null : current))}
+                onClick={() => setLockedGrade((current) => (current === bin.key ? null : bin.key))}
+              >
+                <i style={{backgroundColor: bin.color, boxShadow: `0 0 20px ${bin.color}`}} />
+                <span>
+                  <strong>{bin.label}</strong>
+                  <small>{bin.range} - {bin.detail}</small>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
+  );
+
+  const terrainTools = (
+          <div className="tanga-three__terrain-tools" aria-label="Survey terrain tools">
+            <div className="tanga-three__terrain-tools-head">
+              <span>Survey surface · August 2025</span>
+              <small>DTM source 0.66 m · display mesh ≈20 m · 1× vertical</small>
+            </div>
+            <div className="tanga-three__terrain-switch" role="group" aria-label="Terrain display">
+              <button type="button" aria-pressed={terrainDisplay === 'elevation'} onClick={() => setTerrainDisplay('elevation')}>Elevation</button>
+              <button type="button" aria-pressed={terrainDisplay === 'slope'} onClick={() => setTerrainDisplay('slope')}>Derived slope</button>
+            </div>
+            {terrainProfile.length > 1 ? (
+              <>
+          <button type="button" disabled={!sceneReady || !terrainProfile.length} aria-pressed={terrainProfileSweeping} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            if (terrainProfileSweeping) {
+              setTerrainProfileSweeping(false);
+              return;
+            }
+            terrainSweepProgressRef.current = 0;
+            setTerrainProfilePosition(0);
+            setMotionPaused(false);
+            setTerrainProfileSweeping(true);
+          }}>{terrainProfileSweeping ? 'Stop profile sweep' : 'Trace A–B'}</button>
+                <svg className="tanga-three__terrain-profile" viewBox="0 0 240 64" role="img" aria-label="Terrain elevation profile across a valid surveyed east-west transect">
+                  <path d="M8 54H232" />
+                  <text x="8" y="63" className="tanga-profile-endpoint">A</text>
+                  <text x="224" y="63" className="tanga-profile-endpoint">B</text>
+                  <polyline points={terrainProfilePath} />
+                  <line x1={10 + terrainProfilePosition * 2.2} y1="8" x2={10 + terrainProfilePosition * 2.2} y2="56" />
+                  <circle cx={10 + terrainProfilePosition * 2.2} cy={52 - (((selectedProfileElevation ?? terrainProfileMin) - terrainProfileMin) / terrainProfileRange) * 38} r="3" />
+                </svg>
+                <label className="tanga-three__terrain-profile-control">
+                  <span>A · West → B · East</span>
+                  <strong>{selectedProfileElevation?.toFixed(0)} m</strong>
+                  <input aria-label="Terrain profile cursor" type="range" min="0" max="100" value={terrainProfilePosition} onChange={(event) => {setTerrainProfileSweeping(false);setTerrainProfilePosition(Number(event.target.value));}} />
+                </label>
+                <small className="tanga-three__terrain-provenance">Survey DTM covers 17% of this tile; the rest uses regional DEM. Cursor follows the surveyed profile. Vertical datum is unstated; the survey/context join is left unbridged.</small>
+              </>
+            ) : (
+              <p className="tanga-three__terrain-provenance">Survey surface is unavailable. Showing the regional elevation layer; retry after the terrain assets load.</p>
+            )}
+          </div>
+  );
+
   return (
     <>
     <section className={classNames('tanga-three', visible && 'is-visible', `is-${mode}`, (inspectionMode || inspectionOpen) && 'is-inspecting')} aria-hidden={!visible}>
       <div ref={hostRef} className="tanga-three__canvas" data-status={status} data-ready={sceneReady} />
       {mode === 'mine_planning' && terrainCompare.enabled && <div className="tanga-three__comparison-wipe" style={{left:`${THREE.MathUtils.clamp(terrainCompare.split,8,92)}%`}} title="Drag to compare original terrain and concept site" onPointerDown={event=>{event.currentTarget.setPointerCapture(event.pointerId);const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} onPointerMove={event=>{if(!event.currentTarget.hasPointerCapture(event.pointerId))return;const rect=hostRef.current?.getBoundingClientRect();if(rect?.width)onTerrainCompareSplit?.(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*100,8,92));}} aria-hidden="true"><span>ORIGINAL TERRAIN</span><i/><span>CONCEPT SITE</span></div>}
-      {visible && mode!=='metallurgy' && mode!=='subsurface' && surfaceControl}
+
       {visible && !sceneReady && <p role="status" className="tanga-three__loading">{status || 'Preparing scene data…'}</p>}
       {!minimalViewerChrome && (
         <>
@@ -6653,13 +6760,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             <svg className="tanga-three__leader-svg" viewBox={`0 0 ${projectedFrame.width} ${projectedFrame.height}`} aria-hidden="true">
               {projectedCallouts.map((callout) => (
                 <g key={`leader-${callout.id}`} data-callout-id={callout.id} data-anchor-space={callout.anchor.space} data-anchor-owner={callout.anchor.owner}>
-                  <line
+                  {!(mode==='resource'&&['grade','blocks'].includes(callout.id)) && <line
                     x1={callout.anchorPixelX}
                     y1={callout.anchorPixelY}
                     x2={callout.boxPixelX}
                     y2={callout.boxPixelY}
                     style={{color: callout.tone, stroke: callout.tone}}
-                  />
+                  />}
                   <circle
                     cx={callout.anchorPixelX}
                     cy={callout.anchorPixelY}
@@ -6674,7 +6781,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               ))}
             </svg>
           )}
-          {(hasProjectedCallouts ? projectedCallouts : callouts).map((callout) => (
+          {(hasProjectedCallouts ? projectedCallouts : callouts).filter(callout=>mode!=='resource'||!['grade','blocks'].includes(callout.id)).map((callout) => (
             <div
               key={callout.id}
               data-callout-id={callout.id}
@@ -6749,6 +6856,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         {mode==='subsurface'&&mappedSurfaceStage&&<div className="tanga-three__grid-reference" role="note" aria-label="Geology map grid: UTM zone 37 south, 1 kilometre reference, approximate registration">
           <span aria-hidden="true">▦</span><strong>UTM 37S</strong><span>1 km grid</span><small>Approximate map registration</small>
         </div>}
+        <details className="tanga-camera-menu" onKeyDown={event=>event.stopPropagation()}>
+          <summary>Camera &amp; surface</summary>
+          {mode!=='subsurface' && surfaceControl}
         <div className="tanga-three__camera-tools" role="group" aria-label="3D camera controls">
           <button type="button" disabled={!sceneReady} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
@@ -6758,23 +6868,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             window.dispatchEvent(new Event('tanga:manual-exploration'));
             cameraCommandHandlerRef.current?.({id: Date.now(), action: 'resetView'});
           }}>Reset view</button>
-          {mode === 'topography' && <button type="button" disabled={!sceneReady || !terrainProfile.length} aria-pressed={terrainProfileSweeping} onClick={() => {
-            window.dispatchEvent(new Event('tanga:manual-exploration'));
-            if (terrainProfileSweeping) {
-              setTerrainProfileSweeping(false);
-              return;
-            }
-            terrainSweepProgressRef.current = 0;
-            setTerrainProfilePosition(0);
-            setMotionPaused(false);
-            setTerrainProfileSweeping(true);
-          }}>{terrainProfileSweeping ? 'Stop profile sweep' : 'Trace measured profile'}</button>}
-          {mode === 'drillholes' && <button type="button" disabled={!sceneReady || !journeyHole} onClick={() => {
-            window.dispatchEvent(new Event('tanga:manual-exploration'));
-            setMotionPaused(false);
-            journeyCommand.current?.(journeyHole);
-          }}>Follow recorded hole</button>}
-          {mode === 'drillholes' && journeyReadout.includes(' m') && <output className="tanga-drill-interval-readout" aria-live="off">{journeyReadout}</output>}
           {mode === 'subsurface' && !mappedSurfaceStage && <button type="button" disabled={!sceneReady} aria-pressed={exploded} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
             setMotionPaused(false);
@@ -6790,15 +6883,19 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <small>{mode === 'subsurface' ? 'Plan: drag to pan · 3D: drag to orbit' : 'Drag to orbit · Shift + drag to pan · scroll to zoom'}</small>
           {!inspectionMode && ['topography','subsurface','mine_planning'].includes(mode) && <button className="tanga-three__inspect-toggle" type="button" aria-label={mode==='subsurface'?(inspectionOpen?'Close inspection tools':'Inspection tools'):undefined} title={mode==='subsurface'?'Geology inspection tools':undefined} aria-expanded={inspectionOpen} onClick={() => setInspectionOpen(open => !open)}>{mode==='subsurface'?(inspectionOpen?'Close tools':'Inspect'):(inspectionOpen ? 'Close inspection tools' : mode==='mine_planning' ? 'Mine sequence & tools' : 'Inspection tools')}</button>}
         </div>
+        </details>
+        {mode==='drillholes' && <div className="tanga-drill-journey-primary">
+          <button type="button" disabled={!sceneReady || !journeyHole} onClick={() => {
+            window.dispatchEvent(new Event('tanga:manual-exploration'));
+            setMotionPaused(false);
+            journeyCommand.current?.(journeyHole, journeyHole==='TGDD1009' ? (18.25 + 18.38) / 2 : undefined);
+          }}>{journeyHole ? `Follow ${journeyHole}` : 'Follow recorded hole'}</button>
+          {journeyReadout.includes(' m') && <output className="tanga-drill-interval-readout" aria-live="off">{journeyReadout}</output>}
+        </div>}
         {mode==='resource'&&<details className="tanga-three-animation-tools" onToggle={event=>{if(event.currentTarget.open){const legend=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three__grade-legend');if(legend?.open)legend.open=false;}}}><summary>Resource reveal</summary><button onClick={()=>{setMotionPaused(false);resourceDrillRevealCommandRef.current?.();}}>Replay source drillhole reveal</button><small>Actual assay intervals shown by hole ID and downhole depth for presentation; this is not drilling chronology.</small><button onClick={()=>{setMotionPaused(false);revealCommand.current?.('resource');}}>Replay block assembly</button><button onClick={()=>revealCommand.current?.('none')}>Restore all displayed blocks</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><small>Spatial display reveal only; not geological formation or the estimation process.</small></details>}
         {legendItems.length > 0 && (
           <>
-          {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Follow a drillhole</summary>{journeyHoles.includes('TGDD1009') && <button type="button" onClick={() => {
-            setJourneyHole('TGDD1009');
-            setMotionPaused(false);
-            journeyCommand.current?.('TGDD1009', (18.25 + 18.38) / 2);
-            window.dispatchEvent(new Event('tanga:manual-exploration'));
-          }}>Follow TGDD1009 to sample TGF002</button>}<label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button disabled={!journeyHole} onClick={()=>{setMotionPaused(false);journeyCommand.current?.(journeyHole);}}>Play drillhole journey</button><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>The display cuts away foreground terrain. The trace follows recorded intervals, with gaps left unfilled.</small></details>}
+          {mode==='drillholes'&&<details className="tanga-three-animation-tools"><summary>Choose a drillhole</summary><label>Recorded hole<select aria-label="Drillhole journey source" value={journeyHole} onChange={e=>{setJourneyHole(e.target.value);journeyCommand.current?.(null);}}>{journeyHoles.map(id=><option key={id}>{id}</option>)}</select></label><button onClick={()=>journeyCommand.current?.(null)}>Stop journey</button><button aria-pressed={motionPaused} onClick={()=>setMotionPaused(v=>!v)}>{motionPaused?'Play scene motion':'Pause scene motion'}</button><p role="status">{journeyReadout}</p><small>The display cuts away foreground terrain. The trace follows recorded intervals, with gaps left unfilled.</small></details>}
           <div className="tanga-three__drill-legend" aria-label="Drillhole legend">
             <div className="tanga-three__drill-legend-head">
               <span>{mode === 'topography' ? 'Surface Legend' : 'Drillhole Legend'}</span>
@@ -6842,38 +6939,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <div className="tanga-geology-legend-slot" hidden={inspectionMode||inspectionOpen} ref={onGeologyLegendMount}/>
           {(inspectionMode||inspectionOpen)&&geologyInspection}
         </div>}
-        {mode === 'topography' && (
-          <div className="tanga-three__terrain-tools" aria-label="Survey terrain tools">
-            <div className="tanga-three__terrain-tools-head">
-              <span>Survey surface · August 2025</span>
-              <small>DTM source 0.66 m · display mesh ≈20 m · 1× vertical</small>
-            </div>
-            <div className="tanga-three__terrain-switch" role="group" aria-label="Terrain display">
-              <button type="button" aria-pressed={terrainDisplay === 'elevation'} onClick={() => setTerrainDisplay('elevation')}>Elevation</button>
-              <button type="button" aria-pressed={terrainDisplay === 'slope'} onClick={() => setTerrainDisplay('slope')}>Derived slope</button>
-            </div>
-            {terrainProfile.length > 1 ? (
-              <>
-                <svg className="tanga-three__terrain-profile" viewBox="0 0 240 64" role="img" aria-label="Terrain elevation profile across a valid surveyed east-west transect">
-                  <path d="M8 54H232" />
-                  <text x="8" y="63" className="tanga-profile-endpoint">A</text>
-                  <text x="224" y="63" className="tanga-profile-endpoint">B</text>
-                  <polyline points={terrainProfilePath} />
-                  <line x1={10 + terrainProfilePosition * 2.2} y1="8" x2={10 + terrainProfilePosition * 2.2} y2="56" />
-                  <circle cx={10 + terrainProfilePosition * 2.2} cy={52 - (((selectedProfileElevation ?? terrainProfileMin) - terrainProfileMin) / terrainProfileRange) * 38} r="3" />
-                </svg>
-                <label className="tanga-three__terrain-profile-control">
-                  <span>A · West → B · East</span>
-                  <strong>{selectedProfileElevation?.toFixed(0)} m</strong>
-                  <input aria-label="Terrain profile cursor" type="range" min="0" max="100" value={terrainProfilePosition} onChange={(event) => {setTerrainProfileSweeping(false);setTerrainProfilePosition(Number(event.target.value));}} />
-                </label>
-                <small className="tanga-three__terrain-provenance">Survey DTM covers 17% of this tile; the rest uses regional DEM. Cursor follows the surveyed profile. Vertical datum is unstated; the survey/context join is left unbridged.</small>
-              </>
-            ) : (
-              <p className="tanga-three__terrain-provenance">Survey surface is unavailable. Showing the regional elevation layer; retry after the terrain assets load.</p>
-            )}
-          </div>
-        )}
+        {mode === 'topography' && (terrainToolsMount ? createPortal(terrainTools, terrainToolsMount) : terrainTools)}
       </section>
       {mode === 'mine_planning' && <section className="tanga-mine-story" aria-label="Mining targets and animation">
         <h2>{mineSequenceActive?'Mine-site concept sequence':miningBeat>=3?'Processing & site services':miningBeat===2?'Resource blocks inside pits':'Why these pits?'}</h2>
@@ -6963,63 +7029,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       </section>}
       {mode==='subsurface'&&crossSource&&<GeologyCrossSections source={crossSource} loadSectionBlocks={loadBlocks} onView={(section,flat,move)=>crossViewRef.current?.(section,flat,move)}/>}
       {mode === 'metallurgy' && <MetallurgyVisualStory paused={motionPaused} onToggle={()=>setMotionPaused(v=>!v)}/>}
-      {mode === 'resource' && (
-        <details className="tanga-three__grade-legend" aria-label="TGC grade legend" onToggle={event=>{if(event.currentTarget.open){event.currentTarget.scrollTop=0;const tools=event.currentTarget.closest('.tanga-three')?.querySelector<HTMLDetailsElement>('.tanga-three-animation-tools');if(tools?.open)tools.open=false;}}}>
-          <summary>Grade filter · cutaway</summary>
-          <div className="tanga-three__grade-head">
-            <span>TGC Grade</span>
-            <strong>{resourceFocusLabel(resourceFocus)} view</strong>
-          </div>
-          <div className="tanga-three__resource-threshold">
-            <label htmlFor="tanga-resource-threshold"><span>Show blocks ≥</span><output>{resourceCutoff.toFixed(1)}% TGC</output></label>
-            <input id="tanga-resource-threshold" aria-label="Resource block display threshold in percent TGC" type="range" min="0" max={resourceCutoffMax} step="0.1" value={resourceCutoff} onChange={event=>{setResourceCutoff(Number(event.target.value));window.dispatchEvent(new Event('tanga:manual-exploration'));}}/>
-            <div className="tanga-three__resource-threshold-stats" aria-live="polite">
-              <span>{resourceCutoffSummary?`${resourceCutoffSummary.visibleCells.toLocaleString()} / ${resourceCutoffSummary.availableCells.toLocaleString()} cells`:sceneReady?'Preparing model counts':'Loading source cells'}</span>
-              {resourceCutoffSummary?.visibleCells?<strong>{resourceCutoffSummary.meanTgc.toFixed(2)}% mean cell TGC</strong>:null}
-            </div>
-            <button className="tanga-three__resource-basis" type="button" onClick={()=>{setResourceCutoff(3);window.dispatchEvent(new Event('tanga:manual-exploration'));}}>Use 3% MRE cut-off</button>
-            <small>Source-cell view filter only. It does not recalculate reported tonnes, grade or contained graphite, and is not an economic cutoff.</small>
-          </div>
-          <div className="tanga-three__resource-section">
-            <button type="button" aria-pressed={resourceSectionEnabled} disabled={!sceneReady} onClick={()=>{setExploded(false);setResourceSectionEnabled(value=>!value);window.dispatchEvent(new Event('tanga:manual-exploration'));}}>{resourceSectionEnabled?'Close model cutaway':'Open model cutaway'}</button>
-            <label htmlFor="tanga-resource-section-position"><span>Section sweep</span><output>{resourceSectionPosition}%</output></label>
-            <input id="tanga-resource-section-position" aria-label="Sweep the resource model cutaway" type="range" min="0" max="100" step="1" value={resourceSectionPosition} disabled={!resourceSectionEnabled} onChange={event=>setResourceSectionPosition(Number(event.target.value))}/>
-            {resourceSectionEnabled && <div className="tanga-section-locator" aria-label={`Section position ${resourceSectionPosition}% along the sweep`}>
-              <div className="tanga-section-locator__extent" aria-hidden="true"><i style={{left: `${resourceSectionPosition}%`}}/></div>
-              <span>Schematic section position · {resourceSectionPosition}%</span>
-            </div>}
-            <small>Clips the displayed model and terrain together; it is not a new geological interpretation.</small>
-          </div>
-          <div className="tanga-three__grade-ramp" aria-hidden="true" />
-          <ol className="tanga-three__grade-list">
-            {TGC_GRADE_BINS.map((bin) => (
-              <li
-                key={bin.label}
-                role="button"
-                tabIndex={0}
-                aria-pressed={lockedGrade === bin.key}
-                onKeyDown={event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); setLockedGrade(current => current === bin.key ? null : bin.key);}}}
-                className={classNames(
-                  'tanga-three__grade-item',
-                  activeGrade === bin.key && 'is-hovered',
-                  lockedGrade === bin.key && 'is-locked',
-                  activeGrade && activeGrade !== bin.key && 'is-dim'
-                )}
-                title="Click to lock this grade"
-                onPointerEnter={() => setHoveredGrade(bin.key)}
-                onPointerLeave={() => setHoveredGrade((current) => (current === bin.key ? null : current))}
-                onClick={() => setLockedGrade((current) => (current === bin.key ? null : bin.key))}
-              >
-                <i style={{backgroundColor: bin.color, boxShadow: `0 0 20px ${bin.color}`}} />
-                <span>
-                  <strong>{bin.label}</strong>
-                  <small>{bin.range} - {bin.detail}</small>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </details>
-      )}
+      {mode === 'resource' && (resourceToolsMount ? createPortal(resourceTools, resourceToolsMount) : resourceTools)}
     </section>
     {visible && /failed|unavailable|exceeded|could not|no contained/i.test(status) && typeof document !== 'undefined' && createPortal(
       <div role="alert" className="tanga-three__load-error"><span>{status}</span><button type="button" onClick={onRetry}>{mode === 'drillholes' ? 'Retry drilling data' : 'Retry this scene'}</button></div>,

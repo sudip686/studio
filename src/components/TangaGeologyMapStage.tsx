@@ -11,6 +11,7 @@ export type GeologyUnitSelection = {title:string;rows:string[];tone:string};
 /** Keep the source sheet available as evidence while leading with the 3D map. */
 export default function TangaGeologyMapStage({legendMount, step, ready, onAdvance, onStage, selectedUnit, onSelectUnit, hiddenUnits, onToggleUnit}: {legendMount:HTMLDivElement|null;step:number;ready:boolean;onAdvance:()=>void;onStage:(step:number)=>void;selectedUnit:GeologyUnitSelection|null;onSelectUnit:(unit:GeologyUnitSelection|null)=>void;hiddenUnits:string[];onToggleUnit:(unit:string)=>void}) {
   const [legendOpen,setLegendOpen]=useState(false);
+  const [query,setQuery]=useState('');
   const storyPanel=useRef<HTMLDivElement|null>(null);
   useEffect(()=>{if(storyPanel.current)storyPanel.current.scrollTop=0;},[step,selectedUnit?.title]);
 
@@ -28,7 +29,17 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
   const legend = <div className={`tanga-geology-surface-legend ${legendOpen?'is-open':''}`} aria-label={mapUnits?'Mapped rock types':'Interpreted model rock types'}>
       <header><strong>{mapUnits?'MAPPED GEOLOGY':'INTERPRETED MODEL'}</strong><small>{mapUnits?'8 map classes':'7 model units'}</small></header>
       <button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>{mapUnits?'Map':'Model'} legend · {mapUnits?8:7} classes {legendOpen?'−':'+'}</button>
-      <div>{(mapUnits?MAPPED_SURFACE_UNITS:MODEL_ROCK_UNITS).map(({color,label,...unit})=>mapUnits
+      <input type="search" value={query} aria-label="Filter rock units" placeholder="Find a rock unit" onChange={event=>setQuery(event.target.value)}/>
+      {mapUnits&&selectedUnit&&<button className="tanga-geology-isolate" type="button" onClick={()=>{
+        const others=MAPPED_SURFACE_UNITS.filter(unit=>unit.label!==selectedUnit.title);
+        const isolated=others.every(unit=>hiddenUnits.includes(unit.label));
+        if(isolated)hiddenUnits.forEach(onToggleUnit);
+        else {
+          if(hiddenUnits.includes(selectedUnit.title))onToggleUnit(selectedUnit.title);
+          others.filter(unit=>!hiddenUnits.includes(unit.label)).forEach(unit=>onToggleUnit(unit.label));
+        }
+      }}>{MAPPED_SURFACE_UNITS.every(unit=>unit.label===selectedUnit.title||hiddenUnits.includes(unit.label))?'Show all mapped units':'Isolate selected unit'}</button>}
+      <div>{(mapUnits?MAPPED_SURFACE_UNITS:MODEL_ROCK_UNITS).filter(unit=>unit.label.toLowerCase().includes(query.trim().toLowerCase())).map(({color,label,...unit})=>mapUnits
         ? <div className="tanga-geology-surface-legend__row" key={label}>
           <button className="tanga-geology-surface-legend__unit" type="button" aria-pressed={selectedUnit?.title===label} onClick={()=>{if(selectedUnit?.title===label){onSelectUnit(null);return;}if(hiddenUnits.includes(label))onToggleUnit(label);onSelectUnit({title:label,rows:[label==='Soil cover'?'Source-map soil-cover class; generalized mapped footprint.':'Digitized project-map polygon.','Approximate printed-grid registration; not a surveyed contact.'],tone:color});}}><i style={{background:color}}/>{label}</button>
           <button className="tanga-geology-surface-legend__visibility" type="button" aria-label={`${hiddenUnits.includes(label)?'Show':'Hide'} ${label}`} aria-pressed={!hiddenUnits.includes(label)} onClick={()=>onToggleUnit(label)} title={`${hiddenUnits.includes(label)?'Show':'Hide'} this mapped unit`}>{hiddenUnits.includes(label)?<EyeOff size={14}/>:<Eye size={14}/>}</button>
@@ -40,13 +51,13 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
   return <>
     {legendMount&&createPortal(legend,legendMount)}
 
+        <ol className="tanga-geology-map-sequence tanga-geology-stage-selector" aria-label="Geology evidence sequence">
+          {stages.map((label,index)=><li key={label} aria-current={step===index?'step':undefined}><button type="button" onClick={()=>onStage(index)}><span>0{index+1}</span>{label}</button></li>)}
+        </ol>
     <aside className="tanga-story-panel tanga-story-panel--map" aria-label="Geology map to model story">
       <header className="tanga-geology-story__header">
         <div className="tanga-story-panel__eyebrow">GEOLOGICAL FRAMEWORK · {eyebrow}</div>
         <h2>{headings}</h2>
-        <ol className="tanga-geology-map-sequence" aria-label="Geology evidence sequence">
-          {stages.map((label,index)=><li key={label} aria-current={step===index?'step':undefined}><button type="button" onClick={()=>onStage(index)}><span>0{index+1}</span>{label}</button></li>)}
-        </ol>
       </header>
       <div ref={storyPanel} className="tanga-geology-story__body">
         <p className="tanga-story-panel__intro">{intros[step] ?? intros[0]}</p>
