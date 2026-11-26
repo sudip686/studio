@@ -3212,3 +3212,110 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 @media (min-width: 1121px) {
   .tanga-deck--present .tanga-deck__coach { top: auto; bottom: 102px; }
 }
+
+/* Desktop safe zones: keep chapter headings, slide content, and the persistent
+   navigator in separate measured regions. */
+@media (min-width: 1121px) {
+  .tanga-deck[data-mode="subsurface"] .tanga-geology-stage-selector {
+    top: 166px;
+  }
+
+  .tanga-deck[data-mode="subsurface"] .tanga-three__nav-cluster {
+    top: 166px !important;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark {
+    inset-block: 166px 112px;
+    grid-template-columns: clamp(210px, 16vw, 240px) minmax(0, 1fr) clamp(340px, 29vw, 420px);
+    gap: clamp(14px, 1.6vw, 24px);
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__narrative {
+    max-width: none;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark h2 {
+    margin: 8px 0 12px;
+    font-size: clamp(27px, 2.35vw, 38px);
+    line-height: 1.12;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark ol {
+    gap: 2px;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark li > button {
+    min-height: clamp(30px, 3.4vh, 38px);
+    padding-block: 2px;
+    row-gap: 0;
+    line-height: 1.1;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-process-exhibit--factory {
+    inset: 190px 24px 116px;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-deck__chapter-title {
+    width: max-content;
+    max-width: calc(100vw - 48px);
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-deck__chapter-title h1 {
+    white-space: nowrap;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-factory-header > div:first-child {
+    width: 100%;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-factory-header h2 {
+    white-space: nowrap;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-story-panel--logistics {
+    width: min(390px, calc(100vw - 36px));
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li > div {
+    min-width: 0;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    margin-block: 8px;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 5px 0;
+    border-bottom: 1px solid #ffffff18;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li > svg {
+    display: block;
+    width: 26px;
+    height: 26px;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li p {
+    display: none;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow strong button {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 11px;
+    line-height: 1.25;
+    letter-spacing: 0;
+    white-space: normal;
+    text-wrap: balance;
+  }
+}
