@@ -57,12 +57,12 @@ type GeologyMode = 'topography' | 'drillholes' | 'subsurface' | 'resource' | 'mi
 const TERRAIN_GROUND_COLOR = 0x9a8267;   // untextured fallback surface
 const TOPOGRAPHY_ELEVATION_RAMP = [
   // Hypsometric display tint, not a claim about land cover or soil type.
-  // Keep the DEM readable in a dark theater while giving ridges daylight-like
-  // separation from valley floors and the surrounding regional context.
-  {at: 0, color: new THREE.Color('#405b45')},
-  {at: 0.36, color: new THREE.Color('#718253')},
-  {at: 0.72, color: new THREE.Color('#ac9865')},
-  {at: 1, color: new THREE.Color('#d1b786')},
+  // Use a brighter daylight ramp so surveyed ridges separate from valleys
+  // without changing sampled elevations or the measured vertical scale.
+  {at: 0, color: new THREE.Color('#4f704f')},
+  {at: 0.36, color: new THREE.Color('#899d5e')},
+  {at: 0.72, color: new THREE.Color('#c3ac6e')},
+  {at: 1, color: new THREE.Color('#e5cb92')},
 ];
 /** Flat neutral sky, kept dark enough that the deck's HUD still reads over it. */
 const SKY_COLOR = 0x2b2723;
@@ -3669,7 +3669,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     // geology and grade colours close to their source legend colours.
     const isTerrainView = mode === 'topography';
     const isModelView = mode === 'resource' || mode === 'subsurface';
-    scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x5b6253 : 0x303d47, isTerrainView ? 0.82 : isModelView ? 1.26 : 1.04));
+    scene.add(new THREE.HemisphereLight(0xf3f7fa, isTerrainView ? 0x5b6253 : 0x303d47, isTerrainView ? 0.98 : isModelView ? 1.26 : 1.04));
     // Low raking key across the mapped ridges: the land stays dimensional
     // without suggesting a different sun position or changing elevation.
     const key = new THREE.DirectionalLight(isModelView ? 0xfffbf2 : PRESENTATION_SUN_COLOR, isTerrainView ? 1.7 : mode === 'mine_planning' ? 1.9 : 1.52);
@@ -3678,11 +3678,11 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     key.castShadow = true;
     // Cool fill from opposite side — keeps shadowed slopes readable without
     // washing out the terrain. No shadow casting on the fill (perf + softness).
-    const fill = new THREE.DirectionalLight(isModelView ? 0xd9e2e8 : isTerrainView ? 0xf4edda : 0xa8c5ff, isTerrainView ? 0.52 : mode === 'mine_planning' ? 0.72 : 0.7);
+    const fill = new THREE.DirectionalLight(isModelView ? 0xd9e2e8 : isTerrainView ? 0xf4edda : 0xa8c5ff, isTerrainView ? 0.76 : mode === 'mine_planning' ? 0.72 : 0.7);
     fill.position.set(-1200, 900, -800);
     scene.add(fill);
     // Rim light behind + above — separates ridges from the dark background.
-    const rimLight = new THREE.DirectionalLight(0xffffff, isTerrainView ? 0.22 : isModelView ? 0.6 : 0.5);
+    const rimLight = new THREE.DirectionalLight(0xffffff, isTerrainView ? 0.3 : isModelView ? 0.6 : 0.5);
     rimLight.position.set(0, 1600, -2000);
     scene.add(rimLight);
     key.shadow.mapSize.set(2048, 2048);
