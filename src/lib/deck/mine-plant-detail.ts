@@ -13,6 +13,7 @@ export const PLANT_PROCESS_STAGES = [
 
 export function addPlantDetail(root: THREE.Group, materials: Record<string, THREE.Material>) {
   const steel = materials.steel, accent = materials.copper, dark = materials.roof;
+  const safetyRail = new THREE.MeshStandardMaterial({color: 0xd8ad48, roughness: .73});
   const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number, name: string) => {
     const object = new THREE.Mesh(geometry, material);
     object.name = name; object.position.set(x, y, z); object.castShadow = true; object.receiveShadow = true;
@@ -36,8 +37,8 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
   for (const x of [-112, -96]) for (const z of [-23, -9]) box(.9, 20, .9, x, 11, z, 'Crushing structural frame');
   for (let i = 0; i < 9; i++) box(18, .4, .35, -104, 26, -22 + i * 1.5, 'ROM grizzly bars', dark);
   box(29, 1, 25, -104, 18, -16, 'Feed service platform');
-  for (let i = 0; i < 10; i++) box(.4, 4, .4, -118 + i * 3, 20, -29, 'Feed platform handrail', accent);
-  box(30, .4, .4, -104, 22, -29, 'Feed platform handrail', accent);
+  for (let i = 0; i < 10; i++) box(.4, 4, .4, -118 + i * 3, 20, -29, 'Feed platform handrail', safetyRail);
+  box(30, .4, .4, -104, 22, -29, 'Feed platform handrail', safetyRail);
   mesh(new THREE.ConeGeometry(7, 13, 20), accent, -73, 20, -16, 'Secondary cone crusher');
   const screen = box(16, 3, 10, -58, 20, -16, 'Crushing vibrating screen', dark); screen.rotation.z = -.13;
   for (const z of [-20, -12]) pipe([-66, 11, z], [-51, 17, z], .6, 'Crushing screen supports');
@@ -59,8 +60,8 @@ export function addPlantDetail(root: THREE.Group, materials: Record<string, THRE
   for (const z of [-36, -12, -103]) {
     box(82, 1.5, 2, 39, 11.5, z + 9, 'Flotation concentrate launder', accent);
     box(84, .8, 3, 39, 15, z - 10, 'Flotation operator walkway');
-    for (let x = 0; x < 84; x += 7) box(.35, 3.5, .35, x, 17, z - 11.5, 'Flotation walkway stanchion', accent);
-    box(85, .35, .35, 39, 18.8, z - 11.5, 'Flotation handrail', accent);
+    for (let x = 0; x < 84; x += 7) box(.35, 3.5, .35, x, 17, z - 11.5, 'Flotation walkway stanchion', safetyRail);
+    box(85, .35, .35, 39, 18.8, z - 11.5, 'Flotation handrail', safetyRail);
   }
   for (const [x, z] of [[82, -12], [86, -70], [125, 10]]) {
     box(8, 5, 6, x, 4, z, 'Flotation slurry pump skid', accent);

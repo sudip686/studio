@@ -6045,8 +6045,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
       plantRoofMeshes.forEach(roof=>{
         const open=detail.plantCutaway&&plantRoofMatchesFocus(detail.plantProcess,roof.userData.plantStage)?plantRoofProgress:0;
         const slideSign=Number(roof.userData.roofSlideSign??0);
-        roof.position.y=Number(roof.userData.roofBaseY??roof.position.y);
-        roof.position.z=Number(roof.userData.roofBaseZ??roof.position.z)+slideSign*18*open;
+        roof.position.y=Number(roof.userData.roofBaseY??roof.position.y)+Math.abs(slideSign)*4*open;
+        roof.position.z=Number(roof.userData.roofBaseZ??roof.position.z)+slideSign*22*open;
         if(!roof.userData.roofMaterialClones){
           const materials=Array.isArray(roof.material)?roof.material:[roof.material];
           roof.userData.roofBaseOpacities=materials.map(material=>material.opacity);
@@ -6062,7 +6062,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const materials=Array.isArray(roof.material)?roof.material:[roof.material];
         const baseOpacities=roof.userData.roofBaseOpacities as number[];
         materials.forEach((material,index)=>{
-          material.opacity=THREE.MathUtils.lerp(baseOpacities[index]??1,slideSign===0?.14:1,open);
+          material.opacity=THREE.MathUtils.lerp(baseOpacities[index]??1,slideSign===0?.14:.35,open);
           const transparent=material.opacity<.999;
           if(material.transparent!==transparent){material.transparent=transparent;material.needsUpdate=true;}
           material.depthWrite=material.opacity>.55;

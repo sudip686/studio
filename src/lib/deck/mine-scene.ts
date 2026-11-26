@@ -28,6 +28,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   const wallCladding=new THREE.MeshStandardMaterial({color:0xa2aca5,roughness:.92,metalness:.01});
   const wallRib=new THREE.MeshStandardMaterial({color:0x818d86,roughness:.82,metalness:.05});
   const roofSeam=new THREE.MeshStandardMaterial({color:0x929d96,roughness:.86,metalness:.03});
+  const roofLight = new THREE.MeshStandardMaterial({color: 0x9fb9bf, roughness: .62, metalness: .05});
   function mesh(g:THREE.BufferGeometry,m:THREE.Material,x:number,y:number,z:number,name=''){const a=new THREE.Mesh(g,m);a.position.set(x,y,z);a.name=name;a.castShadow=true;a.receiveShadow=true;root.add(a);return a;}
   const box=(w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material=materials.steel,name='')=>mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,name);
   const cylinder=(r:number,h:number,x:number,y:number,z:number,m:THREE.Material=materials.steel)=>mesh(new THREE.CylinderGeometry(r,r,h,24),m,x,y,z);
@@ -98,9 +99,16 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
   box(392,.15,7,0,serviceRoadY,135,materials.serviceRoad,'Conceptual perimeter service lane');
   box(392,.15,5,0,serviceRoadY,-135,materials.serviceRoad,'Conceptual service lane');
   for(const x of [-195,195])box(4,.15,268,x,serviceRoadY,0,materials.serviceRoad,'Conceptual perimeter service lane');
+  // Route through the southern gate opening between the lab and the water yard.
+  // Start at the edge of the service loop to avoid coplanar road overlaps.
+  const gateLaneStart = 138.5;
+  const gateLaneEnd = 246;
+  box(12,.15,gateLaneEnd-gateLaneStart,30,serviceRoadY,(gateLaneStart+gateLaneEnd)/2,
+    materials.serviceRoad,'Conceptual gate approach service lane');
   const serviceRoadTopY=serviceRoadY+.075;
   const serviceRoadMarkY=serviceRoadTopY+.011;
   for(let x=-185;x<=185;x+=14)box(5,.02,.5,x,serviceRoadMarkY,135,materials.roadMarking,'Illustrative service-lane marking');
+  for(let z=147;z<=238;z+=13)box(.4,.02,4,30,serviceRoadMarkY,z,materials.roadMarking,'Illustrative service-lane marking');
   // Roof panels, portal frames and side openings give each building a legible silhouette.
   function shed(name:string,x:number,z:number,w:number,d:number,h:number,stage?:string){
     const rise=d*.12,roofLength=Math.hypot(d/2,rise);
@@ -131,6 +139,16 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
       seams.instanceMatrix.needsUpdate=true;seams.name=`${name} standing-seam roof ribs`;seams.castShadow=true;seams.userData.plantRoof=true;seams.userData.roofSlideSign=sign;
       if(stage)seams.userData.plantStage=stage;
       root.add(seams);
+      if (stage) {
+        // Banded roof lights give the enclosed process halls a readable scale
+        // from the flyover. They follow the same roof panel in cutaway mode.
+        const light = box(w * .76, .22, 1.8, x, h + rise / 2 + .39, z + sign * d / 4,
+          roofLight, `${name} continuous roof light`);
+        light.rotation.x = slope;
+        light.userData.plantRoof = true;
+        light.userData.roofSlideSign = sign;
+        light.userData.plantStage = stage;
+      }
       // Repeated portal rafters and eave members make the process halls read
       // as steel-framed buildings at whole-campus scale, not smooth toy boxes.
       for(let bay=0;bay<=bayCount;bay++){
@@ -347,7 +365,7 @@ export function buildConcentrator(options: {deferPlantDetail?: boolean; processC
     for(let x=-246;x<=246;x+=24)if(z<0||Math.abs(x)>40)box(.7,5,.7,x,2.5,z,materials.steel,'Perimeter fence post');
     for(const y of [2,4.5])for(const sign of [-1,1])box(206,.4,.4,sign*143,y,z,materials.steel,'Perimeter fence rail and gate opening');
   }
-  for(let i=0;i<7;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
+  for(let i=0;i<4;i++)box(18,.1,.6,-90+i*29,1,238,materials.roof,'Service yard centre markings');
   // Measure structural bases against the pad before batching removes their
   // individual source names. The pad top intentionally overlaps each footing
   // so buildings meet the graded platform without a visible gap.
