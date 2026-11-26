@@ -863,6 +863,18 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-decision-links a + a { background: transparent; border-color: transparent; }
 .tanga-deck--present .tanga-story-panel--decisions { padding: 16px; }
 .tanga-deck--present .tanga-story-panel--decisions h2 { margin: 6px 0 8px; font-size: 22px; }
+@media (min-width: 761px) {
+  .tanga-deck--present .tanga-story-panel--decisions { padding: 14px; }
+  .tanga-deck--present .tanga-story-panel--decisions h2 { margin: 4px 0 6px; font-size: 20px; line-height: 1.15; }
+  .tanga-deck--present .tanga-story-panel--decisions ol { gap: 5px; margin: 6px 0; }
+  .tanga-deck--present .tanga-story-panel--decisions li + li { padding-top: 5px; }
+  .tanga-deck--present .tanga-story-panel--decisions li strong { font-size: 13px; line-height: 1.25; }
+  .tanga-deck--present .tanga-story-panel--decisions li p { margin-top: 2px; font-size: 12px; line-height: 1.35; }
+  .tanga-deck--present .tanga-story-panel--decisions .tanga-decision-links { gap: 3px 5px; margin-top: 4px; }
+  .tanga-deck--present .tanga-story-panel--decisions .tanga-decision-links a { min-height: 28px; padding: 4px 6px; font-size: 11px; }
+  .tanga-deck--present .tanga-story-panel--decisions .tanga-decision-links a img { width: 28px; height: 20px; }
+  .tanga-deck--present .tanga-story-panel--decisions > .tanga-story-panel__link { min-height: 38px; margin-top: 8px; padding: 8px 10px; }
+}
 .tanga-decision-links a:hover,.tanga-decision-links a:focus-visible { border-color: rgba(230,151,96,.66); background: rgba(230,151,96,.1); color: #fff2e7; }
 .tanga-decision-links a:focus-visible { outline: 2px solid #f2bd91; outline-offset: 2px; }
 .tanga-story-close { display: flex; align-items: center; gap: 6px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); color: #f2b17e; font-size: 9px; font-weight: 620; }
