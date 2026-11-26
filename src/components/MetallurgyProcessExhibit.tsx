@@ -203,7 +203,11 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const distance=distanceByStage[next];
       // Keep the camera above the wall line while showing the equipment from a
       // lower three-quarter angle, instead of looking nearly straight down.
-      const localDirection = next === 'flotation' ? new THREE.Vector3(.29, .36, -1).normalize() : new THREE.Vector3(.72, .86, 1.05).normalize();
+      const localDirection = next === 'flotation'
+        ? new THREE.Vector3(.29, .36, -1).normalize()
+        : next === 'dewatering'
+          ? new THREE.Vector3(-.68, .78, 1.05).normalize()
+          : new THREE.Vector3(.72, .86, 1.05).normalize();
       destination.copy(target).addScaledVector(localDirection, distance);
       moveCamera(animate, true);
     }
