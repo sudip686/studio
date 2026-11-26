@@ -195,12 +195,11 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const item = PROCESS.find(candidate => candidate.id === next) ?? PROCESS[0];
       target.set(item.point[0], item.point[1], item.point[2]);
       if (next === 'flotation') plant.localToWorld(target.set(...FLOTATION_SECTION_ORIGIN).setY(10));
-      if (next === 'product') plant.localToWorld(target.set(184, 7, 77));
       // Frame the whole working bay, not a close crop of its roof/floor. The
       // flotation hall is the widest stage; product handling spans the longest
       // building. Give each shot enough room for equipment and roof-cutaway
       // context, then lower the view so the interior reads as a plant space.
-      const distanceByStage:Record<ProcessId,number>={feed:96,milling:82,flotation:47,dewatering:96,product:45};
+      const distanceByStage:Record<ProcessId,number>={feed:96,milling:82,flotation:47,dewatering:96,product:68};
       const distance=distanceByStage[next];
       // Keep the camera above the wall line while showing the equipment from a
       // lower three-quarter angle, instead of looking nearly straight down.
