@@ -1038,9 +1038,9 @@ const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: s
 // the renderer.
 const STATIC_MAP_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: string; note: string; fit?: 'cover' | 'contain'}>> = {
   project: {
-    src: '/presentation-assets/survey-site-aerial.jpg',
-    alt: 'Survey aerial photographs of the Tanga project terrain.',
-    note: 'Survey-site reference · live map unavailable',
+    src: '/presentation-assets/tanga-survey-figure-3-aerial.jpg',
+    alt: 'Survey aerial photograph looking across Tanga hills toward more open lowlands.',
+    note: 'Survey report · Figure 3 · lower aerial photograph · live map unavailable',
     fit: 'cover',
   },
   tanzania: {
@@ -1079,7 +1079,7 @@ const STATIC_MAP_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: str
 // with the deck. Loading these as ordinary images avoids mounting hidden maps
 // or WebGL renderers just to populate navigation thumbnails.
 const SCENE_INDEX_META: Record<WorkbenchMode, {question: string; thumbnail?: string; alt?: string}> = {
-  project: {question: 'Where is the project footprint?', thumbnail: '/presentation-assets/survey-site-aerial.jpg', alt: 'Survey aerial of the Tanga project area'},
+  project: {question: 'Where is the project footprint?', thumbnail: '/presentation-assets/tanga-survey-figure-3-aerial.jpg', alt: 'Survey aerial of Tanga hills and lower lowlands'},
   tanzania: {question: 'Where does Tanga sit in the region?', thumbnail: '/presentation-assets/mre-regional-geology.jpg', alt: 'Regional geology map from the resource report'},
   work_completed: {question: 'What work supports the current interpretation?', thumbnail: '/presentation-assets/metallurgy-samples.jpg', alt: 'Photographs of project testwork samples'},
   topography: {question: 'What does the measured landscape show?', thumbnail: STATIC_SCENE_FALLBACKS.topography!.src, alt: STATIC_SCENE_FALLBACKS.topography!.alt},
@@ -5957,7 +5957,7 @@ export default function TangaDeckWorkbench() {
       }}
       data-testid="tanga-deck-workbench"
     >
-      {activeMode === 'comparison' && isLastStory && !isExploreMode && <img className="tanga-closing-photo" src="/presentation-assets/survey-site-aerial.jpg" alt="Forested hills in the Tanga survey area"/>}
+      {activeMode === 'comparison' && isLastStory && !isExploreMode && <img className="tanga-closing-photo" src="/presentation-assets/tanga-survey-figure-3-aerial.jpg" alt="Survey aerial looking from Tanga hills toward more open lowlands"/>}
       {!isCoverScene && !storyHeroVisible && <TangaCinematicChrome key={`chrome-${activeMode}`} root={stageRef} mode={activeMode} view={`${activeMode}/${activeShotIndex}`}/>}
       <DeckHoverGuide mode={activeMode}/>
       <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
@@ -6470,7 +6470,7 @@ export default function TangaDeckWorkbench() {
       {/* Cover card — animated brand intro on the first scene. */}
       {isCoverScene && (
         <div className="tanga-deck__cover" role="dialog" aria-label="Presentation cover">
-          <img className="tanga-opening-photo" src="/presentation-assets/survey-site-aerial.jpg" alt="Forested hills in the Tanga survey area" fetchPriority="high"/>
+          <img className="tanga-opening-photo" src="/presentation-assets/tanga-survey-figure-3-aerial.jpg" alt="Survey aerial looking from Tanga hills toward more open lowlands" fetchPriority="high"/>
           <div className="tanga-deck__cover-inner">
             <span className="tanga-deck__cover-eyebrow">Sakariya Mines &amp; Minerals · Investor Presentation</span>
             <h1 className="tanga-deck__cover-title">Tanga Graphite</h1>

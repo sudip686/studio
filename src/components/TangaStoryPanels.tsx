@@ -133,8 +133,8 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onTerrainToolsMou
     <div className="tanga-story-panel__eyebrow">TANGA REGION · TANZANIA</div>
     <h2>Tanga Graphite</h2>
     <p className="tanga-story-panel__intro">A graphite project in the Maramba area of Mkinga District, framed by the August 2025 topographical survey.</p>
-    <img className="tanga-story-project-image" src="/presentation-assets/survey-site-aerial.jpg" alt="Aerial photographs of the forested Tanga project landscape"/>
-    <div className="tanga-story-image-caption"><span>Survey report · site photograph</span><small>Map outline shows the provisional project boundary.</small></div>
+    <img className="tanga-story-project-image" src="/presentation-assets/tanga-survey-figure-3-aerial.jpg" alt="Survey aerial photograph looking across Tanga hills toward more open lowlands"/>
+    <div className="tanga-story-image-caption"><span>Survey report · Figure 3 · lower aerial</span><small>Context photograph; map outline shows the provisional project boundary.</small></div>
   </aside>;
 
   if (chapter === 'topography') return <aside className="tanga-story-panel tanga-story-panel--terrain" aria-label="Surveyed terrain basis">
