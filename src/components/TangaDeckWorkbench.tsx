@@ -7365,14 +7365,13 @@ export default function TangaDeckWorkbench() {
             <span>Mapped road profile</span>
             <strong>{routeProfile.targetLabel}</strong>
           </div>
-          <svg viewBox="0 0 230 66" role="img" aria-label={`Elevation profile from ${routeProfile.minElevation} to ${routeProfile.maxElevation} metres`}>
+          <svg viewBox="0 0 230 66" role="img" aria-label={`Mapped elevation profile from Tanga Project to ${routeProfile.targetLabel}, ${routeProfile.minElevation} to ${routeProfile.maxElevation} metres`}>
             <path d="M4 62 L226 62" />
             <polyline points={routeProfile.points} />
           </svg>
           <div className="tanga-deck__route-profile-meta">
-            <span>{routeProfile.distanceLabel}</span>
-            <span>{routeProfile.durationLabel}</span>
-            <span>{routeProfile.minElevation}-{routeProfile.maxElevation} m</span>
+            <span>Tanga Project</span>
+            <span>{routeProfile.minElevation}-{routeProfile.maxElevation} m elevation</span>
           </div>
         </section>
       )}
