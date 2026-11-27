@@ -48,6 +48,43 @@ Review basis: the current local 12-chapter desktop montage at 1366 × 768 (`post
 
 Reviewed the 12 chapter entry views on the local investor branch in Chrome at 1366 × 768. The screenshots cover the opening composition. Later shots, open drawers and deployment performance need separate verification.
 
+## 27 November follow-up — current desktop review
+
+Review basis: a fresh local Chrome capture at 1366 × 768 (`.playwright-mcp/audit-current-project-1366-settled.png`) plus the 12-entry montage (`postchange-montage-1366.png`). This is a desktop visual review; it does not certify later shots, every open panel, or a hosted release.
+
+### Ranked worklist
+
+1. **P0 · Make the first frame match its promise.** In the fresh cold-entry capture, the chapter says “Frame the provisional project boundary” and displays the project locator/evidence, but the map remains at continental scale and the boundary is not visible. Earlier settled captures show the correct polygon. Verify the first authored view and cold-entry reveal as one sequence: either land on the complete boundary before enabling Continue, or change the opening copy and deliberately transition into the boundary. Keep the closer tested-ground view as the next shot.
+2. **P0 · Use one placement contract for all overlays.** Align chapter title, scene controls, right evidence panel, scale/compass, story cue and navigation to stable safe areas. At the current size, ordinary evidence copy and secondary labels read smaller than the scene controls. Raise explanatory text to a comfortable presentation size, reserve microtype for coordinates/source metadata, and avoid overlay-on-overlay callouts.
+3. **P1 · Repair the evidence-led signature views.** Geology needs more of the canvas for the registered map/model; Resource needs one clear orebody focal area with its readout away from blocks; Drilling should emphasize the selected collar/intercept and keep inactive labels quiet. Preserve source data and geology colors.
+4. **P1 · Clarify the two industrial scenes.** Mine Planning should open on both sourced pit envelopes together with enough surrounding site context to explain their relationship; use a detail selector for pit/blocks/plant. Metallurgy should give the connected factory more of the canvas, align its stage strip and actions once, and keep each selected operation beside its own report result and conceptual process explanation.
+5. **P1 · Make comparison and logistics scannable.** Peer Comparison needs a balanced globe/table split, legible ranking rows, and coupled row-to-marker selection. Port Access should keep the selected route and endpoints dominant, with the 72 km report basis and 76 km mapped estimate clearly separated from the elevation inset.
+6. **P2 · Simplify the supporting story views.** Project/Regional should reveal labels only when useful; Work Completed should keep source photo, dated milestone and provenance together; Topography should group relief/profile controls; Conclusion should use the globe as hero and one concise decisions panel with no repeated takeaway.
+
+### Slide-by-slide actions
+
+| # | Chapter | Planned improvement |
+|---|---|---|
+| 01 | Project | Reconcile cold-start camera and title with the actual boundary view; establish the outline before showing project-specific instructions and keep village labels secondary. |
+| 02 | Regional setting | Keep the globe/map dominant; select one route at a time and show its endpoints/distance in the inspector instead of scattering route callouts. |
+| 03 | Work completed | Keep the documentary photo largest; couple the selected date, result, source and image provenance in one evidence unit. |
+| 04 | Topography | Keep the relief central; consolidate source, opacity, profile and trace tools and place the elevation key away from the terrain focal ridge. |
+| 05 | Drillholes | Make the selected hole and its interval the focal point; group hole/layer selection and move assay/core evidence into one inspector. Keep collars simple and hide inactive labels. |
+| 06 | Geology | Increase useful map/model area without distorting the long source footprint; keep stage navigation distinct from lithology visibility and match the map, legend and model palette. |
+| 07 | Resource | Reserve clear space around the dipping blocks; group cutoff/category/slice tools, and keep reported resource figures visibly separate from displayed model-cell statistics. |
+| 08 | Peer comparison | Give the globe and benchmark list enough balanced space; use consistent row alignment, a compact metric/date/source header, and visible row-to-marker selection. |
+| 09 | Mine planning | Show both pits in the opening overview with terrain contact; put Site/North/South/Blocks/Plant in one destination control and label candidate versus illustrative facilities. |
+| 10 | Metallurgy | Enlarge the plant in its safe area; use one stage strip and one action row, with the selected roof cutaway and report-backed result easy to read together. |
+| 11 | Port access | Reduce route-label competition; keep one selected corridor, endpoints and distinct distance bases in the inspector, and the elevation profile in its reserved inset. |
+| 12 | Conclusion | Keep the orbit/globe unobstructed; use a short location marker and one decision panel with evidence-linked next-study questions and replay/share actions. |
+
+### Acceptance order
+
+- [ ] Resolve and capture the cold-entry Project mismatch at 1366 × 768 and 1707 × 842; compare the first useful frame with the settled authored boundary shot.
+- [ ] Capture one representative view from each chapter at both desktop sizes and measure panel/scene bounds; separately capture the selected states for Geology, Resource, Mine Planning and Metallurgy.
+- [ ] Fix the P0 shared placement and evidence typography, then address signature views (Geology, Drilling, Resource, Mine Planning, Metallurgy), then the supporting chapters in story order.
+- [ ] Repeat keyboard, source-access, panel-scroll and overlap checks and verify the current pushed deployment independently from local captures.
+
 ## Shared layout
 
 - [ ] Reserve the bottom centre for chapter navigation. Fold the large “Up next” card into the forward control and put the current shot caption directly under its chapter heading. Give the 3D subject the space currently between these two bars.
