@@ -613,17 +613,6 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     <section className="tanga-process-exhibit tanga-process-exhibit--factory" aria-label={endUseRoute ? 'Illustrative downstream graphite end-use pathways' : 'Conceptual graphite processing facility'} data-inspection={endUseRoute ?? 'factory'} style={showEvidence ? {display: 'none'} : undefined}>
     <header className="tanga-factory-header">
       <div><small>{endUseRoute ? 'DOWNSTREAM USE · ILLUSTRATIVE PATHWAY' : 'PROCESSING CONCEPT · ILLUSTRATIVE 3D FACILITY'}</small><h2>{endUseRoute ? 'From graphite concentrate to end use.' : 'One connected process. Five areas to inspect.'}</h2></div>
-    </header>
-    <div className="tanga-process-stage-strip">{endUseRoute ? <nav className="tanga-enduse-routes" aria-label="Choose an illustrative graphite downstream route">
-      <button type="button" aria-pressed={endUseRoute === 'anode'} onClick={() => chooseEndUseRoute('anode')}><span>01</span><strong>EV battery anode</strong><small>Shaped · purified · coated</small></button>
-      <button type="button" aria-pressed={endUseRoute === 'refractory'} onClick={() => chooseEndUseRoute('refractory')}><span>02</span><strong>Steelmaking refractory</strong><small>Magnesia-carbon brick</small></button>
-    </nav> : <nav className="tanga-process-stages tanga-factory-stages" aria-label="Processing facility areas">
-      {PROCESS.map((item, index) => <button type="button" key={item.id} aria-pressed={!overview && stage === item.id} aria-current={plantTourActive && plantTourStep === index ? 'step' : undefined} data-tour-step={plantTourActive && plantTourStep === index ? 'active' : undefined} onClick={() => { stopPlantTour(); showPlantTourStep(index); setPlantTourComplete(false); window.dispatchEvent(new Event('tanga:manual-exploration')); }}><b>0{index + 1}</b><span>{item.title}</span></button>)}
-    </nav>}</div>
-    <div className="tanga-factory-body">
-      <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage}>
-        <span key={endUseRoute ? `${endUseRoute}-${journeyStep}` : overview ? 'overview' : stage} className="tanga-cinematic-scan" aria-hidden="true"/>
-      </div>
       <div className="tanga-process-actions">
         {endUseRoute ? <>
           <button type="button" aria-label={fullStoryActive ? 'Stop full metallurgy story and return to the plant' : 'Return to processing plant'} onClick={returnToFactory}>{fullStoryActive ? 'Stop full story' : '← Plant tour'}</button>
@@ -634,6 +623,17 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           <button type="button" className="tanga-factory-tour-button" disabled={reduceMotion} title={reduceMotion ? 'Use the five stage buttons and end-use controls to explore without camera motion.' : 'Play the 30-second plant tour, then continue through the illustrative 30-second EV-anode pathway.'} aria-pressed={plantTourActive || fullStoryActive} onClick={() => plantTourActive ? stopPlantTour() : startPlantTour(true)}>{plantTourActive ? 'Stop story' : plantTourComplete ? 'Replay full story' : reduceMotion ? 'Story · reduced motion' : 'Play full story'}</button>
         </>}
         <button type="button" onClick={onToggle} aria-pressed={paused || reduceMotion} disabled={reduceMotion} title={reduceMotion ? 'Reduced motion is enabled in your device settings' : undefined}>{reduceMotion ? 'Motion reduced' : paused ? 'Play process motion' : 'Pause process motion'}</button>
+      </div>
+    </header>
+    <div className="tanga-process-stage-strip">{endUseRoute ? <nav className="tanga-enduse-routes" aria-label="Choose an illustrative graphite downstream route">
+      <button type="button" aria-pressed={endUseRoute === 'anode'} onClick={() => chooseEndUseRoute('anode')}><span>01</span><strong>EV battery anode</strong><small>Shaped · purified · coated</small></button>
+      <button type="button" aria-pressed={endUseRoute === 'refractory'} onClick={() => chooseEndUseRoute('refractory')}><span>02</span><strong>Steelmaking refractory</strong><small>Magnesia-carbon brick</small></button>
+    </nav> : <nav className="tanga-process-stages tanga-factory-stages" aria-label="Processing facility areas">
+      {PROCESS.map((item, index) => <button type="button" key={item.id} aria-pressed={!overview && stage === item.id} aria-current={plantTourActive && plantTourStep === index ? 'step' : undefined} data-tour-step={plantTourActive && plantTourStep === index ? 'active' : undefined} onClick={() => { stopPlantTour(); showPlantTourStep(index); setPlantTourComplete(false); window.dispatchEvent(new Event('tanga:manual-exploration')); }}><b>0{index + 1}</b><span>{item.title}</span></button>)}
+    </nav>}</div>
+    <div className="tanga-factory-body">
+      <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage}>
+        <span key={endUseRoute ? `${endUseRoute}-${journeyStep}` : overview ? 'overview' : stage} className="tanga-cinematic-scan" aria-hidden="true"/>
       </div>
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
         <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : selected.id === 'flotation' ? 'Flotation cell · illustrative section' : selected.id === 'product' ? 'Sizing screen · illustrative split' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>

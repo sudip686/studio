@@ -1816,8 +1816,9 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-three:has(.tanga-process-exhibit--factory) :is(.tanga-three__callout-layer,.tanga-three__nav-cluster,.tanga-three__hud,.tanga-three__panel,.tanga-three__drill-legend,.tanga-surface-control){visibility:hidden!important;pointer-events:none!important}
 .tanga-deck .tanga-process-exhibit--factory{bottom:124px}
 .tanga-process-exhibit--factory[data-inspection="factory"] .tanga-factory-stages{display:grid}
-.tanga-process-exhibit--factory .tanga-factory-header{align-items:center;min-height:48px}
-.tanga-process-exhibit--factory .tanga-factory-header>div:first-child{min-width:0}
+.tanga-process-exhibit--factory .tanga-factory-header{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:48px}
+.tanga-process-exhibit--factory .tanga-factory-header>div:first-child{flex:1 1 auto;min-width:0}
+.tanga-process-exhibit--factory .tanga-factory-header>.tanga-process-actions{position:static;flex:0 0 auto;justify-content:flex-end;margin-left:auto}
 .tanga-process-exhibit--factory .tanga-factory-header small{color:#61756f;font-size:10px;letter-spacing:.16em}
 .tanga-process-exhibit--factory h2{margin:4px 0;color:#203a3d;font-size:clamp(22px,1.8vw,29px);font-weight:560;letter-spacing:-.035em}
 .tanga-process-exhibit--factory .tanga-process-actions{flex-wrap:nowrap;gap:6px}
@@ -3150,8 +3151,6 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-milestone-stage__selector { display: none; }
 .tanga-geology-stage-selector { position: absolute; z-index: 26; top: 120px; left: 12px; right: 12px; }
 .tanga-factory-scene { position: relative; }
-.tanga-factory-scene > .tanga-process-actions { position: absolute; z-index: 4; top: 8px; right: 8px; flex-wrap: wrap; }
-.tanga-factory-scene > .tanga-process-actions button { background: #12242de8; color: #f1f7f8; border-color: #69838d; }
 
 @media (min-width: 1121px) {
   .tanga-deck--present .tanga-shot-caption { margin: 5px 0 0; max-width: 38ch; color: #eef6f7; background: #0d1b23e8; padding: 4px 7px; border-radius: 3px; font-size: 12px; line-height: 1.4; }
