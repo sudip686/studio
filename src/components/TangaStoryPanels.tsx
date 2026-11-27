@@ -150,11 +150,11 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onTerrainToolsMou
   if (chapter === 'drillholes') return <aside className="tanga-story-panel tanga-story-panel--drill" aria-label="Drilling evidence">
     <div className="tanga-story-panel__eyebrow">OBSERVATION · DRILL CORE</div>
     <h2>Inside the drill core</h2>
-    <p className="tanga-story-panel__intro">Each coloured interval records a sample along a drill trace. Use Below ground to follow the holes beneath the terrain.</p>
+    <p className="tanga-story-panel__intro">Intervals show recorded TGC grades. Use Below ground to inspect trace placement.</p>
     {onToggleSceneMotion&&<SceneMotionControl paused={sceneMotionPaused} onToggle={onToggleSceneMotion}/>}
     <div className="tanga-compact-grade-key" aria-label="Recorded interval TGC legend"><span>RECORDED INTERVAL TGC</span><div>{ASSAY_INTERVAL_BINS.map(bin=><span key={bin.key}><i style={{background:bin.color}}/>{bin.label}</span>)}</div></div>
     <div className="tanga-story-inline-note">100 diamond drillholes described in AMC MRE §3.2</div>
-    <p className="tanga-story-datum-note">Collars sit on the displayed terrain. The traces use recorded elevations. Their vertical datum still needs verification.</p>
+    <p className="tanga-story-datum-note">Collars sit on the displayed terrain. Traces use recorded elevations; the vertical datum still needs verification.</p>
     <details className="tanga-drill-source">
       <summary>View core photograph</summary>
       <figure>
@@ -163,7 +163,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onTerrainToolsMou
       </figure>
     </details>
     <button type="button" className="tanga-story-panel__link" onClick={onOpenGeology}>
-      Trace sample TGF002 · TGDD1009 · 18.25–18.38 m <ArrowRight size={14}/>
+      Inspect TGF002 · TGDD1009 · 18.25–18.38 m <ArrowRight size={14}/>
     </button>
   </aside>;
 
@@ -266,11 +266,11 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onTerrainToolsMou
 
   if (chapter === 'accessibility') return <aside className="tanga-story-panel tanga-story-panel--logistics" aria-label="Report development and export chain">
     <div className="tanga-story-panel__eyebrow">PAULSAM · JUNE 2023 · LOGISTICS CONCEPT</div><h2>Ore, concentrate, export cargo</h2>
-    <p className="tanga-story-panel__intro">Different materials need different links. The report separates hillside ore transport from road delivery of concentrate.</p>
+    <p className="tanga-story-panel__intro">Ore travels downhill toward a candidate feed point; concentrate moves by road to storage and port.</p>
     {portDistanceInfo&&<section className="tanga-logistics-distances" aria-label="Project-stated and mapped route distances to Tanga Port">
       <div><span>PROJECT-STATED DISTANCE</span><strong>{portDistanceInfo.projectStated}</strong><small>Project to Tanga Port</small></div>
       <div><span>DISPLAYED ROAD GEOMETRY</span><strong>{portDistanceInfo.mappedRoute}</strong><small>{portDistanceInfo.mappedRouteSource==='osrm'?`${portDistanceInfo.mappedDuration} · mapped road network`:'Indicative mapped path · route not verified'}</small></div>
-      <p>The supplied project distance and mapped road route use different bases. The route is a geographic visualisation, not a confirmed haulage or travel-time study.</p>
+      <p>The report distance and mapped road path use different bases. The mapped route is illustrative, not a verified haulage or travel-time study.</p>
     </section>}
     {onToggleUtilities && <label className="tanga-logistics-utilities"><input type="checkbox" checked={utilitiesVisible} onChange={onToggleUtilities}/> Show power infrastructure</label>}
     <ol className="tanga-material-flow" aria-label="Material journey from mine to port">
@@ -278,7 +278,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onTerrainToolsMou
       <li><Factory aria-hidden="true"/><div><small>02 / CONCENTRATE</small><strong>{onFramePort ? <button type="button" onClick={() => onFramePort('concentrate')}>Plant to storage yard</button> : 'Plant to storage yard'}</strong><p>Road haulage after processing. The study considers yards at Mabokweni and Kwa Songoro.</p></div></li>
       <li><Ship aria-hidden="true"/><div><small>03 / EXPORT CARGO</small><strong>{onFramePort ? <button type="button" onClick={() => onFramePort('cargo')}>Storage yard to port</button> : 'Storage yard to port'}</strong><p>Tanga was the preferred port in the 2023 study.</p></div></li>
     </ol>
-    <p className="tanga-story-panel__qualification">Study §§3.3, 5.3 and 6. A stuffing yard plot is not georeferenced in the supplied report. Map infrastructure and the displayed route do not establish a project connection or current capacity.</p>
+    <p className="tanga-story-panel__qualification">Study §§3.3, 5.3 and 6. No stuffing-yard plot is georeferenced in the report; mapped links and port capacity are unverified.</p>
   </aside>;
 
   if (chapter === 'comparison') return <aside className="tanga-story-panel tanga-story-panel--decisions" aria-label="Evidence-led next decisions">

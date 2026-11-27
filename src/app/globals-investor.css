@@ -3225,6 +3225,140 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck--present .tanga-deck__coach { top: auto; bottom: 102px; }
 }
 
+/* Keep the evidence panels readable above the fixed desktop navigator. Reduce
+   decorative spacing before shrinking evidence copy or introducing scrolling. */
+@media (min-width: 1121px) {
+  .tanga-deck--present :is(.tanga-story-panel--terrain, .tanga-story-panel--drill) {
+    padding: 15px 16px;
+  }
+
+  .tanga-deck--present :is(.tanga-story-panel--terrain, .tanga-story-panel--drill) h2 {
+    margin: 5px 0 8px;
+    font-size: 22px;
+    line-height: 1.12;
+  }
+
+  .tanga-deck--present :is(.tanga-story-panel--terrain, .tanga-story-panel--drill) .tanga-story-panel__intro {
+    line-height: 1.42;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale {
+    gap: 12px;
+    margin: 9px 0;
+    padding: 8px 0;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale strong {
+    font-size: 34px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot {
+    gap: 4px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-three__terrain-profile {
+    height: 54px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-story-panel__qualification,
+  .tanga-deck--present .tanga-story-panel--drill .tanga-story-panel__qualification {
+    margin-top: 7px;
+    padding-top: 7px;
+    line-height: 1.35;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-compact-grade-key {
+    margin: 8px 0;
+    padding: 7px 0;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-compact-grade-key > div {
+    gap: 6px 10px;
+    margin-top: 6px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-story-inline-note {
+    margin-top: 7px;
+    padding: 7px 9px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-story-datum-note {
+    margin-top: 6px;
+    padding: 6px 8px;
+    line-height: 1.35;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-drill-source {
+    margin-top: 6px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-drill-source summary {
+    padding-block: 7px;
+    font-size: 11px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill > .tanga-story-panel__link {
+    min-height: 36px;
+    margin-top: 7px;
+    padding: 8px 9px;
+    font-size: 10px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics {
+    padding: 15px 16px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics h2 {
+    margin: 5px 0 8px;
+    font-size: 22px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-story-panel__intro {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-distances {
+    gap: 6px;
+    margin: 8px 0 2px;
+    padding: 8px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-distances strong {
+    font-size: 18px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-distances > p {
+    padding-top: 5px;
+    font-size: 9px;
+    line-height: 1.3;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-utilities {
+    margin-block: 4px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-material-flow {
+    gap: 1px;
+    margin-block: 5px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-material-flow li {
+    padding-block: 3px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-material-flow li > svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-story-panel__qualification {
+    margin-top: 7px;
+    padding-top: 7px;
+    line-height: 1.35;
+  }
+}
+
 /* The chapter header already names the current view and its takeaway. Remove
    the duplicate floating view/next card on desktop to give the 3D canvas more
    room above the persistent navigator. The closing bookend remains unique. */
