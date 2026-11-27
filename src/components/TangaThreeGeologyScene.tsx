@@ -10,7 +10,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
 import {planSiteFromPitSurfaces, inside, rectangleContained, overlaps, rectangle, type SitePlan, type Point2, type SourcePitSurface} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurface, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, setPitTerrainComparison, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, setPitTerrainComparison, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {cutPitTerrain} from '@/lib/deck/pit-terrain-cut';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
@@ -5225,7 +5225,13 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           for (const [index,pit] of sitePlan.pits.entries()) {
             const height=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
             const sourceSurface=mode==='mine_planning'?orderedSourcePitSurfaces[index]:undefined;
-            const mesh=buildPitSurface(pit,height,cut?.rims[index]);
+            // Mine Planning must render the supplied RF1 10 m bench raster
+            // directly. Rebuilding a smooth convex-hull shell from only the
+            // overall floor and rim elevations flattened the source benches
+            // and made the grade cells look like a separate slab.
+            const mesh=sourceSurface
+              ? buildPitSurfaceFromRaster(sourceSurface,height)
+              : buildPitSurface(pit,height,cut?.rims[index]);
             if(sourceSurface){mesh.name=`${sourceSurface.id==='north'?'North':'South'} RF1 continuous bench interpretation`;mesh.userData.sourcePitSupport=sourceSurface.support;}
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
