@@ -44,6 +44,11 @@ This audit reviews the 12 desktop chapter captures at 1366 × 768 (`postchange-0
 - [ ] Mine Planning shows both RF1 source pits together, with source blocks contained and no terrain gap outside the active raster mask.
 - [ ] Metallurgy keeps source testwork visually separate from the conceptual process animation.
 
+## 27 November implementation progress
+
+- [x] Align the desktop evidence rail: visible story panels and the peer comparison now share a 190 px top edge and a 112 px bottom safe zone at desktop breakpoints. Chapter-specific content and panel widths are retained. Local production Chrome confirmed the chapter mode on all 12 direct views at 1366 × 768 and 1707 × 842, with no document overflow or panel overlap with the chapter title or bottom pager. The two authored views without a story panel retain their full-width milestone/map composition; Metallurgy keeps its full-width plant canvas. Mine Planning and Peer captures: `.playwright-mcp/hud-mine_planning-1366x768.png` and `.playwright-mcp/hud-ranking-1366x768.png`.
+- This closes only the shared vertical evidence-rail alignment item. Fresh visual acceptance of all chapters, control ordering, signature-scene framing and evidence/source checks remains open.
+
 ## Scope note
 
 This is a prioritized design plan, not a claim that each item is already implemented. Current review captures are reference points only; acceptance needs fresh screenshots after each relevant code change. Mobile and tablet work is explicitly deferred.

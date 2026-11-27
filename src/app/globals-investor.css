@@ -3245,6 +3245,30 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck--present .tanga-deck__coach { top: auto; bottom: 102px; }
 }
 
+/* Keep the desktop evidence rail aligned across chapters. The peer benchmark
+   uses the same top and bottom safe zones as the story cards, while retaining
+   its three-column comparison layout. Chapter-specific widths and contents
+   stay intact. */
+@media (min-width: 1121px) {
+  .tanga-deck--present {
+    --tanga-evidence-top: 190px;
+    --tanga-evidence-bottom: 112px;
+    --tanga-evidence-right: 24px;
+  }
+
+  .tanga-deck--present .tanga-story-panel:not(.tanga-story-panel--timeline) {
+    top: var(--tanga-evidence-top) !important;
+    right: var(--tanga-evidence-right) !important;
+    bottom: auto !important;
+    transform: none !important;
+  }
+
+  .tanga-deck--present .tanga-peer-benchmark {
+    inset-block: var(--tanga-evidence-top) var(--tanga-evidence-bottom) !important;
+    inset-inline: var(--tanga-evidence-right) !important;
+  }
+}
+
 /* Keep the evidence panels readable above the fixed desktop navigator. Reduce
    decorative spacing before shrinking evidence copy or introducing scrolling. */
 @media (min-width: 1121px) {
