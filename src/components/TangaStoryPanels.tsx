@@ -306,7 +306,7 @@ export function TangaChapterStoryPanel({chapter, onOpenSurvey, onTerrainToolsMou
 
 export function TangaMilestoneStage({milestoneId, onSelect}: {milestoneId: string; onSelect: (id: string) => void}) {
   const milestone = WORK_MILESTONES.find((item) => item.id === milestoneId) ?? WORK_MILESTONES[1];
-  const isFigure = milestone.id === 'resource' || milestone.id === 'survey';
+  const isFigure = milestone.id === 'resource';
   return <section className={`tanga-milestone-stage${isFigure ? ' is-figure' : ''}`} data-milestone={milestone.id} aria-label={`${milestone.title} source evidence`}>
     <img key={milestone.image} src={milestone.image} alt={milestone.imageAlt} loading="eager" fetchPriority="high"/>
     <div className="tanga-milestone-stage__shade"/>

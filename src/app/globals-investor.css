@@ -771,8 +771,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-milestone-stage img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .tanga-milestone-stage.is-figure img { padding: 24px; object-fit: contain; background: #13191d; }
 @media (min-width: 1201px) {
-  .tanga-milestone-stage[data-milestone="survey"] img { object-position: center 28%; }
-  .tanga-milestone-stage[data-milestone="survey"] .tanga-milestone-stage__shade { background: none; }
+  .tanga-milestone-stage[data-milestone="survey"] img { object-position: center 8%; }
 }
 .tanga-milestone-stage__shade { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(3,7,10,.24),transparent 30%,rgba(3,7,10,.12) 54%,rgba(3,7,10,.86)); pointer-events: none; }
 .tanga-milestone-stage.is-figure .tanga-milestone-stage__shade { background: linear-gradient(180deg,rgba(3,7,10,.14),transparent 34%,rgba(3,7,10,.72)); }
