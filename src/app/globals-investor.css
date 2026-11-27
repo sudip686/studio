@@ -2937,6 +2937,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   }
 
   .tanga-deck.tanga-deck--present .tanga-deck__chapter-title {
+    max-width: clamp(420px, 34vw, 560px);
     padding: 7px 18px 8px 12px;
     border-inline-start: 0;
     background: linear-gradient(90deg, #081017f5, #081017b0 78%, #08101700);
