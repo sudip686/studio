@@ -2369,6 +2369,14 @@ export default function TangaThreeGeologyScene({
 }: TangaThreeGeologySceneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const geologyRailBodyRef = useRef<HTMLDivElement | null>(null);
+  const cameraMenuRef = useRef<HTMLDetailsElement | null>(null);
+  useEffect(() => {
+    const cameraMenu = cameraMenuRef.current;
+    if (!cameraMenu) return;
+    // Camera controls stay visible in the geology rail. Keep their disclosure
+    // open in layout so the scrollable lithology key begins below the controls.
+    cameraMenu.open = mode === 'subsurface';
+  }, [mode]);
   const [inspectionOpen, setInspectionOpen] = useState(false);
   const inspectionActiveRef=useRef(false);inspectionActiveRef.current=inspectionMode||inspectionOpen;
   useEffect(() => setInspectionOpen(false), [mode]);
@@ -6856,7 +6864,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         {mode==='subsurface'&&mappedSurfaceStage&&<div className="tanga-three__grid-reference" role="note" aria-label="Geology map grid: UTM zone 37 south, 1 kilometre reference, approximate registration">
           <span aria-hidden="true">▦</span><strong>UTM 37S</strong><span>1 km grid</span><small>Approximate map registration</small>
         </div>}
-        <details className="tanga-camera-menu" onKeyDown={event=>event.stopPropagation()}>
+        <details ref={cameraMenuRef} className="tanga-camera-menu" onKeyDown={event=>event.stopPropagation()}>
           <summary>Camera &amp; surface</summary>
           {mode!=='subsurface' && surfaceControl}
         <div className="tanga-three__camera-tools" role="group" aria-label="3D camera controls">

@@ -39,7 +39,7 @@ export default function TangaPeerBenchmark({revealed, onReveal, onReset, selecte
       {!selectedRow&&<small>Drag to rotate. Select a marker or project to turn the globe toward it. Projects on the far side appear as you rotate.</small>}
     </div>
     <div className="tanga-peer-benchmark__chart" aria-busy={updating}>
-      <header><div><span>{updating?'UPDATING RANKS…':revealed?'11 PROJECTS · INCLUDING TANGA':'10-PROJECT PUBLISHED BENCHMARK'}</span><h3>Contained graphite</h3><small>Reported project figures · linear scale · Mt</small></div><button type="button" onClick={replay}>{revealed?'Replay before Tanga':'Introduce Tanga →'}</button></header>
+      <header><div><span>{updating?'UPDATING RANKS…':revealed?'2023 PUBLISHED SET + TANGA 2025 MRE':'COSTMINE PUBLISHED LIST · 7 NOV 2023'}</span><h3>Contained graphite</h3><small>{revealed?'Reported values · linear scale · Mt':'Reported project figures · linear scale · Mt'}</small></div><button type="button" onClick={replay}>{revealed?'Replay before Tanga':'Introduce Tanga →'}</button></header>
       <select className="tanga-peer-benchmark__select" aria-label="Select graphite project" disabled={updating} value={selectedRow?.project??''} onChange={event=>{const peer=rows.find(row=>row.project===event.target.value);if(peer)onSelect(peer);}}>
         <option value="">Choose a project on the globe</option>{rows.map(row=><option key={row.project} value={row.project}>#{row.displayRank} {row.project} · {row.containedGraphiteMt} Mt</option>)}
       </select>
