@@ -4985,11 +4985,17 @@ export default function TangaDeckWorkbench() {
   // The cover establishes the coastline before the camera approaches the project.
   const [coverDismissed, setCoverDismissed] = useState(false);
   useEffect(() => {
-    const enter = () => setCoverDismissed(true);
+    const enter = () => {
+      setCoverDismissed(true);
+      // The cover camera is supplied as a temporary viewState override. When
+      // the intro finishes, explicitly fly to the first authored project shot
+      // so a cold entry cannot leave the boundary title over a continent view.
+      if (activeStoryIndex === 0) flyTo('project');
+    };
     if (document.querySelector('.tanga-intro-app[data-intro-complete="true"]')) enter();
     window.addEventListener('tanga:intro-complete', enter);
     return () => window.removeEventListener('tanga:intro-complete', enter);
-  }, []);
+  }, [activeStoryIndex, flyTo]);
   const [actCard, setActCard] = useState<StoryAct | null>(null);
   const beginProjectStory = useCallback(() => {
     setCoverDismissed(true);
@@ -5086,6 +5092,7 @@ export default function TangaDeckWorkbench() {
       const shotId = params.get('view');
       const shotIndex = supportsVersionOneState && shotId ? STORY_SHOTS[targetMode].findIndex((shot) => shot.id === shotId) : -1;
       if (shotIndex >= 0) applyStoryShot(targetMode, shotIndex);
+      else if (targetIndex === activeStoryIndex) applyStoryShot(targetMode, 0);
       if (supportsVersionOneState && targetMode === 'ranking') {
         const peerKey = params.get('peer');
         const peer = peerKey ? graphitePeerRows(true).find((row) => peerProjectKey(row) === peerKey) : null;

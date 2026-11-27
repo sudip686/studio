@@ -80,7 +80,7 @@ Review basis: a fresh local Chrome capture at 1366 × 768 (`.playwright-mcp/audi
 
 ### Acceptance order
 
-- [ ] Resolve and capture the cold-entry Project mismatch at 1366 × 768 and 1707 × 842; compare the first useful frame with the settled authored boundary shot.
+- [x] Resolve and capture the cold-entry Project mismatch at 1366 × 768 and 1707 × 842; compare the first useful frame with the settled authored boundary shot. The one-shot hash restore previously skipped applying the first authored shot when `#project` was already the default chapter, leaving the intro coast zoom at 2.8 under a project-boundary title. The restore now reapplies shot 0 for the already-active chapter, and intro completion explicitly returns to Project. A fresh production build reached map `ready` at zoom 11.7 with the full boundary visible at both sizes; captures: `.playwright-mcp/project-cold-entry-fixed-1366.png` and `.playwright-mcp/project-cold-entry-fixed-1707.png`.
 - [ ] Capture one representative view from each chapter at both desktop sizes and measure panel/scene bounds; separately capture the selected states for Geology, Resource, Mine Planning and Metallurgy.
 - [ ] Fix the P0 shared placement and evidence typography, then address signature views (Geology, Drilling, Resource, Mine Planning, Metallurgy), then the supporting chapters in story order.
 - [ ] Repeat keyboard, source-access, panel-scroll and overlap checks and verify the current pushed deployment independently from local captures.
