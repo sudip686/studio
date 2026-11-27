@@ -2373,12 +2373,12 @@ export default function TangaThreeGeologyScene({
   useEffect(() => {
     const cameraMenu = cameraMenuRef.current;
     if (!cameraMenu) return;
-    // The shared camera controls are visible HUD content on desktop. Keep the
-    // disclosure expanded in layout so the nav rail reserves their height;
-    // otherwise the controls paint below the viewport or over geology layers.
+    // Keep frequently used controls open on other 3D chapters. Geology's
+    // mapped-unit legend is the primary desktop control, so leave its camera
+    // and opacity tools collapsed to preserve room for every source-map class.
     const syncCameraMenu = () => {
       const desktop = window.matchMedia('(min-width: 1051px)').matches;
-      cameraMenu.open = desktop && ['topography', 'drillholes', 'subsurface', 'resource', 'mine_planning'].includes(mode);
+      cameraMenu.open = desktop && ['topography', 'drillholes', 'resource', 'mine_planning'].includes(mode);
     };
     syncCameraMenu();
     window.addEventListener('resize', syncCameraMenu, {passive: true});
@@ -6877,7 +6877,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         </div>}
         <details ref={cameraMenuRef} className="tanga-camera-menu" onKeyDown={event=>event.stopPropagation()}>
           <summary>Camera &amp; surface</summary>
-          {mode!=='subsurface' && surfaceControl}
+          {surfaceControl}
         <div className="tanga-three__camera-tools" role="group" aria-label="3D camera controls">
           <button type="button" disabled={!sceneReady} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
@@ -6954,7 +6954,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           </>
         )}
         {mode==='subsurface' && <div className="tanga-geology-rail-body" ref={geologyRailBodyRef}>
-          {surfaceControl}
           <div className="tanga-geology-legend-slot" hidden={inspectionMode||inspectionOpen} ref={onGeologyLegendMount}/>
           {(inspectionMode||inspectionOpen)&&geologyInspection}
         </div>}

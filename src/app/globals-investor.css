@@ -3483,6 +3483,16 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
     top: 166px !important;
   }
 
+  .tanga-deck[data-mode="subsurface"] .tanga-three__nav-cluster:has(.tanga-camera-menu:not([open])):not(:has(.tanga-geology-section)) {
+    bottom: auto !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .tanga-deck[data-mode="subsurface"] .tanga-three__nav-cluster:has(.tanga-camera-menu:not([open])):not(:has(.tanga-geology-section)) .tanga-geology-rail-body {
+    flex: 0 1 auto;
+  }
+
   .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark {
     inset-block: 166px 112px;
     grid-template-columns: clamp(210px, 16vw, 240px) minmax(0, 1fr) clamp(340px, 29vw, 420px);
