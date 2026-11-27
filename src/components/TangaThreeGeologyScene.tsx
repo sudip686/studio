@@ -2373,9 +2373,16 @@ export default function TangaThreeGeologyScene({
   useEffect(() => {
     const cameraMenu = cameraMenuRef.current;
     if (!cameraMenu) return;
-    // Camera controls stay visible in the geology rail. Keep their disclosure
-    // open in layout so the scrollable lithology key begins below the controls.
-    cameraMenu.open = mode === 'subsurface';
+    // The shared camera controls are visible HUD content on desktop. Keep the
+    // disclosure expanded in layout so the nav rail reserves their height;
+    // otherwise the controls paint below the viewport or over geology layers.
+    const syncCameraMenu = () => {
+      const desktop = window.matchMedia('(min-width: 1051px)').matches;
+      cameraMenu.open = desktop && ['topography', 'drillholes', 'subsurface', 'resource', 'mine_planning'].includes(mode);
+    };
+    syncCameraMenu();
+    window.addEventListener('resize', syncCameraMenu, {passive: true});
+    return () => window.removeEventListener('resize', syncCameraMenu);
   }, [mode]);
   const [inspectionOpen, setInspectionOpen] = useState(false);
   const inspectionActiveRef=useRef(false);inspectionActiveRef.current=inspectionMode||inspectionOpen;
