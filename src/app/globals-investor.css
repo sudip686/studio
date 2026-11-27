@@ -3357,6 +3357,107 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
     padding-top: 7px;
     line-height: 1.35;
   }
+
+  .tanga-deck--present .tanga-story-panel--resource {
+    padding: 14px 16px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource h2 {
+    margin: 5px 0 7px;
+    font-size: 22px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary {
+    display: grid;
+    grid-template-columns: minmax(124px, .9fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    margin: 7px 0;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number {
+    min-width: 0;
+    margin: 0;
+    padding-left: 10px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number strong {
+    font-size: 42px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number strong span {
+    margin-left: 4px;
+    font-size: 18px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number small {
+    margin-top: 5px;
+    font-size: 9px;
+    line-height: 1.25;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts > div {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 0;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts dt {
+    font-size: 9px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts dd {
+    flex: 0 0 auto;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key {
+    margin: 8px 0;
+    padding: 7px 0;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key > div {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key > div > span {
+    min-width: 0;
+    gap: 3px;
+    font-size: 8.5px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key i {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-story-panel__intro {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-story-panel__qualification {
+    margin-top: 7px;
+    padding-top: 7px;
+    line-height: 1.35;
+  }
 }
 
 /* The chapter header already names the current view and its takeaway. Remove
