@@ -26,10 +26,10 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
   const nextLabels=['Tilt to terrain relief','Reveal interpreted depth','Open interpreted section'];
   const mapUnits=step<2;
 
-  const legend = <div className={`tanga-geology-surface-legend ${legendOpen?'is-open':''}`} aria-label={mapUnits?'Mapped rock types':'Interpreted model rock types'}>
+  const legend = <div className={`tanga-geology-surface-legend ${mapUnits?'tanga-geology-surface-legend--mapped':'tanga-geology-surface-legend--model'} ${legendOpen?'is-open':''}`} aria-label={mapUnits?'Mapped rock types':'Interpreted model rock types'}>
       <header><strong>{mapUnits?'MAPPED GEOLOGY':'INTERPRETED MODEL'}</strong><small>{mapUnits?'8 map classes':'7 model units'}</small></header>
       <button type="button" aria-expanded={legendOpen} onClick={()=>setLegendOpen(value=>!value)}>{mapUnits?'Map':'Model'} legend · {mapUnits?8:7} classes {legendOpen?'−':'+'}</button>
-      <input type="search" value={query} aria-label="Filter rock units" placeholder="Find a rock unit" onChange={event=>setQuery(event.target.value)}/>
+      {mapUnits&&<input type="search" value={query} aria-label="Filter rock units" placeholder="Find a rock unit" onChange={event=>setQuery(event.target.value)}/>}
       {mapUnits&&selectedUnit&&<button className="tanga-geology-isolate" type="button" onClick={()=>{
         const others=MAPPED_SURFACE_UNITS.filter(unit=>unit.label!==selectedUnit.title);
         const isolated=others.every(unit=>hiddenUnits.includes(unit.label));
@@ -45,7 +45,6 @@ export default function TangaGeologyMapStage({legendMount, step, ready, onAdvanc
           <button className="tanga-geology-surface-legend__visibility" type="button" aria-label={`${hiddenUnits.includes(label)?'Show':'Hide'} ${label}`} aria-pressed={!hiddenUnits.includes(label)} onClick={()=>onToggleUnit(label)} title={`${hiddenUnits.includes(label)?'Show':'Hide'} this mapped unit`}>{hiddenUnits.includes(label)?<EyeOff size={14}/>:<Eye size={14}/>}</button>
         </div>
         : <span className="tanga-geology-surface-legend__model-row" key={label}><i style={{background:color}}/><span>{label}</span><small>{'colorKeyOnly' in unit&&unit.colorKeyOnly?'Colour key':'Separate'}</small></span>)}</div>
-      {!mapUnits&&<p>No verified surface-to-depth crosswalk. Shared colours are visual keys only; surface units do not highlight model volumes.</p>}
     </div>;
 
   return <>

@@ -1795,6 +1795,11 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-geology-surface-legend__row{display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;gap:4px;min-width:0}
 .tanga-geology-surface-legend__unit{display:flex;align-items:center;gap:8px;min-width:0;padding:3px 4px;border:1px solid transparent;border-radius:3px;background:transparent;color:#34443e;text-align:left;font:inherit;cursor:pointer}
 .tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;padding:3px 4px}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model{max-height:calc(100svh - 560px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#6f7f89 #172128;gap:5px}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model>header{padding-bottom:4px}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model>div{gap:0}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row{padding-block:1px;font-size:10px;line-height:1.25}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model .tanga-geology-surface-legend__model-row>small{padding:1px 4px;font-size:8px}
 .tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row>span{min-width:0;overflow-wrap:anywhere}
 .tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row>small{padding:2px 5px;border:1px solid var(--geology-line);border-radius:3px;color:var(--geology-muted);font-size:9px;line-height:1.2;white-space:nowrap}
 .tanga-geology-surface-legend__unit i{flex:0 0 12px}
