@@ -599,7 +599,10 @@ const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   work_completed: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   ranking: {longitude: 30, latitude: 12, zoom: 1.55, pitch: 0, bearing: 0},
   tanzania: {longitude: 37.8, latitude: -5.85, zoom: 4.85, pitch: 0, bearing: 0},
-  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.05, pitch: 34, bearing: 18},
+  // Keep the full tall boundary inside the map's safe rectangle above the
+  // chapter navigator and to the left of the evidence card. The next authored
+  // shot intentionally returns to the closer tested-ground composition.
+  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 11.65, pitch: 34, bearing: 18},
   topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
   // Framed on the story: project (38.79,-4.81) -> Tanga Port (39.105,-5.064).
   // The old 8.3 zoom sat NW of the corridor and left it as a small cluster in a

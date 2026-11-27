@@ -81,6 +81,8 @@ Reviewed the 12 chapter entry views on the local investor branch in Chrome at 13
 
 ## Implementation and review
 
+- [x] Reframe the opening Project overview so the complete provisional boundary stays above chapter navigation at 1366 × 768 and 1707 × 842. Keep the closer Tested Ground shot as a distinct follow-up. Local production-build captures: `.playwright-mcp/project-overview-adjusted-1366.png` and `.playwright-mcp/project-overview-adjusted-1707.png`.
+
 - [x] Shared desktop navigation and shot captions, consolidated Evidence entry, keyboard focus, and camera controls.
 - [x] Chapter layout changes across all 12 entry views. Chrome captures at 1366 × 768 and 1920 × 1080.
 - [x] Interaction checks for switching evidence milestones, opening sources, selecting geology stages, filtering resource cells, showing all ten peer rows and revealing Tanga at fifth, navigating from Site to Plant and back, opening the flotation roof, and enabling port power infrastructure.
