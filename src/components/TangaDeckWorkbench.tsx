@@ -4665,6 +4665,7 @@ export default function TangaDeckWorkbench() {
       width:224,
       height:94,
       priority: primaryIds.has(callout.id) ? 1000 : callout.id.startsWith('power-') ? 600-index : 400-index,
+      preferredSide: activeMode === 'tanzania' && callout.id === 'project' ? 'top' as const : undefined,
     }));
     const placements = placeLabels(candidates, stageSize, {
       padding:12,
@@ -4883,11 +4884,12 @@ export default function TangaDeckWorkbench() {
     // and the docked right-hand data panel — so no label is hidden behind a panel.
     const W = stageSize.width;
     const H = stageSize.height;
-    // The docked right-hand data/insight panel starts at ~70% of the stage width
-    // across viewports, so keep chip centres within the left 60% — their right
-    // edge (≈ +95px) then always clears the panel. Left edge stays off the logo.
+    // Most map chapters have a docked right-hand inspector, so keep their chips
+    // on the left. Regional setting has no inspector; let the port label sit
+    // beside its actual coast anchor instead of forcing a long leader across
+    // the map. Left edge stays off the logo in either composition.
     const safeL = W * 0.05;
-    const safeR = W * 0.6;
+    const safeR = activeMode === 'tanzania' ? W - 110 : W * 0.6;
     const safeT = 104;       // below the top bar + act ribbon
     const safeB = H - 104;   // above the pager
     positioned.forEach((label) => {
@@ -4917,7 +4919,7 @@ export default function TangaDeckWorkbench() {
     const keepOutRects: Rect[] = [
       {x:0,y:0,width,height:150},
       {x:0,y:height-112,width,height:112},
-      {x:width-(activeMode === 'ranking' ? 470 : 320),y:140,width:470,height:height-140},
+      ...(activeMode === 'tanzania' ? [] : [{x:width-(activeMode === 'ranking' ? 470 : 320),y:140,width:activeMode === 'ranking' ? 470 : 320,height:height-140}]),
       ...projectedSceneCallouts.map(c => ({x:c.boxPixelX-112,y:c.boxPixelY-48,width:224,height:96})),
     ];
     if (activeMode === 'accessibility') keepOutRects.push({x:16,y:height-270,width:300,height:170});

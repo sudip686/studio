@@ -28,6 +28,8 @@ export interface LabelCandidate {
   height: number;
   /** Higher wins when two labels compete for the same space. */
   priority: number;
+  /** Try this side first, then fall back to the normal collision-aware order. */
+  preferredSide?: LabelSide;
 }
 
 export type LabelSide = 'left' | 'right' | 'top' | 'bottom';
@@ -184,8 +186,11 @@ function findSpot(
   occupied: readonly Rect[],
   padding: number
 ): { x: number; y: number; side: LabelSide } | null {
+  const directions = candidate.preferredSide
+    ? [...DIRECTIONS.filter((direction) => direction.side === candidate.preferredSide), ...DIRECTIONS.filter((direction) => direction.side !== candidate.preferredSide)]
+    : DIRECTIONS;
   for (const distance of offsets) {
-    for (const direction of DIRECTIONS) {
+    for (const direction of directions) {
       // Offset from the anchor to the near edge of the box, so a wide label
       // does not creep back over its own anchor point.
       const x =
