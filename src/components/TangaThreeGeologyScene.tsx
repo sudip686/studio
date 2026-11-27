@@ -2700,7 +2700,11 @@ export default function TangaThreeGeologyScene({
     // neutral beyond the finite survey footprint so colored source units and
     // the registered terrain edge remain easy to distinguish. Other evidence
     // chapters retain their darker studio horizon.
-    const sceneSky = mode==='subsurface' ? 0xe8e6df : subsurfaceStudio ? 0x3c4650 : SKY_COLOR;
+    // Keep a daylight field-atlas feel while giving the translucent terrain
+    // and pale mapped units enough tonal separation to read as 3D relief.
+    // This only changes the geology chapter's sky/fog backdrop; unit colors,
+    // terrain textures, and interpreted geometry remain source-derived.
+    const sceneSky = mode==='subsurface' ? 0xd0d0c9 : subsurfaceStudio ? 0x3c4650 : SKY_COLOR;
     scene.background = new THREE.Color(sceneSky);
     // Fog tinted to the sky so distant ground fades into the horizon instead of
     // ending on a hard cut.
