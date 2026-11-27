@@ -3204,6 +3204,22 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-terrain-tools-slot .tanga-three__terrain-profile circle { fill: #a8dfd6; }
 .tanga-terrain-tools-slot .tanga-three__terrain-profile-control { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; font-size: 11px; }
 .tanga-terrain-tools-slot .tanga-three__terrain-profile-control input { width: 100%; }
+.tanga-terrain-tools-slot .tanga-surface-control { position: static; z-index: auto; width: auto; margin: 0; padding: 8px 0; border: 0; border-block: 1px solid #d4e2e522; border-radius: 0; background: transparent; color: inherit; }
+.tanga-terrain-tools-slot .tanga-surface-control label { font-size: 10px; }
+.tanga-terrain-tools-slot .tanga-surface-control input { margin: 3px 0 1px; }
+.tanga-terrain-tools-slot .tanga-surface-control > div { font-size: 8px; }
+.tanga-terrain-tools-slot .tanga-surface-control button { border: 0; padding: 1px 8px; color: #d9b48d; background: none; }
+.tanga-deck--present .tanga-story-panel--terrain { padding: 10px 16px; }
+.tanga-deck--present .tanga-story-panel--terrain h2 { margin: 5px 0; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-panel__intro { line-height: 1.4; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-motion { margin: 4px 0; padding: 4px 6px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-motion button { min-height: 30px; padding: 4px 8px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale { margin: 0; padding: 2px 0; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale strong { font-size: 23px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot .tanga-three__terrain-tools { gap: 3px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot .tanga-three__terrain-profile { height: 44px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot .tanga-surface-control { padding-block: 4px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-panel__qualification { margin-top: 4px; font-size: 9px; line-height: 1.35; }
 .tanga-terrain-tools-slot button { padding: 5px 8px; border: 1px solid #58918d; border-radius: 4px; color: #e6f4f2; background: #173942; cursor: pointer; }
 .tanga-terrain-tools-slot .tanga-three__terrain-switch button[aria-pressed="true"] { background: #416362; }
 .tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher { grid-template-columns: repeat(2,minmax(0,1fr)); }

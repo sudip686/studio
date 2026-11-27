@@ -6699,6 +6699,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               <button type="button" aria-pressed={terrainDisplay === 'elevation'} onClick={() => setTerrainDisplay('elevation')}>Elevation</button>
               <button type="button" aria-pressed={terrainDisplay === 'slope'} onClick={() => setTerrainDisplay('slope')}>Derived slope</button>
             </div>
+            {surfaceControl}
             {terrainProfile.length > 1 ? (
               <>
           <button type="button" disabled={!sceneReady || !terrainProfile.length} aria-pressed={terrainProfileSweeping} onClick={() => {
@@ -6877,8 +6878,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           <span aria-hidden="true">▦</span><strong>UTM 37S</strong><span>1 km grid</span><small>Approximate map registration</small>
         </div>}
         <details ref={cameraMenuRef} className="tanga-camera-menu" onKeyDown={event=>event.stopPropagation()}>
-          <summary>Camera &amp; surface</summary>
-          {surfaceControl}
+          <summary>{mode === 'topography' ? 'Camera' : 'Camera &amp; surface'}</summary>
+          {mode !== 'topography' && surfaceControl}
         <div className="tanga-three__camera-tools" role="group" aria-label="3D camera controls">
           <button type="button" disabled={!sceneReady} onClick={() => {
             window.dispatchEvent(new Event('tanga:manual-exploration'));
