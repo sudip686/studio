@@ -652,8 +652,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
           {!overview&&<>{selected.id!=='product'&&<p className="tanga-factory-motion-note">{selected.motion}</p>}<details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
           {!overview && selected.id==='flotation' && <>
-            <div className="tanga-factory-separation" aria-label="Conceptual graphite and gangue separation"><span><i className="is-graphite"/>Froth carries graphite into the launder</span><span><i className="is-gangue"/>The lower outlet carries the tailings stream</span><small>Illustrative flow. See the composite results below for measured recovery.</small></div>
             <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>
+            <div className="tanga-factory-separation" aria-label="Conceptual graphite and gangue separation"><span><i className="is-graphite"/>Froth carries graphite into the launder</span><span><i className="is-gangue"/>The lower outlet carries the tailings stream</span><small>Illustrative flow. Measured grade and recovery are shown above.</small></div>
           </>}
           {!overview && selected.id==='product' && <>
             <div className="tanga-factory-sizing" aria-label={`Illustrative size split for ${result.id}`}>
