@@ -3505,10 +3505,21 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   }
 
   .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark li > button {
-    min-height: clamp(30px, 3.4vh, 38px);
-    padding-block: 2px;
+    min-height: clamp(28px, 3.1vh, 34px);
+    padding-block: 1px;
     row-gap: 0;
     line-height: 1.1;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__project strong,
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__project small {
+    line-height: 1.1;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__comparison-caveat {
+    display: block;
+    margin-top: 10px;
+    color: #aebfc8;
   }
 
   .tanga-deck[data-mode="metallurgy"] .tanga-process-exhibit--factory {

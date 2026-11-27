@@ -24,8 +24,9 @@ export default function TangaPeerBenchmark({revealed, onReveal, onReset, selecte
     <div className="tanga-peer-benchmark__narrative">
       <span className="tanga-peer-benchmark__eyebrow">PUBLISHED PEER COMPARISON</span>
       <h2>{revealed?<>Tanga enters<br/>{' '}at <em>#{rank}.</em></>:<>Graphite on a<br/>global scale</>}</h2>
-      <p>{revealed?'Tanga’s 2025 estimate places it fifth alongside the ten projects in the 2023 benchmark.':'Select a deposit to locate it on the globe. Introduce Tanga to compare its reported estimate.'}</p>
-      {(!selectedRow||selectedRow.isTanga)&&<div className="tanga-peer-benchmark__measure"><span>{revealed?'TANGA · INDICATED':'COMPARISON MEASURE'}</span><strong>{revealed?'7.31':'Mt'} <small>{revealed?'Mt contained graphite':'million tonnes of contained graphite'}</small></strong><p>{revealed?'148 Mt × 4.94% TGC':'Source estimate dates and reported categories vary.'}</p>{revealed&&<a href="/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf" target="_blank" rel="noreferrer">Open Tanga MRE ↗</a>}</div>}
+      <p>{revealed?'Tanga’s 2025 MRE sorts fifth against the values in the 2023 published set.':'Select a deposit on the globe or list. Then introduce Tanga’s reported estimate.'}</p>
+      {(!selectedRow||selectedRow.isTanga)&&revealed&&<div className="tanga-peer-benchmark__measure"><span>TANGA · INDICATED</span><strong>7.31 <small>Mt contained graphite</small></strong><p>148 Mt × 4.94% TGC</p><a href="/0424046%20Tanga%20Graphite%20Mineral%20Resource%20Estimate%20-%2019%20December%202025.pdf" target="_blank" rel="noreferrer">Open Tanga MRE ↗</a></div>}
+      {(!selectedRow||selectedRow.isTanga)&&<small className="tanga-peer-benchmark__comparison-caveat">Selected published values; estimate dates and reported categories vary. This is not a current global census.</small>}
       {selectedRow&&!selectedRow.isTanga&&selectedEvidence&&<div key={selectedRow.project} className="tanga-peer-benchmark__selection" aria-live="polite">
         <strong>#{selectedRow.displayRank} · {selectedRow.project}</strong>
         <span>{selectedRow.country} · {selectedRow.company}</span>
