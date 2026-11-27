@@ -1794,11 +1794,10 @@ function sceneCalloutsForMode(
 ): SceneCallout[] {
   if (mode === 'tanzania') {
     return [
-      // "Tanzania highlighted / regional position before the project dive" was
-      // stage direction — it described where the deck was in its own sequence
-      // rather than telling the viewer anything about the country. Both now
-      // answer the question this scene exists to answer: why Tanzania.
-      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 72 km from Tanga Port', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
+      // Keep the country scene focused on one project locator. The peer chapter
+      // owns the deposit comparison; this map introduces the district and the
+      // report-stated port connection without repeating a resource headline.
+      {id: 'project', label: 'Tanga · Mkinga District', detail: '72 km to Tanga Port · PaulSam, June 2023', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
     ];
   }
   if (mode === 'project') {
@@ -4707,7 +4706,6 @@ export default function TangaDeckWorkbench() {
       });
     }
     if (activeMode === 'tanzania') {
-      push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
       push('lbl-tanga-port', 'Tanga Port', ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat, 320, '#a7e0d3');
       push('lbl-indian-ocean', 'Indian Ocean', 40.65, -5.45, 0, '#a7c0d8');
     }
@@ -4748,13 +4746,10 @@ export default function TangaDeckWorkbench() {
    * rather than trusted.
    */
   const peerGlobeLabels = useMemo(() => {
-    // Two scenes use these labels for different arguments. The peer field shows
-    // the global set, to place Tanga in it. The country scene shows only the
-    // Tanzanian projects, because "why Tanzania" is best answered by the fact
-    // that four ranked graphite projects — Mahenge, Epanko, Bunyu and Tanga —
-    // sit in the same country, which the deck's own peer data already proves.
-    const isCountryScene = activeMode === 'tanzania';
-    if (activeMode !== 'ranking' && !isCountryScene) return [];
+    // Keep peer markers on the dedicated ranking chapter. The Tanzania view
+    // has one project locator and the port context; repeating peer labels there
+    // competed with the location story and duplicated the later comparison.
+    if (activeMode !== 'ranking') return [];
     if (stageSize.width === 0) return [];
     const map = mapInstance;
     if (!map) return [];
@@ -4776,7 +4771,6 @@ export default function TangaDeckWorkbench() {
     const positioned = graphiteRows
       .filter((project) => Number.isFinite(project.lon) && Number.isFinite(project.lat))
       .filter((project) => arcFromCentre(project.lon, project.lat) < 78)
-      .filter((project) => !isCountryScene || project.country === 'Tanzania')
       // Every near-side project is selectable; label placement declutters the
       // tight East African group without moving its geographic anchors.
       .slice()
@@ -4812,11 +4806,9 @@ export default function TangaDeckWorkbench() {
     // Chips on the right of the globe hang to the left so they stay clear of
     // the ranking panel; chips on the left hang right.
     const safeL = 108;
-    // The trimmed ranking panel starts at about 0.65 of the stage width, so
-    // 0.60 keeps even the widest chip clear of it.
-    // The country scene docks a narrower panel than the ranking table, so its
-    // labels can run further right before they would reach it.
-    const safeR = stageSize.width * (isCountryScene ? 0.72 : 0.60);
+    // The ranking panel starts at about 0.65 of the stage width, so 0.60 keeps
+    // even the widest chip clear of it.
+    const safeR = stageSize.width * 0.60;
     const safeT = 118;
     const safeB = stageSize.height - 120;
     positioned.forEach((label) => {
