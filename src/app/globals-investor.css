@@ -3225,6 +3225,15 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   .tanga-deck--present .tanga-deck__coach { top: auto; bottom: 102px; }
 }
 
+/* The chapter header already names the current view and its takeaway. Remove
+   the duplicate floating view/next card on desktop to give the 3D canvas more
+   room above the persistent navigator. The closing bookend remains unique. */
+@media (min-width: 1121px) {
+  .tanga-deck--present .tanga-story-cue:not(:has(.tanga-story-cue__bookend)) {
+    display: none !important;
+  }
+}
+
 /* Desktop safe zones: keep chapter headings, slide content, and the persistent
    navigator in separate measured regions. */
 @media (min-width: 1121px) {
