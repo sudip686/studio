@@ -5,6 +5,29 @@ export type CandidatePit = {ring: Point2[]; centre: Point2; surface: number; flo
 export type SitePlan = {pits: CandidatePit[]; plant: Point2 | null; rejected: number; audit: string[]};
 /** Optimized RF1 surface cells, transformed into the viewer's local metre coordinates. */
 export type SourcePitSurface = {id:'north'|'south';x0:number;z0:number;dx:number;dz:number;width:number;height:number;support:number;pitElevation:number[][];topography:number[][];benchIndex:number[][];mask:number[][]};
+/** Exact, non-overlapping convex cut regions for a source pit raster.
+ * Adjacent active cells are joined into row runs, avoiding the false area a
+ * convex hull would remove between separate parts of the source shell. */
+export function sourcePitSurfaceCutRings(surface:SourcePitSurface):Point2[][]{
+  const rings:Point2[][]=[];
+  const halfX=Math.abs(surface.dx)/2,halfZ=Math.abs(surface.dz)/2;
+  for(let i=0;i<surface.width;i++){
+    let start=-1;
+    const flush=(end:number)=>{
+      if(start<0)return;
+      const x=surface.x0+i*surface.dx,z0=surface.z0+start*surface.dz,z1=surface.z0+end*surface.dz;
+      const minZ=Math.min(z0,z1)-halfZ,maxZ=Math.max(z0,z1)+halfZ;
+      rings.push([[x-halfX,minZ],[x+halfX,minZ],[x+halfX,maxZ],[x-halfX,maxZ]]);
+      start=-1;
+    };
+    for(let j=0;j<=surface.height;j++){
+      const active=j<surface.height&&Boolean(surface.mask[i]?.[j])&&Number.isFinite(surface.pitElevation[i]?.[j]);
+      if(active&&start<0)start=j;
+      if(!active&&start>=0)flush(j-1);
+    }
+  }
+  return rings;
+}
 export const CONCEPT = {threshold: 3, cell: 25, bench: 10, berm: 6.36, batterDegrees: 70, plantWidth: 200, plantDepth: 140};
 const cross = (a: Point2, b: Point2, c: Point2) => (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
 export function inside(p: Point2, ring: Point2[]) {

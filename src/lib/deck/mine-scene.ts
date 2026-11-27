@@ -725,7 +725,7 @@ export function restorePitTerrain(geometry:THREE.BufferGeometry){
 
 /** Render the source optimized shell as flat floor cells and explicit bench risers. */
 export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:number,z:number)=>number){
-  const positions:number[]=[],colors:number[]=[],indices:number[]=[],dark=new THREE.Color(0x675344),floor=new THREE.Color(0xb29a7d);
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[],benchFace=new THREE.Color(0x80664d),cutWall=new THREE.Color(0x90745a),floor=new THREE.Color(0xb69a78);
   // Reuse vertices across adjacent cells on the same material surface. The
   // previous per-quad duplicates made each 10 m source cell shade as a separate
   // block even when it belonged to one continuous bench tread or riser.
@@ -766,17 +766,28 @@ export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:num
       if(other!==null){
         if(baseFloor>=other)continue;
         const high=other+.7;
-        addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,high,bz],[ax,high,az],dark);
+        addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,high,bz],[ax,high,az],benchFace);
         continue;
       }
       const topA=Math.max(baseFloor+.7,height(ax,az)),topB=Math.max(baseFloor+.7,height(bx,bz));
       if(topA<=baseFloor+.75&&topB<=baseFloor+.75)continue;
-      addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,topB,bz],[ax,topA,az],dark);
+      addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,topB,bz],[ax,topA,az],cutWall);
     }
   }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
   const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
   mesh.name=`${surface.id==='north'?'North':'South'} RF1 optimized pit surface`;mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData.sourcePitSupport=surface.support;return mesh;
+}
+/** Use the RF1 raster at every Mine Planning mesh build, including after the
+ * terrain texture/registration pass replaces the base terrain geometry. */
+export function buildMinePlanningPitSurface(pit:CandidatePit,surface:SourcePitSurface|undefined,height:(x:number,z:number)=>number,terrainRim?:[number,number,number][]){
+  const mesh=surface?buildPitSurfaceFromRaster(surface,height):buildPitSurface(pit,height,terrainRim);
+  if(surface){
+    mesh.name=`${surface.id==='north'?'North':'South'} RF1 continuous bench interpretation`;
+    mesh.userData.sourcePitSupport=surface.support;
+    mesh.userData.sourcePitRaster=true;
+  }
+  return mesh;
 }
 /** Exact contour bands eliminate the staircase aliasing of a clipped XY grid. */
 export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>number, terrainRim?: [number, number, number][]) {

@@ -9,8 +9,8 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
-import {planSiteFromPitSurfaces, inside, rectangleContained, overlaps, rectangle, type SitePlan, type Point2, type SourcePitSurface} from '@/lib/deck/site-planning';
-import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, setPitTerrainComparison, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
+import {planSiteFromPitSurfaces, sourcePitSurfaceCutRings, inside, rectangleContained, overlaps, rectangle, type SitePlan, type Point2, type SourcePitSurface} from '@/lib/deck/site-planning';
+import {buildConcentrator, placeConcentrator, buildMinePlanningPitSurface, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, setPitTerrainComparison, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {cutPitTerrain} from '@/lib/deck/pit-terrain-cut';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
 import {selectPitEvidenceHoles} from '@/lib/deck/mining-evidence';
@@ -3822,14 +3822,16 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     const prepareMineTerrain = (original: THREE.BufferGeometry) => {
       const originalIndex = original.getIndex();
       if (!sitePlan || !originalIndex) return null;
-      const cut = cutPitTerrain(original, sitePlan.pits.map(pit => pit.ring));
-      if (!cut.rims.every(rim => rim.length >= 3)) {
+      const sourceCutRings=mode==='mine_planning'?sourcePitSurfaces.flatMap(sourcePitSurfaceCutRings):[];
+      const usesSourceMask=sourceCutRings.length>0;
+      const cut = cutPitTerrain(original, usesSourceMask?sourceCutRings:sitePlan.pits.map(pit => pit.ring));
+      if (!usesSourceMask&&!cut.rims.every(rim => rim.length >= 3)) {
         cut.geometry.dispose();
         return null;
       }
       setPitTerrainComparison(cut.geometry, originalIndex);
       host.dataset.pitCarvedTriangles = String(cut.changedTriangles);
-      host.dataset.pitRimVertices = cut.rims.map(rim => rim.length).join(',');
+      host.dataset.pitRimVertices = usesSourceMask?`source-mask/${sourceCutRings.length} runs`:cut.rims.map(rim => rim.length).join(',');
       return cut;
     };
     let surveyProfile: TerrainProfilePoint[] = [];
@@ -3908,12 +3910,18 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             if (pad) gradeConceptPad(terrainGeometry, pad);
           }
           const height = (x: number, z: number) => terrainSurfaceY(resources, x, -z);
+          const orderedSources=[...sourcePitSurfaces].sort((a,b)=>(a.z0+(a.height-1)*a.dz/2)-(b.z0+(b.height-1)*b.dz/2));
           sitePlan.pits.forEach((pit, i) => {
-            const replacement = buildPitSurface(pit, height, cut.rims[i]);
+            const replacement = buildMinePlanningPitSurface(pit,mode==='mine_planning'?orderedSources[i]:undefined,height,cut.rims[i]);
             pitSurfaces[i].geometry.dispose();
             pitSurfaces[i].geometry = replacement.geometry;
+            pitSurfaces[i].name = replacement.name;
+            pitSurfaces[i].userData = {...pitSurfaces[i].userData,...replacement.userData};
             replacement.material.dispose();
           });
+          if(mode==='mine_planning'){
+            host.dataset.minePitRenderedSurfaces=JSON.stringify(pitSurfaces.map(mesh=>({name:mesh.name,sourceRaster:mesh.userData.sourcePitRaster===true,support:mesh.userData.sourcePitSupport??null})));
+          }
         }
         disposeObject(terrainLayer);
         terrainLayer.clear();
@@ -5219,7 +5227,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           sitePlan.audit.push('Haul-road geometry omitted: the supplied optimized shell does not include an engineered ramp alignment or checked gradient');
           const orderedSourcePitSurfaces=[...sourcePitSurfaces].sort((a,b)=>(a.z0+(a.height-1)*a.dz/2)-(b.z0+(b.height-1)*b.dz/2));
           if(mode==='mine_planning'){
-            host.dataset.minePitSurfaceSource=cut?'RF1 benches stitched to terrain':'RF1 footprint benches · terrain unavailable';
+            host.dataset.minePitSurfaceSource=cut?'RF1 10 m source bench raster':'RF1 10 m source bench raster · terrain unavailable';
             host.dataset.minePitSurfaceSupports=JSON.stringify(orderedSourcePitSurfaces.map(surface=>({id:surface.id,support:surface.support,width:surface.width,height:surface.height})));
           }
           for (const [index,pit] of sitePlan.pits.entries()) {
@@ -5229,10 +5237,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             // directly. Rebuilding a smooth convex-hull shell from only the
             // overall floor and rim elevations flattened the source benches
             // and made the grade cells look like a separate slab.
-            const mesh=sourceSurface
-              ? buildPitSurfaceFromRaster(sourceSurface,height)
-              : buildPitSurface(pit,height,cut?.rims[index]);
-            if(sourceSurface){mesh.name=`${sourceSurface.id==='north'?'North':'South'} RF1 continuous bench interpretation`;mesh.userData.sourcePitSupport=sourceSurface.support;}
+            const mesh=buildMinePlanningPitSurface(pit,sourceSurface,height,cut?.rims[index]);
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
             pitSurfaces.push(mesh);
@@ -5279,6 +5284,9 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             // No source ramp alignment is supplied. Do not draw a synthetic
             // spiral or attach a truck path to an invented pit access road.
             haulRampPaths.push(null);
+          }
+          if(mode==='mine_planning'){
+            host.dataset.minePitRenderedSurfaces=JSON.stringify(pitSurfaces.map(mesh=>({name:mesh.name,sourceRaster:mesh.userData.sourcePitRaster===true,support:mesh.userData.sourcePitSupport??null})));
           }
           if (sitePlan.plant) {
             const plant = buildConcentrator({deferPlantDetail:true});
