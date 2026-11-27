@@ -3203,7 +3203,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-terrain-tools-slot .tanga-three__terrain-profile-control input { width: 100%; }
 .tanga-terrain-tools-slot button { padding: 5px 8px; border: 1px solid #58918d; border-radius: 4px; color: #e6f4f2; background: #173942; cursor: pointer; }
 .tanga-terrain-tools-slot .tanga-three__terrain-switch button[aria-pressed="true"] { background: #416362; }
-.tanga-site-panel-switcher { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .tanga-resource-tools-slot .tanga-three__grade-legend { position: static !important; width: 100%; max-height: none; margin-block: 8px; }
 .tanga-resource-max { font-size: 11px; color: #a7e0d3; }
 .tanga-logistics-utilities { display: flex; align-items: center; gap: 8px; margin-block: 8px; font-size: 12px; }
