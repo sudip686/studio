@@ -5958,6 +5958,12 @@ export default function TangaDeckWorkbench() {
       <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
+          // DeckGL can mount while the intro/layout gate is still settling and
+          // retain its 300×150 fallback viewport even after the host fills the
+          // screen. Feed its measured stage dimensions so the child Map view,
+          // basemap tiles, and deck layers share the real presentation size.
+          width={stageSize.width || '100%'}
+          height={stageSize.height || '100%'}
           viewState={(isCoverScene ? COVER_COAST_VIEW : viewState) as any}
           controller={!threeVisible}
           layers={threeVisible ? [] : layers}
