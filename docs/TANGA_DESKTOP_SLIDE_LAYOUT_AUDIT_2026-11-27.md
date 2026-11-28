@@ -36,8 +36,8 @@ This audit reviews the 12 desktop chapter captures at 1366 × 768 (`postchange-0
 
 ## Acceptance checklist
 
-- [ ] All 12 chapters reviewed directly at 1366 × 768 and 1707 × 842 after the layout work.
-- [ ] No document overflow, clipped controls, panel overlap or labels over critical evidence.
+- [x] All 12 chapters reviewed directly at 1366 × 768 and 1707 × 842 after the layout work. Latest clean captures: `.playwright-mcp/verify-20261128-160037-1366x768-<chapter>.png` and `.playwright-mcp/verify-20261128-160146-1707x842-<chapter>.png`.
+- [x] No document overflow, clipped controls or visible panel overlap in the 24-entry desktop audit; all entries reported zero overlap/out-of-view/control-outside counts. This confirms entry layouts only, not every opened disclosure or selected-detail state.
 - [ ] Camera, reset, visibility, pause and detail controls are in consistent locations where applicable.
 - [ ] Each chapter has a distinct purpose, a legible evidence hierarchy and one obvious visual focal point.
 - [ ] Geology, resource, drilling and peer claims retain their source, date and limitation cues.
