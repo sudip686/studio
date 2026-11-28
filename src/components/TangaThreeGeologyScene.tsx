@@ -801,25 +801,6 @@ function resourceBlockCenterY(block: ResourceBlock, _voxelScale: number, _resour
   return block.y;
 }
 
-/** Indexed cube corners keep every source block lightweight and camera-independent. */
-function createMinePlanBlockGeometry() {
-  const geometry = createResourceCellGeometry();
-  const positions = geometry.getAttribute('position');
-  const faceTone = new Float32Array(positions.count * 3);
-  for (let i = 0; i < positions.count; i += 1) {
-    const y = positions.getY(i);
-    const x = positions.getX(i);
-    const z = positions.getZ(i);
-    // Bright tops and darker lower sides add stable depth without PBR flicker.
-    const tone = y > 0 ? 1.08 + (x + z) * 0.025 : y < 0 ? 0.42 + (x + z) * 0.035 : 0.68;
-    faceTone[i * 3] = tone;
-    faceTone[i * 3 + 1] = tone;
-    faceTone[i * 3 + 2] = tone;
-  }
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceTone, 3));
-  return geometry;
-}
-
 /**
  * Keep source cells legible as individual blocks when the full pit population
  * is shown. The inset edge is derived from each unit cube's local coordinates,
@@ -5162,11 +5143,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               for(const [bandIndex,band] of pitGradeBands.entries()){
                 const subset=pitBlocks.get(band.key)??[];
                 if(!subset.length)continue;
-                // Match the resource chapter's fixed grade palette. Flat face
-                // tones show cube depth without camera-dependent color changes.
-                const material=new THREE.MeshBasicMaterial({color:band.color,vertexColors:true,transparent:false,opacity:1,depthTest:true,depthWrite:true,toneMapped:false});
-                addStableResourceCellEdges(material);
-                const mesh=new THREE.InstancedMesh(createMinePlanBlockGeometry(),material,subset.length);
+                // Match Resource's source-cell appearance: a solid, exact grade
+                // colour on every cube face. The previous vertex tint darkened
+                // different faces, so adjacent cells no longer read as the same
+                // grade palette when compared with the Resource chapter.
+                const material=new THREE.MeshBasicMaterial({color:band.color,vertexColors:false,transparent:false,opacity:1,depthTest:true,depthWrite:true,toneMapped:false});
+                const mesh=new THREE.InstancedMesh(createResourceCellGeometry(),material,subset.length);
                 mesh.name=`${pitIndex===0?'North':'South'} pit · ${band.range} model cells`;
                 mesh.userData.pitIndex=pitIndex;
                 mesh.userData.gradeBand=band.key;
