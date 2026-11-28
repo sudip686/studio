@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import proj4 from 'proj4';
-import {planSiteFromPitSurfaces, sourcePitSurfaceCutRings, inside, rectangleContained, overlaps, rectangle, type SitePlan, type Point2, type SourcePitSurface} from '@/lib/deck/site-planning';
+import {planSiteFromPitSurfaces, sourcePitSurfaceCutRings, inside, rectangleContained, overlaps, rectangle, type SitePlan, type Point2, type SourcePitSurface, type SourcePitBenchDesign} from '@/lib/deck/site-planning';
 import {buildConcentrator, placeConcentrator, buildMinePlanningPitSurface, sourcePitElevationAt, sourcePitTopographyAt, gradeConceptPad, showConceptTerrain, setPitTerrainComparison, conceptPadHeight, type ConceptPad} from '@/lib/deck/mine-scene';
 import {cutPitTerrain} from '@/lib/deck/pit-terrain-cut';
 import {planHaulRoute, buildHaulRoad, buildHaulTruck, routePosition} from '@/lib/deck/mine-haulage';
@@ -4224,7 +4224,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const boundary: Point2[] = (licenceRing?.[0] ?? []).map(([lon, lat]) => {const p = localPoint(lon, lat, 700); return [p.x, p.z];});
         const referenceResponse=await fetchAsset('/generated/orewaste-reference.json?v=rf1-continuous-benches-20261031',{cache:'force-cache'});
         if(!referenceResponse.ok)throw new Error('Ore/waste scenario reference unavailable');
-        const reference=await referenceResponse.json() as {blocks:number[][];provenance:{sourceTimestamp:string;sourceFile?:string};pitSurfaces?:{components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>}};
+        const reference=await referenceResponse.json() as {blocks:number[][];provenance:{sourceTimestamp:string;sourceFile?:string};pitSurfaces?:{design?:SourcePitBenchDesign;components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>}};
         if(cancelled)return;
         const sourceComponents=reference.pitSurfaces?.components??[];
         sourcePitSurfaces=sourceComponents.map((source,index)=>{
@@ -4241,7 +4241,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               return terrainSurfaceY(terrainResources,x,-z)+(rl-sourceGround)*VERTICAL_EXAGGERATION;
             })),
             topography:source.topography.map(column=>column.map(rl=>(rl-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION)),
-            sourceBenchElevation:source.pitElevation,benchIndex:source.benchIndex,mask:source.mask,
+            benchDesign:reference.pitSurfaces?.design,benchIndex:source.benchIndex,mask:source.mask,
           };
         });
         if(sourcePitSurfaces.length!==2)throw new Error('Two RF1 optimized pit surfaces are required for Mine Planning');
@@ -5227,7 +5227,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           sitePlan.audit.push('Haul-road geometry omitted: the supplied optimized shell does not include an engineered ramp alignment or checked gradient');
           const orderedSourcePitSurfaces=[...sourcePitSurfaces].sort((a,b)=>(a.z0+(a.height-1)*a.dz/2)-(b.z0+(b.height-1)*b.dz/2));
           if(mode==='mine_planning'){
-            host.dataset.minePitSurfaceSource=cut?'RF1 10 m source bench raster':'RF1 10 m source bench raster · terrain unavailable';
+            host.dataset.minePitSurfaceSource=cut?'RF1 slope-controlled bench concept':'RF1 slope-controlled bench concept · terrain unavailable';
             host.dataset.minePitSurfaceSupports=JSON.stringify(orderedSourcePitSurfaces.map(surface=>({id:surface.id,support:surface.support,width:surface.width,height:surface.height})));
           }
           for (const [index,pit] of sitePlan.pits.entries()) {

@@ -723,42 +723,54 @@ export function restorePitTerrain(geometry:THREE.BufferGeometry){
   if(index){geometry.setIndex(index);geometry.computeBoundingSphere();geometry.userData.sourceTerrainIndex=undefined;}
 }
 
-/** Interpolate the source bench levels across cell edges and preserve the RF1 mask. */
+/** Build a terraced interpretation of the RF1 slope-controlled bench plan. */
 export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:number,z:number)=>number){
   const positions:number[]=[],colors:number[]=[],indices:number[]=[];
   const tread=new THREE.Color(0xb49a79),batter=new THREE.Color(0x80664e),shade=new THREE.Color();
   const subdivisions=4;
   const vertices=new Map<number,number>();
   const active=(i:number,j:number)=>Boolean(surface.mask[i]?.[j])&&Number.isFinite(surface.pitElevation[i]?.[j]);
-  const benchInterval=CONCEPT.bench;
+  const design=surface.benchDesign;
+  const benchHeight=design?.bench_height??CONCEPT.bench;
+  // Use the plan's middle weathering slope across the visual concept. The
+  // input has no engineered sectors or ramp alignment.
+  const benchPitch=benchHeight/Math.tan(THREE.MathUtils.degToRad(design?.overall_slope_deg.transition??43.5));
+  const faceRun=benchHeight/Math.tan(THREE.MathUtils.degToRad(design?.batter_deg??CONCEPT.batterDegrees));
   const stride=surface.width*subdivisions+1;
+  const crestEdges:{u:number;v:number;alongX:boolean}[]=[];
+  const crestRows=Array.from({length:surface.height},()=>[] as number[]);
+  let depthLimit=0;
 
-  const samples=new Map<number,{level:number;offset:number}>();
-  const sampleKey=(i:number,j:number)=>i*surface.height+j;
-  const kernel=[1,4,6,4,1];
   for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++){
     if(!active(i,j))continue;
-    const registered=surface.pitElevation[i][j];
-    const source=surface.sourceBenchElevation?.[i]?.[j]??registered;
-    let level=0,offset=0,total=0;
-    // Smooth the bench contours and the registration separately. A narrow
-    // kernel rounds single-cell corners while retaining the larger levels.
-    for(let di=-2;di<=2;di++)for(let dj=-2;dj<=2;dj++){
-      const row=i+di,col=j+dj;
-      if(!active(row,col))continue;
-      const weight=kernel[di+2]*kernel[dj+2];
-      const neighbor=surface.pitElevation[row][col];
-      const neighborSource=surface.sourceBenchElevation?.[row]?.[col]??neighbor;
-      level+=neighborSource*weight;
-      offset+=(neighbor-neighborSource)*weight;
-      total+=weight;
+    depthLimit=Math.max(depthLimit,((surface.benchIndex[i]?.[j]??0)+1)*benchHeight);
+    for(const [di,dj] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      if(active(i+di,j+dj))continue;
+      const u=i+di*.5,v=j+dj*.5;
+      crestEdges.push({u,v,alongX:dj!==0});
+      crestRows[j].push(height(surface.x0+u*surface.dx,surface.z0+v*surface.dz));
     }
-    samples.set(sampleKey(i,j),{
-      level:THREE.MathUtils.clamp(level/total,source-benchInterval,source+benchInterval),
-      offset:offset/total,
-    });
   }
+  depthLimit=Math.min(depthLimit,design?.max_depth??depthLimit);
 
+  const dx=Math.abs(surface.dx),dz=Math.abs(surface.dz);
+  const distanceToCrest=(u:number,v:number)=>{
+    let nearest=Infinity;
+    for(const edge of crestEdges){
+      const x=Math.abs(u-edge.u),z=Math.abs(v-edge.v);
+      const ex=(edge.alongX?Math.max(0,x-.5):x)*dx;
+      const ez=(edge.alongX?z:Math.max(0,z-.5))*dz;
+      nearest=Math.min(nearest,ex*ex+ez*ez);
+    }
+    return Math.sqrt(nearest);
+  };
+
+  // Sample the surveyed crest along strike to avoid transferring each
+  // hillside bump to every tread. Keep the actual terrain at the outer edge.
+  const crestProfile=crestRows.map((_,j)=>{
+    const window=crestRows.slice(Math.max(0,j-4),j+5).flat().sort((a,b)=>a-b);
+    return window[Math.floor(window.length/2)];
+  });
   const vertex=(ix:number,iz:number)=>{
     const key=iz*stride+ix;
     const existing=vertices.get(key);
@@ -766,46 +778,17 @@ export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:num
     const u=ix/subdivisions-.5,v=iz/subdivisions-.5;
     const x=surface.x0+u*surface.dx,z=surface.z0+v*surface.dz;
     const ground=height(x,z);
-    const i=Math.floor(u),j=Math.floor(v);
-    let level=0,offset=0,total=0;
-    for(let di=0;di<=1;di++)for(let dj=0;dj<=1;dj++){
-      const weight=(1-Math.abs(u-i-di))*(1-Math.abs(v-j-dj));
-      if(weight<=0)continue;
-      const row=i+di,col=j+dj;
-      if(!active(row,col))continue;
-      const sample=samples.get(sampleKey(row,col))!;
-      level+=sample.level*weight;
-      offset+=sample.offset*weight;
-      total+=weight;
-    }
-
-    // A shared sample on the mask boundary meets the terrain. Keep all
-    // remaining vertices at or below ground, including shallow rim cells.
-    const cellX=Math.floor(ix/subdivisions),cellZ=Math.floor(iz/subdivisions);
-    const minX=ix%subdivisions===0?cellX-1:cellX;
-    const minZ=iz%subdivisions===0?cellZ-1:cellZ;
-    let onRim=false;
-    for(let row=minX;row<=cellX;row++)for(let col=minZ;col<=cellZ;col++){
-      if(!active(row,col))onRim=true;
-    }
-    const band=total?level/total/benchInterval:ground/benchInterval;
-    const step=Math.floor(band),fraction=band-step;
-    // Hold the digitized levels across broad treads. A short continuous
-    // transition between them produces a sloped batter instead of a wall
-    // along the edges of individual 10 metre source cells.
-    const transition=THREE.MathUtils.smoothstep(fraction,.26,.74);
-    const elevation=(step+transition)*benchInterval+(total?offset/total:0);
-    // Blend into the survey surface over one cell near the edge. This
-    // removes thin isolated spikes around the exact mask cut.
-    let rimDistance=1;
-    for(let row=cellX-1;row<=cellX+1;row++)for(let col=cellZ-1;col<=cellZ+1;col++){
-      if(active(row,col))continue;
-      const distance=Math.hypot(Math.max(0,Math.abs(u-row)-.5),Math.max(0,Math.abs(v-col)-.5));
-      rimDistance=Math.min(rimDistance,distance);
-    }
-    const cutWeight=onRim?0:THREE.MathUtils.smoothstep(rimDistance,0,.85);
-    const y=THREE.MathUtils.lerp(ground,Math.min(elevation,ground),cutWeight);
-    shade.copy(tread).lerp(batter,transition*(1-transition)*3);
+    const distance=distanceToCrest(u,v);
+    const row=THREE.MathUtils.clamp(v,0,surface.height-1);
+    const j=Math.floor(row);
+    const crest=THREE.MathUtils.lerp(crestProfile[j]??ground,crestProfile[j+1]??ground,row-j);
+    const bench=Math.floor(distance/benchPitch);
+    const within=distance-bench*benchPitch;
+    const face=THREE.MathUtils.clamp(within/faceRun,0,1);
+    const depth=Math.min(depthLimit,(bench+face)*benchHeight);
+    const cutWeight=THREE.MathUtils.smoothstep(distance,0,benchPitch);
+    const y=THREE.MathUtils.lerp(ground,Math.min(crest-depth,ground),cutWeight);
+    shade.copy(tread).lerp(batter,face>0&&face<1?.65:0);
     const index=positions.length/3;
     positions.push(x,y,z);
     colors.push(shade.r,shade.g,shade.b);

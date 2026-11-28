@@ -3,8 +3,14 @@ export type Point2 = [number, number];
 export type PlanningBlock = {x: number; y: number; z: number; dx: number; dy: number; dz: number; carbon: number};
 export type CandidatePit = {ring: Point2[]; centre: Point2; surface: number; floor: number; depth: number; support: number};
 export type SitePlan = {pits: CandidatePit[]; plant: Point2 | null; rejected: number; audit: string[]};
+export type SourcePitBenchDesign = {
+  bench_height:number;
+  max_depth:number;
+  batter_deg:number;
+  overall_slope_deg:{fresh:number;transition:number;oxide:number};
+};
 /** Optimized RF1 surface cells, transformed into the viewer's local metre coordinates. */
-export type SourcePitSurface = {id:'north'|'south';x0:number;z0:number;dx:number;dz:number;width:number;height:number;support:number;sourceBenchElevation?:number[][];pitElevation:number[][];topography:number[][];benchIndex:number[][];mask:number[][]};
+export type SourcePitSurface = {id:'north'|'south';x0:number;z0:number;dx:number;dz:number;width:number;height:number;support:number;benchDesign?:SourcePitBenchDesign;pitElevation:number[][];topography:number[][];benchIndex:number[][];mask:number[][]};
 /** Exact, non-overlapping convex cut regions for a source pit raster.
  * Adjacent active cells are joined into row runs, avoiding the false area a
  * convex hull would remove between separate parts of the source shell. */

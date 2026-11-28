@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import proj4 from 'proj4';
 import {buildConcentrator, placeConcentrator, buildPitSurface, buildMinePlanningPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, conceptPadHeight, showConceptTerrain, setPitTerrainComparison, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
-import {rectangle, inside, overlaps, planSiteFromPitSurfaces, sourcePitSurfaceCutRings, type SourcePitSurface} from '../src/lib/deck/site-planning';
+import {rectangle, inside, overlaps, planSiteFromPitSurfaces, sourcePitSurfaceCutRings, type SourcePitSurface, type SourcePitBenchDesign} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
@@ -47,7 +47,7 @@ for(let i=0;i<sourcePitMeshes.length;i++){
 const reference=JSON.parse(fs.readFileSync('public/generated/orewaste-reference.json','utf8')) as {
   provenance:{scenarioRF:number;sourceSha256:string};
   blocks:number[][];
-  pitSurfaces:{components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>};
+  pitSurfaces:{design:SourcePitBenchDesign;components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>};
 };
 assert.equal(reference.provenance.scenarioRF,1,'Mine Planning is tied to the supplied RF 1 source scenario');
 assert.equal(reference.pitSurfaces.components.length,2,'The source reference provides two RF1 pit surfaces');
@@ -59,7 +59,7 @@ const actualSourcePits:SourcePitSurface[]=reference.pitSurfaces.components.map((
   dx:source.dx,dz:-source.dy,width:source.width,height:source.height,support:source.support,
   topography:source.topography.map(column=>column.map(rl=>rl-700)),
   pitElevation:source.pitElevation.map(column=>column.map((rl,i)=>rl-700)),
-  sourceBenchElevation:source.pitElevation,benchIndex:source.benchIndex,mask:source.mask,
+  benchDesign:reference.pitSurfaces.design,benchIndex:source.benchIndex,mask:source.mask,
 }));
 assert.deepEqual(actualSourcePits.map(pit=>pit.support),[4376,5618],'RF1 source masks retain their measured north/south support');
 const sourceCutRings=actualSourcePits.flatMap(sourcePitSurfaceCutRings);
