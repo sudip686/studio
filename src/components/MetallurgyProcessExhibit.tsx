@@ -170,7 +170,7 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       // The campus has its water allowance and approach yard at the near edge.
       // Aim below the low edge so near-side features clear the canvas caption
       // while the far perimeter keeps a small but visible top margin.
-      target.y = bounds.min.y - Math.max(8, size.y * .14);
+      target.y = bounds.min.y - Math.max(8, size.y * .17);
       const fitCamera = new THREE.PerspectiveCamera(camera.fov, camera.aspect, .1, 4000);
       let distance = Math.max(size.x, size.z) * .8;
       for (let iteration = 0; iteration < 5; iteration++) {
@@ -184,9 +184,10 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
         distance *= Math.max(.1, extent / .76);
       }
       // Keep the full campus, fence, yard and near-side water allowance in
-      // frame while using more of the canvas for the plant itself. Keep enough
-      // clearance for the near-side water allowance and perimeter at 1366 px.
-      distance = Math.max(125, distance * .68);
+      // frame while giving the buildings more of the widescreen exhibit area.
+      // This close overview keeps the site readable at laptop width without
+      // replacing the whole-campus reset with a detail shot.
+      distance = Math.max(120, distance * .62);
       destination.copy(target).addScaledVector(direction, distance);
       moveCamera(animate);
     }
@@ -195,16 +196,19 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
       const item = PROCESS.find(candidate => candidate.id === next) ?? PROCESS[0];
       target.set(item.point[0], item.point[1], item.point[2]);
       if (next === 'flotation') plant.localToWorld(target.set(...FLOTATION_SECTION_ORIGIN).setY(10));
-      if (next === 'product') plant.localToWorld(target.set(184, 7, 77));
       // Frame the whole working bay, not a close crop of its roof/floor. The
       // flotation hall is the widest stage; product handling spans the longest
       // building. Give each shot enough room for equipment and roof-cutaway
       // context, then lower the view so the interior reads as a plant space.
-      const distanceByStage:Record<ProcessId,number>={feed:96,milling:82,flotation:47,dewatering:96,product:45};
+      const distanceByStage:Record<ProcessId,number>={feed:96,milling:82,flotation:47,dewatering:96,product:68};
       const distance=distanceByStage[next];
       // Keep the camera above the wall line while showing the equipment from a
       // lower three-quarter angle, instead of looking nearly straight down.
-      const localDirection = next === 'flotation' ? new THREE.Vector3(.29, .36, -1).normalize() : new THREE.Vector3(.72, .86, 1.05).normalize();
+      const localDirection = next === 'flotation'
+        ? new THREE.Vector3(.29, .36, -1).normalize()
+        : next === 'dewatering'
+          ? new THREE.Vector3(-.68, .78, 1.05).normalize()
+          : new THREE.Vector3(.72, .86, 1.05).normalize();
       destination.copy(target).addScaledVector(localDirection, distance);
       moveCamera(animate, true);
     }
@@ -610,17 +614,6 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
     <section className="tanga-process-exhibit tanga-process-exhibit--factory" aria-label={endUseRoute ? 'Illustrative downstream graphite end-use pathways' : 'Conceptual graphite processing facility'} data-inspection={endUseRoute ?? 'factory'} style={showEvidence ? {display: 'none'} : undefined}>
     <header className="tanga-factory-header">
       <div><small>{endUseRoute ? 'DOWNSTREAM USE · ILLUSTRATIVE PATHWAY' : 'PROCESSING CONCEPT · ILLUSTRATIVE 3D FACILITY'}</small><h2>{endUseRoute ? 'From graphite concentrate to end use.' : 'One connected process. Five areas to inspect.'}</h2></div>
-    </header>
-    <div className="tanga-process-stage-strip">{endUseRoute ? <nav className="tanga-enduse-routes" aria-label="Choose an illustrative graphite downstream route">
-      <button type="button" aria-pressed={endUseRoute === 'anode'} onClick={() => chooseEndUseRoute('anode')}><span>01</span><strong>EV battery anode</strong><small>Shaped · purified · coated</small></button>
-      <button type="button" aria-pressed={endUseRoute === 'refractory'} onClick={() => chooseEndUseRoute('refractory')}><span>02</span><strong>Steelmaking refractory</strong><small>Magnesia-carbon brick</small></button>
-    </nav> : <nav className="tanga-process-stages tanga-factory-stages" aria-label="Processing facility areas">
-      {PROCESS.map((item, index) => <button type="button" key={item.id} aria-pressed={!overview && stage === item.id} aria-current={plantTourActive && plantTourStep === index ? 'step' : undefined} data-tour-step={plantTourActive && plantTourStep === index ? 'active' : undefined} onClick={() => { stopPlantTour(); showPlantTourStep(index); setPlantTourComplete(false); window.dispatchEvent(new Event('tanga:manual-exploration')); }}><b>0{index + 1}</b><span>{item.title}</span></button>)}
-    </nav>}</div>
-    <div className="tanga-factory-body">
-      <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage}>
-        <span key={endUseRoute ? `${endUseRoute}-${journeyStep}` : overview ? 'overview' : stage} className="tanga-cinematic-scan" aria-hidden="true"/>
-      </div>
       <div className="tanga-process-actions">
         {endUseRoute ? <>
           <button type="button" aria-label={fullStoryActive ? 'Stop full metallurgy story and return to the plant' : 'Return to processing plant'} onClick={returnToFactory}>{fullStoryActive ? 'Stop full story' : '← Plant tour'}</button>
@@ -631,6 +624,17 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           <button type="button" className="tanga-factory-tour-button" disabled={reduceMotion} title={reduceMotion ? 'Use the five stage buttons and end-use controls to explore without camera motion.' : 'Play the 30-second plant tour, then continue through the illustrative 30-second EV-anode pathway.'} aria-pressed={plantTourActive || fullStoryActive} onClick={() => plantTourActive ? stopPlantTour() : startPlantTour(true)}>{plantTourActive ? 'Stop story' : plantTourComplete ? 'Replay full story' : reduceMotion ? 'Story · reduced motion' : 'Play full story'}</button>
         </>}
         <button type="button" onClick={onToggle} aria-pressed={paused || reduceMotion} disabled={reduceMotion} title={reduceMotion ? 'Reduced motion is enabled in your device settings' : undefined}>{reduceMotion ? 'Motion reduced' : paused ? 'Play process motion' : 'Pause process motion'}</button>
+      </div>
+    </header>
+    <div className="tanga-process-stage-strip">{endUseRoute ? <nav className="tanga-enduse-routes" aria-label="Choose an illustrative graphite downstream route">
+      <button type="button" aria-pressed={endUseRoute === 'anode'} onClick={() => chooseEndUseRoute('anode')}><span>01</span><strong>EV battery anode</strong><small>Shaped · purified · coated</small></button>
+      <button type="button" aria-pressed={endUseRoute === 'refractory'} onClick={() => chooseEndUseRoute('refractory')}><span>02</span><strong>Steelmaking refractory</strong><small>Magnesia-carbon brick</small></button>
+    </nav> : <nav className="tanga-process-stages tanga-factory-stages" aria-label="Processing facility areas">
+      {PROCESS.map((item, index) => <button type="button" key={item.id} aria-pressed={!overview && stage === item.id} aria-current={plantTourActive && plantTourStep === index ? 'step' : undefined} data-tour-step={plantTourActive && plantTourStep === index ? 'active' : undefined} onClick={() => { stopPlantTour(); showPlantTourStep(index); setPlantTourComplete(false); window.dispatchEvent(new Event('tanga:manual-exploration')); }}><b>0{index + 1}</b><span>{item.title}</span></button>)}
+    </nav>}</div>
+    <div className="tanga-factory-body">
+      <div className="tanga-process-scene tanga-factory-scene"><div ref={host} className="tanga-process-canvas" data-stage={stage}>
+        <span key={endUseRoute ? `${endUseRoute}-${journeyStep}` : overview ? 'overview' : stage} className="tanga-cinematic-scan" aria-hidden="true"/>
       </div>
         {error && <div className="tanga-factory-error" role="alert"><strong>3D view unavailable</strong><span>{error}</span><div><button type="button" onClick={() => { setError(''); setRendererAttempt(value => value + 1); }}>Retry factory view</button><button type="button" onClick={() => setShowEvidence(true)}>Open laboratory evidence</button></div></div>}
         <div className="tanga-process-caption"><span>{endUseRoute ? `${routeTitle} · ${journeyStep + 1} / ${String(routeSteps.length).padStart(2, '0')} · ${routeSteps[journeyStep]}` : overview ? 'Facility overview · connected campus and process route' : selected.id === 'flotation' ? 'Flotation cell · illustrative section' : selected.id === 'product' ? 'Sizing screen · illustrative split' : `${selected.title} · ${openRoof ? 'roof cutaway' : 'selected area'}`}</span><small>Drag to orbit · scroll to zoom · {endUseRoute ? 'Plant tour returns to the connected facility' : 'Whole plant restores overview'}</small></div>
@@ -649,8 +653,8 @@ export default function MetallurgyProcessExhibit({paused, onToggle}: {paused: bo
           {!overview && <dl className="tanga-factory-flow"><div><dt>Input</dt><dd>{selected.input}</dd></div><div><dt>Output</dt><dd>{selected.output}</dd></div></dl>}
           {!overview&&<>{selected.id!=='product'&&<p className="tanga-factory-motion-note">{selected.motion}</p>}<details className="tanga-factory-operation-basis"><summary>Operation &amp; source basis</summary><p>{selected.basis}</p>{selected.id!=='product'&&<a href={IMO_PROCESS_REPORT} target="_blank" rel="noreferrer">IMO report · Appendix D ↗</a>}</details></>}
           {!overview && selected.id==='flotation' && <>
-            <div className="tanga-factory-separation" aria-label="Conceptual graphite and gangue separation"><span><i className="is-graphite"/>Froth carries graphite into the launder</span><span><i className="is-gangue"/>The lower outlet carries the tailings stream</span><small>Illustrative flow. See the composite results below for measured recovery.</small></div>
             <button className="tanga-factory-result" type="button" onClick={() => setShowEvidence(true)} title="Open the full laboratory results board"><span>IMO LAB · {result.id}</span><strong>{result.carbon}</strong><small>{result.recovery} recovery · {result.coarse} above 150 µm</small></button>
+            <div className="tanga-factory-separation" aria-label="Conceptual graphite and gangue separation"><span><i className="is-graphite"/>Froth carries graphite into the launder</span><span><i className="is-gangue"/>The lower outlet carries the tailings stream</span><small>Illustrative flow. Measured grade and recovery are shown above.</small></div>
           </>}
           {!overview && selected.id==='product' && <>
             <div className="tanga-factory-sizing" aria-label={`Illustrative size split for ${result.id}`}>

@@ -599,7 +599,10 @@ const VIEW_STATES: Record<WorkbenchMode, DeckViewState> = {
   work_completed: {longitude: 38, latitude: -6.4, zoom: 1.75, pitch: 0, bearing: 0},
   ranking: {longitude: 30, latitude: 12, zoom: 1.55, pitch: 0, bearing: 0},
   tanzania: {longitude: 37.8, latitude: -5.85, zoom: 4.85, pitch: 0, bearing: 0},
-  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 12.05, pitch: 34, bearing: 18},
+  // Keep the full tall boundary inside the map's safe rectangle above the
+  // chapter navigator and to the left of the evidence card. The next authored
+  // shot intentionally returns to the closer tested-ground composition.
+  project: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 11.65, pitch: 34, bearing: 18},
   topography: {longitude: PROJECT_CENTER.lon, latitude: PROJECT_CENTER.lat, zoom: 13.4, pitch: 54, bearing: 26},
   // Framed on the story: project (38.79,-4.81) -> Tanga Port (39.105,-5.064).
   // The old 8.3 zoom sat NW of the corridor and left it as a small cluster in a
@@ -1038,9 +1041,9 @@ const STATIC_SCENE_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: s
 // the renderer.
 const STATIC_MAP_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: string; note: string; fit?: 'cover' | 'contain'}>> = {
   project: {
-    src: '/presentation-assets/survey-site-aerial.jpg',
-    alt: 'Survey aerial photographs of the Tanga project terrain.',
-    note: 'Survey-site reference · live map unavailable',
+    src: '/presentation-assets/tanga-survey-figure-3-aerial.jpg',
+    alt: 'Survey aerial photograph looking across Tanga hills toward more open lowlands.',
+    note: 'Survey report · Figure 3 · lower aerial photograph · live map unavailable',
     fit: 'cover',
   },
   tanzania: {
@@ -1079,7 +1082,7 @@ const STATIC_MAP_FALLBACKS: Partial<Record<WorkbenchMode, {src: string; alt: str
 // with the deck. Loading these as ordinary images avoids mounting hidden maps
 // or WebGL renderers just to populate navigation thumbnails.
 const SCENE_INDEX_META: Record<WorkbenchMode, {question: string; thumbnail?: string; alt?: string}> = {
-  project: {question: 'Where is the project footprint?', thumbnail: '/presentation-assets/survey-site-aerial.jpg', alt: 'Survey aerial of the Tanga project area'},
+  project: {question: 'Where is the project footprint?', thumbnail: '/presentation-assets/tanga-survey-figure-3-aerial.jpg', alt: 'Survey aerial of Tanga hills and lower lowlands'},
   tanzania: {question: 'Where does Tanga sit in the region?', thumbnail: '/presentation-assets/mre-regional-geology.jpg', alt: 'Regional geology map from the resource report'},
   work_completed: {question: 'What work supports the current interpretation?', thumbnail: '/presentation-assets/metallurgy-samples.jpg', alt: 'Photographs of project testwork samples'},
   topography: {question: 'What does the measured landscape show?', thumbnail: STATIC_SCENE_FALLBACKS.topography!.src, alt: STATIC_SCENE_FALLBACKS.topography!.alt},
@@ -1794,11 +1797,10 @@ function sceneCalloutsForMode(
 ): SceneCallout[] {
   if (mode === 'tanzania') {
     return [
-      // "Tanzania highlighted / regional position before the project dive" was
-      // stage direction — it described where the deck was in its own sequence
-      // rather than telling the viewer anything about the country. Both now
-      // answer the question this scene exists to answer: why Tanzania.
-      {id: 'project', label: 'Tanga · 7.3 Mt contained', detail: 'Mozambique Belt, 72 km from Tanga Port', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
+      // Keep the country scene focused on one project locator. The peer chapter
+      // owns the deposit comparison; this map introduces the district and the
+      // report-stated port connection without repeating a resource headline.
+      {id: 'project', label: 'Tanga · Mkinga District', detail: '72 km to Tanga Port · PaulSam, June 2023', boxX: 55, boxY: 56, tone: '#c7551b', anchor: wgs84Anchor(PROJECT_CENTER, 90000), offset: {x: 88, y: -96}},
     ];
   }
   if (mode === 'project') {
@@ -4663,6 +4665,7 @@ export default function TangaDeckWorkbench() {
       width:224,
       height:94,
       priority: primaryIds.has(callout.id) ? 1000 : callout.id.startsWith('power-') ? 600-index : 400-index,
+      preferredSide: activeMode === 'tanzania' && callout.id === 'project' ? 'top' as const : undefined,
     }));
     const placements = placeLabels(candidates, stageSize, {
       padding:12,
@@ -4707,7 +4710,6 @@ export default function TangaDeckWorkbench() {
       });
     }
     if (activeMode === 'tanzania') {
-      push('lbl-marker', 'Tanga project', PROJECT_CENTER.lon, PROJECT_CENTER.lat, 320, '#c7551b');
       push('lbl-tanga-port', 'Tanga Port', ROUTE_TARGETS.port.lon, ROUTE_TARGETS.port.lat, 320, '#a7e0d3');
       push('lbl-indian-ocean', 'Indian Ocean', 40.65, -5.45, 0, '#a7c0d8');
     }
@@ -4748,13 +4750,10 @@ export default function TangaDeckWorkbench() {
    * rather than trusted.
    */
   const peerGlobeLabels = useMemo(() => {
-    // Two scenes use these labels for different arguments. The peer field shows
-    // the global set, to place Tanga in it. The country scene shows only the
-    // Tanzanian projects, because "why Tanzania" is best answered by the fact
-    // that four ranked graphite projects — Mahenge, Epanko, Bunyu and Tanga —
-    // sit in the same country, which the deck's own peer data already proves.
-    const isCountryScene = activeMode === 'tanzania';
-    if (activeMode !== 'ranking' && !isCountryScene) return [];
+    // Keep peer markers on the dedicated ranking chapter. The Tanzania view
+    // has one project locator and the port context; repeating peer labels there
+    // competed with the location story and duplicated the later comparison.
+    if (activeMode !== 'ranking') return [];
     if (stageSize.width === 0) return [];
     const map = mapInstance;
     if (!map) return [];
@@ -4776,7 +4775,6 @@ export default function TangaDeckWorkbench() {
     const positioned = graphiteRows
       .filter((project) => Number.isFinite(project.lon) && Number.isFinite(project.lat))
       .filter((project) => arcFromCentre(project.lon, project.lat) < 78)
-      .filter((project) => !isCountryScene || project.country === 'Tanzania')
       // Every near-side project is selectable; label placement declutters the
       // tight East African group without moving its geographic anchors.
       .slice()
@@ -4812,11 +4810,9 @@ export default function TangaDeckWorkbench() {
     // Chips on the right of the globe hang to the left so they stay clear of
     // the ranking panel; chips on the left hang right.
     const safeL = 108;
-    // The trimmed ranking panel starts at about 0.65 of the stage width, so
-    // 0.60 keeps even the widest chip clear of it.
-    // The country scene docks a narrower panel than the ranking table, so its
-    // labels can run further right before they would reach it.
-    const safeR = stageSize.width * (isCountryScene ? 0.72 : 0.60);
+    // The ranking panel starts at about 0.65 of the stage width, so 0.60 keeps
+    // even the widest chip clear of it.
+    const safeR = stageSize.width * 0.60;
     const safeT = 118;
     const safeB = stageSize.height - 120;
     positioned.forEach((label) => {
@@ -4888,11 +4884,12 @@ export default function TangaDeckWorkbench() {
     // and the docked right-hand data panel — so no label is hidden behind a panel.
     const W = stageSize.width;
     const H = stageSize.height;
-    // The docked right-hand data/insight panel starts at ~70% of the stage width
-    // across viewports, so keep chip centres within the left 60% — their right
-    // edge (≈ +95px) then always clears the panel. Left edge stays off the logo.
+    // Most map chapters have a docked right-hand inspector, so keep their chips
+    // on the left. Regional setting has no inspector; let the port label sit
+    // beside its actual coast anchor instead of forcing a long leader across
+    // the map. Left edge stays off the logo in either composition.
     const safeL = W * 0.05;
-    const safeR = W * 0.6;
+    const safeR = activeMode === 'tanzania' ? W - 110 : W * 0.6;
     const safeT = 104;       // below the top bar + act ribbon
     const safeB = H - 104;   // above the pager
     positioned.forEach((label) => {
@@ -4922,7 +4919,7 @@ export default function TangaDeckWorkbench() {
     const keepOutRects: Rect[] = [
       {x:0,y:0,width,height:150},
       {x:0,y:height-112,width,height:112},
-      {x:width-(activeMode === 'ranking' ? 470 : 320),y:140,width:470,height:height-140},
+      ...(activeMode === 'tanzania' ? [] : [{x:width-(activeMode === 'ranking' ? 470 : 320),y:140,width:activeMode === 'ranking' ? 470 : 320,height:height-140}]),
       ...projectedSceneCallouts.map(c => ({x:c.boxPixelX-112,y:c.boxPixelY-48,width:224,height:96})),
     ];
     if (activeMode === 'accessibility') keepOutRects.push({x:16,y:height-270,width:300,height:170});
@@ -4990,11 +4987,17 @@ export default function TangaDeckWorkbench() {
   // The cover establishes the coastline before the camera approaches the project.
   const [coverDismissed, setCoverDismissed] = useState(false);
   useEffect(() => {
-    const enter = () => setCoverDismissed(true);
+    const enter = () => {
+      setCoverDismissed(true);
+      // The cover camera is supplied as a temporary viewState override. When
+      // the intro finishes, explicitly fly to the first authored project shot
+      // so a cold entry cannot leave the boundary title over a continent view.
+      if (activeStoryIndex === 0) flyTo('project');
+    };
     if (document.querySelector('.tanga-intro-app[data-intro-complete="true"]')) enter();
     window.addEventListener('tanga:intro-complete', enter);
     return () => window.removeEventListener('tanga:intro-complete', enter);
-  }, []);
+  }, [activeStoryIndex, flyTo]);
   const [actCard, setActCard] = useState<StoryAct | null>(null);
   const beginProjectStory = useCallback(() => {
     setCoverDismissed(true);
@@ -5091,6 +5094,7 @@ export default function TangaDeckWorkbench() {
       const shotId = params.get('view');
       const shotIndex = supportsVersionOneState && shotId ? STORY_SHOTS[targetMode].findIndex((shot) => shot.id === shotId) : -1;
       if (shotIndex >= 0) applyStoryShot(targetMode, shotIndex);
+      else if (targetIndex === activeStoryIndex) applyStoryShot(targetMode, 0);
       if (supportsVersionOneState && targetMode === 'ranking') {
         const peerKey = params.get('peer');
         const peer = peerKey ? graphitePeerRows(true).find((row) => peerProjectKey(row) === peerKey) : null;
@@ -5957,12 +5961,18 @@ export default function TangaDeckWorkbench() {
       }}
       data-testid="tanga-deck-workbench"
     >
-      {activeMode === 'comparison' && isLastStory && !isExploreMode && <img className="tanga-closing-photo" src="/presentation-assets/survey-site-aerial.jpg" alt="Forested hills in the Tanga survey area"/>}
+      {activeMode === 'comparison' && isLastStory && !isExploreMode && <img className="tanga-closing-photo" src="/presentation-assets/tanga-survey-figure-3-aerial.jpg" alt="Survey aerial looking from Tanga hills toward more open lowlands"/>}
       {!isCoverScene && !storyHeroVisible && <TangaCinematicChrome key={`chrome-${activeMode}`} root={stageRef} mode={activeMode} view={`${activeMode}/${activeShotIndex}`}/>}
       <DeckHoverGuide mode={activeMode}/>
       <EvidenceReplay mode={activeMode} ready={threeLoadReport.scene==='ready'} navigate={mode=>{setIsAutoplay(false);void activateMode(mode);}}/>
       <div ref={deckStageRef} className="tanga-deck__deck-stage" aria-hidden={threeVisible}>
         <DeckGL
+          // DeckGL can mount while the intro/layout gate is still settling and
+          // retain its 300×150 fallback viewport even after the host fills the
+          // screen. Feed its measured stage dimensions so the child Map view,
+          // basemap tiles, and deck layers share the real presentation size.
+          width={stageSize.width || '100%'}
+          height={stageSize.height || '100%'}
           viewState={(isCoverScene ? COVER_COAST_VIEW : viewState) as any}
           controller={!threeVisible}
           layers={threeVisible ? [] : layers}
@@ -6028,6 +6038,7 @@ export default function TangaDeckWorkbench() {
           labelDensity={labelDensity}
           layerSettings={layerSettings}
           pitGradeFocus={pitGradeFocus}
+          pitBlocksFocus={activeMode==='mine_planning'&&['pit-blocks','north-pit','south-pit'].includes(activeShot?.id??'')}
           terrainCompare={{enabled: surfaceConceptView, split: surfaceCompareSplit}}
           onTerrainCompareSplit={setSurfaceCompareSplit}
           inspectionMode={isExploreMode}
@@ -6470,7 +6481,7 @@ export default function TangaDeckWorkbench() {
       {/* Cover card — animated brand intro on the first scene. */}
       {isCoverScene && (
         <div className="tanga-deck__cover" role="dialog" aria-label="Presentation cover">
-          <img className="tanga-opening-photo" src="/presentation-assets/survey-site-aerial.jpg" alt="Forested hills in the Tanga survey area" fetchPriority="high"/>
+          <img className="tanga-opening-photo" src="/presentation-assets/tanga-survey-figure-3-aerial.jpg" alt="Survey aerial looking from Tanga hills toward more open lowlands" fetchPriority="high"/>
           <div className="tanga-deck__cover-inner">
             <span className="tanga-deck__cover-eyebrow">Sakariya Mines &amp; Minerals · Investor Presentation</span>
             <h1 className="tanga-deck__cover-title">Tanga Graphite</h1>
@@ -7365,14 +7376,13 @@ export default function TangaDeckWorkbench() {
             <span>Mapped road profile</span>
             <strong>{routeProfile.targetLabel}</strong>
           </div>
-          <svg viewBox="0 0 230 66" role="img" aria-label={`Elevation profile from ${routeProfile.minElevation} to ${routeProfile.maxElevation} metres`}>
+          <svg viewBox="0 0 230 66" role="img" aria-label={`Mapped elevation profile from Tanga Project to ${routeProfile.targetLabel}, ${routeProfile.minElevation} to ${routeProfile.maxElevation} metres`}>
             <path d="M4 62 L226 62" />
             <polyline points={routeProfile.points} />
           </svg>
           <div className="tanga-deck__route-profile-meta">
-            <span>{routeProfile.distanceLabel}</span>
-            <span>{routeProfile.durationLabel}</span>
-            <span>{routeProfile.minElevation}-{routeProfile.maxElevation} m</span>
+            <span>Tanga Project</span>
+            <span>{routeProfile.minElevation}-{routeProfile.maxElevation} m elevation</span>
           </div>
         </section>
       )}

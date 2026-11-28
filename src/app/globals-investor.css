@@ -771,8 +771,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-milestone-stage img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .tanga-milestone-stage.is-figure img { padding: 24px; object-fit: contain; background: #13191d; }
 @media (min-width: 1201px) {
-  .tanga-milestone-stage[data-milestone="survey"] img { object-position: center 28%; }
-  .tanga-milestone-stage[data-milestone="survey"] .tanga-milestone-stage__shade { background: none; }
+  .tanga-milestone-stage[data-milestone="survey"] img { object-position: center 8%; }
 }
 .tanga-milestone-stage__shade { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(3,7,10,.24),transparent 30%,rgba(3,7,10,.12) 54%,rgba(3,7,10,.86)); pointer-events: none; }
 .tanga-milestone-stage.is-figure .tanga-milestone-stage__shade { background: linear-gradient(180deg,rgba(3,7,10,.14),transparent 34%,rgba(3,7,10,.72)); }
@@ -863,6 +862,18 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-decision-links a + a { background: transparent; border-color: transparent; }
 .tanga-deck--present .tanga-story-panel--decisions { padding: 16px; }
 .tanga-deck--present .tanga-story-panel--decisions h2 { margin: 6px 0 8px; font-size: 22px; }
+@media (min-width: 761px) {
+  .tanga-deck--present .tanga-story-panel--decisions { padding: 14px; }
+  .tanga-deck--present .tanga-story-panel--decisions h2 { margin: 4px 0 6px; font-size: 20px; line-height: 1.15; }
+  .tanga-deck--present .tanga-story-panel--decisions ol { gap: 5px; margin: 6px 0; }
+  .tanga-deck--present .tanga-story-panel--decisions li + li { padding-top: 5px; }
+  .tanga-deck--present .tanga-story-panel--decisions li strong { font-size: 13px; line-height: 1.25; }
+  .tanga-deck--present .tanga-story-panel--decisions li p { margin-top: 2px; font-size: 12px; line-height: 1.35; }
+  .tanga-deck--present .tanga-story-panel--decisions .tanga-decision-links { gap: 3px 5px; margin-top: 4px; }
+  .tanga-deck--present .tanga-story-panel--decisions .tanga-decision-links a { min-height: 28px; padding: 4px 6px; font-size: 11px; }
+  .tanga-deck--present .tanga-story-panel--decisions .tanga-decision-links a img { width: 28px; height: 20px; }
+  .tanga-deck--present .tanga-story-panel--decisions > .tanga-story-panel__link { min-height: 38px; margin-top: 8px; padding: 8px 10px; }
+}
 .tanga-decision-links a:hover,.tanga-decision-links a:focus-visible { border-color: rgba(230,151,96,.66); background: rgba(230,151,96,.1); color: #fff2e7; }
 .tanga-decision-links a:focus-visible { outline: 2px solid #f2bd91; outline-offset: 2px; }
 .tanga-story-close { display: flex; align-items: center; gap: 6px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.1); color: #f2b17e; font-size: 9px; font-weight: 620; }
@@ -1783,6 +1794,11 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-geology-surface-legend__row{display:grid;grid-template-columns:minmax(0,1fr) 26px;align-items:center;gap:4px;min-width:0}
 .tanga-geology-surface-legend__unit{display:flex;align-items:center;gap:8px;min-width:0;padding:3px 4px;border:1px solid transparent;border-radius:3px;background:transparent;color:#34443e;text-align:left;font:inherit;cursor:pointer}
 .tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;padding:3px 4px}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model{max-height:calc(100svh - 560px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#6f7f89 #172128;gap:5px}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model>header{padding-bottom:4px}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model>div{gap:0}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row{padding-block:1px;font-size:10px;line-height:1.25}
+.tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend--model .tanga-geology-surface-legend__model-row>small{padding:1px 4px;font-size:8px}
 .tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row>span{min-width:0;overflow-wrap:anywhere}
 .tanga-deck[data-mode="subsurface"] .tanga-geology-surface-legend__model-row>small{padding:2px 5px;border:1px solid var(--geology-line);border-radius:3px;color:var(--geology-muted);font-size:9px;line-height:1.2;white-space:nowrap}
 .tanga-geology-surface-legend__unit i{flex:0 0 12px}
@@ -1799,8 +1815,9 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-three:has(.tanga-process-exhibit--factory) :is(.tanga-three__callout-layer,.tanga-three__nav-cluster,.tanga-three__hud,.tanga-three__panel,.tanga-three__drill-legend,.tanga-surface-control){visibility:hidden!important;pointer-events:none!important}
 .tanga-deck .tanga-process-exhibit--factory{bottom:124px}
 .tanga-process-exhibit--factory[data-inspection="factory"] .tanga-factory-stages{display:grid}
-.tanga-process-exhibit--factory .tanga-factory-header{align-items:center;min-height:48px}
-.tanga-process-exhibit--factory .tanga-factory-header>div:first-child{min-width:0}
+.tanga-process-exhibit--factory .tanga-factory-header{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:48px}
+.tanga-process-exhibit--factory .tanga-factory-header>div:first-child{flex:1 1 auto;min-width:0}
+.tanga-process-exhibit--factory .tanga-factory-header>.tanga-process-actions{position:static;flex:0 0 auto;justify-content:flex-end;margin-left:auto}
 .tanga-process-exhibit--factory .tanga-factory-header small{color:#61756f;font-size:10px;letter-spacing:.16em}
 .tanga-process-exhibit--factory h2{margin:4px 0;color:#203a3d;font-size:clamp(22px,1.8vw,29px);font-weight:560;letter-spacing:-.035em}
 .tanga-process-exhibit--factory .tanga-process-actions{flex-wrap:nowrap;gap:6px}
@@ -2920,6 +2937,7 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
   }
 
   .tanga-deck.tanga-deck--present .tanga-deck__chapter-title {
+    max-width: clamp(420px, 34vw, 560px);
     padding: 7px 18px 8px 12px;
     border-inline-start: 0;
     background: linear-gradient(90deg, #081017f5, #081017b0 78%, #08101700);
@@ -3133,8 +3151,6 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-milestone-stage__selector { display: none; }
 .tanga-geology-stage-selector { position: absolute; z-index: 26; top: 120px; left: 12px; right: 12px; }
 .tanga-factory-scene { position: relative; }
-.tanga-factory-scene > .tanga-process-actions { position: absolute; z-index: 4; top: 8px; right: 8px; flex-wrap: wrap; }
-.tanga-factory-scene > .tanga-process-actions button { background: #12242de8; color: #f1f7f8; border-color: #69838d; }
 
 @media (min-width: 1121px) {
   .tanga-deck--present .tanga-shot-caption { margin: 5px 0 0; max-width: 38ch; color: #eef6f7; background: #0d1b23e8; padding: 4px 7px; border-radius: 3px; font-size: 12px; line-height: 1.4; }
@@ -3189,9 +3205,25 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 .tanga-terrain-tools-slot .tanga-three__terrain-profile circle { fill: #a8dfd6; }
 .tanga-terrain-tools-slot .tanga-three__terrain-profile-control { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; font-size: 11px; }
 .tanga-terrain-tools-slot .tanga-three__terrain-profile-control input { width: 100%; }
+.tanga-terrain-tools-slot .tanga-surface-control { position: static; z-index: auto; width: auto; margin: 0; padding: 8px 0; border: 0; border-block: 1px solid #d4e2e522; border-radius: 0; background: transparent; color: inherit; }
+.tanga-terrain-tools-slot .tanga-surface-control label { font-size: 10px; }
+.tanga-terrain-tools-slot .tanga-surface-control input { margin: 3px 0 1px; }
+.tanga-terrain-tools-slot .tanga-surface-control > div { font-size: 8px; }
+.tanga-terrain-tools-slot .tanga-surface-control button { border: 0; padding: 1px 8px; color: #d9b48d; background: none; }
+.tanga-deck--present .tanga-story-panel--terrain { padding: 10px 16px; }
+.tanga-deck--present .tanga-story-panel--terrain h2 { margin: 5px 0; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-panel__intro { line-height: 1.4; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-motion { margin: 4px 0; padding: 4px 6px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-motion button { min-height: 30px; padding: 4px 8px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale { margin: 0; padding: 2px 0; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale strong { font-size: 23px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot .tanga-three__terrain-tools { gap: 3px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot .tanga-three__terrain-profile { height: 44px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot .tanga-surface-control { padding-block: 4px; }
+.tanga-deck--present .tanga-story-panel--terrain .tanga-story-panel__qualification { margin-top: 4px; font-size: 9px; line-height: 1.35; }
 .tanga-terrain-tools-slot button { padding: 5px 8px; border: 1px solid #58918d; border-radius: 4px; color: #e6f4f2; background: #173942; cursor: pointer; }
 .tanga-terrain-tools-slot .tanga-three__terrain-switch button[aria-pressed="true"] { background: #416362; }
-.tanga-site-panel-switcher { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.tanga-deck--present .tanga-story-panel--concept .tanga-site-panel-switcher { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .tanga-resource-tools-slot .tanga-three__grade-legend { position: static !important; width: 100%; max-height: none; margin-block: 8px; }
 .tanga-resource-max { font-size: 11px; color: #a7e0d3; }
 .tanga-logistics-utilities { display: flex; align-items: center; gap: 8px; margin-block: 8px; font-size: 12px; }
@@ -3211,4 +3243,400 @@ body.tanga-body:has(.tanga-deck) { min-width:0; }
 }
 @media (min-width: 1121px) {
   .tanga-deck--present .tanga-deck__coach { top: auto; bottom: 102px; }
+}
+
+/* Keep the desktop evidence rail aligned across chapters. The peer benchmark
+   uses the same top and bottom safe zones as the story cards, while retaining
+   its three-column comparison layout. Chapter-specific widths and contents
+   stay intact. */
+@media (min-width: 1121px) {
+  .tanga-deck--present {
+    --tanga-evidence-top: 190px;
+    --tanga-evidence-bottom: 112px;
+    --tanga-evidence-right: 24px;
+  }
+
+  .tanga-deck--present .tanga-story-panel:not(.tanga-story-panel--timeline) {
+    top: var(--tanga-evidence-top) !important;
+    right: var(--tanga-evidence-right) !important;
+    bottom: auto !important;
+    transform: none !important;
+  }
+
+  .tanga-deck--present .tanga-peer-benchmark {
+    inset-block: var(--tanga-evidence-top) var(--tanga-evidence-bottom) !important;
+    inset-inline: var(--tanga-evidence-right) !important;
+  }
+}
+
+/* Keep the evidence panels readable above the fixed desktop navigator. Reduce
+   decorative spacing before shrinking evidence copy or introducing scrolling. */
+@media (min-width: 1121px) {
+  .tanga-deck--present :is(.tanga-story-panel--terrain, .tanga-story-panel--drill) {
+    padding: 15px 16px;
+  }
+
+  .tanga-deck--present :is(.tanga-story-panel--terrain, .tanga-story-panel--drill) h2 {
+    margin: 5px 0 8px;
+    font-size: 22px;
+    line-height: 1.12;
+  }
+
+  .tanga-deck--present :is(.tanga-story-panel--terrain, .tanga-story-panel--drill) .tanga-story-panel__intro {
+    line-height: 1.42;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale {
+    gap: 12px;
+    margin: 9px 0;
+    padding: 8px 0;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-scale strong {
+    font-size: 34px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-terrain-tools-slot {
+    gap: 4px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-three__terrain-profile {
+    height: 54px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--terrain .tanga-story-panel__qualification,
+  .tanga-deck--present .tanga-story-panel--drill .tanga-story-panel__qualification {
+    margin-top: 7px;
+    padding-top: 7px;
+    line-height: 1.35;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-compact-grade-key {
+    margin: 8px 0;
+    padding: 7px 0;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-compact-grade-key > div {
+    gap: 6px 10px;
+    margin-top: 6px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-story-inline-note {
+    margin-top: 7px;
+    padding: 7px 9px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-story-datum-note {
+    margin-top: 6px;
+    padding: 6px 8px;
+    line-height: 1.35;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-drill-source {
+    margin-top: 6px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill .tanga-drill-source summary {
+    padding-block: 7px;
+    font-size: 11px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--drill > .tanga-story-panel__link {
+    min-height: 36px;
+    margin-top: 7px;
+    padding: 8px 9px;
+    font-size: 10px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics {
+    padding: 15px 16px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics h2 {
+    margin: 5px 0 8px;
+    font-size: 22px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-story-panel__intro {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-distances {
+    gap: 6px;
+    margin: 8px 0 2px;
+    padding: 8px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-distances strong {
+    font-size: 18px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-distances > p {
+    padding-top: 5px;
+    font-size: 9px;
+    line-height: 1.3;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-logistics-utilities {
+    margin-block: 4px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-material-flow {
+    gap: 1px;
+    margin-block: 5px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-material-flow li {
+    padding-block: 3px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-material-flow li > svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--logistics .tanga-story-panel__qualification {
+    margin-top: 7px;
+    padding-top: 7px;
+    line-height: 1.35;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource {
+    padding: 14px 16px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource h2 {
+    margin: 5px 0 7px;
+    font-size: 22px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary {
+    display: grid;
+    grid-template-columns: minmax(124px, .9fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    margin: 7px 0;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number {
+    min-width: 0;
+    margin: 0;
+    padding-left: 10px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number strong {
+    font-size: 42px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number strong span {
+    margin-left: 4px;
+    font-size: 18px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-number small {
+    margin-top: 5px;
+    font-size: 9px;
+    line-height: 1.25;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts > div {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 0;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts dt {
+    font-size: 9px;
+  }
+
+  .tanga-deck--present .tanga-story-resource-summary .tanga-story-resource-facts dd {
+    flex: 0 0 auto;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key {
+    margin: 8px 0;
+    padding: 7px 0;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key > div {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key > div > span {
+    min-width: 0;
+    gap: 3px;
+    font-size: 8.5px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-compact-grade-key i {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-story-panel__intro {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .tanga-deck--present .tanga-story-panel--resource .tanga-story-panel__qualification {
+    margin-top: 7px;
+    padding-top: 7px;
+    line-height: 1.35;
+  }
+}
+
+/* The chapter header already names the current view and its takeaway. Remove
+   the duplicate floating view/next card on desktop to give the 3D canvas more
+   room above the persistent navigator. The closing bookend remains unique. */
+@media (min-width: 1121px) {
+  .tanga-deck--present .tanga-story-cue:not(:has(.tanga-story-cue__bookend)) {
+    display: none !important;
+  }
+}
+
+/* Desktop safe zones: keep chapter headings, slide content, and the persistent
+   navigator in separate measured regions. */
+@media (min-width: 1121px) {
+  .tanga-deck[data-mode="subsurface"] .tanga-geology-stage-selector {
+    top: 166px;
+  }
+
+  .tanga-deck[data-mode="subsurface"] .tanga-three__nav-cluster {
+    top: 166px !important;
+  }
+
+  .tanga-deck[data-mode="subsurface"] .tanga-three__nav-cluster:has(.tanga-camera-menu:not([open])):not(:has(.tanga-geology-section)) {
+    bottom: auto !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .tanga-deck[data-mode="subsurface"] .tanga-three__nav-cluster:has(.tanga-camera-menu:not([open])):not(:has(.tanga-geology-section)) .tanga-geology-rail-body {
+    flex: 0 1 auto;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark {
+    inset-block: 166px 112px;
+    grid-template-columns: clamp(210px, 16vw, 240px) minmax(0, 1fr) clamp(340px, 29vw, 420px);
+    gap: clamp(14px, 1.6vw, 24px);
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__narrative {
+    max-width: none;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark h2 {
+    margin: 8px 0 12px;
+    font-size: clamp(27px, 2.35vw, 38px);
+    line-height: 1.12;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark ol {
+    gap: 2px;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark li > button {
+    min-height: clamp(28px, 3.1vh, 34px);
+    padding-block: 1px;
+    row-gap: 0;
+    line-height: 1.1;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__project strong,
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__project small {
+    line-height: 1.1;
+  }
+
+  .tanga-deck[data-mode="ranking"] .tanga-peer-benchmark__comparison-caveat {
+    display: block;
+    margin-top: 10px;
+    color: #aebfc8;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-process-exhibit--factory {
+    inset: 190px 24px 116px;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-deck__chapter-title {
+    width: max-content;
+    max-width: calc(100vw - 48px);
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-deck__chapter-title h1 {
+    white-space: nowrap;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-factory-header > div:first-child {
+    width: 100%;
+  }
+
+  .tanga-deck[data-mode="metallurgy"] .tanga-factory-header h2 {
+    white-space: nowrap;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-story-panel--logistics {
+    width: min(390px, calc(100vw - 36px));
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li > div {
+    min-width: 0;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    margin-block: 8px;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 5px 0;
+    border-bottom: 1px solid #ffffff18;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li > svg {
+    display: block;
+    width: 26px;
+    height: 26px;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow li p {
+    display: none;
+  }
+
+  .tanga-deck[data-mode="accessibility"] .tanga-material-flow strong button {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 11px;
+    line-height: 1.25;
+    letter-spacing: 0;
+    white-space: normal;
+    text-wrap: balance;
+  }
 }

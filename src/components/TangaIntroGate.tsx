@@ -8,7 +8,7 @@ import {assetUrl} from '@/lib/asset-url';
 const VIDEO_KEY = '/media/tanga-google-earth-intro-corrected-preview.mp4';
 const INTRO_VIDEO_SRC = assetUrl(VIDEO_KEY) + '?v=intro-opt-1080-20260819';
 const INTRO_VIDEO_SRC_LOCAL = VIDEO_KEY + '?v=intro-opt-1080-20260819';
-const INTRO_POSTER_SRC = '/presentation-assets/survey-site-aerial.jpg';
+const INTRO_POSTER_SRC = '/presentation-assets/tanga-survey-figure-3-aerial.jpg';
 const ERROR_FALLBACK_MS = 2000;
 
 type IntroState = 'checking' | 'playing' | 'blocked' | 'finishing' | 'done';

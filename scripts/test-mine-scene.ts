@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as THREE from 'three';
 import proj4 from 'proj4';
-import {buildConcentrator, placeConcentrator, buildPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, conceptPadHeight, showConceptTerrain, setPitTerrainComparison, type ConceptPad} from '../src/lib/deck/mine-scene';
+import {buildConcentrator, placeConcentrator, buildPitSurface, buildMinePlanningPitSurface, buildPitSurfaceFromRaster, sourcePitElevationAt, conceptPadHeight, showConceptTerrain, setPitTerrainComparison, type ConceptPad} from '../src/lib/deck/mine-scene';
 import {buildMineSiteCampus} from '../src/lib/deck/mine-site-campus';
-import {rectangle, inside, overlaps, planSiteFromPitSurfaces, type SourcePitSurface} from '../src/lib/deck/site-planning';
+import {rectangle, inside, overlaps, planSiteFromPitSurfaces, sourcePitSurfaceCutRings, type SourcePitSurface, type SourcePitBenchDesign} from '../src/lib/deck/site-planning';
 import {planHaulRoute, routePosition, buildHaulTruck} from '../src/lib/deck/mine-haulage';
 import {buildDevelopmentInfrastructure} from '../src/lib/deck/mine-development';
 import {selectPitEvidenceHoles, type EvidenceInterval} from '../src/lib/deck/mining-evidence';
@@ -47,7 +47,7 @@ for(let i=0;i<sourcePitMeshes.length;i++){
 const reference=JSON.parse(fs.readFileSync('public/generated/orewaste-reference.json','utf8')) as {
   provenance:{scenarioRF:number;sourceSha256:string};
   blocks:number[][];
-  pitSurfaces:{components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>};
+  pitSurfaces:{design:SourcePitBenchDesign;components:Array<{x0:number;y0:number;dx:number;dy:number;width:number;height:number;support:number;topography:number[][];pitElevation:number[][];benchIndex:number[][];mask:number[][]}>};
 };
 assert.equal(reference.provenance.scenarioRF,1,'Mine Planning is tied to the supplied RF 1 source scenario');
 assert.equal(reference.pitSurfaces.components.length,2,'The source reference provides two RF1 pit surfaces');
@@ -59,9 +59,13 @@ const actualSourcePits:SourcePitSurface[]=reference.pitSurfaces.components.map((
   dx:source.dx,dz:-source.dy,width:source.width,height:source.height,support:source.support,
   topography:source.topography.map(column=>column.map(rl=>rl-700)),
   pitElevation:source.pitElevation.map(column=>column.map((rl,i)=>rl-700)),
-  benchIndex:source.benchIndex,mask:source.mask,
+  benchDesign:reference.pitSurfaces.design,benchIndex:source.benchIndex,mask:source.mask,
 }));
 assert.deepEqual(actualSourcePits.map(pit=>pit.support),[4376,5618],'RF1 source masks retain their measured north/south support');
+const sourceCutRings=actualSourcePits.flatMap(sourcePitSurfaceCutRings);
+assert.ok(sourceCutRings.length>0&&sourceCutRings.length<500,'RF1 source-mask cut uses compact contiguous raster runs instead of a broad convex hull');
+const sourceCutArea=sourceCutRings.reduce((total,ring)=>total+Math.abs(ring.reduce((sum,[x,z],i)=>{const [nx,nz]=ring[(i+1)%ring.length];return sum+x*nz-nx*z;},0))/2,0);
+assert.ok(Math.abs(sourceCutArea-actualSourcePits.reduce((total,surface)=>total+surface.support*surface.dx*Math.abs(surface.dz),0))<.01,'RF1 terrain cut area exactly follows active raster cells without removing convex-hull gaps');
 const actualPlan=planSiteFromPitSurfaces([...actualSourcePits].reverse(),()=>100,rectangle([0,0],2000,5000));
 assert.equal(actualPlan.pits.length,2,'Planning the real RF1 surfaces retains both distinct pits');
 assert.deepEqual(actualPlan.pits.map(pit=>pit.support),[4376,5618],'The planned pits retain the actual RF1 mask counts');
@@ -72,6 +76,11 @@ const terrainFixture = new THREE.PlaneGeometry(2000, 5200, 73, 173).rotateX(-Mat
 const fixturePosition = terrainFixture.getAttribute('position');
 const fixtureHeight = (x: number, z: number) => 75 + x * .04 - z * .02;
 for (let i = 0; i < fixturePosition.count; i++) fixturePosition.setY(i, fixtureHeight(fixturePosition.getX(i), fixturePosition.getZ(i)));
+const sourceMaskCut=cutPitTerrain(terrainFixture,sourceCutRings);
+const sourceMaskCutPositions=sourceMaskCut.geometry.getAttribute('position'),sourceMaskCutIndex=sourceMaskCut.geometry.getIndex()!;
+let sourceMaskRemainingArea=0;
+for(let i=0;i<sourceMaskCutIndex.count;i+=3){const a=sourceMaskCutIndex.getX(i),b=sourceMaskCutIndex.getX(i+1),c=sourceMaskCutIndex.getX(i+2);sourceMaskRemainingArea+=Math.abs((sourceMaskCutPositions.getX(b)-sourceMaskCutPositions.getX(a))*(sourceMaskCutPositions.getZ(c)-sourceMaskCutPositions.getZ(a))-(sourceMaskCutPositions.getZ(b)-sourceMaskCutPositions.getZ(a))*(sourceMaskCutPositions.getX(c)-sourceMaskCutPositions.getX(a)))/2;}
+assert.ok(Math.abs(sourceMaskRemainingArea-(2000*5200-sourceCutArea))<.1,'Terrain clipping removes precisely the active source-mask footprint, including concavities and gaps');
 const originalTriangleCount = terrainFixture.getIndex()!.count;
 const pitRings = actualPlan.pits.map(pit => pit.ring);
 const cut = cutPitTerrain(terrainFixture, pitRings);
@@ -173,6 +182,36 @@ for (const [pitIndex, mesh] of actualPitMeshes.entries()) {
     assert.equal(surfaceEdges.get(seam)! + edgeCounts.get(seam)!, 2, 'Terrain and pit faces close each rim segment without a gap');
   });
   assert.equal(position.count > 0, true);
+}
+const actualRasterPitMeshes=actualPlan.pits.map((pit,index)=>{
+  const surface=actualSourcePits[index];
+  const height=(x:number,z:number)=>{
+    const i=Math.max(0,Math.min(surface.width-1,Math.round((x-surface.x0)/surface.dx)));
+    const j=Math.max(0,Math.min(surface.height-1,Math.round((z-surface.z0)/surface.dz)));
+    return surface.topography[i]?.[j]??Math.max(...surface.topography.flat());
+  };
+  return buildMinePlanningPitSurface(pit,surface,height);
+});
+assert.deepEqual(actualRasterPitMeshes.map(mesh=>mesh.name),['North RF1 continuous bench interpretation','South RF1 continuous bench interpretation'],'The selected Mine Planning meshes are built directly from the north/south RF1 rasters');
+for(const [index,mesh] of actualRasterPitMeshes.entries()){
+  const surface=actualSourcePits[index],position=mesh.geometry.getAttribute('position'),bounds=new THREE.Box3().setFromObject(mesh);
+  assert.equal(mesh.userData.sourcePitRaster,true,`${mesh.name} is marked as the rendered source raster`);
+  assert.equal(mesh.userData.sourcePitSupport,surface.support,`${mesh.name} preserves the raster support`);
+  assert.ok(position.count>0&&mesh.geometry.index!.count>0,`${mesh.name} creates raster-derived geometry`);
+  assert.ok(Array.from(position.array).every(Number.isFinite),`${mesh.name} has finite raster-derived vertices`);
+  const indices=mesh.geometry.index!;
+  let footprint=0;
+  for(let face=0;face<indices.count;face+=3){
+    const a=indices.getX(face),b=indices.getX(face+1),c=indices.getX(face+2);
+    const area=((position.getZ(b)-position.getZ(a))*(position.getX(c)-position.getX(a))
+      -(position.getX(b)-position.getX(a))*(position.getZ(c)-position.getZ(a)))/2;
+    assert.ok(area>0,'Bench faces have positive plan area rather than vertical cell walls');
+    footprint+=area;
+  }
+  assert.ok(Math.abs(footprint-surface.support*surface.dx*Math.abs(surface.dz))<1,
+    'The continuous mesh fills the exact terrain cut without bridging inactive cells');
+  assert.ok(bounds.min.y<bounds.max.y,`${mesh.name} preserves vertical bench relief`);
+  assert.ok(index===0?bounds.max.z<0:bounds.min.z>0,`${mesh.name} stays at its distinct source location`);
 }
 const sourceBlockSupport=[0,0];
 for(const block of reference.blocks){

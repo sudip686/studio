@@ -1,6 +1,90 @@
 # Tanga desktop layout plan
 
+## 27 November 2026 — slide-by-slide layout pass
+
+Review basis: the current local 12-chapter desktop montage at 1366 × 768 (`postchange-montage-1366.png`) and the existing desktop layout checklist. This is a visual planning pass, not acceptance of later camera shots, open inspectors, or live deployment behavior. Keep the scene as the primary surface and retain the current Sakariya visual language.
+
+### Shared placement contract
+
+- Keep the brand/header compact at the top left and the seven story waypoints centered at the top. Avoid placing chapter-specific actions in this persistent navigation row.
+- Reserve the upper-left safe area for chapter number and one-line takeaway. Keep the line short enough to avoid crossing the subject.
+- Place chapter-specific controls in one compact left rail. Default to the primary action and expose specialist layers/camera options through a clearly named disclosure.
+- Use one right-side inspector for interpretation, evidence and source links. Avoid a second card that repeats its headline or facts elsewhere on the slide.
+- Keep the lower story cue and chapter navigator in distinct rows with enough separation from legends, profiles and annotations. Where the visual requires more height, allow the cue to collapse without hiding the navigation.
+- Keep camera/reset, orientation, scale and scene-specific layer controls in predictable positions. Never make a decorative annotation look like a button or a control look like a story label.
+- Set panel bounds against the focal scene region at 1366 × 768 and 1920 × 1080. Verify the initial and selected-detail states, including text wrapping, open disclosures and keyboard focus, before accepting each chapter.
+
+### Slide-by-slide plan
+
+| # | Chapter | What the current desktop view asks the viewer to process | Next layout pass |
+|---|---|---|---|
+| 01 | Project | Aerial image, licence outline, several map labels, onboarding instruction, story cue and project-summary card all compete for attention. | Make the licence and lower-aerial image the sole focal pair. Reduce map labels to the project name and one boundary key; keep one short project summary and the source caption in the right inspector. Move first-use instructions beside Next and keep the boundary status in the caption. |
+| 02 | Regional setting | Globe/map, project and port labels, infrastructure callouts, route cues and a right summary all compete. | Keep the globe/map dominant. Replace scattered route actions with one compact route selector (project, port, power/rail where supported); show the selected endpoints and one distance readout in the inspector. Fade or hide unselected route labels. |
+| 03 | Work completed | Large source photograph, milestone rail, thumbnail selection and right-side milestone details repeat related information. | Keep the documentary image largest. Use one dated milestone selector and one evidence card containing the result, source/caption and image provenance. Remove duplicate milestone titles/captions from other panels. |
+| 04 | Topography | Terrain is clear, but terrain layers, profile/trace, opacity and map options are split across controls. | Group terrain source, opacity and profile/trace under one “Terrain” control group. Keep the elevation key and scale near the canvas edge; show one profile with named endpoints and keep its line clear of the ridgeline. |
+| 05 | Drillholes | The left rail is dense while collar labels, selected-hole details, interval evidence and the lower cue share a textured map. | Default to one hole selector and one layer control. Put selected hole, depth/assay interval and core/photo evidence together in the right inspector. Keep collars simple and labels hidden until selection; do not show holes on earlier landscape chapters. |
+| 06 | Geology | The source map is a narrow north–south figure in a broad light canvas, with layers/stages/legend distributed around it. | Give the source map a terrain context and fit its full extent with a readable margin; never stretch the map geometry to fill the canvas. Put “Mapped surface → Relief → Interpreted depth” in one stage strip, and put the lithology legend/visibility controls in one collapsible rail. Match map/model colors and keep the licence line absent. |
+| 07 | Resource | The dipping orebody, large reported-tonnage card, model labels and cut-off/category controls compete for the same view. | Preserve the orebody as the focal visual. Keep the reported estimate and reporting basis in the right inspector header; group cut-off, category and section controls on the left. Replace floating explanatory boxes with one selected-block/threshold readout and keep reported tonnes distinct from displayed model occupancy. |
+| 08 | Peer comparison | The opening thesis, globe and ten-row ranking panel each demand equal attention; table rows are difficult to scan at presentation scale. | Shorten the left thesis to one comparison statement. Give the globe a larger unobstructed viewport and the ranking a fixed-width, readable ten-row panel with a compact metric/date/source header. Selecting a row must highlight its globe marker; keep the Tanga reveal and “fifth” basis explicit. |
+| 09 | Mine planning | Two conceptual pits share the terrain with site facilities, source/status labels, several view controls and a large inspector. | Keep both sourced pits together in the default natural oblique overview. Use one destination selector for Site / North / South / Blocks / Plant and one compact camera menu. Put concept status and source basis in the inspector; show full facility names on selection. Keep pit rims, benches and ore blocks grounded and visible around the HUD. |
+| 10 | Metallurgy | The bright plant scene is framed by several top action/stage rows, a right evidence panel and multiple pathway controls. | Normalize the panel typography and geometry to the rest of the deck while leaving the plant bright. Use one stage strip along the plant frame, one Play/Pause + Whole plant action row, and show Open roof only for a selected hall. The right inspector should show one operation, one sourced result and its evidence link; downstream anode/refractory visuals need a clear conceptual label. |
+| 11 | Port access | Map route, infrastructure labels, lower profile, route stages, distance cards and the right inspector compete for a shared reading order. | Make the selected route the clear map focal path. Put route selection and endpoints together; keep report-stated 72 km and mapped-road 76 km in separate, labeled rows. Collapse optional utility nodes and keep the elevation profile in one stable lower-left area without overlapping navigation. |
+| 12 | Conclusion | Globe/orbit, presenter prompt, map locator, bottom story cue and next-study decisions repeat the closing message. | Keep the current single conclusion slide. Use the globe/orbit as the hero, a compact location label on the map, and one right decision panel with three evidence-linked next-study questions. Remove duplicate summary prose; keep Replay and Copy/Share as the final clear actions. |
+
+### Recommended execution order
+
+1. Fix the common safe areas and control roles, then verify them on a map chapter, the light-background Metallurgy scene and the full 3D Mine Planning scene.
+2. Reduce scene obstruction in Geology, Drilling and Peer comparison; check selected states and evidence/source access.
+3. Rebalance the Project, Regional, Work completed, Topography, Resource, Port and Conclusion panels using the same spacing, type and disclosure behavior.
+4. Capture all 12 chapters and at least one selected-detail state for Geology, Resource, Mine Planning and Metallurgy at 1366 × 768 and 1920 × 1080. Check scene focal area, panel overlap, clipping/scroll, control position, label readability, keyboard focus and source access.
+5. Repeat the visual and interaction pass on the intended live desktop deployment. Keep phone/tablet acceptance separate and deferred.
+
+### Checklist status
+
+- [ ] Apply and document the shared placement contract across all 12 chapters.
+- [ ] Complete the slide-specific composition updates above without changing source values, geological colors, pit locations, or report qualifications.
+- [ ] Verify initial and selected-detail states at both desktop sizes; confirm no panel hides a key scene anchor or another control.
+- [ ] Recheck all 12 deep links and core interactions on the current branch deployment.
+
 Reviewed the 12 chapter entry views on the local investor branch in Chrome at 1366 × 768. The screenshots cover the opening composition. Later shots, open drawers and deployment performance need separate verification.
+
+## 27 November follow-up — current desktop review
+
+Review basis: a fresh local Chrome capture at 1366 × 768 (`.playwright-mcp/audit-current-project-1366-settled.png`) plus the 12-entry montage (`postchange-montage-1366.png`). This is a desktop visual review; it does not certify later shots, every open panel, or a hosted release.
+
+### Ranked worklist
+
+1. **P0 · Make the first frame match its promise.** In the fresh cold-entry capture, the chapter says “Frame the provisional project boundary” and displays the project locator/evidence, but the map remains at continental scale and the boundary is not visible. Earlier settled captures show the correct polygon. Verify the first authored view and cold-entry reveal as one sequence: either land on the complete boundary before enabling Continue, or change the opening copy and deliberately transition into the boundary. Keep the closer tested-ground view as the next shot.
+2. **P0 · Use one placement contract for all overlays.** Align chapter title, scene controls, right evidence panel, scale/compass, story cue and navigation to stable safe areas. At the current size, ordinary evidence copy and secondary labels read smaller than the scene controls. Raise explanatory text to a comfortable presentation size, reserve microtype for coordinates/source metadata, and avoid overlay-on-overlay callouts.
+3. **P1 · Repair the evidence-led signature views.** Geology needs more of the canvas for the registered map/model; Resource needs one clear orebody focal area with its readout away from blocks; Drilling should emphasize the selected collar/intercept and keep inactive labels quiet. Preserve source data and geology colors.
+4. **P1 · Clarify the two industrial scenes.** Mine Planning should open on both sourced pit envelopes together with enough surrounding site context to explain their relationship; use a detail selector for pit/blocks/plant. Metallurgy should give the connected factory more of the canvas, align its stage strip and actions once, and keep each selected operation beside its own report result and conceptual process explanation.
+5. **P1 · Make comparison and logistics scannable.** Peer Comparison needs a balanced globe/table split, legible ranking rows, and coupled row-to-marker selection. Port Access should keep the selected route and endpoints dominant, with the 72 km report basis and 76 km mapped estimate clearly separated from the elevation inset.
+6. **P2 · Simplify the supporting story views.** Project/Regional should reveal labels only when useful; Work Completed should keep source photo, dated milestone and provenance together; Topography should group relief/profile controls; Conclusion should use the globe as hero and one concise decisions panel with no repeated takeaway.
+
+### Slide-by-slide actions
+
+| # | Chapter | Planned improvement |
+|---|---|---|
+| 01 | Project | Reconcile cold-start camera and title with the actual boundary view; establish the outline before showing project-specific instructions and keep village labels secondary. |
+| 02 | Regional setting | Keep the globe/map dominant; select one route at a time and show its endpoints/distance in the inspector instead of scattering route callouts. |
+| 03 | Work completed | Keep the documentary photo largest; couple the selected date, result, source and image provenance in one evidence unit. |
+| 04 | Topography | Keep the relief central; consolidate source, opacity, profile and trace tools and place the elevation key away from the terrain focal ridge. |
+| 05 | Drillholes | Make the selected hole and its interval the focal point; group hole/layer selection and move assay/core evidence into one inspector. Keep collars simple and hide inactive labels. |
+| 06 | Geology | Increase useful map/model area without distorting the long source footprint; keep stage navigation distinct from lithology visibility and match the map, legend and model palette. |
+| 07 | Resource | Reserve clear space around the dipping blocks; group cutoff/category/slice tools, and keep reported resource figures visibly separate from displayed model-cell statistics. |
+| 08 | Peer comparison | Give the globe and benchmark list enough balanced space; use consistent row alignment, a compact metric/date/source header, and visible row-to-marker selection. |
+| 09 | Mine planning | Show both pits in the opening overview with terrain contact; put Site/North/South/Blocks/Plant in one destination control and label candidate versus illustrative facilities. |
+| 10 | Metallurgy | Enlarge the plant in its safe area; use one stage strip and one action row, with the selected roof cutaway and report-backed result easy to read together. |
+| 11 | Port access | Reduce route-label competition; keep one selected corridor, endpoints and distinct distance bases in the inspector, and the elevation profile in its reserved inset. |
+| 12 | Conclusion | Keep the orbit/globe unobstructed; use a short location marker and one decision panel with evidence-linked next-study questions and replay/share actions. |
+
+### Acceptance order
+
+- [x] Resolve and capture the cold-entry Project mismatch at 1366 × 768 and 1707 × 842; compare the first useful frame with the settled authored boundary shot. The one-shot hash restore previously skipped applying the first authored shot when `#project` was already the default chapter, leaving the intro coast zoom at 2.8 under a project-boundary title. The restore now reapplies shot 0 for the already-active chapter, and intro completion explicitly returns to Project. A fresh production build reached map `ready` at zoom 11.7 with the full boundary visible at both sizes; captures: `.playwright-mcp/project-cold-entry-fixed-1366.png` and `.playwright-mcp/project-cold-entry-fixed-1707.png`.
+- [x] Fit the geology unit keys into their safe area at 1366 × 768 and 1707 × 842. The camera/opacity group now starts collapsed on Geology and remains available in the `Camera & surface` disclosure; opacity is grouped with those controls. The mapped stage shows all eight source-map classes with `scrollHeight === clientHeight` at both sizes; the interpreted-depth stage shows all seven model units without scrolling at 1707 × 842. The rail sizes to content and ends above navigation. Opening the disclosure exposes the opacity slider, Below ground, Reset view and Inspect controls. Mapped-stage captures: `.playwright-mcp/geology-rail-fit-1366.png` and `.playwright-mcp/geology-rail-fit-1707.png`.
+- [ ] Capture one representative view from each chapter at both desktop sizes and measure panel/scene bounds; separately capture the selected states for Geology, Resource, Mine Planning and Metallurgy.
+- [ ] Fix the P0 shared placement and evidence typography, then address signature views (Geology, Drilling, Resource, Mine Planning, Metallurgy), then the supporting chapters in story order.
+- [ ] Repeat keyboard, source-access, panel-scroll and overlap checks and verify the current pushed deployment independently from local captures.
 
 ## Shared layout
 
@@ -35,8 +119,15 @@ Reviewed the 12 chapter entry views on the local investor branch in Chrome at 13
 
 ## Implementation and review
 
+- [x] Reframe the opening Project overview so the complete provisional boundary stays above chapter navigation at 1366 × 768 and 1707 × 842. Keep the closer Tested Ground shot as a distinct follow-up. Local production-build captures: `.playwright-mcp/project-overview-adjusted-1366.png` and `.playwright-mcp/project-overview-adjusted-1707.png`.
+
 - [x] Shared desktop navigation and shot captions, consolidated Evidence entry, keyboard focus, and camera controls.
 - [x] Chapter layout changes across all 12 entry views. Chrome captures at 1366 × 768 and 1920 × 1080.
 - [x] Interaction checks for switching evidence milestones, opening sources, selecting geology stages, filtering resource cells, showing all ten peer rows and revealing Tanga at fifth, navigating from Site to Plant and back, opening the flotation roof, and enabling port power infrastructure.
+- [x] Move the Metallurgy camera/process toolbar into the heading row so it no longer overlays the plant. Production-build checks at 1366 × 768 covered the initial facility and selected Flotation with the roof settled open; a 1920 × 1080 check covered Flotation and the anode pathway. At each state the title/toolbar did not overlap, actions ended above the canvas, and there was no document overflow. Capture: `.playwright-mcp/metallurgy-toolbar-1366.png`. The selected Flotation inspector still scrolls and remains open for its own density pass.
+- [x] Lead the selected Flotation inspector with its report-backed result before showing the conceptual separation graphic. At 1366 × 768, the selected composite's TC, recovery and coarse fraction are fully visible without scrolling; lower conceptual/source details remain scrollable. Capture: `.playwright-mcp/metallurgy-evidence-first-1366.png`.
+- [x] Refine Peer Comparison's laptop layout: remove the pre-reveal oversized “Mt” placeholder, state the dated-set caveat in the narrative, and compact the ranking rows. On a production build at 1366 × 768, all ten published benchmark rows fit before reveal; after inserting Tanga, the eleventh row remains reachable in the list's own scroll area. The Tanga state shows 7.31 Mt, its 148 Mt × 4.94% TGC basis, and the MRE link. At 1920 × 1080 all rows fit in the panel. Neither size has document overflow. Capture: `.playwright-mcp/peer-unrevealed-1366.png`.
+- [x] Verify the Peer Comparison change on the pushed Vercel branch preview at 1366 × 768. All ten pre-reveal rows fit, the comparison caveat is visible, the document has no overflow, the map reaches ready state, and the browser console has no errors or warnings.
+- [x] Audit Mine Planning's Site, Pit blocks and Plant panel states at desktop sizes. At 1366 × 768, both source pit shells and their grade blocks are visible together; the right inspector keeps its own scroll for supporting details without covering the map or bottom navigation. At 1920 × 1080, the Plant controls fit without panel scroll and the facility/site labels remain visible. No document overflow. Captures: `.playwright-mcp/mine-planning-layout-1366-pass.png`, `.playwright-mcp/mine-planning-blocks-layout-1366-pass.png`, `.playwright-mcp/mine-planning-plant-1920.png`.
 - [ ] Complete visual acceptance for every later shot and inspector at both sizes. Camera framing still uses authored presets. A live camera fit tied to the available canvas, regional peer-cluster expansion, and an in-deck return to a specific closing question remain open.
 - [ ] Verify the branch deployment and repeat cold and warm transitions into Drilling.

@@ -104,6 +104,10 @@ for ($slideIndex = $First; $slideIndex -le $Last; $slideIndex++) {
   $auditResult = (& $browserCli --session $BrowserSession eval -b $auditEncoded) -join "`n"
   if ($LASTEXITCODE -ne 0) { throw "Layout audit failed for chapter $slideIndex." }
   $auditObject = $auditResult | ConvertFrom-Json
+  # Move off the scene-index trigger before capture. Otherwise its native
+  # hover tooltip can sit over the scene even after the index itself closes.
+  & $browserCli --session $BrowserSession mouse move ($Width - 4) 10 | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not clear the pointer before chapter $slideIndex screenshot." }
   $capturePath = Join-Path $captureRoot "verify-$stamp-$($Width)x$($Height)-$($slideIndex.ToString('00'))-$mode.png"
   & $browserCli --session $BrowserSession screenshot $capturePath
   if ($LASTEXITCODE -ne 0) { throw "Screenshot failed for chapter $slideIndex." }

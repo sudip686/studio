@@ -723,60 +723,111 @@ export function restorePitTerrain(geometry:THREE.BufferGeometry){
   if(index){geometry.setIndex(index);geometry.computeBoundingSphere();geometry.userData.sourceTerrainIndex=undefined;}
 }
 
-/** Render the source optimized shell as flat floor cells and explicit bench risers. */
+/** Build a terraced interpretation of the RF1 slope-controlled bench plan. */
 export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:number,z:number)=>number){
-  const positions:number[]=[],colors:number[]=[],indices:number[]=[],dark=new THREE.Color(0x675344),floor=new THREE.Color(0xb29a7d);
-  // Reuse vertices across adjacent cells on the same material surface. The
-  // previous per-quad duplicates made each 10 m source cell shade as a separate
-  // block even when it belonged to one continuous bench tread or riser.
-  const vertexByPosition=new Map<string,number>();
-  const addVertex=(x:number,y:number,z:number,color:THREE.Color)=>{
-    const key=`${Math.round(x*100)}:${Math.round(y*100)}:${Math.round(z*100)}:${color.getHex()}`;
-    const existing=vertexByPosition.get(key);if(existing!==undefined)return existing;
-    const index=positions.length/3;positions.push(x,y,z);colors.push(color.r,color.g,color.b);vertexByPosition.set(key,index);return index;
-  };
-  const addQuad=(a:[number,number,number],b:[number,number,number],c:[number,number,number],d:[number,number,number],color:THREE.Color)=>{
-    const v=[a,b,c,d].map(p=>addVertex(p[0],p[1],p[2],color));indices.push(v[0],v[1],v[2],v[0],v[2],v[3]);
-  };
-  const floorCache=new Map<string,number|null>();
-  const cellFloor=(i:number,j:number)=>{
-    if(!surface.mask[i]?.[j])return null;
-    const key=`${i}:${j}`,cached=floorCache.get(key);if(cached!==undefined)return cached;
-    const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz,elevation=surface.pitElevation[i]?.[j];
-    if(!Number.isFinite(elevation)){floorCache.set(key,null);return null;}
-    // The source shell and viewer terrain are registered from separate grids.
-    // Keep the whole bench cell below the displayed ground so a local
-    // interpolation mismatch cannot lift a tread above the terrain.
-    const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
-    const result=Math.min(elevation!,height(x,z)-.7,height(x-halfX,z-halfZ)-.7,height(x+halfX,z-halfZ)-.7,height(x+halfX,z+halfZ)-.7,height(x-halfX,z+halfZ)-.7);
-    floorCache.set(key,result);return result;
-  };
-  const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[];
+  const tread=new THREE.Color(0xb49a79),batter=new THREE.Color(0x80664e),shade=new THREE.Color();
+  const subdivisions=4;
+  const vertices=new Map<number,number>();
+  const active=(i:number,j:number)=>Boolean(surface.mask[i]?.[j])&&Number.isFinite(surface.pitElevation[i]?.[j]);
+  const design=surface.benchDesign;
+  const benchHeight=design?.bench_height??CONCEPT.bench;
+  // Use the plan's middle weathering slope across the visual concept. The
+  // input has no engineered sectors or ramp alignment.
+  const benchPitch=benchHeight/Math.tan(THREE.MathUtils.degToRad(design?.overall_slope_deg.transition??43.5));
+  const faceRun=benchHeight/Math.tan(THREE.MathUtils.degToRad(design?.batter_deg??CONCEPT.batterDegrees));
+  const stride=surface.width*subdivisions+1;
+  const crestEdges:{u:number;v:number;alongX:boolean}[]=[];
+  const crestRows=Array.from({length:surface.height},()=>[] as number[]);
+  let depthLimit=0;
+
   for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++){
-    const baseFloor=cellFloor(i,j);if(baseFloor===null)continue;
-    const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz,y=baseFloor+.7;
-    const west=x-halfX,east=x+halfX,south=z+halfZ,north=z-halfZ;
-    addQuad([west,y,south],[east,y,south],[east,y,north],[west,y,north],floor);
-    const edges:[number,number,[number,number],[number,number]][]=[
-      [-1,0,[west,south],[west,north]],[1,0,[east,north],[east,south]],
-      [0,-1,[east,south],[west,south]],[0,1,[west,north],[east,north]],
-    ];
-    for(const [di,dj,a,b] of edges){
-      const other=cellFloor(i+di,j+dj),ax=a[0],az=a[1],bx=b[0],bz=b[1];
-      if(other!==null){
-        if(baseFloor>=other)continue;
-        const high=other+.7;
-        addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,high,bz],[ax,high,az],dark);
-        continue;
-      }
-      const topA=Math.max(baseFloor+.7,height(ax,az)),topB=Math.max(baseFloor+.7,height(bx,bz));
-      if(topA<=baseFloor+.75&&topB<=baseFloor+.75)continue;
-      addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,topB,bz],[ax,topA,az],dark);
+    if(!active(i,j))continue;
+    depthLimit=Math.max(depthLimit,((surface.benchIndex[i]?.[j]??0)+1)*benchHeight);
+    for(const [di,dj] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      if(active(i+di,j+dj))continue;
+      const u=i+di*.5,v=j+dj*.5;
+      crestEdges.push({u,v,alongX:dj!==0});
+      crestRows[j].push(height(surface.x0+u*surface.dx,surface.z0+v*surface.dz));
     }
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
-  const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
-  mesh.name=`${surface.id==='north'?'North':'South'} RF1 optimized pit surface`;mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData.sourcePitSupport=surface.support;return mesh;
+  depthLimit=Math.min(depthLimit,design?.max_depth??depthLimit);
+
+  const dx=Math.abs(surface.dx),dz=Math.abs(surface.dz);
+  const distanceToCrest=(u:number,v:number)=>{
+    let nearest=Infinity;
+    for(const edge of crestEdges){
+      const x=Math.abs(u-edge.u),z=Math.abs(v-edge.v);
+      const ex=(edge.alongX?Math.max(0,x-.5):x)*dx;
+      const ez=(edge.alongX?z:Math.max(0,z-.5))*dz;
+      nearest=Math.min(nearest,ex*ex+ez*ez);
+    }
+    return Math.sqrt(nearest);
+  };
+
+  // Sample the surveyed crest along strike to avoid transferring each
+  // hillside bump to every tread. Keep the actual terrain at the outer edge.
+  const crestProfile=crestRows.map((_,j)=>{
+    const window=crestRows.slice(Math.max(0,j-4),j+5).flat().sort((a,b)=>a-b);
+    return window[Math.floor(window.length/2)];
+  });
+  const vertex=(ix:number,iz:number)=>{
+    const key=iz*stride+ix;
+    const existing=vertices.get(key);
+    if(existing!==undefined)return existing;
+    const u=ix/subdivisions-.5,v=iz/subdivisions-.5;
+    const x=surface.x0+u*surface.dx,z=surface.z0+v*surface.dz;
+    const ground=height(x,z);
+    const distance=distanceToCrest(u,v);
+    const row=THREE.MathUtils.clamp(v,0,surface.height-1);
+    const j=Math.floor(row);
+    const crest=THREE.MathUtils.lerp(crestProfile[j]??ground,crestProfile[j+1]??ground,row-j);
+    const bench=Math.floor(distance/benchPitch);
+    const within=distance-bench*benchPitch;
+    const face=THREE.MathUtils.clamp(within/faceRun,0,1);
+    const depth=Math.min(depthLimit,(bench+face)*benchHeight);
+    const cutWeight=THREE.MathUtils.smoothstep(distance,0,benchPitch);
+    const y=THREE.MathUtils.lerp(ground,Math.min(crest-depth,ground),cutWeight);
+    shade.copy(tread).lerp(batter,face>0&&face<1?.65:0);
+    const index=positions.length/3;
+    positions.push(x,y,z);
+    colors.push(shade.r,shade.g,shade.b);
+    vertices.set(key,index);
+    return index;
+  };
+
+  for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++){
+    if(!active(i,j))continue;
+    for(let di=0;di<subdivisions;di++)for(let dj=0;dj<subdivisions;dj++){
+      const x=i*subdivisions+di,z=j*subdivisions+dj;
+      const a=vertex(x,z),b=vertex(x+1,z),c=vertex(x+1,z+1),d=vertex(x,z+1);
+      if(surface.dx*surface.dz>0)indices.push(a,d,b,b,d,c);
+      else indices.push(a,b,d,b,c,d);
+    }
+  }
+
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  const material=new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.name=`${surface.id==='north'?'North':'South'} RF1 optimized pit surface`;
+  mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData.sourcePitSupport=surface.support;
+  return mesh;
+}
+
+/** Rebuild the same RF1 interpretation when the displayed terrain changes. */
+export function buildMinePlanningPitSurface(pit:CandidatePit,surface:SourcePitSurface|undefined,height:(x:number,z:number)=>number,terrainRim?:[number,number,number][]){
+  const mesh=surface?buildPitSurfaceFromRaster(surface,height):buildPitSurface(pit,height,terrainRim);
+  if(surface){
+    mesh.name=`${surface.id==='north'?'North':'South'} RF1 continuous bench interpretation`;
+    mesh.userData.sourcePitSupport=surface.support;
+    mesh.userData.sourcePitRaster=true;
+  }
+  return mesh;
 }
 /** Exact contour bands eliminate the staircase aliasing of a clipped XY grid. */
 export function buildPitSurface(pit:CandidatePit,height:(x:number,z:number)=>number, terrainRim?: [number, number, number][]) {

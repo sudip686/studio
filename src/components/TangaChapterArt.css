@@ -37,9 +37,9 @@
   .tanga-deck .tanga-story-panel--concept .tanga-pit-grade-key { margin-block:3px; }
 }
 @media(min-width:1000px) {
-  .tanga-deck .tanga-story-panel--resource .tanga-story-resource-number { display:flex; align-items:flex-end; gap:14px; padding:0; border:0; margin:10px 0 12px; }
-  .tanga-deck .tanga-story-panel--resource .tanga-story-resource-number strong { font-size:clamp(48px,4vw,68px); letter-spacing:-.055em; }
-  .tanga-deck .tanga-story-panel--resource .tanga-story-resource-number small { max-width:90px; padding-bottom:5px; margin:0; }
+  .tanga-deck .tanga-story-panel--resource .tanga-story-resource-number { display:grid; align-content:start; justify-items:start; gap:3px; padding:0; border:0; margin:10px 0 12px; }
+  .tanga-deck .tanga-story-panel--resource .tanga-story-resource-number strong { max-width:100%; font-size:clamp(42px,3.3vw,56px); letter-spacing:-.055em; white-space:nowrap; }
+  .tanga-deck .tanga-story-panel--resource .tanga-story-resource-number small { max-width:125px; padding:0; margin:0; line-height:1.3; }
   .tanga-deck .tanga-story-resource-facts { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0 0 8px; }
   .tanga-deck .tanga-story-resource-facts > div { display:block; padding:5px 0; border-top:1px solid #8b9a9d66; border-bottom:0; }
   .tanga-deck .tanga-story-resource-facts dd { margin-top:3px; color:#f6e4c8; font-size:18px; font-variant-numeric:tabular-nums; }
