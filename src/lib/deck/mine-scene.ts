@@ -733,6 +733,32 @@ export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:num
   const benchInterval=CONCEPT.bench;
   const stride=surface.width*subdivisions+1;
 
+  const samples=new Map<number,{level:number;offset:number}>();
+  const sampleKey=(i:number,j:number)=>i*surface.height+j;
+  const kernel=[1,4,6,4,1];
+  for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++){
+    if(!active(i,j))continue;
+    const registered=surface.pitElevation[i][j];
+    const source=surface.sourceBenchElevation?.[i]?.[j]??registered;
+    let level=0,offset=0,total=0;
+    // Smooth the bench contours and the registration separately. A narrow
+    // kernel rounds single-cell corners while retaining the larger levels.
+    for(let di=-2;di<=2;di++)for(let dj=-2;dj<=2;dj++){
+      const row=i+di,col=j+dj;
+      if(!active(row,col))continue;
+      const weight=kernel[di+2]*kernel[dj+2];
+      const neighbor=surface.pitElevation[row][col];
+      const neighborSource=surface.sourceBenchElevation?.[row]?.[col]??neighbor;
+      level+=neighborSource*weight;
+      offset+=(neighbor-neighborSource)*weight;
+      total+=weight;
+    }
+    samples.set(sampleKey(i,j),{
+      level:THREE.MathUtils.clamp(level/total,source-benchInterval,source+benchInterval),
+      offset:offset/total,
+    });
+  }
+
   const vertex=(ix:number,iz:number)=>{
     const key=iz*stride+ix;
     const existing=vertices.get(key);
@@ -747,10 +773,9 @@ export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:num
       if(weight<=0)continue;
       const row=i+di,col=j+dj;
       if(!active(row,col))continue;
-      const registered=surface.pitElevation[row][col];
-      const sourceLevel=surface.sourceBenchElevation?.[row]?.[col]??registered;
-      level+=sourceLevel*weight;
-      offset+=(registered-sourceLevel)*weight;
+      const sample=samples.get(sampleKey(row,col))!;
+      level+=sample.level*weight;
+      offset+=sample.offset*weight;
       total+=weight;
     }
 
@@ -770,7 +795,16 @@ export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:num
     // along the edges of individual 10 metre source cells.
     const transition=THREE.MathUtils.smoothstep(fraction,.26,.74);
     const elevation=(step+transition)*benchInterval+(total?offset/total:0);
-    const y=onRim?ground:Math.min(elevation,ground);
+    // Blend into the survey surface over one cell near the edge. This
+    // removes thin isolated spikes around the exact mask cut.
+    let rimDistance=1;
+    for(let row=cellX-1;row<=cellX+1;row++)for(let col=cellZ-1;col<=cellZ+1;col++){
+      if(active(row,col))continue;
+      const distance=Math.hypot(Math.max(0,Math.abs(u-row)-.5),Math.max(0,Math.abs(v-col)-.5));
+      rimDistance=Math.min(rimDistance,distance);
+    }
+    const cutWeight=onRim?0:THREE.MathUtils.smoothstep(rimDistance,0,.85);
+    const y=THREE.MathUtils.lerp(ground,Math.min(elevation,ground),cutWeight);
     shade.copy(tread).lerp(batter,transition*(1-transition)*3);
     const index=positions.length/3;
     positions.push(x,y,z);
