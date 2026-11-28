@@ -321,6 +321,7 @@ type TangaThreeGeologySceneProps = {
   labelDensity?: LabelDensity;
   layerSettings?: DeckLayerSettings;
   pitGradeFocus?: string | null;
+  pitBlocksFocus?: boolean;
   terrainCompare?: {enabled: boolean; split: number};
   onTerrainCompareSplit?: (split: number) => void;
   inspectionMode?: boolean;
@@ -1028,7 +1029,7 @@ function materialsForObject(object: THREE.Object3D) {
  * any sense of where "ground level" is, which is the reference decks' whole
  * trick for making depth legible.
  */
-function terrainOpacityForView(mode: GeologyMode, view: SurfaceCameraView) {
+function terrainOpacityForView(mode: GeologyMode, view: SurfaceCameraView, pitBlocksFocus = false) {
   // Looking up from beneath: the surface becomes a ceiling. Keep it faint so
   // it reads as the roof of the deposit without hiding the model.
   if (view === 'bottom') {
@@ -1037,6 +1038,11 @@ function terrainOpacityForView(mode: GeologyMode, view: SurfaceCameraView) {
     if (mode === 'mine_planning') return 0.24;
     return 0.3;
   }
+
+  // In mine-plan shots focused on source grade cells, let the blocks read
+  // through a lightly translucent terrain surface like the Resource view.
+  // The site overview remains fully opaque and natural.
+  if (mode === 'mine_planning' && pitBlocksFocus) return 0.64;
 
   // Plan view: the ground is the subject again, so keep it solid.
   if (view === 'top') {
@@ -1056,9 +1062,9 @@ if (mode === 'mine_planning') return 1;
 }
 
 /** Authored surface opacity stays fixed while orbiting outside the subsurface chapter. */
-function terrainOpacityForPresentation(mode: GeologyMode, view: SurfaceCameraView, mappedSurface = false) {
+function terrainOpacityForPresentation(mode: GeologyMode, view: SurfaceCameraView, mappedSurface = false, pitBlocksFocus = false) {
   if (mappedSurface) return .92;
-  return terrainOpacityForView(mode, mode === 'subsurface' ? view : 'default');
+  return terrainOpacityForView(mode, mode === 'subsurface' ? view : 'default', pitBlocksFocus);
 }
 
 function makeCameraShot(
@@ -2333,6 +2339,7 @@ export default function TangaThreeGeologyScene({
   labelDensity = 'key',
   layerSettings = DEFAULT_LAYER_SETTINGS,
   pitGradeFocus = null,
+  pitBlocksFocus = false,
   terrainCompare = {enabled: false, split: 50},
   onTerrainCompareSplit,
   inspectionMode = false,
@@ -2430,6 +2437,8 @@ export default function TangaThreeGeologyScene({
   const [authoredSurfaceOpacity,setAuthoredSurfaceOpacity]=useState(1);
   useEffect(()=>{if(surfaceOpacity===null)resetSurfaceRef.current?.();},[surfaceOpacity]);
   const surfaceOpacityRef=useRef<number|null>(null);surfaceOpacityRef.current=surfaceOpacity;
+  const pitBlocksFocusRef=useRef(pitBlocksFocus);pitBlocksFocusRef.current=pitBlocksFocus;
+  useEffect(()=>{if(surfaceOpacityRef.current===null)resetSurfaceRef.current?.();},[pitBlocksFocus]);
   const [resourceCutoff, setResourceCutoff] = useState(3);
   const [resourceCutoffMax, setResourceCutoffMax] = useState(12);
   const [resourceCutoffSummary, setResourceCutoffSummary] = useState<ResourceCutoffSummary|null>(null);
@@ -2882,7 +2891,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
     terrainMaterialsRef.current = terrainSurfaceMaterials;
     let surfaceCameraView: SurfaceCameraView = lowCamera ? 'bottom' : 'default';
     const applyTerrainSurfaceView = () => {
-      const opacity = terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique);
+      const opacity = terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current);
       const isGlass = opacity < 1;
       setAuthoredSurfaceOpacity(opacity);
       terrainSurfaceMaterials.forEach((material) => {
@@ -3287,7 +3296,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         const retainFrame = geologyOblique;
         leaveGeologyPlan(true); geologyOblique = false;
         setMappedSurfaceStage(false);
-        setAuthoredSurfaceOpacity(terrainOpacityForPresentation(mode,surfaceCameraView,geologyPlan||geologyOblique));
+        setAuthoredSurfaceOpacity(terrainOpacityForPresentation(mode,surfaceCameraView,geologyPlan||geologyOblique,pitBlocksFocusRef.current));
         if (retainFrame) cameraTween=null;
         setSectionEnabled(false);explodedRef.current=false;setExploded(false);separation=0;
         if (!retainFrame) scheduleCameraTween(cameraShot.to.clone(),cameraShot.target.clone(),2,cameraShot.fov);
@@ -3769,8 +3778,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // saturated grades are the only vivid thing on screen; a pale
           // surface competes with the data and washes the whole frame out.
           color: mode==='subsurface' ? 0x52616a : TERRAIN_GROUND_COLOR,
-          transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
-          opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
+          transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current) < 1,
+          opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current),
           alphaTest: 0,
           side: THREE.DoubleSide,
           vertexColors: true,
@@ -3778,7 +3787,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           // lifting the whole surface toward white under the environment map.
           emissive: new THREE.Color('#241a12'),
           emissiveIntensity: 0.06,
-          depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
+          depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current) >= 1,
           depthTest: true,
           polygonOffset: true,
           polygonOffsetFactor: 2,
@@ -3922,12 +3931,12 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             color: mode === 'subsurface' ? 0x52616a : 0x9a8267,
             colorWrite: true,
             toneMapped: false,
-            transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
-            opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
+            transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current) < 1,
+            opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current),
             alphaTest: 0,
             side: THREE.DoubleSide,
             forceSinglePass: true,
-            depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
+            depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current) >= 1,
             depthTest: true,
             polygonOffset: true,
             polygonOffsetFactor: 2,
@@ -3950,8 +3959,8 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           satelliteTerrainMaterial ?? new THREE.MeshLambertMaterial({
             map: null,
             color: 0xffffff,
-            transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) < 1,
-            opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique),
+            transparent: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current) < 1,
+            opacity: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current),
             emissive: new THREE.Color('#000000'),
             emissiveIntensity: 0,
             alphaTest: 0,
@@ -3959,7 +3968,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             forceSinglePass: true,
             vertexColors: mode === 'topography',
             dithering: true,
-            depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique) >= 1,
+            depthWrite: terrainOpacityForPresentation(mode, surfaceCameraView, geologyPlan || geologyOblique, pitBlocksFocusRef.current) >= 1,
             depthTest: true,
             polygonOffset: true,
             polygonOffsetFactor: 2,

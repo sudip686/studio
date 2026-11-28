@@ -6038,6 +6038,7 @@ export default function TangaDeckWorkbench() {
           labelDensity={labelDensity}
           layerSettings={layerSettings}
           pitGradeFocus={pitGradeFocus}
+          pitBlocksFocus={activeMode==='mine_planning'&&['pit-blocks','north-pit','south-pit'].includes(activeShot?.id??'')}
           terrainCompare={{enabled: surfaceConceptView, split: surfaceCompareSplit}}
           onTerrainCompareSplit={setSurfaceCompareSplit}
           inspectionMode={isExploreMode}
