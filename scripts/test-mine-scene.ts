@@ -59,7 +59,7 @@ const actualSourcePits:SourcePitSurface[]=reference.pitSurfaces.components.map((
   dx:source.dx,dz:-source.dy,width:source.width,height:source.height,support:source.support,
   topography:source.topography.map(column=>column.map(rl=>rl-700)),
   pitElevation:source.pitElevation.map(column=>column.map((rl,i)=>rl-700)),
-  benchIndex:source.benchIndex,mask:source.mask,
+  sourceBenchElevation:source.pitElevation,benchIndex:source.benchIndex,mask:source.mask,
 }));
 assert.deepEqual(actualSourcePits.map(pit=>pit.support),[4376,5618],'RF1 source masks retain their measured north/south support');
 const sourceCutRings=actualSourcePits.flatMap(sourcePitSurfaceCutRings);
@@ -199,6 +199,17 @@ for(const [index,mesh] of actualRasterPitMeshes.entries()){
   assert.equal(mesh.userData.sourcePitSupport,surface.support,`${mesh.name} preserves the raster support`);
   assert.ok(position.count>0&&mesh.geometry.index!.count>0,`${mesh.name} creates raster-derived geometry`);
   assert.ok(Array.from(position.array).every(Number.isFinite),`${mesh.name} has finite raster-derived vertices`);
+  const indices=mesh.geometry.index!;
+  let footprint=0;
+  for(let face=0;face<indices.count;face+=3){
+    const a=indices.getX(face),b=indices.getX(face+1),c=indices.getX(face+2);
+    const area=((position.getZ(b)-position.getZ(a))*(position.getX(c)-position.getX(a))
+      -(position.getX(b)-position.getX(a))*(position.getZ(c)-position.getZ(a)))/2;
+    assert.ok(area>0,'Bench faces have positive plan area rather than vertical cell walls');
+    footprint+=area;
+  }
+  assert.ok(Math.abs(footprint-surface.support*surface.dx*Math.abs(surface.dz))<1,
+    'The continuous mesh fills the exact terrain cut without bridging inactive cells');
   assert.ok(bounds.min.y<bounds.max.y,`${mesh.name} preserves vertical bench relief`);
   assert.ok(index===0?bounds.max.z<0:bounds.min.z>0,`${mesh.name} stays at its distinct source location`);
 }

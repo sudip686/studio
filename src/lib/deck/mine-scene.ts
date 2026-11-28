@@ -723,63 +723,86 @@ export function restorePitTerrain(geometry:THREE.BufferGeometry){
   if(index){geometry.setIndex(index);geometry.computeBoundingSphere();geometry.userData.sourceTerrainIndex=undefined;}
 }
 
-/** Render the source optimized shell as flat floor cells and explicit bench risers. */
+/** Interpolate the source bench levels across cell edges and preserve the RF1 mask. */
 export function buildPitSurfaceFromRaster(surface:SourcePitSurface,height:(x:number,z:number)=>number){
-  const positions:number[]=[],colors:number[]=[],indices:number[]=[],benchFace=new THREE.Color(0x80664d),cutWall=new THREE.Color(0x90745a),floor=new THREE.Color(0xb69a78);
-  // Reuse vertices across adjacent cells on the same material surface. The
-  // previous per-quad duplicates made each 10 m source cell shade as a separate
-  // block even when it belonged to one continuous bench tread or riser.
-  const vertexByPosition=new Map<string,number>();
-  const addVertex=(x:number,y:number,z:number,color:THREE.Color)=>{
-    const key=`${Math.round(x*100)}:${Math.round(y*100)}:${Math.round(z*100)}:${color.getHex()}`;
-    const existing=vertexByPosition.get(key);if(existing!==undefined)return existing;
-    const index=positions.length/3;positions.push(x,y,z);colors.push(color.r,color.g,color.b);vertexByPosition.set(key,index);return index;
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[];
+  const tread=new THREE.Color(0xb49a79),batter=new THREE.Color(0x80664e),shade=new THREE.Color();
+  const subdivisions=4;
+  const vertices=new Map<number,number>();
+  const active=(i:number,j:number)=>Boolean(surface.mask[i]?.[j])&&Number.isFinite(surface.pitElevation[i]?.[j]);
+  const benchInterval=CONCEPT.bench;
+  const stride=surface.width*subdivisions+1;
+
+  const vertex=(ix:number,iz:number)=>{
+    const key=iz*stride+ix;
+    const existing=vertices.get(key);
+    if(existing!==undefined)return existing;
+    const u=ix/subdivisions-.5,v=iz/subdivisions-.5;
+    const x=surface.x0+u*surface.dx,z=surface.z0+v*surface.dz;
+    const ground=height(x,z);
+    const i=Math.floor(u),j=Math.floor(v);
+    let level=0,offset=0,total=0;
+    for(let di=0;di<=1;di++)for(let dj=0;dj<=1;dj++){
+      const weight=(1-Math.abs(u-i-di))*(1-Math.abs(v-j-dj));
+      if(weight<=0)continue;
+      const row=i+di,col=j+dj;
+      if(!active(row,col))continue;
+      const registered=surface.pitElevation[row][col];
+      const sourceLevel=surface.sourceBenchElevation?.[row]?.[col]??registered;
+      level+=sourceLevel*weight;
+      offset+=(registered-sourceLevel)*weight;
+      total+=weight;
+    }
+
+    // A shared sample on the mask boundary meets the terrain. Keep all
+    // remaining vertices at or below ground, including shallow rim cells.
+    const cellX=Math.floor(ix/subdivisions),cellZ=Math.floor(iz/subdivisions);
+    const minX=ix%subdivisions===0?cellX-1:cellX;
+    const minZ=iz%subdivisions===0?cellZ-1:cellZ;
+    let onRim=false;
+    for(let row=minX;row<=cellX;row++)for(let col=minZ;col<=cellZ;col++){
+      if(!active(row,col))onRim=true;
+    }
+    const band=total?level/total/benchInterval:ground/benchInterval;
+    const step=Math.floor(band),fraction=band-step;
+    // Hold the digitized levels across broad treads. A short continuous
+    // transition between them produces a sloped batter instead of a wall
+    // along the edges of individual 10 metre source cells.
+    const transition=THREE.MathUtils.smoothstep(fraction,.26,.74);
+    const elevation=(step+transition)*benchInterval+(total?offset/total:0);
+    const y=onRim?ground:Math.min(elevation,ground);
+    shade.copy(tread).lerp(batter,transition*(1-transition)*3);
+    const index=positions.length/3;
+    positions.push(x,y,z);
+    colors.push(shade.r,shade.g,shade.b);
+    vertices.set(key,index);
+    return index;
   };
-  const addQuad=(a:[number,number,number],b:[number,number,number],c:[number,number,number],d:[number,number,number],color:THREE.Color)=>{
-    const v=[a,b,c,d].map(p=>addVertex(p[0],p[1],p[2],color));indices.push(v[0],v[1],v[2],v[0],v[2],v[3]);
-  };
-  const floorCache=new Map<string,number|null>();
-  const cellFloor=(i:number,j:number)=>{
-    if(!surface.mask[i]?.[j])return null;
-    const key=`${i}:${j}`,cached=floorCache.get(key);if(cached!==undefined)return cached;
-    const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz,elevation=surface.pitElevation[i]?.[j];
-    if(!Number.isFinite(elevation)){floorCache.set(key,null);return null;}
-    // The source shell and viewer terrain are registered from separate grids.
-    // Keep the whole bench cell below the displayed ground so a local
-    // interpolation mismatch cannot lift a tread above the terrain.
-    const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
-    const result=Math.min(elevation!,height(x,z)-.7,height(x-halfX,z-halfZ)-.7,height(x+halfX,z-halfZ)-.7,height(x+halfX,z+halfZ)-.7,height(x-halfX,z+halfZ)-.7);
-    floorCache.set(key,result);return result;
-  };
-  const halfX=surface.dx/2,halfZ=Math.abs(surface.dz)/2;
+
   for(let i=0;i<surface.width;i++)for(let j=0;j<surface.height;j++){
-    const baseFloor=cellFloor(i,j);if(baseFloor===null)continue;
-    const x=surface.x0+i*surface.dx,z=surface.z0+j*surface.dz,y=baseFloor+.7;
-    const west=x-halfX,east=x+halfX,south=z+halfZ,north=z-halfZ;
-    addQuad([west,y,south],[east,y,south],[east,y,north],[west,y,north],floor);
-    const edges:[number,number,[number,number],[number,number]][]=[
-      [-1,0,[west,south],[west,north]],[1,0,[east,north],[east,south]],
-      [0,-1,[east,south],[west,south]],[0,1,[west,north],[east,north]],
-    ];
-    for(const [di,dj,a,b] of edges){
-      const other=cellFloor(i+di,j+dj),ax=a[0],az=a[1],bx=b[0],bz=b[1];
-      if(other!==null){
-        if(baseFloor>=other)continue;
-        const high=other+.7;
-        addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,high,bz],[ax,high,az],benchFace);
-        continue;
-      }
-      const topA=Math.max(baseFloor+.7,height(ax,az)),topB=Math.max(baseFloor+.7,height(bx,bz));
-      if(topA<=baseFloor+.75&&topB<=baseFloor+.75)continue;
-      addQuad([ax,baseFloor+.7,az],[bx,baseFloor+.7,bz],[bx,topB,bz],[ax,topA,az],cutWall);
+    if(!active(i,j))continue;
+    for(let di=0;di<subdivisions;di++)for(let dj=0;dj<subdivisions;dj++){
+      const x=i*subdivisions+di,z=j*subdivisions+dj;
+      const a=vertex(x,z),b=vertex(x+1,z),c=vertex(x+1,z+1),d=vertex(x,z+1);
+      if(surface.dx*surface.dz>0)indices.push(a,d,b,b,d,c);
+      else indices.push(a,b,d,b,c,d);
     }
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();geometry.computeBoundingSphere();
-  const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
-  mesh.name=`${surface.id==='north'?'North':'South'} RF1 optimized pit surface`;mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData.sourcePitSupport=surface.support;return mesh;
+
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  const material=new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,toneMapped:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.name=`${surface.id==='north'?'North':'South'} RF1 optimized pit surface`;
+  mesh.receiveShadow=true;mesh.castShadow=true;mesh.userData.sourcePitSupport=surface.support;
+  return mesh;
 }
-/** Use the RF1 raster at every Mine Planning mesh build, including after the
- * terrain texture/registration pass replaces the base terrain geometry. */
+
+/** Rebuild the same RF1 interpretation when the displayed terrain changes. */
 export function buildMinePlanningPitSurface(pit:CandidatePit,surface:SourcePitSurface|undefined,height:(x:number,z:number)=>number,terrainRim?:[number,number,number][]){
   const mesh=surface?buildPitSurfaceFromRaster(surface,height):buildPitSurface(pit,height,terrainRim);
   if(surface){

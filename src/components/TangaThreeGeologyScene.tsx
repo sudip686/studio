@@ -4241,7 +4241,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
               return terrainSurfaceY(terrainResources,x,-z)+(rl-sourceGround)*VERTICAL_EXAGGERATION;
             })),
             topography:source.topography.map(column=>column.map(rl=>(rl-LOCAL_VERTICAL_DATUM)*VERTICAL_EXAGGERATION)),
-            benchIndex:source.benchIndex,mask:source.mask,
+            sourceBenchElevation:source.pitElevation,benchIndex:source.benchIndex,mask:source.mask,
           };
         });
         if(sourcePitSurfaces.length!==2)throw new Error('Two RF1 optimized pit surfaces are required for Mine Planning');
@@ -5233,10 +5233,6 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
           for (const [index,pit] of sitePlan.pits.entries()) {
             const height=(x:number,z:number)=>terrainSurfaceY(terrainResources,x,-z);
             const sourceSurface=mode==='mine_planning'?orderedSourcePitSurfaces[index]:undefined;
-            // Mine Planning must render the supplied RF1 10 m bench raster
-            // directly. Rebuilding a smooth convex-hull shell from only the
-            // overall floor and rim elevations flattened the source benches
-            // and made the grade cells look like a separate slab.
             const mesh=buildMinePlanningPitSurface(pit,sourceSurface,height,cut?.rims[index]);
             tagDeckLayer(mesh, 'context');
             stage.add(mesh);
