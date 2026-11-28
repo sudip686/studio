@@ -5170,7 +5170,39 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
                   matrices[offset+14]=b.z;
                   matrices[offset+15]=1;
                 });
-                mesh.instanceMatrix.needsUpdate=true;tagDeckLayer(mesh,'blocks');stage.add(mesh);targetMeshes.push(mesh);revealBlocks.push(mesh);pickables.push(mesh);
+                mesh.instanceMatrix.needsUpdate=true;
+                tagDeckLayer(mesh,'blocks');
+                stage.add(mesh);
+                targetMeshes.push(mesh);
+                revealBlocks.push(mesh);
+                pickables.push(mesh);
+
+                // Resource uses a fine dark edge pass so adjacent grade cells
+                // stay individually legible at presentation distance. Apply the
+                // same treatment to the exact same pit source-cell transforms.
+                const outlineMaterial=new THREE.MeshBasicMaterial({
+                  color:0x071116,
+                  wireframe:true,
+                  transparent:true,
+                  opacity:.24,
+                  depthTest:true,
+                  depthWrite:false,
+                  polygonOffset:true,
+                  polygonOffsetFactor:-2,
+                  polygonOffsetUnits:-2,
+                  fog:false,
+                });
+                const outline=new THREE.InstancedMesh(createResourceCellGeometry(),outlineMaterial,subset.length);
+                outline.name=`${mesh.name} · cell edges`;
+                outline.userData.pitIndex=pitIndex;
+                outline.userData.gradeBand=band.key;
+                outline.userData.pitBlockOutline=true;
+                outline.renderOrder=mesh.renderOrder+0.01;
+                outline.instanceMatrix.array.set(mesh.instanceMatrix.array);
+                outline.instanceMatrix.needsUpdate=true;
+                tagDeckLayer(outline,'blocks');
+                stage.add(outline);
+                targetMeshes.push(outline);
               }
             });
             if(cancelled)return;
@@ -5185,16 +5217,39 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
             setPitBlocksStatus('ready');
             return true;
           };
+          let mineBlockBuildPromise:Promise<boolean|undefined>|null=null;
+          const scheduleMinePlanBlockBuild=(sourceBlocks:ResourceBlock[])=>{
+            if(cancelled||mineBlockBuildPromise||!sourceBlocks.length)return;
+            host.dataset.miningBlocksState='filtering';
+            host.dataset.mineTargetFilterTotal=String(sourceBlocks.length);
+            host.dataset.mineTargetFilterProgress='0';
+            setPitBlocksStatus('loading');
+            const buildPromise=buildPitBlockTargets(sourceBlocks);
+            mineBlockBuildPromise=buildPromise;
+            void buildPromise.then(built=>{
+              if(!built||cancelled)return;
+              if(revealActionRef.current==='pitcut'||revealActionRef.current==='benches')revealCommand.current?.(revealActionRef.current);
+              pitBlockRetryRef.current=null;
+              setStatus('RF1 source ore blocks registered inside both optimized pit shells');
+              if(siteSceneReady)reportLoadState('ready',resources?'ready':'degraded',resources?.quality??assetQuality,`${host.dataset.miningTargetsDisplayed??0} source ore blocks registered in Mine Planning`);
+            }).catch(error=>{
+              if(cancelled)return;
+              console.warn('Mine-plan pit surfaces remain available; source ore cells could not be prepared.',error);
+              host.dataset.miningBlocksState='error';
+              setPitBlocksStatus('error');
+              setStatus('RF1 pit surfaces ready · source ore cells unavailable; choose Inspect to retry');
+              if(siteSceneReady)reportLoadState('ready','degraded',resources?.quality??assetQuality,'Mine-plan site ready · source block model unavailable');
+            }).finally(()=>{
+              if(mineBlockBuildPromise===buildPromise)mineBlockBuildPromise=null;
+            });
+          };
+          pitBlockRetryRef.current=()=>{
+            if(host.dataset.miningBlocksState==='error')scheduleMinePlanBlockBuild(minePlanSourceBlocks);
+          };
           if(blocks.length){
             buildPitBlockTargets(blocks);
           }else if(minePlanSourceBlocks.length){
-            host.dataset.miningBlocksState='filtering';
-            const built=await buildPitBlockTargets(minePlanSourceBlocks);
-            if(!built||cancelled)return;
-            if(revealActionRef.current==='pitcut'||revealActionRef.current==='benches')revealCommand.current?.(revealActionRef.current);
-            pitBlockRetryRef.current=null;
-            setStatus('RF1 source ore blocks registered inside both optimized pit shells');
-            if(siteSceneReady)reportLoadState('ready',resources?'ready':'degraded',resources?.quality??assetQuality,`${host.dataset.miningTargetsDisplayed??0} source ore blocks registered in Mine Planning`);
+            scheduleMinePlanBlockBuild(minePlanSourceBlocks);
           }
           const sourceTerrain = terrainMeshes[0]?.geometry;
           const cut = sourceTerrain ? prepareMineTerrain(sourceTerrain) : null;
@@ -6182,7 +6237,7 @@ const cameraShot = cameraShotForMode(mode, lowCamera);
         mesh.visible=showPitBlocks;
         mesh.material.depthTest=!presentationOptions.current.targetXray;
         const storyReveal=story.playing&&beat===2&&!reducedMotion.matches?Math.min(1,Math.max(0,(storyAge-8)/1.2)):1;
-        const opacity=layerSettingsRef.current.blocks.opacity*storyReveal,transparent=opacity<.999;
+        const opacity=layerSettingsRef.current.blocks.opacity*storyReveal*(mesh.userData.pitBlockOutline ? .24 : 1),transparent=opacity<.999;
         if(mesh.material.transparent!==transparent){mesh.material.transparent=transparent;mesh.material.needsUpdate=true;}
         mesh.material.opacity=opacity;
         mesh.material.depthWrite=!presentationOptions.current.targetXray&&!transparent;
