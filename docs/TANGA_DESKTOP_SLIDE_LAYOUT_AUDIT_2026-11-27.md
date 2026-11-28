@@ -41,8 +41,8 @@ This audit reviews the 12 desktop chapter captures at 1366 × 768 (`postchange-0
 - [ ] Camera, reset, visibility, pause and detail controls are in consistent locations where applicable.
 - [ ] Each chapter has a distinct purpose, a legible evidence hierarchy and one obvious visual focal point.
 - [ ] Geology, resource, drilling and peer claims retain their source, date and limitation cues.
-- [ ] Mine Planning shows both RF1 source pits together, with source blocks contained and no terrain gap outside the active raster mask.
-- [ ] Metallurgy keeps source testwork visually separate from the conceptual process animation.
+- [x] Mine Planning shows both RF1 source pits together, with source blocks contained and no terrain gap outside the active raster mask. The `dd39c45` Vercel deployment reached ready at 1707 × 842; telemetry reports 12,026 rendered source blocks, 2,456 / 5,905 / 3,403 / 262 cells in the four grade bands, two RF1 surfaces with 4,376 / 5,618 source supports, and zero source-floor height above terrain. Local production captures show both pits in the frame.
+- [x] Metallurgy keeps source testwork visually separate from the conceptual process animation. The whole-campus view labels the facility and process as illustrative, while the separate evidence card reports the eight composites; see the 1366 × 768 and 1707 × 842 captures listed in the 28 November follow-up.
 
 ## 27 November implementation progress
 
